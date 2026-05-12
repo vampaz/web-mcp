@@ -20,3 +20,9 @@ export type {
 export { createBestPlanner, createChromeAIPlanner, createHeuristicPlanner } from './planner'
 export { clearToolsForTest, getRegistrySnapshot, getTool, invokeTool, listTools, registerTool } from './registry'
 export { getSupportLabel, isWebMCPSupported } from './support'
+export {
+  installWebMCPKitTestBridge,
+  type TestBridgeSnapshot,
+  type TestBridgeTool,
+  type WebMCPKitTestBridge
+} from './test-bridge'

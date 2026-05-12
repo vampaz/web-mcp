@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { invokeWebMCPTool, listWebMCPTools, waitForWebMCPTool } from '@webmcp-kit/testing/playwright'
 
 type LanguageModelAvailability = 'available' | 'downloadable' | 'downloading' | 'unavailable'
 
@@ -63,6 +64,29 @@ test('rechecks Chrome AI before running a command if the page mounted with fallb
   await page.getByRole('button', { name: 'Run command' }).click()
 
   await expect(page.locator('.status-strip strong').filter({ hasText: 'Chrome built-in AI (ready)' })).toBeVisible()
+  await expect(getChecklistInput(page, '4. Croissant')).toBeChecked()
+  await expect(getChecklistInput(page, '7. Baguette')).toBeChecked()
+})
+
+test('exposes registered tools through Playwright helpers', async function testPlaywrightHelpers({ page }) {
+  await installLanguageModelMock(page, 'available')
+  await page.goto('/')
+  await waitForWebMCPTool(page, 'select_items')
+
+  const tools = await listWebMCPTools(page)
+  expect(tools.map(function getToolName(tool) {
+    return tool.name
+  })).toContain('select_items')
+
+  const result = await invokeWebMCPTool(page, {
+    toolName: 'select_items',
+    input: {
+      ids: ['item_4', 'item_7']
+    },
+    source: 'planner'
+  })
+
+  expect(result.status).toBe('success')
   await expect(getChecklistInput(page, '4. Croissant')).toBeChecked()
   await expect(getChecklistInput(page, '7. Baguette')).toBeChecked()
 })

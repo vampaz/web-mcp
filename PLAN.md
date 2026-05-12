@@ -9,9 +9,9 @@ This is not a new protocol. It is an adoption layer for WebMCP.
 ---
 
 - [ ] Phase 1: Package Foundation
-  - [ ] Step 1.1: Initialize monorepo with pnpm workspaces
-    - Files: `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`
-    - Verify: `pnpm install` succeeds
+  - [x] Step 1.1: Initialize monorepo with npm workspaces
+    - Files: `package.json`, `package-lock.json`, `tsconfig.base.json`
+    - Verify: `npm install` succeeds
   - [ ] Step 1.2: Create package structure
     - Files: `packages/core/package.json`, `packages/devtools/package.json`, `packages/vue/package.json`, `packages/react/package.json`, `packages/svelte/package.json`, `packages/astro/package.json`
     - Verify: workspace package discovery works
@@ -125,8 +125,8 @@ This is not a new protocol. It is an adoption layer for WebMCP.
   - [ ] Step 8.3: Add docs/catalog export
     - Files: `packages/core/src/adapters/catalog.ts`
     - Verify: produces Markdown and JSON catalogs
-  - [ ] Step 8.4: Add Playwright helpers
-    - Files: `packages/testing/src/playwright.ts`
+  - [x] Step 8.4: Add Playwright helpers
+    - Files: `packages/testing/src/playwright.ts`, `packages/core/src/test-bridge.ts`
     - Verify: tests can list and invoke fallback tools from `page`
 
 - [ ] Phase 9: Demo Applications

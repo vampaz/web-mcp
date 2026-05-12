@@ -55,6 +55,30 @@ registration.unregister()
 - `getRegistrySnapshot()` returns support mode, tool count, and registered tools.
 - `isWebMCPSupported()` checks for native WebMCP registration support.
 - `createBestPlanner()` uses Chrome built-in AI when available, otherwise a deterministic local planner.
+- `installWebMCPKitTestBridge()` exposes a kit-specific test bridge for Playwright and local QA.
+
+## Playwright Helpers
+
+Apps can install the test bridge in development or test builds:
+
+```ts
+import { installWebMCPKitTestBridge } from '@webmcp-kit/core'
+
+installWebMCPKitTestBridge()
+```
+
+Playwright tests can then inspect and invoke tools through the page:
+
+```ts
+import { invokeWebMCPTool, waitForWebMCPTool } from '@webmcp-kit/testing/playwright'
+
+await waitForWebMCPTool(page, 'select_items')
+await invokeWebMCPTool(page, {
+  toolName: 'select_items',
+  input: { ids: ['item_4', 'item_7'] },
+  source: 'planner'
+})
+```
 
 ## Local Demo
 
@@ -75,6 +99,7 @@ The demo exposes invoice, product search, cart, and support-ticket tools. It sho
 
 ```sh
 npm run test
+npm run test:e2e
 npm exec tsc -- --noEmit
 ```
 

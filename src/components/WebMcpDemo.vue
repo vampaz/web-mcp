@@ -168,6 +168,7 @@ import {
   createBestPlanner,
   defineTool,
   getSupportLabel,
+  installWebMCPKitTestBridge,
   invokeTool,
   listTools,
   mountDevtoolsOverlay,
@@ -237,6 +238,7 @@ onMounted(async function handleMounted() {
   registerDemoTools()
   registerSupportFormTool()
   refreshTools()
+  unregisterCallbacks.push(installWebMCPKitTestBridge())
   devtoolsOverlay = mountDevtoolsOverlay({ initiallyOpen: true })
 
   await refreshPlanner()
