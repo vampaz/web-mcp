@@ -15,6 +15,29 @@ interface WindowWithLanguageModel extends Window {
 
 type ChromeAIAvailability = 'available' | 'downloadable' | 'downloading' | 'unavailable'
 
+const numberWords = new Map([
+  ['one', 1],
+  ['two', 2],
+  ['three', 3],
+  ['four', 4],
+  ['five', 5],
+  ['six', 6],
+  ['seven', 7],
+  ['eight', 8],
+  ['nine', 9],
+  ['ten', 10],
+  ['eleven', 11],
+  ['twelve', 12],
+  ['thirteen', 13],
+  ['fourteen', 14],
+  ['fifteen', 15],
+  ['sixteen', 16],
+  ['seventeen', 17],
+  ['eighteen', 18],
+  ['nineteen', 19],
+  ['twenty', 20]
+])
+
 export function createHeuristicPlanner(): ToolPlanner {
   return {
     name: 'Local heuristic planner',
@@ -134,15 +157,15 @@ function planWithHeuristics(message: string, tools: WebMCPTool[]): ToolPlan {
     }
   }
 
-  if (normalizedMessage.includes('cart') || normalizedMessage.includes('add ')) {
+  if (normalizedMessage.includes('cart') || normalizedMessage.includes('card') || normalizedMessage.includes('add ')) {
     return {
       toolName: pickToolName(tools, 'add_to_cart'),
       input: {
         productId: normalizedMessage.includes('keyboard') ? 'kbd-01' : 'dock-02',
-        quantity: 1
+        quantity: extractQuantity(message)
       },
       confidence: 0.68,
-      reason: 'Matched add-to-cart wording.'
+      reason: 'Matched add-to-cart wording and extracted quantity when present.'
     }
   }
 
@@ -177,6 +200,20 @@ function extractAmount(message: string): number {
   if (!amount) return 100
 
   return Number(amount.replace(',', '.'))
+}
+
+function extractQuantity(message: string): number {
+  const numericQuantity = message.match(/\b(\d+)\b/)?.[1]
+  if (numericQuantity) return Number(numericQuantity)
+
+  const normalizedMessage = message.toLowerCase()
+  for (const [word, value] of numberWords) {
+    if (new RegExp(`\\b${word}\\b`).test(normalizedMessage)) {
+      return value
+    }
+  }
+
+  return 1
 }
 
 function extractCustomerName(message: string): string {

@@ -66,4 +66,26 @@ describe('planner', () => {
     expect(planner.status).toBe('fallback')
     expect(planner.available).toBe(true)
   })
+
+  it('extracts word quantities for cart commands', async () => {
+    const planner = createHeuristicPlanner()
+    const plan = await planner.plan('Add ten keyboards to the card.', [])
+
+    expect(plan.toolName).toBe('add_to_cart')
+    expect(plan.input).toEqual({
+      productId: 'kbd-01',
+      quantity: 10
+    })
+  })
+
+  it('extracts numeric quantities for cart commands', async () => {
+    const planner = createHeuristicPlanner()
+    const plan = await planner.plan('Add 12 docks to the cart.', [])
+
+    expect(plan.toolName).toBe('add_to_cart')
+    expect(plan.input).toEqual({
+      productId: 'dock-02',
+      quantity: 12
+    })
+  })
 })
