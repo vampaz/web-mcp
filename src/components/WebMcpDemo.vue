@@ -20,6 +20,7 @@
       <div>
         <span>Planner</span>
         <strong>{{ plannerName }}</strong>
+        <small>{{ plannerDetail }}</small>
       </div>
       <div>
         <span>Registered tools</span>
@@ -64,6 +65,7 @@
           <span>Selected tool</span>
           <strong>{{ lastPlan.toolName }}</strong>
           <p>{{ lastPlan.reason }}</p>
+          <p class="planner-used">Planned by {{ lastPlannerUsed }}</p>
           <code>{{ JSON.stringify(lastPlan.input, null, 2) }}</code>
         </div>
       </div>
@@ -138,7 +140,8 @@ import {
   listTools,
   registerTool,
   type RegisteredTool,
-  type ToolPlan
+  type ToolPlan,
+  type ToolPlanner
 } from '@webmcp-kit/core'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
@@ -146,6 +149,8 @@ import type { ActivityItem, CartLine, Invoice, Product, SupportTicket } from '@/
 
 const prompt = ref('Create an invoice for Acme for 500 euros')
 const plannerName = ref('Loading')
+const plannerDetail = ref('Checking Chrome built-in AI availability.')
+const lastPlannerUsed = ref('No command has run yet')
 const selectedToolName = ref('create_invoice')
 const registeredTools = ref<RegisteredTool[]>([])
 const lastPlan = ref<ToolPlan | null>(null)
@@ -178,7 +183,8 @@ onMounted(async function handleMounted() {
   refreshTools()
 
   const planner = await createBestPlanner()
-  plannerName.value = planner.name
+  plannerName.value = `${planner.name} (${planner.status})`
+  plannerDetail.value = planner.detail
 
   window.__webMCPKitDemoPlanner = planner
 })
@@ -324,6 +330,7 @@ async function runPrompt() {
   })
   const plan = await planner.plan(prompt.value, tools)
   lastPlan.value = plan
+  lastPlannerUsed.value = `${planner.name} (${planner.status})`
   selectedToolName.value = plan.toolName
 
   const registration = listTools().find(function findRegistration(item) {
@@ -371,8 +378,10 @@ function addActivity(title: string, detail: string, tone: ActivityItem['tone']) 
 declare global {
   interface Window {
     __webMCPKitDemoPlanner?: {
-      name: string
-      available: boolean
+      name: ToolPlanner['name']
+      available: ToolPlanner['available']
+      status: ToolPlanner['status']
+      detail: ToolPlanner['detail']
       plan: (message: string, tools: ReturnType<typeof listTools>[number]['tool'][]) => Promise<ToolPlan>
     }
   }
@@ -471,9 +480,14 @@ h2 {
 }
 
 .status-strip span,
-.plan-card span {
+.plan-card span,
+.status-strip small {
   color: #9ea8a1;
   font-size: 0.78rem;
+}
+
+.status-strip span,
+.plan-card span {
   text-transform: uppercase;
 }
 
@@ -581,6 +595,11 @@ textarea:focus {
 .plan-card p {
   margin: 0;
   color: #c9d1cb;
+}
+
+.planner-used {
+  color: #e8be53;
+  font-size: 0.88rem;
 }
 
 code {

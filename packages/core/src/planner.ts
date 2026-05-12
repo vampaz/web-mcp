@@ -5,7 +5,7 @@ interface LanguageModelSession {
 }
 
 interface LanguageModelApi {
-  availability: (options?: unknown) => Promise<string>
+  availability: (options?: unknown) => Promise<ChromeAIAvailability>
   create: (options?: unknown) => Promise<LanguageModelSession>
 }
 
@@ -13,10 +13,14 @@ interface WindowWithLanguageModel extends Window {
   LanguageModel?: LanguageModelApi
 }
 
+type ChromeAIAvailability = 'available' | 'downloadable' | 'downloading' | 'unavailable'
+
 export function createHeuristicPlanner(): ToolPlanner {
   return {
     name: 'Local heuristic planner',
     available: true,
+    status: 'fallback',
+    detail: 'Chrome built-in AI is unavailable, so WebMCP Kit is using deterministic local planning.',
     async plan(message: string, tools: WebMCPTool[]) {
       return planWithHeuristics(message, tools)
     }
@@ -30,6 +34,8 @@ export async function createChromeAIPlanner(): Promise<ToolPlanner> {
     return {
       name: 'Chrome built-in AI',
       available: false,
+      status: 'unavailable',
+      detail: 'The browser does not expose the Chrome built-in AI LanguageModel API.',
       async plan(message: string, tools: WebMCPTool[]) {
         return planWithHeuristics(message, tools)
       }
@@ -39,7 +45,21 @@ export async function createChromeAIPlanner(): Promise<ToolPlanner> {
   try {
     const availability = await languageModel.availability()
     if (availability === 'unavailable') {
-      return createUnavailableChromePlanner()
+      return createUnavailableChromePlanner('Chrome reports that built-in AI is unavailable in this environment.')
+    }
+
+    if (availability === 'downloadable' || availability === 'downloading') {
+      return {
+        name: 'Chrome built-in AI',
+        available: false,
+        status: availability,
+        detail: availability === 'downloadable'
+          ? 'Chrome built-in AI is available after the browser downloads the model.'
+          : 'Chrome is downloading the built-in AI model.',
+        async plan(message: string, tools: WebMCPTool[]) {
+          return planWithHeuristics(message, tools)
+        }
+      }
     }
 
     const session = await languageModel.create({
@@ -54,12 +74,14 @@ export async function createChromeAIPlanner(): Promise<ToolPlanner> {
     return {
       name: 'Chrome built-in AI',
       available: true,
+      status: 'ready',
+      detail: 'Chrome built-in AI is ready and will choose tools locally in the browser.',
       async plan(message: string, tools: WebMCPTool[]) {
         return planWithChromeAI(session, message, tools)
       }
     }
   } catch {
-    return createUnavailableChromePlanner()
+    return createUnavailableChromePlanner('Chrome built-in AI could not create a planning session.')
   }
 }
 
@@ -167,10 +189,12 @@ function getLanguageModel(): LanguageModelApi | undefined {
   return (window as WindowWithLanguageModel).LanguageModel
 }
 
-function createUnavailableChromePlanner(): ToolPlanner {
+function createUnavailableChromePlanner(detail: string): ToolPlanner {
   return {
     name: 'Chrome built-in AI',
     available: false,
+    status: 'unavailable',
+    detail,
     async plan(message: string, tools: WebMCPTool[]) {
       return planWithHeuristics(message, tools)
     }

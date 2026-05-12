@@ -79,6 +79,8 @@ export interface ToolPlan {
 export interface ToolPlanner {
   name: string
   available: boolean
+  status: 'ready' | 'downloadable' | 'downloading' | 'unavailable' | 'fallback'
+  detail: string
   plan: (message: string, tools: WebMCPTool[]) => Promise<ToolPlan>
 }
 
