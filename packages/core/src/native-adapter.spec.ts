@@ -97,4 +97,91 @@ describe('native WebMCP adapter', () => {
     expect(firstUnregister).toHaveBeenCalledOnce()
     expect(secondUnregister).not.toHaveBeenCalled()
   })
+
+  it('supports dispose-only native handles', () => {
+    const dispose = vi.fn()
+    ;(navigator as NavigatorWithModelContext).modelContext = {
+      registerTool: vi.fn(function registerNativeToolMock() {
+        return { dispose }
+      })
+    }
+
+    const registration = registerTool(defineTool({
+      name: 'create_ticket',
+      description: 'Create a support ticket for the currently visible customer account.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          subject: { type: 'string' }
+        },
+        required: ['subject']
+      },
+      execute(input) {
+        return input
+      }
+    }))
+
+    registration.unregister()
+
+    expect(dispose).toHaveBeenCalledOnce()
+  })
+
+  it('surfaces a compatibility warning for unexpected native handles', () => {
+    ;(navigator as NavigatorWithModelContext).modelContext = {
+      registerTool: vi.fn(function registerNativeToolMock() {
+        return { close: vi.fn() }
+      })
+    }
+
+    const registration = registerTool(defineTool({
+      name: 'select_items',
+      description: 'Select checklist items by stable IDs from the current visible checklist.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          ids: {
+            type: 'array',
+            items: { type: 'string' }
+          }
+        },
+        required: ['ids']
+      },
+      execute(input) {
+        return input
+      }
+    }))
+
+    expect(registration.mode).toBe('native-and-fallback')
+    expect(registration.warnings).toContain('Native WebMCP registration returned a handle without unregister or dispose; local unregister cannot remove the native tool.')
+  })
+
+  it('executes native calls with native source context', async () => {
+    let nativeExecute: ((input: Record<string, unknown>) => unknown) | undefined
+    ;(navigator as NavigatorWithModelContext).modelContext = {
+      registerTool: vi.fn(function registerNativeToolMock(nativeTool) {
+        nativeExecute = nativeTool.execute
+        return undefined
+      })
+    }
+
+    registerTool(defineTool({
+      name: 'search_products',
+      description: 'Search the local product catalog and return matching products for the current shopper.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' }
+        },
+        required: ['query']
+      },
+      execute(input, context) {
+        return { query: input.query, source: context.source }
+      }
+    }))
+
+    expect(await nativeExecute?.({ query: 'dock' })).toEqual({
+      query: 'dock',
+      source: 'native'
+    })
+  })
 })

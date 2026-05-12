@@ -16,15 +16,18 @@ export function registerTool<TInput = Record<string, unknown>, TOutput = unknown
     registeredTools.get(tool.name)?.unregister()
   }
 
-  const unregisterNative = registerNativeTool(tool)
-  const warnings = getToolWarnings(tool)
+  const nativeRegistration = registerNativeTool(tool)
+  const warnings = [
+    ...getToolWarnings(tool),
+    ...(nativeRegistration?.warnings ?? [])
+  ]
 
   const registration: RegisteredTool<TInput, TOutput> = {
     tool,
-    mode: unregisterNative ? 'native-and-fallback' : 'fallback',
+    mode: nativeRegistration ? 'native-and-fallback' : 'fallback',
     warnings,
     unregister() {
-      unregisterNative?.()
+      nativeRegistration?.unregister?.()
       registeredTools.delete(tool.name)
       emitWebMCPKitEvent({
         type: 'unregistered',

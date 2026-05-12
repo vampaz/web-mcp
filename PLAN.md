@@ -43,11 +43,11 @@ This is not a new protocol. It is an adoption layer for WebMCP.
   - [ ] Step 3.2: Implement native registration adapter
     - Files: `packages/core/src/native-adapter.ts`
     - Verify: calls `navigator.modelContext.registerTool` when available
-  - [ ] Step 3.3: Normalize native API compatibility
-    - Files: `packages/core/src/native-compat.ts`
+  - [x] Step 3.3: Normalize native API compatibility
+    - Files: `packages/core/src/native-adapter.ts`
     - Verify: compatibility warnings are produced for unexpected native API shapes
-  - [ ] Step 3.4: Add unregister/update abstraction
-    - Files: `packages/core/src/registration.ts`
+  - [x] Step 3.4: Add unregister/update abstraction
+    - Files: `packages/core/src/native-adapter.ts`, `packages/core/src/registry.ts`
     - Verify: works whether native registration returns a handle or not
 
 - [ ] Phase 4: Fallback Registry
