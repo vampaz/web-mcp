@@ -207,6 +207,42 @@ function planWithHeuristics(message: string, tools: WebMCPTool[]): ToolPlan {
     }
   }
 
+  if (normalizedMessage.includes('select') && normalizedMessage.includes('first')) {
+    return {
+      toolName: pickToolName(tools, 'select_items_by_position'),
+      input: {
+        start: 1,
+        count: extractQuantity(message)
+      },
+      confidence: 0.7,
+      reason: 'Matched positional checklist selection wording.'
+    }
+  }
+
+  if (normalizedMessage.includes('select') && normalizedMessage.includes('all')) {
+    const category = extractSelectionCategory(normalizedMessage)
+
+    if (category) {
+      return {
+        toolName: pickToolName(tools, 'select_items_by_category'),
+        input: {
+          category
+        },
+        confidence: 0.72,
+        reason: 'Matched category checklist selection wording.'
+      }
+    }
+  }
+
+  if (normalizedMessage.includes('clear') && normalizedMessage.includes('selection')) {
+    return {
+      toolName: pickToolName(tools, 'clear_item_selection'),
+      input: {},
+      confidence: 0.7,
+      reason: 'Matched checklist clear-selection wording.'
+    }
+  }
+
   if (normalizedMessage.includes('support') || normalizedMessage.includes('ticket') || normalizedMessage.includes('help')) {
     return {
       toolName: pickToolName(tools, 'create_support_ticket'),
@@ -252,6 +288,14 @@ function extractQuantity(message: string): number {
   }
 
   return 1
+}
+
+function extractSelectionCategory(normalizedMessage: string): string | undefined {
+  if (/\bfruits?\b/.test(normalizedMessage)) return 'fruit'
+  if (/\bvegetables?\b/.test(normalizedMessage)) return 'vegetable'
+  if (/\bbakery\b|\bbread\b|\bbreads\b/.test(normalizedMessage)) return 'bakery'
+  if (/\bdrinks?\b|\bbeverages?\b/.test(normalizedMessage)) return 'drink'
+  return undefined
 }
 
 function extractCustomerName(message: string): string {

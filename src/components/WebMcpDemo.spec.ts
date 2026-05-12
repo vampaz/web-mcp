@@ -31,4 +31,23 @@ describe('WebMcpDemo', () => {
     expect(wrapper.text()).toContain('Invoice created')
     expect(wrapper.text()).toContain('Acme')
   })
+
+  it('selects checklist items by natural language command', async () => {
+    const wrapper = mountWithDeps(WebMcpDemo)
+    await flushPromises()
+
+    await wrapper.find('textarea[aria-label="Natural language command"]').setValue('Select the first five items')
+    await wrapper.find('.primary-action').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('5 selected')
+    expect(wrapper.text()).toContain('Selected positions 1-5')
+
+    await wrapper.find('textarea[aria-label="Natural language command"]').setValue('Select all the items that are fruits')
+    await wrapper.find('.primary-action').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('4 selected')
+    expect(wrapper.text()).toContain('Selected all fruit items')
+  })
 })

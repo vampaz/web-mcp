@@ -55,6 +55,12 @@
           <button type="button" @click="setPrompt('Open a support ticket about billing access')">
             Support
           </button>
+          <button type="button" @click="setPrompt('Select the first five items')">
+            First five
+          </button>
+          <button type="button" @click="setPrompt('Select all the items that are fruits')">
+            Fruits
+          </button>
         </div>
 
         <button class="primary-action" type="button" @click="runPrompt">
@@ -131,6 +137,26 @@
         </div>
       </article>
     </section>
+
+    <section class="selection-panel">
+      <div class="panel-heading">
+        <p class="eyebrow">Selection tools</p>
+        <h2>Ten-item checklist</h2>
+      </div>
+
+      <div class="selection-summary">
+        <strong>{{ selectedItems.length }} selected</strong>
+        <span>Try “select the first five items”, “select all fruits”, or “clear the selection”.</span>
+      </div>
+
+      <div class="checklist-grid">
+        <label v-for="(item, index) in selectableItems" :key="item.id" class="checklist-item">
+          <input v-model="item.selected" type="checkbox" />
+          <span>{{ index + 1 }}. {{ item.name }}</span>
+          <em>{{ item.category }}</em>
+        </label>
+      </div>
+    </section>
   </main>
 </template>
 
@@ -150,7 +176,7 @@ import {
 } from '@webmcp-kit/core'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
-import type { ActivityItem, CartLine, Invoice, Product, SupportTicket } from '@/interfaces/demo'
+import type { ActivityItem, CartLine, Invoice, Product, SelectableItem, SupportTicket } from '@/interfaces/demo'
 
 const prompt = ref('Create an invoice for Acme for 500 euros')
 const plannerName = ref('Loading')
@@ -167,6 +193,11 @@ let devtoolsOverlay: DevtoolsOverlay | undefined
 const supportLabel = computed(function getCurrentSupportLabel() {
   return getSupportLabel()
 })
+const selectedItems = computed(function getSelectedItems() {
+  return selectableItems.value.filter(function filterSelected(item) {
+    return item.selected
+  })
+})
 
 const invoices = ref<Invoice[]>([
   { id: 'inv_100', customerName: 'Globex', amount: 230, status: 'sent' }
@@ -175,6 +206,18 @@ const products = ref<Product[]>([
   { id: 'kbd-01', name: 'Low-profile keyboard', category: 'Input', price: 129 },
   { id: 'dock-02', name: 'Travel USB-C dock', category: 'Connectivity', price: 89 },
   { id: 'cam-03', name: 'Desk camera', category: 'Video', price: 149 }
+])
+const selectableItems = ref<SelectableItem[]>([
+  { id: 'item_1', name: 'Apple', category: 'fruit', selected: false },
+  { id: 'item_2', name: 'Banana', category: 'fruit', selected: false },
+  { id: 'item_3', name: 'Carrot', category: 'vegetable', selected: false },
+  { id: 'item_4', name: 'Croissant', category: 'bakery', selected: false },
+  { id: 'item_5', name: 'Orange', category: 'fruit', selected: false },
+  { id: 'item_6', name: 'Spinach', category: 'vegetable', selected: false },
+  { id: 'item_7', name: 'Baguette', category: 'bakery', selected: false },
+  { id: 'item_8', name: 'Water', category: 'drink', selected: false },
+  { id: 'item_9', name: 'Pear', category: 'fruit', selected: false },
+  { id: 'item_10', name: 'Coffee', category: 'drink', selected: false }
 ])
 const cart = ref<CartLine[]>([])
 const tickets = ref<SupportTicket[]>([])
@@ -299,6 +342,88 @@ function registerDemoTools() {
       })]
       addActivity('Cart updated', `${line.name} added`, 'success')
       return line
+    }
+  })).unregister)
+
+  unregisterCallbacks.push(registerTool(defineTool({
+    name: 'select_items_by_position',
+    description: 'Select checklist items by one-based position range in the visible ten-item list.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        start: {
+          type: 'number',
+          minimum: 1,
+          description: 'First one-based item position to select.'
+        },
+        count: {
+          type: 'number',
+          minimum: 1,
+          description: 'Number of consecutive items to select.'
+        }
+      },
+      required: ['start', 'count']
+    },
+    execute(input) {
+      const start = Math.max(1, Number(input.start ?? 1))
+      const count = Math.max(1, Number(input.count ?? 1))
+      const end = start + count - 1
+      selectableItems.value = selectableItems.value.map(function mapItem(item, index) {
+        const position = index + 1
+        return {
+          ...item,
+          selected: position >= start && position <= end
+        }
+      })
+      addActivity('Items selected', `Selected positions ${start}-${end}`, 'success')
+      return selectedItems.value
+    }
+  })).unregister)
+
+  unregisterCallbacks.push(registerTool(defineTool({
+    name: 'select_items_by_category',
+    description: 'Select checklist items whose category matches the requested item category.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        category: {
+          type: 'string',
+          enum: ['fruit', 'vegetable', 'bakery', 'drink'],
+          description: 'Category to select.'
+        }
+      },
+      required: ['category']
+    },
+    execute(input) {
+      const category = String(input.category ?? 'fruit')
+      selectableItems.value = selectableItems.value.map(function mapItem(item) {
+        return {
+          ...item,
+          selected: item.category === category
+        }
+      })
+      addActivity('Category selected', `Selected all ${category} items`, 'success')
+      return selectedItems.value
+    }
+  })).unregister)
+
+  unregisterCallbacks.push(registerTool(defineTool({
+    name: 'clear_item_selection',
+    description: 'Clear every selected checkbox in the visible ten-item checklist.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      additionalProperties: false
+    },
+    execute() {
+      selectableItems.value = selectableItems.value.map(function mapItem(item) {
+        return {
+          ...item,
+          selected: false
+        }
+      })
+      addActivity('Selection cleared', 'No checklist items are selected', 'info')
+      return []
     }
   })).unregister)
 
@@ -471,7 +596,8 @@ h2 {
 
 .status-strip,
 .workbench,
-.state-grid {
+.state-grid,
+.selection-panel {
   display: grid;
   gap: 16px;
 }
@@ -484,7 +610,8 @@ h2 {
 .status-strip div,
 .command-panel,
 .tools-panel,
-.state-panel {
+.state-panel,
+.selection-panel {
   border: 1px solid rgba(244, 240, 232, 0.14);
   background: rgba(12, 17, 16, 0.72);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.26);
@@ -639,6 +766,62 @@ code {
   margin-top: 16px;
 }
 
+.selection-panel {
+  margin-top: 16px;
+  padding: clamp(18px, 3vw, 28px);
+}
+
+.selection-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  align-items: baseline;
+  color: #c9d1cb;
+}
+
+.selection-summary strong {
+  color: #30a779;
+  font-size: 1.2rem;
+}
+
+.selection-summary span {
+  color: #9ea8a1;
+}
+
+.checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.checklist-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid rgba(244, 240, 232, 0.12);
+  background: rgba(244, 240, 232, 0.05);
+}
+
+.checklist-item input {
+  inline-size: 18px;
+  block-size: 18px;
+  accent-color: #30a779;
+}
+
+.checklist-item span {
+  color: #f4f0e8;
+  overflow-wrap: anywhere;
+}
+
+.checklist-item em {
+  grid-column: 2;
+  color: #9ea8a1;
+  font-size: 0.78rem;
+  font-style: normal;
+}
+
 .state-panel h2 {
   margin-bottom: 14px;
 }
@@ -666,7 +849,8 @@ code {
 @media (max-width: 980px) {
   .hero-panel,
   .workbench,
-  .state-grid {
+  .state-grid,
+  .checklist-grid {
     grid-template-columns: 1fr;
   }
 

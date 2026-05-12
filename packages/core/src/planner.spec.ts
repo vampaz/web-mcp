@@ -109,4 +109,33 @@ describe('planner', () => {
       quantity: 12
     })
   })
+
+  it('plans positional checklist selection', async () => {
+    const planner = createHeuristicPlanner()
+    const plan = await planner.plan('Select the first five items', [])
+
+    expect(plan.toolName).toBe('select_items_by_position')
+    expect(plan.input).toEqual({
+      start: 1,
+      count: 5
+    })
+  })
+
+  it('plans category checklist selection', async () => {
+    const planner = createHeuristicPlanner()
+    const plan = await planner.plan('Select all the items that are fruits', [])
+
+    expect(plan.toolName).toBe('select_items_by_category')
+    expect(plan.input).toEqual({
+      category: 'fruit'
+    })
+  })
+
+  it('plans checklist selection clearing', async () => {
+    const planner = createHeuristicPlanner()
+    const plan = await planner.plan('Clear the selection', [])
+
+    expect(plan.toolName).toBe('clear_item_selection')
+    expect(plan.input).toEqual({})
+  })
 })
