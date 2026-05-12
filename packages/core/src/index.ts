@@ -4,6 +4,7 @@ export { emitWebMCPKitEvent, subscribeWebMCPKitEvents } from './events'
 export { inferFormInputSchema, registerFormTool, type FormInput, type RegisterFormToolOptions } from './forms'
 export type {
   JsonSchema,
+  PlannerContext,
   RegisteredTool,
   RegistrySnapshot,
   ToolConfirmation,

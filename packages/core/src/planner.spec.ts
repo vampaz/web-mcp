@@ -4,9 +4,9 @@ import { createBestPlanner, createChromeAIPlanner, createHeuristicPlanner } from
 
 interface WindowWithLanguageModel extends Window {
   LanguageModel?: {
-    availability: () => Promise<'available' | 'downloadable' | 'downloading' | 'unavailable'>
+    availability: (options?: unknown) => Promise<'available' | 'downloadable' | 'downloading' | 'unavailable'>
     create: () => Promise<{
-      prompt: () => Promise<string>
+      prompt: (message: string) => Promise<string>
     }>
   }
 }
@@ -112,22 +112,53 @@ describe('planner', () => {
 
   it('plans positional checklist selection', async () => {
     const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Select the first five items', [])
+    const plan = await planner.plan('Select the first five items', [], {
+      checklistItems: [
+        { id: 'item_1' },
+        { id: 'item_2' },
+        { id: 'item_3' },
+        { id: 'item_4' },
+        { id: 'item_5' },
+        { id: 'item_6' }
+      ]
+    })
 
-    expect(plan.toolName).toBe('select_items_by_position')
+    expect(plan.toolName).toBe('select_items')
     expect(plan.input).toEqual({
-      start: 1,
-      count: 5
+      ids: ['item_1', 'item_2', 'item_3', 'item_4', 'item_5']
     })
   })
 
-  it('plans category checklist selection', async () => {
-    const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Select all the items that are fruits', [])
+  it('passes app context to Chrome AI for semantic selection', async () => {
+    let promptText = ''
+    ;(window as WindowWithLanguageModel).LanguageModel = {
+      availability: async () => 'available',
+      create: async () => ({
+        prompt: async (message: string) => {
+          promptText = message
+          return JSON.stringify({
+            toolName: 'select_items',
+            input: { ids: ['item_4', 'item_7'] },
+            confidence: 0.93,
+            reason: 'Selected French foods from checklist context.'
+          })
+        }
+      })
+    }
 
-    expect(plan.toolName).toBe('select_items_by_category')
+    const planner = await createChromeAIPlanner()
+    const plan = await planner.plan('Select all the foods that are French', [], {
+      checklistItems: [
+        { id: 'item_4', name: 'Croissant', description: 'French bakery food, pastry' },
+        { id: 'item_7', name: 'Baguette', description: 'French bakery food, bread' }
+      ]
+    })
+
+    expect(promptText).toContain('Current app context')
+    expect(promptText).toContain('Croissant')
+    expect(plan.toolName).toBe('select_items')
     expect(plan.input).toEqual({
-      category: 'fruit'
+      ids: ['item_4', 'item_7']
     })
   })
 

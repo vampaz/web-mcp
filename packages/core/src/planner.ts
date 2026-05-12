@@ -1,4 +1,4 @@
-import type { ToolPlan, ToolPlanner, WebMCPTool } from './interfaces/tool'
+import type { PlannerContext, ToolPlan, ToolPlanner, WebMCPTool } from './interfaces/tool'
 
 interface LanguageModelSession {
   prompt: (message: string, options?: ChromeAIPromptOptions) => Promise<string>
@@ -69,8 +69,8 @@ export function createHeuristicPlanner(): ToolPlanner {
     available: true,
     status: 'fallback',
     detail: 'Chrome built-in AI is unavailable, so WebMCP Kit is using deterministic local planning.',
-    async plan(message: string, tools: WebMCPTool[]) {
-      return planWithHeuristics(message, tools)
+    async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
+      return planWithHeuristics(message, tools, context)
     }
   }
 }
@@ -84,8 +84,8 @@ export async function createChromeAIPlanner(): Promise<ToolPlanner> {
       available: false,
       status: 'unavailable',
       detail: 'The browser does not expose the Chrome built-in AI LanguageModel API.',
-      async plan(message: string, tools: WebMCPTool[]) {
-        return planWithHeuristics(message, tools)
+      async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
+        return planWithHeuristics(message, tools, context)
       }
     }
   }
@@ -104,8 +104,8 @@ export async function createChromeAIPlanner(): Promise<ToolPlanner> {
         detail: availability === 'downloadable'
           ? 'Chrome built-in AI is available after the browser downloads the model.'
           : 'Chrome is downloading the built-in AI model.',
-        async plan(message: string, tools: WebMCPTool[]) {
-          return planWithHeuristics(message, tools)
+        async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
+          return planWithHeuristics(message, tools, context)
         }
       }
     }
@@ -117,13 +117,13 @@ export async function createChromeAIPlanner(): Promise<ToolPlanner> {
       available: true,
       status: 'ready',
       detail: 'Chrome built-in AI is available. The model session will start from the next user command.',
-      async plan(message: string, tools: WebMCPTool[]) {
+      async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
         try {
           session ??= await createChromeAISession(languageModel)
-          return await planWithChromeAI(session, message, tools)
+          return await planWithChromeAI(session, message, tools, context)
         } catch (error) {
           return {
-            ...planWithHeuristics(message, tools),
+            ...planWithHeuristics(message, tools, context),
             reason: `Chrome built-in AI could not plan this command (${getErrorMessage(error)}). Used deterministic fallback.`
           }
         }
@@ -141,7 +141,12 @@ export async function createBestPlanner(): Promise<ToolPlanner> {
   return createHeuristicPlanner()
 }
 
-async function planWithChromeAI(session: LanguageModelSession, message: string, tools: WebMCPTool[]): Promise<ToolPlan> {
+async function planWithChromeAI(
+  session: LanguageModelSession,
+  message: string,
+  tools: WebMCPTool[],
+  context: PlannerContext = {}
+): Promise<ToolPlan> {
   const schema = {
     type: 'object',
     properties: {
@@ -160,10 +165,12 @@ async function planWithChromeAI(session: LanguageModelSession, message: string, 
     inputSchema: tool.inputSchema
   }))
 
-  const response = await session.prompt(
-    `User request: ${message}\n\nAvailable tools:\n${JSON.stringify(toolCatalog, null, 2)}`,
-    { responseConstraint: schema }
-  )
+  const response = await session.prompt([
+    `User request: ${message}`,
+    `Current app context:\n${JSON.stringify(context, null, 2)}`,
+    `Available tools:\n${JSON.stringify(toolCatalog, null, 2)}`,
+    'Choose the best tool and exact parameters from the current app context. Prefer stable IDs from context over labels.'
+  ].join('\n\n'), { responseConstraint: schema })
 
   return JSON.parse(response) as ToolPlan
 }
@@ -180,7 +187,7 @@ function createChromeAISession(languageModel: LanguageModelApi): Promise<Languag
   })
 }
 
-function planWithHeuristics(message: string, tools: WebMCPTool[]): ToolPlan {
+function planWithHeuristics(message: string, tools: WebMCPTool[], context: PlannerContext = {}): ToolPlan {
   const normalizedMessage = message.toLowerCase()
 
   if (normalizedMessage.includes('invoice')) {
@@ -209,28 +216,12 @@ function planWithHeuristics(message: string, tools: WebMCPTool[]): ToolPlan {
 
   if (normalizedMessage.includes('select') && normalizedMessage.includes('first')) {
     return {
-      toolName: pickToolName(tools, 'select_items_by_position'),
+      toolName: pickToolName(tools, 'select_items'),
       input: {
-        start: 1,
-        count: extractQuantity(message)
+        ids: getFirstContextItemIds(context, extractQuantity(message))
       },
       confidence: 0.7,
-      reason: 'Matched positional checklist selection wording.'
-    }
-  }
-
-  if (normalizedMessage.includes('select') && normalizedMessage.includes('all')) {
-    const category = extractSelectionCategory(normalizedMessage)
-
-    if (category) {
-      return {
-        toolName: pickToolName(tools, 'select_items_by_category'),
-        input: {
-          category
-        },
-        confidence: 0.72,
-        reason: 'Matched category checklist selection wording.'
-      }
+      reason: 'Fallback selected the first visible checklist item IDs from context.'
     }
   }
 
@@ -290,17 +281,24 @@ function extractQuantity(message: string): number {
   return 1
 }
 
-function extractSelectionCategory(normalizedMessage: string): string | undefined {
-  if (/\bfruits?\b/.test(normalizedMessage)) return 'fruit'
-  if (/\bvegetables?\b/.test(normalizedMessage)) return 'vegetable'
-  if (/\bbakery\b|\bbread\b|\bbreads\b/.test(normalizedMessage)) return 'bakery'
-  if (/\bdrinks?\b|\bbeverages?\b/.test(normalizedMessage)) return 'drink'
-  return undefined
-}
-
 function extractCustomerName(message: string): string {
   const match = message.match(/(?:for|to)\s+([A-Z][\w\s-]{1,40})(?:\s+(?:for|with|at|of)\s+|$)/)
   return match?.[1]?.trim() ?? 'Acme Corp'
+}
+
+function getFirstContextItemIds(context: PlannerContext, count: number): string[] {
+  const items = Array.isArray(context.checklistItems) ? context.checklistItems : []
+  return items
+    .slice(0, count)
+    .map((item) => getContextItemId(item))
+    .filter((id): id is string => Boolean(id))
+}
+
+function getContextItemId(item: unknown): string | undefined {
+  if (!item || typeof item !== 'object' || !('id' in item)) return undefined
+
+  const id = (item as { id: unknown }).id
+  return typeof id === 'string' ? id : undefined
 }
 
 function getLanguageModel(): LanguageModelApi | undefined {
@@ -314,8 +312,8 @@ function createUnavailableChromePlanner(detail: string): ToolPlanner {
     available: false,
     status: 'unavailable',
     detail,
-    async plan(message: string, tools: WebMCPTool[]) {
-      return planWithHeuristics(message, tools)
+    async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
+      return planWithHeuristics(message, tools, context)
     }
   }
 }

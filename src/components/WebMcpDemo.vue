@@ -58,8 +58,11 @@
           <button type="button" @click="setPrompt('Select the first five items')">
             First five
           </button>
-          <button type="button" @click="setPrompt('Select all the items that are fruits')">
-            Fruits
+          <button type="button" @click="setPrompt('Select all the foods that are French')">
+            French foods
+          </button>
+          <button type="button" @click="setPrompt('Select all the ones that are roots')">
+            Roots
           </button>
         </div>
 
@@ -146,14 +149,14 @@
 
       <div class="selection-summary">
         <strong>{{ selectedItems.length }} selected</strong>
-        <span>Try “select the first five items”, “select all fruits”, or “clear the selection”.</span>
+        <span>Try “select the first five items”, “select French foods”, “select roots”, or “clear the selection”.</span>
       </div>
 
       <div class="checklist-grid">
         <label v-for="(item, index) in selectableItems" :key="item.id" class="checklist-item">
           <input v-model="item.selected" type="checkbox" />
           <span>{{ index + 1 }}. {{ item.name }}</span>
-          <em>{{ item.category }}</em>
+          <em>{{ item.description }}</em>
         </label>
       </div>
     </section>
@@ -208,16 +211,16 @@ const products = ref<Product[]>([
   { id: 'cam-03', name: 'Desk camera', category: 'Video', price: 149 }
 ])
 const selectableItems = ref<SelectableItem[]>([
-  { id: 'item_1', name: 'Apple', category: 'fruit', selected: false },
-  { id: 'item_2', name: 'Banana', category: 'fruit', selected: false },
-  { id: 'item_3', name: 'Carrot', category: 'vegetable', selected: false },
-  { id: 'item_4', name: 'Croissant', category: 'bakery', selected: false },
-  { id: 'item_5', name: 'Orange', category: 'fruit', selected: false },
-  { id: 'item_6', name: 'Spinach', category: 'vegetable', selected: false },
-  { id: 'item_7', name: 'Baguette', category: 'bakery', selected: false },
-  { id: 'item_8', name: 'Water', category: 'drink', selected: false },
-  { id: 'item_9', name: 'Pear', category: 'fruit', selected: false },
-  { id: 'item_10', name: 'Coffee', category: 'drink', selected: false }
+  { id: 'item_1', name: 'Apple', category: 'fruit', description: 'fruit, food, common snack', selected: false },
+  { id: 'item_2', name: 'Banana', category: 'fruit', description: 'fruit, food, tropical snack', selected: false },
+  { id: 'item_3', name: 'Carrot', category: 'vegetable', description: 'root vegetable, food', selected: false },
+  { id: 'item_4', name: 'Croissant', category: 'bakery', description: 'French bakery food, pastry', selected: false },
+  { id: 'item_5', name: 'Orange', category: 'fruit', description: 'fruit, food, citrus', selected: false },
+  { id: 'item_6', name: 'Spinach', category: 'vegetable', description: 'leaf vegetable, food', selected: false },
+  { id: 'item_7', name: 'Baguette', category: 'bakery', description: 'French bakery food, bread', selected: false },
+  { id: 'item_8', name: 'Water', category: 'drink', description: 'drink, beverage, not food', selected: false },
+  { id: 'item_9', name: 'Beetroot', category: 'vegetable', description: 'root vegetable, food', selected: false },
+  { id: 'item_10', name: 'Coffee', category: 'drink', description: 'drink, beverage, not food', selected: false }
 ])
 const cart = ref<CartLine[]>([])
 const tickets = ref<SupportTicket[]>([])
@@ -346,63 +349,30 @@ function registerDemoTools() {
   })).unregister)
 
   unregisterCallbacks.push(registerTool(defineTool({
-    name: 'select_items_by_position',
-    description: 'Select checklist items by one-based position range in the visible ten-item list.',
+    name: 'select_items',
+    description: 'Select checklist items by stable item IDs from the current visible checklist context.',
     inputSchema: {
       type: 'object',
       properties: {
-        start: {
-          type: 'number',
-          minimum: 1,
-          description: 'First one-based item position to select.'
-        },
-        count: {
-          type: 'number',
-          minimum: 1,
-          description: 'Number of consecutive items to select.'
+        ids: {
+          type: 'array',
+          items: {
+            type: 'string'
+          },
+          description: 'Stable IDs of checklist items to select.'
         }
       },
-      required: ['start', 'count']
+      required: ['ids']
     },
     execute(input) {
-      const start = Math.max(1, Number(input.start ?? 1))
-      const count = Math.max(1, Number(input.count ?? 1))
-      const end = start + count - 1
-      selectableItems.value = selectableItems.value.map(function mapItem(item, index) {
-        const position = index + 1
-        return {
-          ...item,
-          selected: position >= start && position <= end
-        }
-      })
-      addActivity('Items selected', `Selected positions ${start}-${end}`, 'success')
-      return selectedItems.value
-    }
-  })).unregister)
-
-  unregisterCallbacks.push(registerTool(defineTool({
-    name: 'select_items_by_category',
-    description: 'Select checklist items whose category matches the requested item category.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        category: {
-          type: 'string',
-          enum: ['fruit', 'vegetable', 'bakery', 'drink'],
-          description: 'Category to select.'
-        }
-      },
-      required: ['category']
-    },
-    execute(input) {
-      const category = String(input.category ?? 'fruit')
+      const ids = Array.isArray(input.ids) ? input.ids.map(String) : []
       selectableItems.value = selectableItems.value.map(function mapItem(item) {
         return {
           ...item,
-          selected: item.category === category
+          selected: ids.includes(item.id)
         }
       })
-      addActivity('Category selected', `Selected all ${category} items`, 'success')
+      addActivity('Items selected', `Selected ${selectedItems.value.length} checklist items`, 'success')
       return selectedItems.value
     }
   })).unregister)
@@ -449,7 +419,7 @@ async function runPrompt() {
   const tools = listTools().map(function mapRegistration(registration) {
     return registration.tool
   })
-  const plan = await planner.plan(prompt.value, tools)
+  const plan = await planner.plan(prompt.value, tools, getPlannerContext())
   lastPlan.value = plan
   lastPlannerUsed.value = `${planner.name} (${planner.status})`
   selectedToolName.value = plan.toolName
@@ -494,6 +464,23 @@ function refreshTools() {
   registeredTools.value = listTools()
 }
 
+function getPlannerContext() {
+  return {
+    checklistItems: selectableItems.value.map(function mapChecklistItem(item, index) {
+      return {
+        id: item.id,
+        position: index + 1,
+        name: item.name,
+        category: item.category,
+        description: item.description,
+        selected: item.selected
+      }
+    }),
+    products: products.value,
+    invoices: invoices.value
+  }
+}
+
 function createSupportTicket(subject: string, body: string): SupportTicket {
   const ticket = {
     id: `ticket_${Date.now()}`,
@@ -525,7 +512,7 @@ declare global {
       available: ToolPlanner['available']
       status: ToolPlanner['status']
       detail: ToolPlanner['detail']
-      plan: (message: string, tools: ReturnType<typeof listTools>[number]['tool'][]) => Promise<ToolPlan>
+      plan: (message: string, tools: ReturnType<typeof listTools>[number]['tool'][], context?: ReturnType<typeof getPlannerContext>) => Promise<ToolPlan>
     }
   }
 }

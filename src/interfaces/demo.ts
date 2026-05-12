@@ -30,6 +30,7 @@ export interface SelectableItem {
   id: string
   name: string
   category: 'fruit' | 'vegetable' | 'bakery' | 'drink'
+  description: string
   selected: boolean
 }
 

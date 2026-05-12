@@ -6,6 +6,15 @@ import { clearToolsForTest } from '@webmcp-kit/core'
 import WebMcpDemo from './WebMcpDemo.vue'
 import { mountWithDeps } from '@/test-utils/mount-with-deps'
 
+interface WindowWithLanguageModel extends Window {
+  LanguageModel?: {
+    availability: (options?: unknown) => Promise<'available'>
+    create: () => Promise<{
+      prompt: (message: string) => Promise<string>
+    }>
+  }
+}
+
 describe('WebMcpDemo', () => {
   beforeEach(() => {
     clearToolsForTest()
@@ -15,6 +24,7 @@ describe('WebMcpDemo', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     clearToolsForTest()
+    delete (window as WindowWithLanguageModel).LanguageModel
     document.body.innerHTML = ''
   })
 
@@ -32,22 +42,45 @@ describe('WebMcpDemo', () => {
     expect(wrapper.text()).toContain('Acme')
   })
 
-  it('selects checklist items by natural language command', async () => {
+  it('selects checklist items from AI-chosen context IDs', async () => {
+    ;(window as WindowWithLanguageModel).LanguageModel = {
+      availability: async () => 'available',
+      create: async () => ({
+        prompt: async (message: string) => {
+          if (message.includes('French')) {
+            return JSON.stringify({
+              toolName: 'select_items',
+              input: { ids: ['item_4', 'item_7'] },
+              confidence: 0.94,
+              reason: 'Selected French foods from current checklist context.'
+            })
+          }
+
+          return JSON.stringify({
+            toolName: 'select_items',
+            input: { ids: ['item_3', 'item_9'] },
+            confidence: 0.91,
+            reason: 'Selected root vegetables from current checklist context.'
+          })
+        }
+      })
+    }
+
     const wrapper = mountWithDeps(WebMcpDemo)
     await flushPromises()
 
-    await wrapper.find('textarea[aria-label="Natural language command"]').setValue('Select the first five items')
+    await wrapper.find('textarea[aria-label="Natural language command"]').setValue('Select all the foods that are French')
     await wrapper.find('.primary-action').trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('5 selected')
-    expect(wrapper.text()).toContain('Selected positions 1-5')
+    expect(wrapper.text()).toContain('2 selected')
+    expect(wrapper.text()).toContain('Selected 2 checklist items')
 
-    await wrapper.find('textarea[aria-label="Natural language command"]').setValue('Select all the items that are fruits')
+    await wrapper.find('textarea[aria-label="Natural language command"]').setValue('Select all the ones that are roots')
     await wrapper.find('.primary-action').trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('4 selected')
-    expect(wrapper.text()).toContain('Selected all fruit items')
+    expect(wrapper.text()).toContain('2 selected')
+    expect(wrapper.text()).toContain('Beetroot')
   })
 })
