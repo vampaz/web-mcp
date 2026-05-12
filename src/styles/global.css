@@ -1,0 +1,31 @@
+:root {
+  color-scheme: dark;
+  font-family: Avenir Next, Avenir, Corbel, Segoe UI, sans-serif;
+  background: #090b0b;
+  color: #f4f0e8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at 14% 18%, rgba(48, 167, 121, 0.22), transparent 24rem),
+    radial-gradient(circle at 88% 12%, rgba(232, 190, 83, 0.16), transparent 21rem),
+    linear-gradient(135deg, #090b0b 0%, #101714 54%, #0f1110 100%);
+}
+
+button,
+textarea,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
