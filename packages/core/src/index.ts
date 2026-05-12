@@ -1,4 +1,11 @@
 export { defineTool } from './define-tool'
+export {
+  createToolCatalog,
+  formatToolCatalogMarkdown,
+  type ToolCatalog,
+  type ToolCatalogEntry,
+  type ToolCatalogOptions
+} from './adapters/catalog'
 export { mountDevtoolsOverlay, type DevtoolsOverlay, type MountDevtoolsOptions } from './devtools'
 export { emitWebMCPKitEvent, subscribeWebMCPKitEvents } from './events'
 export { inferFormInputSchema, registerFormTool, type FormInput, type RegisterFormToolOptions } from './forms'

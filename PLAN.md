@@ -122,7 +122,7 @@ This is not a new protocol. It is an adoption layer for WebMCP.
   - [ ] Step 8.2: Add local MCP bridge prototype
     - Files: `packages/mcp-bridge/src/index.ts`
     - Verify: fallback-registered tools can be listed and invoked from a local MCP client in development
-  - [ ] Step 8.3: Add docs/catalog export
+  - [x] Step 8.3: Add docs/catalog export
     - Files: `packages/core/src/adapters/catalog.ts`
     - Verify: produces Markdown and JSON catalogs
   - [x] Step 8.4: Add Playwright helpers
