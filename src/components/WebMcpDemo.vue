@@ -70,24 +70,27 @@
         </div>
       </div>
 
-      <aside class="tools-panel">
+      <aside class="tools-panel support-panel">
         <div class="panel-heading">
-          <p class="eyebrow">Registry</p>
-          <h2>Exposed tools</h2>
+          <p class="eyebrow">Form helper</p>
+          <h2>Support ticket form</h2>
         </div>
 
-        <button
-          v-for="registration in registeredTools"
-          :key="registration.tool.name"
-          type="button"
-          class="tool-card"
-          :class="{ active: selectedToolName === registration.tool.name }"
-          @click="selectTool(registration.tool.name)"
-        >
-          <span>{{ registration.mode }}</span>
-          <strong>{{ registration.tool.name }}</strong>
-          <small>{{ registration.tool.description }}</small>
-        </button>
+        <form ref="supportForm" class="support-form" @submit.prevent="submitSupportForm">
+          <label>
+            Subject
+            <input v-model="supportSubject" name="subject" required data-tool-description="Short issue summary." />
+          </label>
+          <label>
+            Details
+            <textarea v-model="supportBody" name="body" required rows="5" data-tool-description="Detailed issue description." />
+          </label>
+          <button class="primary-action" type="submit">Create ticket</button>
+        </form>
+
+        <p class="helper-copy">
+          This form is registered through `registerFormTool()`, which applies WebMCP form metadata and exposes the same action to the devtools overlay.
+        </p>
       </aside>
     </section>
 
@@ -138,8 +141,10 @@ import {
   getSupportLabel,
   invokeTool,
   listTools,
+  mountDevtoolsOverlay,
   registerTool,
-  type RegisteredTool,
+  registerFormTool,
+  type DevtoolsOverlay,
   type ToolPlan,
   type ToolPlanner
 } from '@webmcp-kit/core'
@@ -152,9 +157,13 @@ const plannerName = ref('Loading')
 const plannerDetail = ref('Checking Chrome built-in AI availability.')
 const lastPlannerUsed = ref('No command has run yet')
 const selectedToolName = ref('create_invoice')
-const registeredTools = ref<RegisteredTool[]>([])
+const registeredTools = ref<ReturnType<typeof listTools>>([])
 const lastPlan = ref<ToolPlan | null>(null)
 const unregisterCallbacks: Array<() => void> = []
+const supportForm = ref<HTMLFormElement | null>(null)
+const supportSubject = ref('Billing access')
+const supportBody = ref('I cannot open the latest invoice from the workspace.')
+let devtoolsOverlay: DevtoolsOverlay | undefined
 const supportLabel = computed(function getCurrentSupportLabel() {
   return getSupportLabel()
 })
@@ -180,7 +189,9 @@ const activity = ref<ActivityItem[]>([
 
 onMounted(async function handleMounted() {
   registerDemoTools()
+  registerSupportFormTool()
   refreshTools()
+  devtoolsOverlay = mountDevtoolsOverlay({ initiallyOpen: true })
 
   const planner = await createBestPlanner()
   plannerName.value = `${planner.name} (${planner.status})`
@@ -193,6 +204,7 @@ onUnmounted(function handleUnmounted() {
   for (const unregister of unregisterCallbacks) {
     unregister()
   }
+  devtoolsOverlay?.destroy()
 })
 
 function registerDemoTools() {
@@ -290,35 +302,19 @@ function registerDemoTools() {
     }
   })).unregister)
 
-  unregisterCallbacks.push(registerTool(defineTool({
+}
+
+function registerSupportFormTool() {
+  if (!supportForm.value) return
+
+  unregisterCallbacks.push(registerFormTool({
+    form: supportForm.value,
     name: 'create_support_ticket',
-    description: 'Create a support ticket from a user issue and mark it as open for triage.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        subject: {
-          type: 'string',
-          description: 'Short issue summary.'
-        },
-        body: {
-          type: 'string',
-          description: 'Detailed issue description.'
-        }
-      },
-      required: ['subject', 'body']
-    },
+    description: 'Create a support ticket from the visible support form and mark it as open for triage.',
     execute(input) {
-      const ticket = {
-        id: `ticket_${Date.now()}`,
-        subject: String(input.subject ?? 'Support request'),
-        body: String(input.body ?? ''),
-        status: 'open' as const
-      }
-      tickets.value = [ticket, ...tickets.value]
-      addActivity('Ticket opened', ticket.subject, 'success')
-      return ticket
+      return createSupportTicket(String(input.subject ?? 'Support request'), String(input.body ?? ''))
     }
-  })).unregister)
+  }).unregister)
 }
 
 async function runPrompt() {
@@ -351,16 +347,38 @@ async function runPrompt() {
   }
 }
 
-function selectTool(toolName: string) {
-  selectedToolName.value = toolName
-}
-
 function setPrompt(nextPrompt: string) {
   prompt.value = nextPrompt
 }
 
+async function submitSupportForm() {
+  const result = await invokeTool({
+    toolName: 'create_support_ticket',
+    input: {
+      subject: supportSubject.value,
+      body: supportBody.value
+    }
+  })
+
+  if (result.status !== 'success') {
+    addActivity('Ticket blocked', result.error ?? 'The ticket form could not run.', 'warning')
+  }
+}
+
 function refreshTools() {
   registeredTools.value = listTools()
+}
+
+function createSupportTicket(subject: string, body: string): SupportTicket {
+  const ticket = {
+    id: `ticket_${Date.now()}`,
+    subject,
+    body,
+    status: 'open' as const
+  }
+  tickets.value = [ticket, ...tickets.value]
+  addActivity('Ticket opened', ticket.subject, 'success')
+  return ticket
 }
 
 function addActivity(title: string, detail: string, tone: ActivityItem['tone']) {
@@ -540,7 +558,7 @@ textarea:focus {
 
 .prompt-examples button,
 .primary-action,
-.tool-card {
+.support-form input {
   border: 1px solid rgba(244, 240, 232, 0.18);
   color: #f4f0e8;
   background: rgba(244, 240, 232, 0.06);
@@ -559,28 +577,33 @@ textarea:focus {
   font-weight: 900;
 }
 
-.tool-card {
+.support-form {
   display: grid;
-  width: 100%;
-  gap: 7px;
-  padding: 16px;
-  text-align: left;
+  gap: 12px;
 }
 
-.tool-card + .tool-card {
-  margin-top: 10px;
+.support-form label {
+  display: grid;
+  gap: 8px;
+  color: #c9d1cb;
+  font-size: 0.92rem;
 }
 
-.tool-card.active {
-  border-color: #30a779;
-  background: rgba(48, 167, 121, 0.16);
+.support-form input {
+  min-height: 46px;
+  padding: 12px;
+  outline: none;
 }
 
-.tool-card span,
-.tool-card small,
 .state-row em,
-.empty-state {
+.empty-state,
+.helper-copy {
   color: #9ea8a1;
+}
+
+.helper-copy {
+  margin: 14px 0 0;
+  line-height: 1.5;
 }
 
 .plan-card {

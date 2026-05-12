@@ -15,6 +15,7 @@ describe('WebMcpDemo', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     clearToolsForTest()
+    document.body.innerHTML = ''
   })
 
   it('registers tools and executes a natural language command', async () => {
@@ -22,7 +23,7 @@ describe('WebMcpDemo', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Registered tools')
-    expect(wrapper.text()).toContain('create_invoice')
+    expect(document.body.textContent).toContain('create_invoice')
 
     await wrapper.find('.primary-action').trigger('click')
     await flushPromises()
