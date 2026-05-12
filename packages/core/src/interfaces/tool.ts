@@ -47,6 +47,13 @@ export interface RegisteredTool<TInput = Record<string, unknown>, TOutput = unkn
   unregister: () => void
 }
 
+export interface RegistrySnapshot {
+  supportLabel: string
+  nativeWebMCP: boolean
+  toolCount: number
+  tools: RegisteredTool[]
+}
+
 export interface ToolInvocation<TInput = Record<string, unknown>> {
   toolName: string
   input: TInput

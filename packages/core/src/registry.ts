@@ -1,8 +1,9 @@
 import { assertValidTool } from './define-tool'
 import { emitWebMCPKitEvent } from './events'
-import type { RegisteredTool, ToolInvocation, ToolInvocationResult, WebMCPTool } from './interfaces/tool'
+import type { RegisteredTool, RegistrySnapshot, ToolInvocation, ToolInvocationResult, WebMCPTool } from './interfaces/tool'
 import { registerNativeTool } from './native-adapter'
 import { getToolWarnings } from './quality'
+import { getSupportLabel, isWebMCPSupported } from './support'
 
 const registeredTools = new Map<string, RegisteredTool>()
 
@@ -50,6 +51,17 @@ export function listTools(): RegisteredTool[] {
 
 export function getTool(name: string): RegisteredTool | undefined {
   return registeredTools.get(name)
+}
+
+export function getRegistrySnapshot(): RegistrySnapshot {
+  const tools = listTools()
+
+  return {
+    supportLabel: getSupportLabel(),
+    nativeWebMCP: isWebMCPSupported(),
+    toolCount: tools.length,
+    tools
+  }
 }
 
 export async function invokeTool<TOutput = unknown>(
