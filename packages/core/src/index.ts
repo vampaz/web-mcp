@@ -1,4 +1,5 @@
 export { defineTool } from './define-tool'
+export { mountDevtoolsOverlay, type DevtoolsOverlay, type MountDevtoolsOptions } from './devtools'
 export { emitWebMCPKitEvent, subscribeWebMCPKitEvents } from './events'
 export type {
   JsonSchema,
