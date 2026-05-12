@@ -26,7 +26,7 @@ This is not a new protocol. It is an adoption layer for WebMCP.
   - [ ] Step 2.2: Implement `defineTool()`
     - Files: `packages/core/src/define-tool.ts`
     - Verify: `packages/core/src/define-tool.spec.ts`
-  - [ ] Step 2.3: Implement runtime schema validation
+  - [x] Step 2.3: Implement runtime schema validation
     - Files: `packages/core/src/schema.ts`
     - Verify: invalid tool definitions return actionable errors
   - [ ] Step 2.4: Implement tool quality checks

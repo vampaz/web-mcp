@@ -19,6 +19,7 @@ export type {
 } from './interfaces/tool'
 export { createBestPlanner, createChromeAIPlanner, createHeuristicPlanner } from './planner'
 export { clearToolsForTest, getRegistrySnapshot, getTool, invokeTool, listTools, registerTool } from './registry'
+export { validateJsonSchema } from './schema'
 export { getSupportLabel, isWebMCPSupported } from './support'
 export {
   installWebMCPKitTestBridge,
