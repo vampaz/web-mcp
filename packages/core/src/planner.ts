@@ -1,12 +1,12 @@
 import type { ToolPlan, ToolPlanner, WebMCPTool } from './interfaces/tool'
 
 interface LanguageModelSession {
-  prompt: (message: string, options?: { responseConstraint?: unknown }) => Promise<string>
+  prompt: (message: string, options?: ChromeAIPromptOptions) => Promise<string>
 }
 
 interface LanguageModelApi {
-  availability: (options?: unknown) => Promise<ChromeAIAvailability>
-  create: (options?: unknown) => Promise<LanguageModelSession>
+  availability: (options?: ChromeAIOptions) => Promise<ChromeAIAvailability>
+  create: (options?: ChromeAIOptions) => Promise<LanguageModelSession>
 }
 
 interface WindowWithLanguageModel extends Window {
@@ -14,6 +14,31 @@ interface WindowWithLanguageModel extends Window {
 }
 
 type ChromeAIAvailability = 'available' | 'downloadable' | 'downloading' | 'unavailable'
+type ChromeAIOutputLanguage = 'en'
+
+interface ChromeAIOptions {
+  expectedOutputs?: Array<{
+    type: 'text'
+    languages: ChromeAIOutputLanguage[]
+  }>
+  initialPrompts?: Array<{
+    role: 'system'
+    content: string
+  }>
+}
+
+interface ChromeAIPromptOptions {
+  responseConstraint?: unknown
+}
+
+const chromeAITextOptions = {
+  expectedOutputs: [
+    {
+      type: 'text',
+      languages: ['en']
+    }
+  ]
+} satisfies ChromeAIOptions
 
 const numberWords = new Map([
   ['one', 1],
@@ -66,7 +91,7 @@ export async function createChromeAIPlanner(): Promise<ToolPlanner> {
   }
 
   try {
-    const availability = await languageModel.availability()
+    const availability = await languageModel.availability(chromeAITextOptions)
     if (availability === 'unavailable') {
       return createUnavailableChromePlanner('Chrome reports that built-in AI is unavailable in this environment.')
     }
@@ -145,6 +170,7 @@ async function planWithChromeAI(session: LanguageModelSession, message: string, 
 
 function createChromeAISession(languageModel: LanguageModelApi): Promise<LanguageModelSession> {
   return languageModel.create({
+    ...chromeAITextOptions,
     initialPrompts: [
       {
         role: 'system',
