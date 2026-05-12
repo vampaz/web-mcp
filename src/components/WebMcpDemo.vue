@@ -239,11 +239,7 @@ onMounted(async function handleMounted() {
   refreshTools()
   devtoolsOverlay = mountDevtoolsOverlay({ initiallyOpen: true })
 
-  const planner = await createBestPlanner()
-  plannerName.value = `${planner.name} (${planner.status})`
-  plannerDetail.value = planner.detail
-
-  window.__webMCPKitDemoPlanner = planner
+  await refreshPlanner()
 })
 
 onUnmounted(function handleUnmounted() {
@@ -413,7 +409,7 @@ function registerSupportFormTool() {
 }
 
 async function runPrompt() {
-  const planner = window.__webMCPKitDemoPlanner
+  const planner = await getCurrentPlanner()
   if (!planner) return
 
   const tools = listTools().map(function mapRegistration(registration) {
@@ -462,6 +458,22 @@ async function submitSupportForm() {
 
 function refreshTools() {
   registeredTools.value = listTools()
+}
+
+async function getCurrentPlanner() {
+  const planner = window.__webMCPKitDemoPlanner
+  if (planner && planner.status !== 'fallback' && planner.status !== 'unavailable') return planner
+
+  return refreshPlanner()
+}
+
+async function refreshPlanner() {
+  const planner = await createBestPlanner()
+  plannerName.value = `${planner.name} (${planner.status})`
+  plannerDetail.value = planner.detail
+  window.__webMCPKitDemoPlanner = planner
+
+  return planner
 }
 
 function getPlannerContext() {

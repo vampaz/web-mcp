@@ -12,6 +12,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "test": "vitest --run",
+    "test:e2e": "playwright test",
     "test:watch": "vitest --watch"
   },
   "dependencies": {
@@ -21,6 +22,7 @@
     "vue": "latest"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/node": "latest",
     "@vitejs/plugin-vue": "latest",
     "@vue/test-utils": "latest",

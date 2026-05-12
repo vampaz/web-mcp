@@ -17,6 +17,10 @@ type ChromeAIAvailability = 'available' | 'downloadable' | 'downloading' | 'unav
 type ChromeAIOutputLanguage = 'en'
 
 interface ChromeAIOptions {
+  expectedInputs?: Array<{
+    type: 'text'
+    languages: ChromeAIOutputLanguage[]
+  }>
   expectedOutputs?: Array<{
     type: 'text'
     languages: ChromeAIOutputLanguage[]
@@ -32,6 +36,12 @@ interface ChromeAIPromptOptions {
 }
 
 const chromeAITextOptions = {
+  expectedInputs: [
+    {
+      type: 'text',
+      languages: ['en']
+    }
+  ],
   expectedOutputs: [
     {
       type: 'text',
@@ -97,38 +107,20 @@ export async function createChromeAIPlanner(): Promise<ToolPlanner> {
     }
 
     if (availability === 'downloadable' || availability === 'downloading') {
-      return {
-        name: 'Chrome built-in AI',
-        available: false,
-        status: availability,
-        detail: availability === 'downloadable'
-          ? 'Chrome built-in AI is available after the browser downloads the model.'
-          : 'Chrome is downloading the built-in AI model.',
-        async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
-          return planWithHeuristics(message, tools, context)
-        }
-      }
+      return createActiveChromePlanner(
+        languageModel,
+        availability,
+        availability === 'downloadable'
+          ? 'Chrome built-in AI can be used after Chrome downloads the model from a user command.'
+          : 'Chrome is downloading the built-in AI model and will plan when the session is ready.'
+      )
     }
 
-    let session: LanguageModelSession | undefined
-
-    return {
-      name: 'Chrome built-in AI',
-      available: true,
-      status: 'ready',
-      detail: 'Chrome built-in AI is available. The model session will start from the next user command.',
-      async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
-        try {
-          session ??= await createChromeAISession(languageModel)
-          return await planWithChromeAI(session, message, tools, context)
-        } catch (error) {
-          return {
-            ...planWithHeuristics(message, tools, context),
-            reason: `Chrome built-in AI could not plan this command (${getErrorMessage(error)}). Used deterministic fallback.`
-          }
-        }
-      }
-    }
+    return createActiveChromePlanner(
+      languageModel,
+      'ready',
+      'Chrome built-in AI is available. The model session will start from the next user command.'
+    )
   } catch {
     return createUnavailableChromePlanner('Chrome built-in AI could not create a planning session.')
   }
@@ -234,6 +226,17 @@ function planWithHeuristics(message: string, tools: WebMCPTool[], context: Plann
     }
   }
 
+  if (normalizedMessage.includes('select') && hasTool(tools, 'select_items')) {
+    return {
+      toolName: 'select_items',
+      input: {
+        ids: []
+      },
+      confidence: 0.2,
+      reason: 'Fallback planner cannot infer semantic checklist selection. Chrome built-in AI needs to choose IDs from the current app context.'
+    }
+  }
+
   if (normalizedMessage.includes('support') || normalizedMessage.includes('ticket') || normalizedMessage.includes('help')) {
     return {
       toolName: pickToolName(tools, 'create_support_ticket'),
@@ -258,6 +261,10 @@ function planWithHeuristics(message: string, tools: WebMCPTool[], context: Plann
 
 function pickToolName(tools: WebMCPTool[], preferredName: string): string {
   return tools.find((tool) => tool.name === preferredName)?.name ?? tools[0]?.name ?? preferredName
+}
+
+function hasTool(tools: WebMCPTool[], preferredName: string): boolean {
+  return tools.some((tool) => tool.name === preferredName)
 }
 
 function extractAmount(message: string): number {
@@ -304,6 +311,32 @@ function getContextItemId(item: unknown): string | undefined {
 function getLanguageModel(): LanguageModelApi | undefined {
   if (typeof window === 'undefined') return undefined
   return (window as WindowWithLanguageModel).LanguageModel
+}
+
+function createActiveChromePlanner(
+  languageModel: LanguageModelApi,
+  status: 'ready' | 'downloadable' | 'downloading',
+  detail: string
+): ToolPlanner {
+  let session: LanguageModelSession | undefined
+
+  return {
+    name: 'Chrome built-in AI',
+    available: true,
+    status,
+    detail,
+    async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
+      try {
+        session ??= await createChromeAISession(languageModel)
+        return await planWithChromeAI(session, message, tools, context)
+      } catch (error) {
+        return {
+          ...planWithHeuristics(message, tools, context),
+          reason: `Chrome built-in AI could not plan this command (${getErrorMessage(error)}). Used deterministic fallback.`
+        }
+      }
+    }
+  }
 }
 
 function createUnavailableChromePlanner(detail: string): ToolPlanner {

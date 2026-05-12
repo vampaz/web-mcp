@@ -5,7 +5,7 @@ import { createBestPlanner, createChromeAIPlanner, createHeuristicPlanner } from
 interface WindowWithLanguageModel extends Window {
   LanguageModel?: {
     availability: (options?: unknown) => Promise<'available' | 'downloadable' | 'downloading' | 'unavailable'>
-    create: () => Promise<{
+    create: (options?: unknown) => Promise<{
       prompt: (message: string) => Promise<string>
     }>
   }
@@ -25,18 +25,30 @@ describe('planner', () => {
     expect(plan.input.amount).toBe(250)
   })
 
-  it('reports Chrome AI downloadable status without using it as active planner', async () => {
+  it('uses Chrome AI as the active planner when the model is downloadable', async () => {
+    const create = vi.fn(async () => ({
+      prompt: async () => JSON.stringify({
+        toolName: 'select_items',
+        input: { ids: ['item_4', 'item_7'] },
+        confidence: 0.9,
+        reason: 'Chrome chose French foods.'
+      })
+    }))
     ;(window as WindowWithLanguageModel).LanguageModel = {
       availability: async () => 'downloadable',
-      create: async () => ({
-        prompt: async () => '{}'
-      })
+      create
     }
 
-    const planner = await createChromeAIPlanner()
+    const planner = await createBestPlanner()
+    const plan = await planner.plan('Select all the foods that are French', [])
 
-    expect(planner.available).toBe(false)
+    expect(planner.available).toBe(true)
     expect(planner.status).toBe('downloadable')
+    expect(plan.toolName).toBe('select_items')
+    expect(plan.input).toEqual({
+      ids: ['item_4', 'item_7']
+    })
+    expect(create).toHaveBeenCalledOnce()
   })
 
   it('uses Chrome built-in AI when available', async () => {
@@ -127,6 +139,34 @@ describe('planner', () => {
     expect(plan.input).toEqual({
       ids: ['item_1', 'item_2', 'item_3', 'item_4', 'item_5']
     })
+  })
+
+  it('does not route semantic checklist selection to product search in fallback mode', async () => {
+    const planner = createHeuristicPlanner()
+    const plan = await planner.plan('Select all the items that are French food.', [
+      {
+        name: 'select_items',
+        description: 'Select checklist items by ID.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute: () => []
+      },
+      {
+        name: 'search_products',
+        description: 'Search products.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute: () => []
+      }
+    ])
+
+    expect(plan.toolName).toBe('select_items')
+    expect(plan.input).toEqual({
+      ids: []
+    })
+    expect(plan.reason).toContain('cannot infer semantic checklist selection')
   })
 
   it('passes app context to Chrome AI for semantic selection', async () => {
