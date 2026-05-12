@@ -85,22 +85,23 @@ export async function createChromeAIPlanner(): Promise<ToolPlanner> {
       }
     }
 
-    const session = await languageModel.create({
-      initialPrompts: [
-        {
-          role: 'system',
-          content: 'Choose exactly one app tool for the user request. Return only JSON matching the requested schema.'
-        }
-      ]
-    })
+    let session: LanguageModelSession | undefined
 
     return {
       name: 'Chrome built-in AI',
       available: true,
       status: 'ready',
-      detail: 'Chrome built-in AI is ready and will choose tools locally in the browser.',
+      detail: 'Chrome built-in AI is available. The model session will start from the next user command.',
       async plan(message: string, tools: WebMCPTool[]) {
-        return planWithChromeAI(session, message, tools)
+        try {
+          session ??= await createChromeAISession(languageModel)
+          return await planWithChromeAI(session, message, tools)
+        } catch (error) {
+          return {
+            ...planWithHeuristics(message, tools),
+            reason: `Chrome built-in AI could not plan this command (${getErrorMessage(error)}). Used deterministic fallback.`
+          }
+        }
       }
     }
   } catch {
@@ -140,6 +141,17 @@ async function planWithChromeAI(session: LanguageModelSession, message: string, 
   )
 
   return JSON.parse(response) as ToolPlan
+}
+
+function createChromeAISession(languageModel: LanguageModelApi): Promise<LanguageModelSession> {
+  return languageModel.create({
+    initialPrompts: [
+      {
+        role: 'system',
+        content: 'Choose exactly one app tool for the user request. Return only JSON matching the requested schema.'
+      }
+    ]
+  })
 }
 
 function planWithHeuristics(message: string, tools: WebMCPTool[]): ToolPlan {
@@ -236,4 +248,9 @@ function createUnavailableChromePlanner(detail: string): ToolPlanner {
       return planWithHeuristics(message, tools)
     }
   }
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  return 'unknown error'
 }

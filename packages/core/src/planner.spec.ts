@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createBestPlanner, createChromeAIPlanner, createHeuristicPlanner } from './planner'
 
@@ -40,24 +40,45 @@ describe('planner', () => {
   })
 
   it('uses Chrome built-in AI when available', async () => {
+    const create = vi.fn(async () => ({
+      prompt: async () => JSON.stringify({
+        toolName: 'search_products',
+        input: { query: 'dock' },
+        confidence: 0.9,
+        reason: 'Chrome chose product search.'
+      })
+    }))
     ;(window as WindowWithLanguageModel).LanguageModel = {
       availability: async () => 'available',
-      create: async () => ({
-        prompt: async () => JSON.stringify({
-          toolName: 'search_products',
-          input: { query: 'dock' },
-          confidence: 0.9,
-          reason: 'Chrome chose product search.'
-        })
-      })
+      create
     }
 
     const planner = await createChromeAIPlanner()
+    expect(create).not.toHaveBeenCalled()
+
     const plan = await planner.plan('Find docks', [])
 
     expect(planner.available).toBe(true)
     expect(planner.status).toBe('ready')
     expect(plan.toolName).toBe('search_products')
+    expect(create).toHaveBeenCalledOnce()
+  })
+
+  it('falls back if Chrome AI session creation fails after user activation', async () => {
+    ;(window as WindowWithLanguageModel).LanguageModel = {
+      availability: async () => 'available',
+      create: async () => {
+        throw new Error('user activation required')
+      }
+    }
+
+    const planner = await createChromeAIPlanner()
+    const plan = await planner.plan('Add ten keyboards to the cart.', [])
+
+    expect(planner.available).toBe(true)
+    expect(plan.toolName).toBe('add_to_cart')
+    expect(plan.input.quantity).toBe(10)
+    expect(plan.reason).toContain('Used deterministic fallback')
   })
 
   it('creates a direct heuristic planner', () => {
