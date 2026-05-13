@@ -48,6 +48,7 @@ registration.unregister()
 
 ## Core API
 
+- `createWebMCPKit(options)` initializes the kit and optional planner provider.
 - `defineTool(tool)` validates and preserves a typed tool definition.
 - `registerTool(tool)` registers with native WebMCP when available and always stores the tool in the fallback registry.
 - `invokeTool({ toolName, input, confirmed })` invokes fallback-registered tools for devtools, tests, and demos.
@@ -56,6 +57,44 @@ registration.unregister()
 - `isWebMCPSupported()` checks for native WebMCP registration support.
 - `createBestPlanner()` uses Chrome built-in AI when available, otherwise a deterministic local planner.
 - `installWebMCPKitTestBridge()` exposes a kit-specific test bridge for Playwright and local QA.
+
+## Planner Providers
+
+Developers can pass a planner provider when initializing the kit:
+
+```ts
+import { createWebMCPKit } from '@webmcp-kit/core'
+
+const kit = await createWebMCPKit({
+  planner: {
+    provider: 'openrouter',
+    model: 'openrouter/auto',
+    auth: {
+      mode: 'user-key',
+      apiKey: userProvidedKey
+    }
+  }
+})
+```
+
+User-key mode is intentionally simple and does not need a server, but the key is visible to the browser page. For app-owned production secrets, use server mode:
+
+```ts
+await createWebMCPKit({
+  planner: {
+    provider: 'openai',
+    model: 'gpt-4.1-mini',
+    auth: {
+      mode: 'server',
+      endpoint: '/api/webmcp/plan'
+    }
+  }
+})
+```
+
+See [Planner Providers](./docs/planner-providers.md) for OpenRouter, OpenAI, OpenAI-compatible, Cloudflare Workers AI, Chrome built-in AI, and local fallback examples.
+
+For local development and preview deployments, the demo also exposes `cloudflare-binding`: a server-endpoint-only mode where the browser selects from approved Cloudflare Workers AI models and the Astro Cloudflare runtime endpoint uses an `AI` binding. It is not shown in normal production builds by default.
 
 ## Playwright Helpers
 

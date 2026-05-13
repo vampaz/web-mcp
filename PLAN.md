@@ -129,6 +129,23 @@ This is not a new protocol. It is an adoption layer for WebMCP.
     - Files: `packages/testing/src/playwright.ts`, `packages/core/src/test-bridge.ts`
     - Verify: tests can list and invoke fallback tools from `page`
 
+- [ ] Phase 8.5: Planner Providers
+  - [x] Step 8.5.1: Add provider config and kit initialization
+    - Files: `packages/core/src/interfaces/tool.ts`, `packages/core/src/kit.ts`
+    - Verify: configured planner initializes from `createWebMCPKit()`
+  - [x] Step 8.5.2: Add remote OpenAI-compatible planning
+    - Files: `packages/core/src/planner.ts`
+    - Verify: server endpoint and user-key modes are covered by tests
+  - [x] Step 8.5.3: Add development provider selector
+    - Files: `src/components/WebMcpDemo.vue`
+    - Verify: Chrome Beta E2E can select OpenRouter with a user key
+  - [x] Step 8.5.4: Add Cloudflare binding planner mode
+    - Files: `packages/core/src/planner.ts`, `src/components/WebMcpDemo.vue`, `docs/planner-providers.md`
+    - Verify: unit and E2E tests cover model selection through the mocked binding endpoint
+  - [x] Step 8.5.5: Wire Astro Cloudflare adapter for AI bindings
+    - Files: `astro.config.mjs`, `wrangler.toml`, `src/worker.ts`, `src/pages/api/webmcp/plan.ts`
+    - Verify: route tests cover planning through the Cloudflare `AI` binding shape
+
 - [ ] Phase 9: Demo Applications
   - [ ] Step 9.1: Build plain JavaScript demo
     - Files: `apps/plain-demo/src/main.ts`

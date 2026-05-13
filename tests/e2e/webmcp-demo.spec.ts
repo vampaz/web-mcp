@@ -91,6 +91,73 @@ test('exposes registered tools through Playwright helpers', async function testP
   await expect(getChecklistInput(page, '7. Baguette')).toBeChecked()
 })
 
+test('plans through a selected user-key provider', async function testUserKeyProviderSelection({ page }) {
+  await page.route('https://openrouter.ai/api/v1/chat/completions', async function fulfillOpenRouter(route, request) {
+    expect(request.headers().authorization).toBe('Bearer local-user-key')
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                toolName: 'select_items',
+                input: { ids: ['item_4', 'item_7'] },
+                confidence: 0.94,
+                reason: 'OpenRouter selected French foods from current checklist context.'
+              })
+            }
+          }
+        ]
+      })
+    })
+  })
+
+  await page.goto('/')
+  await page.waitForSelector('text=Ten-item checklist')
+
+  await page.getByLabel('Provider').selectOption('openrouter')
+  await page.getByLabel('User API key').fill('local-user-key')
+  await page.getByLabel('Natural language command').fill('Select all the items that are French food.')
+  await page.getByRole('button', { name: 'Run command' }).click()
+
+  await expect(page.locator('.status-strip strong').filter({ hasText: 'OpenRouter (ready)' })).toBeVisible()
+  await expect(getChecklistInput(page, '4. Croissant')).toBeChecked()
+  await expect(getChecklistInput(page, '7. Baguette')).toBeChecked()
+})
+
+test('plans through the dev Cloudflare binding provider', async function testCloudflareBindingProviderSelection({ page }) {
+  await page.route('**/api/webmcp/plan', async function fulfillCloudflareBinding(route, request) {
+    expect(request.postDataJSON()).toMatchObject({
+      provider: 'cloudflare-binding',
+      model: '@cf/qwen/qwq-32b',
+      message: 'Select all the ones that are roots'
+    })
+
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        toolName: 'select_items',
+        input: { ids: ['item_3', 'item_9'] },
+        confidence: 0.92,
+        reason: 'Cloudflare binding selected roots from current checklist context.'
+      })
+    })
+  })
+
+  await page.goto('/')
+  await page.waitForSelector('text=Ten-item checklist')
+
+  await page.getByLabel('Provider').selectOption('cloudflare-binding')
+  await page.getByLabel('Binding model').selectOption('@cf/qwen/qwq-32b')
+  await page.getByLabel('Natural language command').fill('Select all the ones that are roots')
+  await page.getByRole('button', { name: 'Run command' }).click()
+
+  await expect(page.locator('.status-strip strong').filter({ hasText: 'Cloudflare binding (ready)' })).toBeVisible()
+  await expect(getChecklistInput(page, '3. Carrot')).toBeChecked()
+  await expect(getChecklistInput(page, '9. Beetroot')).toBeChecked()
+})
+
 async function installLanguageModelMock(page: Page, availability: LanguageModelAvailability) {
   await page.addInitScript(function mockLanguageModel(mockAvailability) {
     const browserWindow = window as Window & {

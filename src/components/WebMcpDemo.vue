@@ -35,6 +35,76 @@
           <h2>Natural language command</h2>
         </div>
 
+        <div class="planner-panel">
+          <label>
+            Provider
+            <select v-model="plannerProvider">
+              <option value="auto">Auto</option>
+              <option value="chrome-built-in">Chrome built-in AI</option>
+              <option value="local">Local fallback</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="openai">OpenAI</option>
+              <option value="openai-compatible">OpenAI-compatible</option>
+              <option v-if="showCloudflareBinding" value="cloudflare-binding">Cloudflare binding (dev/preview)</option>
+              <option value="cloudflare-workers-ai">Cloudflare Workers AI (REST)</option>
+            </select>
+          </label>
+
+          <label v-if="usesRemotePlanner && plannerProvider !== 'cloudflare-binding'">
+            Model
+            <input v-model="plannerModel" type="text" />
+          </label>
+
+          <label v-if="plannerProvider === 'cloudflare-binding'">
+            Binding model
+            <select v-model="plannerModel">
+              <option v-for="model in cloudflareBindingModels" :key="model.id" :value="model.id">
+                {{ model.label }}
+              </option>
+            </select>
+          </label>
+
+          <label v-if="plannerProvider === 'openai-compatible'">
+            Base URL
+            <input v-model="plannerBaseUrl" type="url" placeholder="http://localhost:1234/v1" />
+          </label>
+
+          <label v-if="plannerProvider === 'cloudflare-workers-ai' && plannerAuthMode === 'user-key'">
+            Cloudflare account ID
+            <input v-model="plannerAccountId" type="text" />
+          </label>
+
+          <label v-if="usesRemotePlanner && plannerProvider !== 'cloudflare-binding'">
+            Auth mode
+            <select v-model="plannerAuthMode">
+              <option value="server">Server endpoint</option>
+              <option value="user-key">User key in browser</option>
+            </select>
+          </label>
+
+          <label v-if="usesRemotePlanner && (plannerAuthMode === 'server' || plannerProvider === 'cloudflare-binding')">
+            {{ plannerProvider === 'cloudflare-binding' ? 'Binding endpoint' : 'Planner endpoint' }}
+            <input v-model="plannerEndpoint" type="text" placeholder="/api/webmcp/plan" />
+          </label>
+
+          <label v-if="usesRemotePlanner && plannerAuthMode === 'user-key' && plannerProvider !== 'cloudflare-binding'">
+            User API key
+            <input v-model="plannerApiKey" type="password" autocomplete="off" placeholder="Stored in memory for this demo" />
+          </label>
+
+          <p v-if="usesRemotePlanner && plannerAuthMode === 'user-key' && plannerProvider !== 'cloudflare-binding'" class="planner-warning">
+            User-key mode is simple and has no server, but the key is visible to this browser page. Use it for local experiments or user-owned keys, not shared production app secrets.
+          </p>
+
+          <p v-if="plannerProvider === 'cloudflare-binding'" class="planner-warning">
+            Cloudflare binding mode is only exposed in local development or preview builds. It calls the selected endpoint and expects that endpoint to use an `AI` binding.
+          </p>
+
+          <p v-if="plannerProvider === 'cloudflare-workers-ai' && plannerAuthMode === 'server'" class="planner-warning">
+            Cloudflare Workers AI REST server mode needs `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` on the server, or a custom endpoint.
+          </p>
+        </div>
+
         <textarea
           v-model="prompt"
           rows="4"
@@ -166,6 +236,7 @@
 <script setup lang="ts">
 import {
   createBestPlanner,
+  createConfiguredPlanner,
   defineTool,
   getSupportLabel,
   installWebMCPKitTestBridge,
@@ -175,16 +246,64 @@ import {
   registerTool,
   registerFormTool,
   type DevtoolsOverlay,
+  type PlannerProviderConfig,
+  type PlannerProviderKind,
   type ToolPlan,
   type ToolPlanner
 } from '@webmcp-kit/core'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import type { ActivityItem, CartLine, Invoice, Product, SelectableItem, SupportTicket } from '@/interfaces/demo'
 
 const prompt = ref('Create an invoice for Acme for 500 euros')
 const plannerName = ref('Loading')
 const plannerDetail = ref('Checking Chrome built-in AI availability.')
+const plannerProvider = ref<PlannerProviderKind>('auto')
+const plannerModel = ref('openrouter/auto')
+const plannerBaseUrl = ref('')
+const plannerEndpoint = ref('/api/webmcp/plan')
+const plannerApiKey = ref('')
+const plannerAccountId = ref('')
+const plannerAuthMode = ref<'server' | 'user-key'>('user-key')
+const showCloudflareBinding = import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIEW === 'true'
+const cloudflareBindingModels = [
+  {
+    id: '@cf/google/gemma-4-26b-a4b-it',
+    label: 'Gemma 4 26B A4B'
+  },
+  {
+    id: '@cf/moonshotai/kimi-k2.6',
+    label: 'Kimi K2.6'
+  },
+  {
+    id: '@cf/zai-org/glm-4.7-flash',
+    label: 'GLM 4.7 Flash'
+  },
+  {
+    id: '@cf/qwen/qwen3-30b-a3b-fp8',
+    label: 'Qwen3 30B A3B FP8'
+  },
+  {
+    id: '@cf/openai/gpt-oss-20b',
+    label: 'GPT OSS 20B'
+  },
+  {
+    id: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
+    label: 'DeepSeek R1 Distill Qwen 32B'
+  },
+  {
+    id: '@cf/qwen/qwq-32b',
+    label: 'Qwen QwQ 32B'
+  },
+  {
+    id: '@cf/meta/llama-3.1-8b-instruct',
+    label: 'Llama 3.1 8B Instruct'
+  },
+  {
+    id: '@cf/meta/llama-3.2-3b-instruct',
+    label: 'Llama 3.2 3B Instruct'
+  }
+]
 const lastPlannerUsed = ref('No command has run yet')
 const selectedToolName = ref('create_invoice')
 const registeredTools = ref<ReturnType<typeof listTools>>([])
@@ -201,6 +320,13 @@ const selectedItems = computed(function getSelectedItems() {
   return selectableItems.value.filter(function filterSelected(item) {
     return item.selected
   })
+})
+const usesRemotePlanner = computed(function getUsesRemotePlanner() {
+  return plannerProvider.value === 'openrouter'
+    || plannerProvider.value === 'openai'
+    || plannerProvider.value === 'openai-compatible'
+    || plannerProvider.value === 'cloudflare-binding'
+    || plannerProvider.value === 'cloudflare-workers-ai'
 })
 
 const invoices = ref<Invoice[]>([
@@ -233,6 +359,38 @@ const activity = ref<ActivityItem[]>([
     tone: 'info'
   }
 ])
+
+watch(plannerProvider, function handlePlannerProviderChanged(provider) {
+  if (provider === 'openrouter') {
+    plannerModel.value = 'openrouter/auto'
+    plannerAuthMode.value = 'user-key'
+    return
+  }
+
+  if (provider === 'openai') {
+    plannerModel.value = 'gpt-4.1-mini'
+    plannerAuthMode.value = 'user-key'
+    return
+  }
+
+  if (provider === 'cloudflare-workers-ai') {
+    plannerModel.value = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b'
+    plannerAuthMode.value = 'server'
+    return
+  }
+
+  if (provider === 'cloudflare-binding') {
+    plannerModel.value = cloudflareBindingModels[0].id
+    plannerAuthMode.value = 'server'
+    plannerEndpoint.value = '/api/webmcp/plan'
+    return
+  }
+
+  if (provider === 'openai-compatible') {
+    plannerModel.value = ''
+    plannerAuthMode.value = 'user-key'
+  }
+})
 
 onMounted(async function handleMounted() {
   registerDemoTools()
@@ -463,19 +621,57 @@ function refreshTools() {
 }
 
 async function getCurrentPlanner() {
-  const planner = window.__webMCPKitDemoPlanner
-  if (planner && planner.status !== 'fallback' && planner.status !== 'unavailable') return planner
-
   return refreshPlanner()
 }
 
 async function refreshPlanner() {
-  const planner = await createBestPlanner()
+  const plannerConfig = getSelectedPlannerConfig()
+  const planner = plannerConfig ? await createConfiguredPlanner(plannerConfig) : await createBestPlanner()
   plannerName.value = `${planner.name} (${planner.status})`
   plannerDetail.value = planner.detail
   window.__webMCPKitDemoPlanner = planner
 
   return planner
+}
+
+function getSelectedPlannerConfig(): PlannerProviderConfig | undefined {
+  if (plannerProvider.value === 'auto') return undefined
+
+  if (plannerProvider.value === 'chrome-built-in' || plannerProvider.value === 'local') {
+    return {
+      provider: plannerProvider.value,
+      auth: {
+        mode: 'none'
+      }
+    }
+  }
+
+  if (plannerProvider.value === 'cloudflare-binding') {
+    return {
+      provider: plannerProvider.value,
+      model: plannerModel.value || cloudflareBindingModels[0].id,
+      auth: {
+        mode: 'server',
+        endpoint: plannerEndpoint.value
+      }
+    }
+  }
+
+  return {
+    provider: plannerProvider.value,
+    model: plannerModel.value || undefined,
+    baseUrl: plannerBaseUrl.value || undefined,
+    accountId: plannerAccountId.value || undefined,
+    auth: plannerAuthMode.value === 'server'
+      ? {
+          mode: 'server',
+          endpoint: plannerEndpoint.value
+        }
+      : {
+          mode: 'user-key',
+          apiKey: plannerApiKey.value || undefined
+        }
+  }
 }
 
 function getPlannerContext() {
@@ -684,6 +880,45 @@ textarea:focus {
   margin: 14px 0;
 }
 
+.planner-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid rgba(244, 240, 232, 0.14);
+  background: rgba(244, 240, 232, 0.04);
+}
+
+.planner-panel label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: #c9d1cb;
+  font-size: 0.86rem;
+}
+
+.planner-panel input,
+.planner-panel select {
+  min-width: 0;
+  min-height: 42px;
+  padding: 10px;
+  border: 1px solid rgba(244, 240, 232, 0.18);
+  background: #f4f0e8;
+  color: #0c1110;
+  font: inherit;
+}
+
+.planner-warning {
+  grid-column: 1 / -1;
+  margin: 0;
+  border-left: 3px solid #e8be53;
+  padding-left: 10px;
+  color: #e7d7a5;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
 .prompt-examples button,
 .primary-action,
 .support-form input {
@@ -852,6 +1087,10 @@ code {
   .workbench,
   .state-grid,
   .checklist-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .planner-panel {
     grid-template-columns: 1fr;
   }
 

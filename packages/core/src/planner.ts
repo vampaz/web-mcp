@@ -1,4 +1,11 @@
-import type { PlannerContext, ToolPlan, ToolPlanner, WebMCPTool } from './interfaces/tool'
+import type {
+  PlannerAuth,
+  PlannerContext,
+  PlannerProviderConfig,
+  ToolPlan,
+  ToolPlanner,
+  WebMCPTool
+} from './interfaces/tool'
 
 interface LanguageModelSession {
   prompt: (message: string, options?: ChromeAIPromptOptions) => Promise<string>
@@ -49,6 +56,18 @@ const chromeAITextOptions = {
     }
   ]
 } satisfies ChromeAIOptions
+
+const toolPlanSchema = {
+  type: 'object',
+  properties: {
+    toolName: { type: 'string' },
+    input: { type: 'object' },
+    confidence: { type: 'number' },
+    reason: { type: 'string' }
+  },
+  required: ['toolName', 'input', 'confidence', 'reason'],
+  additionalProperties: false
+}
 
 const numberWords = new Map([
   ['one', 1],
@@ -133,36 +152,80 @@ export async function createBestPlanner(): Promise<ToolPlanner> {
   return createHeuristicPlanner()
 }
 
+export async function createConfiguredPlanner(config?: PlannerProviderConfig): Promise<ToolPlanner> {
+  if (!config || config.provider === 'auto') return createBestPlanner()
+
+  if (config.provider === 'chrome-built-in') return createChromeAIPlanner()
+  if (config.provider === 'local') return createHeuristicPlanner()
+
+  return createRemotePlanner(config)
+}
+
+export function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner {
+  const providerLabel = getProviderLabel(config)
+  const model = config.model ?? getDefaultModel(config)
+  const auth = config.auth ?? { mode: 'none' }
+  const serverBindingRequired = requiresServerBinding(config, auth)
+  const key = getPlannerApiKey(config.provider, auth)
+  const keyRequired = requiresBrowserKey(config, auth)
+
+  if (serverBindingRequired) {
+    return {
+      name: providerLabel,
+      available: false,
+      status: 'unavailable',
+      detail: `${providerLabel} needs server endpoint mode so the browser talks to a local or preview Worker with an AI binding.`,
+      async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
+        return {
+          ...planWithHeuristics(message, tools, context),
+          reason: `${providerLabel} needs server endpoint mode. Used deterministic fallback.`
+        }
+      }
+    }
+  }
+
+  if (keyRequired && !key) {
+    return {
+      name: providerLabel,
+      available: false,
+      status: 'needs-key',
+      detail: `${providerLabel} needs a user API key. In user-key mode the key is stored in the browser and visible to this page.`,
+      async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
+        return {
+          ...planWithHeuristics(message, tools, context),
+          reason: `${providerLabel} needs a user API key. Used deterministic fallback.`
+        }
+      }
+    }
+  }
+
+  return {
+    name: providerLabel,
+    available: true,
+    status: 'ready',
+    detail: getRemotePlannerDetail(config, auth),
+    async plan(message: string, tools: WebMCPTool[], context: PlannerContext = {}) {
+      try {
+        const plan = await planWithRemoteProvider(config, auth, key, model, message, tools, context)
+        validateRemotePlan(plan, tools)
+        return plan
+      } catch (error) {
+        return {
+          ...planWithHeuristics(message, tools, context),
+          reason: `${providerLabel} could not plan this command (${getErrorMessage(error)}). Used deterministic fallback.`
+        }
+      }
+    }
+  }
+}
+
 async function planWithChromeAI(
   session: LanguageModelSession,
   message: string,
   tools: WebMCPTool[],
   context: PlannerContext = {}
 ): Promise<ToolPlan> {
-  const schema = {
-    type: 'object',
-    properties: {
-      toolName: { type: 'string' },
-      input: { type: 'object' },
-      confidence: { type: 'number' },
-      reason: { type: 'string' }
-    },
-    required: ['toolName', 'input', 'confidence', 'reason'],
-    additionalProperties: false
-  }
-
-  const toolCatalog = tools.map((tool) => ({
-    name: tool.name,
-    description: tool.description,
-    inputSchema: tool.inputSchema
-  }))
-
-  const response = await session.prompt([
-    `User request: ${message}`,
-    `Current app context:\n${JSON.stringify(context, null, 2)}`,
-    `Available tools:\n${JSON.stringify(toolCatalog, null, 2)}`,
-    'Choose the best tool and exact parameters from the current app context. Prefer stable IDs from context over labels.'
-  ].join('\n\n'), { responseConstraint: schema })
+  const response = await session.prompt(createPlannerPrompt(message, tools, context), { responseConstraint: toolPlanSchema })
 
   return JSON.parse(response) as ToolPlan
 }
@@ -177,6 +240,173 @@ function createChromeAISession(languageModel: LanguageModelApi): Promise<Languag
       }
     ]
   })
+}
+
+async function planWithRemoteProvider(
+  config: PlannerProviderConfig,
+  auth: PlannerAuth,
+  apiKey: string | undefined,
+  model: string,
+  message: string,
+  tools: WebMCPTool[],
+  context: PlannerContext
+): Promise<ToolPlan> {
+  if (auth.mode === 'server') {
+    return planWithServerEndpoint(auth.endpoint, config, model, message, tools, context)
+  }
+
+  if (config.provider === 'cloudflare-workers-ai') {
+    return planWithCloudflareRest(config, apiKey, model, message, tools, context)
+  }
+
+  return planWithOpenAICompatible(config, apiKey, model, message, tools, context)
+}
+
+async function planWithServerEndpoint(
+  endpoint: string,
+  config: PlannerProviderConfig,
+  model: string,
+  message: string,
+  tools: WebMCPTool[],
+  context: PlannerContext
+): Promise<ToolPlan> {
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      provider: config.provider,
+      model,
+      message,
+      tools: createToolCatalog(tools),
+      context,
+      responseSchema: toolPlanSchema
+    })
+  })
+
+  if (!response.ok) {
+    throw new Error(await getServerPlannerError(response))
+  }
+
+  return await response.json() as ToolPlan
+}
+
+async function planWithOpenAICompatible(
+  config: PlannerProviderConfig,
+  apiKey: string | undefined,
+  model: string,
+  message: string,
+  tools: WebMCPTool[],
+  context: PlannerContext
+): Promise<ToolPlan> {
+  const baseUrl = getOpenAICompatibleBaseUrl(config)
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  }
+
+  if (apiKey) {
+    headers.Authorization = `Bearer ${apiKey}`
+  }
+
+  if (config.provider === 'openrouter' && typeof location !== 'undefined') {
+    headers['HTTP-Referer'] = location.origin
+    headers['X-Title'] = 'WebMCP Kit'
+  }
+
+  const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model,
+      messages: createPlannerMessages(message, tools, context),
+      response_format: {
+        type: 'json_object'
+      },
+      temperature: 0
+    })
+  })
+
+  if (!response.ok) {
+    throw new Error(`${getProviderLabel(config)} returned ${response.status}`)
+  }
+
+  const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> }
+  const content = payload.choices?.[0]?.message?.content
+  if (!content) throw new Error('provider returned no message content')
+
+  return JSON.parse(content) as ToolPlan
+}
+
+async function planWithCloudflareRest(
+  config: PlannerProviderConfig,
+  apiKey: string | undefined,
+  model: string,
+  message: string,
+  tools: WebMCPTool[],
+  context: PlannerContext
+): Promise<ToolPlan> {
+  if (!config.accountId) {
+    throw new Error('Cloudflare REST planning needs accountId or server endpoint mode')
+  }
+
+  const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${config.accountId}/ai/run/${model}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      messages: createPlannerMessages(message, tools, context),
+      response_format: {
+        type: 'json_schema',
+        json_schema: toolPlanSchema
+      },
+      temperature: 0
+    })
+  })
+
+  if (!response.ok) {
+    throw new Error(`Cloudflare Workers AI returned ${response.status}`)
+  }
+
+  const payload = await response.json() as { result?: { response?: string } }
+  const content = payload.result?.response
+  if (!content) throw new Error('Cloudflare returned no response content')
+
+  return JSON.parse(content) as ToolPlan
+}
+
+function createPlannerMessages(message: string, tools: WebMCPTool[], context: PlannerContext) {
+  return [
+    {
+      role: 'system',
+      content: 'Choose exactly one app tool for the user request. Return only JSON with toolName, input, confidence, and reason.'
+    },
+    {
+      role: 'user',
+      content: createPlannerPrompt(message, tools, context)
+    }
+  ]
+}
+
+function createPlannerPrompt(message: string, tools: WebMCPTool[], context: PlannerContext): string {
+  return [
+    `User request: ${message}`,
+    `Current app context:\n${JSON.stringify(context, null, 2)}`,
+    `Available tools:\n${JSON.stringify(createToolCatalog(tools), null, 2)}`,
+    'Choose the best tool and exact parameters from the current app context. Prefer stable IDs from context over labels.',
+    'Return only valid JSON matching this schema:',
+    JSON.stringify(toolPlanSchema, null, 2)
+  ].join('\n\n')
+}
+
+function createToolCatalog(tools: WebMCPTool[]) {
+  return tools.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    inputSchema: tool.inputSchema
+  }))
 }
 
 function planWithHeuristics(message: string, tools: WebMCPTool[], context: PlannerContext = {}): ToolPlan {
@@ -349,6 +579,87 @@ function createUnavailableChromePlanner(detail: string): ToolPlanner {
       return planWithHeuristics(message, tools, context)
     }
   }
+}
+
+function validateRemotePlan(plan: ToolPlan, tools: WebMCPTool[]): void {
+  if (!plan || typeof plan !== 'object') throw new Error('provider returned an invalid plan')
+  if (typeof plan.toolName !== 'string') throw new Error('provider returned a plan without toolName')
+  if (!plan.input || typeof plan.input !== 'object' || Array.isArray(plan.input)) throw new Error('provider returned a plan with invalid input')
+  if (typeof plan.confidence !== 'number') throw new Error('provider returned a plan without numeric confidence')
+  if (typeof plan.reason !== 'string') throw new Error('provider returned a plan without reason')
+  if (!tools.some((tool) => tool.name === plan.toolName)) throw new Error(`provider selected unknown tool "${plan.toolName}"`)
+}
+
+function getPlannerApiKey(provider: PlannerProviderConfig['provider'], auth: PlannerAuth): string | undefined {
+  if (auth.mode !== 'user-key') return undefined
+  if (auth.apiKey) return auth.apiKey
+  if (typeof localStorage === 'undefined') return undefined
+
+  const storageKey = auth.storageKey ?? getDefaultStorageKey(provider)
+  return localStorage.getItem(storageKey) ?? undefined
+}
+
+function requiresBrowserKey(config: PlannerProviderConfig, auth: PlannerAuth): boolean {
+  return auth.mode === 'user-key'
+    && config.provider !== 'chrome-built-in'
+    && config.provider !== 'local'
+    && config.provider !== 'cloudflare-binding'
+}
+
+function requiresServerBinding(config: PlannerProviderConfig, auth: PlannerAuth): boolean {
+  return config.provider === 'cloudflare-binding' && auth.mode !== 'server'
+}
+
+function getRemotePlannerDetail(config: PlannerProviderConfig, auth: PlannerAuth): string {
+  const provider = getProviderLabel(config)
+  if (config.provider === 'cloudflare-binding') return `${provider} will plan through ${auth.mode === 'server' ? auth.endpoint : 'a server endpoint'} using a local or preview Cloudflare AI binding.`
+  if (auth.mode === 'server') return `${provider} will plan through ${auth.endpoint}; provider secrets stay server-side.`
+  if (auth.mode === 'user-key') return `${provider} will plan directly from the browser with a user-provided key. This is convenient but the key is visible to this page.`
+  return `${provider} will plan without an API key.`
+}
+
+function getOpenAICompatibleBaseUrl(config: PlannerProviderConfig): string {
+  if (config.provider === 'openrouter') return config.baseUrl ?? 'https://openrouter.ai/api/v1'
+  if (config.provider === 'openai') return config.baseUrl ?? 'https://api.openai.com/v1'
+  if (!config.baseUrl) throw new Error('OpenAI-compatible planning needs baseUrl')
+
+  return config.baseUrl
+}
+
+function getDefaultModel(config: PlannerProviderConfig): string {
+  if (config.provider === 'openrouter') return 'openrouter/auto'
+  if (config.provider === 'openai') return 'gpt-4.1-mini'
+  if (config.provider === 'cloudflare-binding') return '@cf/google/gemma-4-26b-a4b-it'
+  if (config.provider === 'cloudflare-workers-ai') return '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b'
+
+  return 'default'
+}
+
+function getProviderLabel(config: PlannerProviderConfig): string {
+  if (config.provider === 'openrouter') return 'OpenRouter'
+  if (config.provider === 'openai') return 'OpenAI'
+  if (config.provider === 'openai-compatible') return 'OpenAI-compatible provider'
+  if (config.provider === 'cloudflare-binding') return 'Cloudflare binding'
+  if (config.provider === 'cloudflare-workers-ai') return 'Cloudflare Workers AI'
+  if (config.provider === 'chrome-built-in') return 'Chrome built-in AI'
+  if (config.provider === 'local') return 'Local heuristic planner'
+
+  return 'Planner'
+}
+
+function getDefaultStorageKey(provider: PlannerProviderConfig['provider']): string {
+  return `webmcp-kit:${provider}:api-key`
+}
+
+async function getServerPlannerError(response: Response): Promise<string> {
+  try {
+    const payload = await response.json() as { error?: string }
+    if (payload.error) return `server planner returned ${response.status}: ${payload.error}`
+  } catch {
+    return `server planner returned ${response.status}`
+  }
+
+  return `server planner returned ${response.status}`
 }
 
 function getErrorMessage(error: unknown): string {

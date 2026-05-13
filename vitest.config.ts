@@ -7,7 +7,8 @@ export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
-      '@': path.resolve(process.cwd(), 'src')
+      '@': path.resolve(process.cwd(), 'src'),
+      'cloudflare:workers': path.resolve(process.cwd(), 'src/test-utils/cloudflare-workers-stub.ts')
     }
   },
   test: {

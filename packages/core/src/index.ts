@@ -12,6 +12,10 @@ export { inferFormInputSchema, registerFormTool, type FormInput, type RegisterFo
 export type {
   JsonSchema,
   PlannerContext,
+  PlannerAuth,
+  PlannerProviderConfig,
+  PlannerProviderKind,
+  PlannerRequest,
   RegisteredTool,
   RegistrySnapshot,
   ToolConfirmation,
@@ -24,7 +28,14 @@ export type {
   WebMCPKitEvent,
   WebMCPTool
 } from './interfaces/tool'
-export { createBestPlanner, createChromeAIPlanner, createHeuristicPlanner } from './planner'
+export { createWebMCPKit, type WebMCPKit, type WebMCPKitOptions } from './kit'
+export {
+  createBestPlanner,
+  createChromeAIPlanner,
+  createConfiguredPlanner,
+  createHeuristicPlanner,
+  createRemotePlanner
+} from './planner'
 export { clearToolsForTest, getRegistrySnapshot, getTool, invokeTool, listTools, registerTool } from './registry'
 export { validateJsonSchema } from './schema'
 export { getSupportLabel, isWebMCPSupported } from './support'

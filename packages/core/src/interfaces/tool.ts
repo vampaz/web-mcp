@@ -80,10 +80,39 @@ export interface PlannerContext {
   [key: string]: unknown
 }
 
+export type PlannerProviderKind =
+  | 'auto'
+  | 'chrome-built-in'
+  | 'local'
+  | 'openai'
+  | 'openrouter'
+  | 'openai-compatible'
+  | 'cloudflare-binding'
+  | 'cloudflare-workers-ai'
+
+export type PlannerAuth =
+  | { mode: 'none' }
+  | { mode: 'server', endpoint: string }
+  | { mode: 'user-key', apiKey?: string, storageKey?: string, allowInProduction?: boolean }
+
+export interface PlannerProviderConfig {
+  provider: PlannerProviderKind
+  model?: string
+  baseUrl?: string
+  accountId?: string
+  auth?: PlannerAuth
+}
+
+export interface PlannerRequest {
+  message: string
+  tools: WebMCPTool[]
+  context: PlannerContext
+}
+
 export interface ToolPlanner {
   name: string
   available: boolean
-  status: 'ready' | 'downloadable' | 'downloading' | 'unavailable' | 'fallback'
+  status: 'ready' | 'downloadable' | 'downloading' | 'unavailable' | 'fallback' | 'needs-key'
   detail: string
   plan: (message: string, tools: WebMCPTool[], context?: PlannerContext) => Promise<ToolPlan>
 }
