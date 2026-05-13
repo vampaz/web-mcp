@@ -141,6 +141,10 @@ const overlayStyles = `
   border-left: 3px solid #e8be53;
   padding-left: 8px;
 }
+.wmk-devtools__error {
+  color: #f39a8d;
+  font-size: 12px;
+}
 .wmk-devtools__quality {
   color: #30a779;
   font-size: 12px;
@@ -191,14 +195,21 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
 
   const unsubscribe = subscribeWebMCPKitEvents(function handleEvent(event) {
     if (event.type === 'invoked') {
-      pendingInvocations.set(event.toolName, event.detail as ToolInvocation)
+      const invocation = event.detail as ToolInvocation
+      if (invocation.id) {
+        pendingInvocations.set(invocation.id, invocation)
+      }
       return
     }
 
     if (event.type === 'succeeded' || event.type === 'failed' || event.type === 'blocked') {
-      history.unshift(toHistoryItem(nextHistoryId, event, pendingInvocations.get(event.toolName)))
+      const result = event.detail as ToolInvocationResult | undefined
+      const invocation = result?.invocationId ? pendingInvocations.get(result.invocationId) : undefined
+      history.unshift(toHistoryItem(nextHistoryId, event, invocation))
       nextHistoryId += 1
-      pendingInvocations.delete(event.toolName)
+      if (result?.invocationId) {
+        pendingInvocations.delete(result.invocationId)
+      }
       history.splice(5)
     }
     render()
@@ -296,19 +307,70 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
 
   async function invokeFromOverlay(toolName: string, replayInput?: Record<string, unknown>) {
     const textarea = root.querySelector<HTMLTextAreaElement>(`textarea[data-tool-name="${toolName}"]`)
-    const input = replayInput ?? (textarea?.value ? JSON.parse(textarea.value) as Record<string, unknown> : {})
+    const parsedInput = replayInput
+      ? { ok: true, input: replayInput } as const
+      : parseInput(toolName, textarea?.value ?? '')
+    if (!parsedInput.ok) return
+
+    const invocationId = createInvocationId()
     const registration = listTools().find((item) => item.tool.name === toolName)
     const confirmed = registration?.tool.confirmation?.required ? window.confirm(registration.tool.confirmation.reason) : true
 
     const invocation = {
+      id: invocationId,
       toolName,
-      input,
+      input: parsedInput.input,
       confirmed,
       source: 'devtools'
     } satisfies ToolInvocation
-    pendingInvocations.set(toolName, invocation)
     await invokeTool(invocation)
   }
+
+  function parseInput(toolName: string, value: string): { ok: true, input: Record<string, unknown> } | { ok: false } {
+    if (!value.trim()) {
+      return {
+        ok: true,
+        input: {}
+      }
+    }
+
+    try {
+      const input = JSON.parse(value) as unknown
+      if (input && typeof input === 'object' && !Array.isArray(input)) {
+        return {
+          ok: true,
+          input: input as Record<string, unknown>
+        }
+      }
+    } catch {
+      addLocalHistoryError(toolName, 'Input must be valid JSON.')
+      return {
+        ok: false
+      }
+    }
+
+    addLocalHistoryError(toolName, 'Input must be a JSON object.')
+    return {
+      ok: false
+    }
+  }
+
+  function addLocalHistoryError(toolName: string, detail: string): void {
+    history.unshift({
+      id: nextHistoryId,
+      toolName,
+      status: 'error',
+      input: {},
+      detail
+    })
+    nextHistoryId += 1
+    history.splice(5)
+    render()
+  }
+}
+
+function createInvocationId(): string {
+  return `devtools_${Date.now()}_${Math.random().toString(16).slice(2)}`
 }
 
 function getQualityScore(warnings: string[]): number {

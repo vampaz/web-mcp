@@ -2,15 +2,21 @@
 
 WebMCP Kit is a framework-agnostic TypeScript toolkit for exposing app actions to native WebMCP when available, plus local fallback tooling for development and tests.
 
-## Install
+## Local Workspace
+
+In this repository, the packages are local npm workspace packages:
+
+- `@webmcp-kit/core`
+- `@webmcp-kit/devtools`
+- `@webmcp-kit/testing`
+- `@webmcp-kit/mcp-bridge`
+
+Use normal workspace imports while developing the kit. After the packages are made public, apps will install them from npm.
+
+## Future npm Install
 
 ```sh
 npm install @webmcp-kit/core
-```
-
-Add devtools only when you want the browser overlay:
-
-```sh
 npm install @webmcp-kit/devtools
 ```
 

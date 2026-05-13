@@ -66,6 +66,11 @@ registerTool(defineTool({
     required: ['productId', 'quantity'],
     additionalProperties: false
   },
+  guard(input) {
+    return products.some(function hasProduct(product) {
+      return product.id === String(input.productId ?? '')
+    }) || 'Product is not available in the current catalog.'
+  },
   execute(input) {
     const productId = String(input.productId ?? '')
     const quantity = Number(input.quantity ?? 1)
@@ -99,6 +104,11 @@ function searchProducts(query: string): Product[] {
 }
 
 function addToCart(productId: string, quantity: number): void {
+  const product = products.find(function findProduct(item) {
+    return item.id === productId
+  })
+  if (!product) throw new Error('Product is not available in the current catalog.')
+
   const existingLine = cart.find(function findLine(line) {
     return line.productId === productId
   })

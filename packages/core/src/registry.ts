@@ -83,6 +83,14 @@ export async function invokeTool<TOutput = unknown>(
     )
   }
 
+  const invocationId = invocation.id ?? createInvocationId()
+  const trackedInvocation = {
+    ...invocation,
+    id: invocationId
+  }
+
+  emitWebMCPKitEvent({ type: 'invoked', toolName: invocation.toolName, timestamp: Date.now(), detail: trackedInvocation })
+
   const availability = registration.tool.scope?.()
   if (availability && !availability.available) {
     const result = createResult<TOutput>(
@@ -92,6 +100,7 @@ export async function invokeTool<TOutput = unknown>(
       undefined,
       availability.reason ?? 'Tool is not available in the current state.'
     )
+    result.invocationId = invocationId
     emitWebMCPKitEvent({ type: 'blocked', toolName: invocation.toolName, timestamp: Date.now(), detail: result })
     return result
   }
@@ -104,6 +113,7 @@ export async function invokeTool<TOutput = unknown>(
       undefined,
       registration.tool.confirmation.reason
     )
+    result.invocationId = invocationId
     emitWebMCPKitEvent({ type: 'blocked', toolName: invocation.toolName, timestamp: Date.now(), detail: result })
     return result
   }
@@ -117,17 +127,17 @@ export async function invokeTool<TOutput = unknown>(
       undefined,
       typeof guardResult === 'string' ? guardResult : 'Tool guard blocked invocation.'
     )
+    result.invocationId = invocationId
     emitWebMCPKitEvent({ type: 'blocked', toolName: invocation.toolName, timestamp: Date.now(), detail: result })
     return result
   }
-
-  emitWebMCPKitEvent({ type: 'invoked', toolName: invocation.toolName, timestamp: Date.now(), detail: invocation })
 
   try {
     const output = await registration.tool.execute(invocation.input, {
       source: invocation.source ?? 'fallback'
     })
     const result = createResult<TOutput>(invocation.toolName, 'success', startedAt, output as TOutput)
+    result.invocationId = invocationId
     emitWebMCPKitEvent({ type: 'succeeded', toolName: invocation.toolName, timestamp: Date.now(), detail: result })
     return result
   } catch (error) {
@@ -138,6 +148,7 @@ export async function invokeTool<TOutput = unknown>(
       undefined,
       error instanceof Error ? error.message : 'Tool invocation failed.'
     )
+    result.invocationId = invocationId
     emitWebMCPKitEvent({ type: 'failed', toolName: invocation.toolName, timestamp: Date.now(), detail: result })
     return result
   }
@@ -161,4 +172,8 @@ function createResult<TOutput>(
     error,
     durationMs: Math.round(performance.now() - startedAt)
   }
+}
+
+function createInvocationId(): string {
+  return `invocation_${Date.now()}_${Math.random().toString(16).slice(2)}`
 }

@@ -8,7 +8,7 @@ This is not a new protocol. It is an adoption layer for WebMCP.
 
 ## Current Implementation Status
 
-- `packages/core`, `packages/testing`, `packages/devtools`, and `packages/mcp-bridge` are implemented and covered by unit tests.
+- `packages/core`, `packages/testing`, `packages/devtools`, and `packages/mcp-bridge` are implemented as local npm workspace packages and covered by tests.
 - The devtools overlay lives in `packages/devtools`; core remains framework-agnostic.
 - The active demo is the root Astro app in `src/pages/index.astro` and `src/components/WebMcpDemo.vue`; separate `apps/*` demos remain planned.
 - Planner providers now support Chrome built-in AI, deterministic fallback, server endpoints, user-provided OpenAI-compatible keys, Cloudflare REST, and Cloudflare binding mode.
@@ -21,7 +21,7 @@ This is not a new protocol. It is an adoption layer for WebMCP.
   - [x] Step 1.1: Initialize monorepo with npm workspaces
     - Files: `package.json`, `package-lock.json`, `.npmrc`
     - Verify: `npm install` succeeds
-  - [x] Step 1.2: Create publishable framework-agnostic package structure
+  - [x] Step 1.2: Create framework-agnostic workspace package structure
     - Files: `packages/core/package.json`, `packages/testing/package.json`, `packages/devtools/package.json`, `packages/mcp-bridge/package.json`
     - Verify: workspace package discovery works
   - [x] Step 1.3: Add strict TypeScript and test setup

@@ -55,6 +55,7 @@ export interface RegistrySnapshot {
 }
 
 export interface ToolInvocation<TInput = Record<string, unknown>> {
+  id?: string
   toolName: string
   input: TInput
   confirmed?: boolean
@@ -62,6 +63,7 @@ export interface ToolInvocation<TInput = Record<string, unknown>> {
 }
 
 export interface ToolInvocationResult<TOutput = unknown> {
+  invocationId?: string
   toolName: string
   status: 'success' | 'error' | 'blocked' | 'unavailable'
   output?: TOutput

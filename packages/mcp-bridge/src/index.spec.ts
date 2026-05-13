@@ -83,4 +83,73 @@ describe('local MCP bridge', () => {
       }
     })
   })
+
+  it('requires explicit confirmation for confirmed tools', async () => {
+    registerTool(defineTool({
+      name: 'checkout_cart',
+      description: 'Checkout the current cart and clear all cart lines after explicit confirmation.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        required: [],
+        additionalProperties: false
+      },
+      confirmation: {
+        required: true,
+        reason: 'Checkout clears the cart.'
+      },
+      execute() {
+        return {
+          ok: true
+        }
+      }
+    }))
+
+    const bridge = createLocalMCPBridge()
+
+    await expect(bridge.handleRequest({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: {
+        name: 'checkout_cart',
+        arguments: {}
+      }
+    })).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 1,
+      result: {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify('Checkout clears the cart.')
+          }
+        ],
+        isError: true
+      }
+    })
+
+    await expect(bridge.handleRequest({
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/call',
+      params: {
+        name: 'checkout_cart',
+        arguments: {},
+        confirmed: true
+      }
+    })).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 2,
+      result: {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({ ok: true })
+          }
+        ],
+        isError: false
+      }
+    })
+  })
 })
