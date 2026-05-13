@@ -53,7 +53,8 @@ export function inferFormInputSchema(form: HTMLFormElement): JsonSchema {
     type: 'object',
     properties,
     required,
-    additionalProperties: false
+    additionalProperties: false,
+    'x-webmcp-source': 'form'
   }
 }
 

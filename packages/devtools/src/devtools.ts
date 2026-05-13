@@ -1,7 +1,13 @@
-import type { JsonSchema, ToolInvocationResult, WebMCPKitEvent } from './interfaces/tool'
-import { invokeTool, listTools } from './registry'
-import { getSupportLabel } from './support'
-import { subscribeWebMCPKitEvents } from './events'
+import {
+  getSupportLabel,
+  invokeTool,
+  listTools,
+  subscribeWebMCPKitEvents,
+  type JsonSchema,
+  type ToolInvocation,
+  type ToolInvocationResult,
+  type WebMCPKitEvent
+} from '@webmcp-kit/core'
 
 export interface DevtoolsOverlay {
   refresh: () => void
@@ -14,8 +20,12 @@ export interface MountDevtoolsOptions {
 }
 
 interface HistoryItem {
+  id: number
   toolName: string
   status: ToolInvocationResult['status']
+  input: Record<string, unknown>
+  output?: unknown
+  durationMs?: number
   detail: string
 }
 
@@ -68,6 +78,7 @@ const overlayStyles = `
 .wmk-devtools__eyebrow,
 .wmk-devtools__meta,
 .wmk-devtools__warning,
+.wmk-devtools__preview,
 .wmk-devtools__history {
   color: #9ea8a1;
   font-size: 12px;
@@ -130,11 +141,35 @@ const overlayStyles = `
   border-left: 3px solid #e8be53;
   padding-left: 8px;
 }
+.wmk-devtools__quality {
+  color: #30a779;
+  font-size: 12px;
+  font-weight: 800;
+}
+.wmk-devtools__preview summary {
+  cursor: pointer;
+}
+.wmk-devtools__preview pre,
+.wmk-devtools__history pre {
+  overflow: auto;
+  margin: 6px 0 0;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.26);
+  color: #f4f0e8;
+  white-space: pre-wrap;
+}
 .wmk-devtools__history {
   display: grid;
-  gap: 6px;
+  gap: 10px;
   border-top: 1px solid rgba(244, 240, 232, 0.13);
   padding-top: 12px;
+}
+.wmk-devtools__history-item {
+  display: grid;
+  gap: 6px;
+}
+.wmk-devtools__history-item button {
+  justify-self: start;
 }
 `
 
@@ -150,11 +185,20 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
   target.append(style, root)
 
   let open = options.initiallyOpen ?? true
+  let nextHistoryId = 1
   const history: HistoryItem[] = []
+  const pendingInvocations = new Map<string, ToolInvocation>()
 
   const unsubscribe = subscribeWebMCPKitEvents(function handleEvent(event) {
+    if (event.type === 'invoked') {
+      pendingInvocations.set(event.toolName, event.detail as ToolInvocation)
+      return
+    }
+
     if (event.type === 'succeeded' || event.type === 'failed' || event.type === 'blocked') {
-      history.unshift(toHistoryItem(event))
+      history.unshift(toHistoryItem(nextHistoryId, event, pendingInvocations.get(event.toolName)))
+      nextHistoryId += 1
+      pendingInvocations.delete(event.toolName)
       history.splice(5)
     }
     render()
@@ -182,6 +226,14 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
 
     if (action === 'invoke') {
       void invokeFromOverlay(String(targetElement.dataset.toolName))
+      return
+    }
+
+    if (action === 'replay') {
+      const historyItem = history.find((item) => String(item.id) === targetElement.dataset.historyId)
+      if (historyItem) {
+        void invokeFromOverlay(historyItem.toolName, historyItem.input)
+      }
     }
   })
 
@@ -215,7 +267,12 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
             <div class="wmk-devtools__meta">${escapeHtml(registration.mode)}</div>
             <strong>${escapeHtml(registration.tool.name)}</strong>
             <p>${escapeHtml(registration.tool.description)}</p>
+            <div class="wmk-devtools__quality">Quality ${getQualityScore(registration.warnings)}% · ${registration.warnings.length} warnings</div>
             ${registration.warnings.map((warning) => `<div class="wmk-devtools__warning">${escapeHtml(warning)}</div>`).join('')}
+            <details class="wmk-devtools__preview">
+              <summary>Prompt preview</summary>
+              <pre>${escapeHtml(createPromptPreview(registration.tool.name, registration.tool.description, registration.tool.inputSchema))}</pre>
+            </details>
             <textarea data-tool-name="${escapeHtml(registration.tool.name)}">${escapeHtml(JSON.stringify(createSampleInput(registration.tool.inputSchema), null, 2))}</textarea>
             <div class="wmk-devtools__actions">
               <button type="button" data-action="invoke" data-tool-name="${escapeHtml(registration.tool.name)}">Invoke</button>
@@ -226,34 +283,44 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
         <div class="wmk-devtools__history">
           <strong>Invocation history</strong>
           ${history.length === 0 ? '<span>No invocations yet.</span>' : history.map((item) => `
-            <span>${escapeHtml(item.toolName)} - ${escapeHtml(item.status)} - ${escapeHtml(item.detail)}</span>
+            <article class="wmk-devtools__history-item">
+              <span>${escapeHtml(item.toolName)} - ${escapeHtml(item.status)} - ${escapeHtml(item.detail)}${item.durationMs === undefined ? '' : ` - ${item.durationMs}ms`}</span>
+              <pre>${escapeHtml(JSON.stringify({ input: item.input, output: item.output }, null, 2))}</pre>
+              <button type="button" data-action="replay" data-history-id="${item.id}">Replay</button>
+            </article>
           `).join('')}
         </div>
       </div>
     `
   }
 
-  async function invokeFromOverlay(toolName: string) {
+  async function invokeFromOverlay(toolName: string, replayInput?: Record<string, unknown>) {
     const textarea = root.querySelector<HTMLTextAreaElement>(`textarea[data-tool-name="${toolName}"]`)
-    const input = textarea?.value ? JSON.parse(textarea.value) as Record<string, unknown> : {}
+    const input = replayInput ?? (textarea?.value ? JSON.parse(textarea.value) as Record<string, unknown> : {})
     const registration = listTools().find((item) => item.tool.name === toolName)
     const confirmed = registration?.tool.confirmation?.required ? window.confirm(registration.tool.confirmation.reason) : true
 
-    const result = await invokeTool({
+    const invocation = {
       toolName,
       input,
       confirmed,
       source: 'devtools'
-    })
-
-    history.unshift({
-      toolName,
-      status: result.status,
-      detail: result.error ?? 'Completed'
-    })
-    history.splice(5)
-    render()
+    } satisfies ToolInvocation
+    pendingInvocations.set(toolName, invocation)
+    await invokeTool(invocation)
   }
+}
+
+function getQualityScore(warnings: string[]): number {
+  return Math.max(0, 100 - warnings.length * 20)
+}
+
+function createPromptPreview(name: string, description: string, inputSchema: JsonSchema): string {
+  return [
+    `Tool: ${name}`,
+    `When to use: ${description}`,
+    `Input JSON Schema: ${JSON.stringify(inputSchema, null, 2)}`
+  ].join('\n\n')
 }
 
 function createSampleInput(schema: JsonSchema): Record<string, unknown> {
@@ -279,12 +346,16 @@ function createSampleValue(key: string, schema: JsonSchema): unknown {
   return 'Sample value'
 }
 
-function toHistoryItem(event: WebMCPKitEvent): HistoryItem {
+function toHistoryItem(id: number, event: WebMCPKitEvent, invocation?: ToolInvocation): HistoryItem {
   const result = event.detail as ToolInvocationResult | undefined
 
   return {
+    id,
     toolName: event.toolName,
     status: result?.status ?? (event.type === 'succeeded' ? 'success' : 'error'),
+    input: invocation?.input ?? {},
+    output: result?.output,
+    durationMs: result?.durationMs,
     detail: result?.error ?? 'Completed'
   }
 }

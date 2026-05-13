@@ -6,7 +6,7 @@ export {
   type ToolCatalogEntry,
   type ToolCatalogOptions
 } from './adapters/catalog'
-export { mountDevtoolsOverlay, type DevtoolsOverlay, type MountDevtoolsOptions } from './devtools'
+export { formatOpenAITool, formatOpenAITools, type OpenAIFunctionTool } from './adapters/openai'
 export { emitWebMCPKitEvent, subscribeWebMCPKitEvents } from './events'
 export { inferFormInputSchema, registerFormTool, type FormInput, type RegisterFormToolOptions } from './forms'
 export type {

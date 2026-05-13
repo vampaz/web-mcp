@@ -39,7 +39,8 @@ describe('form helpers', () => {
         }
       },
       required: ['subject'],
-      additionalProperties: false
+      additionalProperties: false,
+      'x-webmcp-source': 'form'
     })
   })
 
@@ -79,5 +80,28 @@ describe('form helpers', () => {
       subject: 'Billing',
       body: 'Cannot access invoices.'
     })
+  })
+
+  it('warns on risky form-backed tools', () => {
+    document.body.innerHTML = `
+      <form>
+        <input name="email" />
+        <input name="password" type="password" />
+        <textarea name="body" data-tool-description="Support request details"></textarea>
+      </form>
+    `
+
+    const form = document.querySelector('form')
+    if (!form) throw new Error('Expected test form.')
+
+    const registration = registerFormTool({
+      form,
+      name: 'submit_account_request',
+      description: 'Submit the account request form for review by the support team.'
+    })
+
+    expect(registration.warnings).toContain('Form field "email" needs a specific tool description.')
+    expect(registration.warnings).toContain('Form field "email" is exposed without validation constraints.')
+    expect(registration.warnings).toContain('Sensitive form field "password" should require explicit confirmation or be excluded.')
   })
 })

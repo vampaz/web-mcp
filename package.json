@@ -18,6 +18,7 @@
   "dependencies": {
     "@astrojs/vue": "latest",
     "@webmcp-kit/core": "0.0.0",
+    "@webmcp-kit/devtools": "0.0.0",
     "astro": "latest",
     "three": "^0.184.0",
     "vue": "latest"

@@ -242,15 +242,14 @@ import {
   installWebMCPKitTestBridge,
   invokeTool,
   listTools,
-  mountDevtoolsOverlay,
   registerTool,
   registerFormTool,
-  type DevtoolsOverlay,
   type PlannerProviderConfig,
   type PlannerProviderKind,
   type ToolPlan,
   type ToolPlanner
 } from '@webmcp-kit/core'
+import { mountDevtoolsOverlay, type DevtoolsOverlay } from '@webmcp-kit/devtools'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import type { ActivityItem, CartLine, Invoice, Product, SelectableItem, SupportTicket } from '@/interfaces/demo'
@@ -486,10 +485,17 @@ function registerDemoTools() {
       },
       required: ['productId', 'quantity']
     },
+    guard(input) {
+      return products.value.some(function hasProduct(item) {
+        return item.id === String(input.productId ?? '')
+      }) || 'Product is not available in the current catalog.'
+    },
     execute(input) {
       const product = products.value.find(function findProduct(item) {
-        return item.id === input.productId
-      }) ?? products.value[0]
+        return item.id === String(input.productId ?? '')
+      })
+      if (!product) throw new Error('Product is not available in the current catalog.')
+
       const line = {
         productId: product.id,
         name: product.name,
@@ -501,6 +507,37 @@ function registerDemoTools() {
       })]
       addActivity('Cart updated', `${line.name} added`, 'success')
       return line
+    }
+  })).unregister)
+
+  unregisterCallbacks.push(registerTool(defineTool({
+    name: 'checkout_cart',
+    description: 'Checkout the current cart and clear all cart lines after explicit confirmation.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+      additionalProperties: false
+    },
+    confirmation: {
+      required: true,
+      reason: 'Checkout clears the cart and represents a purchase action.'
+    },
+    guard() {
+      return cart.value.length > 0 || 'Cart is empty.'
+    },
+    execute() {
+      const lines = [...cart.value]
+      const total = lines.reduce(function sumCart(sum, line) {
+        return sum + line.price * line.quantity
+      }, 0)
+      cart.value = []
+      addActivity('Checkout completed', `${lines.length} lines for €${total}`, 'success')
+
+      return {
+        lines,
+        total
+      }
     }
   })).unregister)
 

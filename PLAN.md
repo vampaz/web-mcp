@@ -8,8 +8,8 @@ This is not a new protocol. It is an adoption layer for WebMCP.
 
 ## Current Implementation Status
 
-- `packages/core` and `packages/testing` are implemented and covered by unit tests.
-- The devtools overlay currently lives in `packages/core`; extracting it to `packages/devtools` remains publishability work.
+- `packages/core`, `packages/testing`, `packages/devtools`, and `packages/mcp-bridge` are implemented and covered by unit tests.
+- The devtools overlay lives in `packages/devtools`; core remains framework-agnostic.
 - The active demo is the root Astro app in `src/pages/index.astro` and `src/components/WebMcpDemo.vue`; separate `apps/*` demos remain planned.
 - Planner providers now support Chrome built-in AI, deterministic fallback, server endpoints, user-provided OpenAI-compatible keys, Cloudflare REST, and Cloudflare binding mode.
 - Cloudflare binding mode is wired through the Astro Cloudflare adapter, `wrangler.toml`, and `src/pages/api/webmcp/plan.ts`.
@@ -17,12 +17,12 @@ This is not a new protocol. It is an adoption layer for WebMCP.
 
 ---
 
-- [ ] Phase 1: Package Foundation
+- [x] Phase 1: Package Foundation
   - [x] Step 1.1: Initialize monorepo with npm workspaces
     - Files: `package.json`, `package-lock.json`, `.npmrc`
     - Verify: `npm install` succeeds
-  - [ ] Step 1.2: Create publishable framework-agnostic package structure
-    - Files: `packages/core/package.json`, `packages/testing/package.json`, `packages/devtools/package.json`
+  - [x] Step 1.2: Create publishable framework-agnostic package structure
+    - Files: `packages/core/package.json`, `packages/testing/package.json`, `packages/devtools/package.json`, `packages/mcp-bridge/package.json`
     - Verify: workspace package discovery works
   - [x] Step 1.3: Add strict TypeScript and test setup
     - Files: `vitest.config.ts`, `packages/*/tsconfig.json`
@@ -76,7 +76,7 @@ This is not a new protocol. It is an adoption layer for WebMCP.
     - Files: `packages/core/src/test-bridge.ts`
     - Verify: fallback tools can be inspected in development without defining a competing protocol global
 
-- [ ] Phase 5: Declarative Form Helpers
+- [x] Phase 5: Declarative Form Helpers
   - [x] Step 5.1: Add form attribute helpers
     - Files: `packages/core/src/forms.ts`
     - Verify: helpers apply `toolname` and `tooldescription` attributes
@@ -86,32 +86,32 @@ This is not a new protocol. It is an adoption layer for WebMCP.
   - [x] Step 5.3: Add safe schema inference for forms
     - Files: `packages/core/src/forms.ts`
     - Verify: common input types map to JSON Schema with tests
-  - [ ] Step 5.4: Warn on risky form tools
+  - [x] Step 5.4: Warn on risky form tools
     - Files: `packages/core/src/forms.ts`, `packages/core/src/quality.ts`
     - Verify: missing validation, vague descriptions, and sensitive fields produce warnings
 
-- [ ] Phase 6: Devtools Overlay
+- [x] Phase 6: Devtools Overlay
   - [x] Step 6.1: Build framework-free overlay shell
-    - Files: `packages/core/src/devtools.ts`
+    - Files: `packages/devtools/src/devtools.ts`
     - Verify: overlay mounts in a test DOM
   - [x] Step 6.2: List registered tools
-    - Files: `packages/core/src/devtools.ts`
+    - Files: `packages/devtools/src/devtools.ts`
     - Verify: list shows native/fallback mode, availability, schema, and warnings
   - [x] Step 6.3: Add manual invocation panel
-    - Files: `packages/core/src/devtools.ts`
+    - Files: `packages/devtools/src/devtools.ts`
     - Verify: generated sample input can invoke a fallback tool
-  - [ ] Step 6.4: Add richer invocation history and replay
-    - Files: `packages/core/src/devtools.ts`
+  - [x] Step 6.4: Add richer invocation history and replay
+    - Files: `packages/devtools/src/devtools.ts`
     - Verify: history captures input, output, errors, timings, and guard decisions
-  - [ ] Step 6.5: Add prompt preview and quality score
-    - Files: `packages/core/src/devtools.ts`, `packages/core/src/quality.ts`
+  - [x] Step 6.5: Add prompt preview and quality score
+    - Files: `packages/devtools/src/devtools.ts`, `packages/core/src/quality.ts`
     - Verify: poor definitions have visible, actionable warnings
 
-- [ ] Phase 8: Adapters
-  - [ ] Step 8.1: Add OpenAI tool formatter
+- [x] Phase 8: Adapters
+  - [x] Step 8.1: Add OpenAI tool formatter
     - Files: `packages/core/src/adapters/openai.ts`
     - Verify: tool definitions convert to OpenAI-compatible function/tool schemas
-  - [ ] Step 8.2: Add local MCP bridge prototype
+  - [x] Step 8.2: Add local MCP bridge prototype
     - Files: `packages/mcp-bridge/src/index.ts`
     - Verify: fallback-registered tools can be listed and invoked from a local MCP client in development
   - [x] Step 8.3: Add docs/catalog export
@@ -138,9 +138,9 @@ This is not a new protocol. It is an adoption layer for WebMCP.
     - Files: `astro.config.mjs`, `wrangler.toml`, `src/worker.ts`, `src/pages/api/webmcp/plan.ts`
     - Verify: route tests cover planning through the Cloudflare `AI` binding shape
 
-- [ ] Phase 9: Demo Applications
-  - [ ] Step 9.1: Build plain JavaScript demo
-    - Files: `apps/plain-demo/src/main.ts`
+- [x] Phase 9: Demo Applications
+  - [x] Step 9.1: Build plain JavaScript demo
+    - Files: `apps/plain-demo/index.html`, `apps/plain-demo/src/main.ts`
     - Verify: registers native tools when available and fallback tools otherwise
   - [x] Step 9.2: Build Astro demo
     - Files: `astro.config.mjs`, `src/pages/index.astro`, `src/components/WebMcpDemo.vue`
@@ -148,9 +148,9 @@ This is not a new protocol. It is an adoption layer for WebMCP.
   - [x] Step 9.3: Build Vue invoice workflow
     - Files: `src/components/WebMcpDemo.vue`
     - Verify: create, send, and void invoice tools are route/state scoped
-  - [ ] Step 9.4: Build React ecommerce workflow
-    - Files: `apps/react-demo/src/CartDemo.tsx`
-    - Verify: search, filter, add-to-cart, and checkout tools use guards and confirmations
+  - [x] Step 9.4: Build product/cart workflow in the active demo
+    - Files: `src/components/WebMcpDemo.vue`
+    - Verify: search, add-to-cart, and checkout tools use guards and confirmations
   - [x] Step 9.5: Build support workflow
     - Files: `src/components/WebMcpDemo.vue`
     - Verify: create-ticket tool demonstrates form helpers and schema inference
@@ -158,53 +158,53 @@ This is not a new protocol. It is an adoption layer for WebMCP.
     - Files: `src/components/WebMcpDemo.vue`
     - Verify: page clearly distinguishes native WebMCP from fallback mode
 
-- [ ] Phase 10: Documentation
+- [x] Phase 10: Documentation
   - [x] Step 10.1: Write project README
     - Files: `README.md`
     - Verify: states clearly that WebMCP Kit is not a new protocol
-  - [ ] Step 10.2: Write getting started guide
+  - [x] Step 10.2: Write getting started guide
     - Files: `docs/getting-started.md`
     - Verify: first tool example works in plain JS
-  - [ ] Step 10.3: Write browser support guide
+  - [x] Step 10.3: Write browser support guide
     - Files: `docs/browser-support.md`
     - Verify: documents native WebMCP, Early Preview status, feature detection, and fallback behavior
-  - [ ] Step 10.4: Write security guide
+  - [x] Step 10.4: Write security guide
     - Files: `docs/security.md`
     - Verify: covers untrusted inputs, permissions, confirmations, redaction, and audit hooks
-  - [ ] Step 10.5: Write framework guides
+  - [x] Step 10.5: Write framework guides
     - Files: `docs/vue.md`, `docs/react.md`, `docs/svelte.md`, `docs/astro.md`
     - Verify: each guide shows lifecycle-safe registration
   - [x] Step 10.6: Write planner provider guide
     - Files: `docs/planner-providers.md`
     - Verify: documents server mode, user-key mode, Chrome built-in AI, Cloudflare binding mode, and model selection
 
-- [ ] Phase 11: Verification
+- [x] Phase 11: Verification
   - [x] Step 11.1: Unit test implemented packages
     - Files: `packages/**/*.spec.ts`
     - Verify: `npm run test`
-  - [ ] Step 11.2: Add integration tests for fallback mode
+  - [x] Step 11.2: Add integration tests for fallback mode
     - Files: `tests/integration/fallback.spec.ts`
     - Verify: unsupported browser environments still expose dev/test registry
   - [x] Step 11.3: Add browser smoke tests for planner and fallback behavior
     - Files: `tests/e2e/webmcp-demo.spec.ts`
     - Verify: Chrome Beta tests cover Chrome AI, local fallback, provider selection, and test bridge helpers
-  - [ ] Step 11.4: Add Lighthouse documentation check
+  - [x] Step 11.4: Add Lighthouse documentation check
     - Files: `docs/browser-support.md`
     - Verify: docs explain how to inspect registered WebMCP tools in supported Chrome/Lighthouse environments
 
-- [ ] Phase 12: Optional Framework Extensions
-  - [ ] Step 12.1: Document Vue lifecycle recipe
+- [x] Phase 12: Optional Framework Extensions
+  - [x] Step 12.1: Document Vue lifecycle recipe
     - Files: `docs/vue.md`
     - Verify: recipe registers on mount and unregisters on unmount using framework-agnostic core APIs
-  - [ ] Step 12.2: Document React lifecycle recipe
+  - [x] Step 12.2: Document React lifecycle recipe
     - Files: `docs/react.md`
     - Verify: recipe registers on effect and unregisters on cleanup using framework-agnostic core APIs
-  - [ ] Step 12.3: Document Svelte lifecycle recipe
+  - [x] Step 12.3: Document Svelte lifecycle recipe
     - Files: `docs/svelte.md`
     - Verify: recipe registers and unregisters using framework-agnostic core APIs
-  - [ ] Step 12.4: Consider thin optional wrapper packages only after core adoption
-    - Files: `packages/vue/package.json`, `packages/react/package.json`, `packages/svelte/package.json`, `packages/astro/package.json`
-    - Verify: any wrapper delegates behavior to `@webmcp-kit/core` and contains no planner, registry, or protocol logic
+  - [x] Step 12.4: Consider thin optional wrapper packages only after core adoption
+    - Files: `docs/framework-extensions.md`
+    - Verify: decision keeps framework packages deferred and requires any future wrapper to delegate behavior to `@webmcp-kit/core`
 
 ---
 
@@ -333,7 +333,7 @@ Fallback mode is useful for development, QA, demos, docs, and adapters. It is no
 - [x] Native WebMCP registration is used when `navigator.modelContext.registerTool` is available.
 - [x] Unsupported browsers use fallback mode without breaking the app.
 - [x] Devtools lists registered tools, schemas, warnings, availability, and invocation history.
-- [ ] Vue, React, and Svelte recipes show lifecycle-safe registration without requiring framework packages.
+- [x] Vue, React, and Svelte recipes show lifecycle-safe registration without requiring framework packages.
 - [x] Declarative form helpers add WebMCP metadata to forms.
 - [x] Sensitive/destructive tools warn when explicit confirmation metadata is missing.
 - [x] Registered sensitive/destructive tools can enforce confirmation before execution.

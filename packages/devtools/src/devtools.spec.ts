@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { defineTool } from './define-tool'
+import { clearToolsForTest, defineTool, registerTool } from '@webmcp-kit/core'
+
 import { mountDevtoolsOverlay } from './devtools'
-import { clearToolsForTest, registerTool } from './registry'
 
 describe('devtools overlay', () => {
   beforeEach(() => {
@@ -40,15 +40,30 @@ describe('devtools overlay', () => {
 
     expect(document.body.textContent).toContain('Tool Inspector')
     expect(document.body.textContent).toContain('create_invoice')
+    expect(document.body.textContent).toContain('Quality 100%')
+    expect(document.body.textContent).toContain('Prompt preview')
 
     const invokeButton = document.querySelector<HTMLButtonElement>('button[data-action="invoke"]')
     invokeButton?.click()
-    await new Promise((resolve) => window.setTimeout(resolve))
+    await flushPromises()
 
     expect(execute).toHaveBeenCalledWith({ customerName: 'Acme Corp', amount: 1 }, { source: 'devtools' })
     expect(document.body.textContent).toContain('Invocation history')
+    expect(document.body.textContent).toContain('"input"')
+    expect(document.body.textContent).toContain('"output"')
+
+    const replayButton = document.querySelector<HTMLButtonElement>('button[data-action="replay"]')
+    replayButton?.click()
+    await flushPromises()
+
+    expect(execute).toHaveBeenCalledTimes(2)
 
     overlay.destroy()
     expect(document.body.textContent).not.toContain('Tool Inspector')
   })
 })
+
+async function flushPromises(): Promise<void> {
+  await Promise.resolve()
+  await Promise.resolve()
+}
