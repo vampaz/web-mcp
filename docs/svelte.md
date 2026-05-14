@@ -1,32 +1,31 @@
-# Svelte Recipe
+# Svelte Helper
 
-Use the framework-agnostic core API inside `onMount`.
+Use `useWebMCPTool` to register a tool while the component is mounted. `when` can be a boolean, function, or readable store.
 
 ```svelte
 <script lang="ts">
-  import { onMount } from 'svelte'
-  import { defineTool, registerTool } from '@webmcp-kit/core'
+  import { readable } from 'svelte/store'
+  import { defineTool } from '@webmcp-kit/core'
+  import { useWebMCPTool } from '@webmcp-kit/svelte'
 
-  onMount(function registerTools() {
-    const registration = registerTool(defineTool({
-      name: 'search_products',
-      description: 'Search the local product catalog for the current shopper.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          query: { type: 'string' }
-        },
-        required: ['query'],
-        additionalProperties: false
+  const isCatalogRoute = readable(window.location.pathname.startsWith('/catalog'))
+
+  useWebMCPTool(defineTool({
+    name: 'search_products',
+    description: 'Search the local product catalog for the current shopper.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string' }
       },
-      execute(input) {
-        return input
-      }
-    }))
-
-    return function unregisterTools() {
-      registration.unregister()
+      required: ['query'],
+      additionalProperties: false
+    },
+    execute(input) {
+      return input
     }
+  }), {
+    when: isCatalogRoute
   })
 </script>
 ```

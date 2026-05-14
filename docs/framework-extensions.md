@@ -12,6 +12,10 @@ The core package owns:
 - form helpers
 - catalog/adapters
 
-Framework packages should not own protocol, planner, registry, or execution logic. Vue, React, Svelte, and Astro support starts as documentation recipes that show lifecycle-safe registration with `@webmcp-kit/core`.
+Framework packages should not own protocol, planner, registry, or execution logic. Vue, React, Svelte, and Astro support starts as lifecycle-safe helpers that delegate registration to `@webmcp-kit/core`.
 
-Thin optional packages can be reconsidered after core adoption if users repeatedly ask for framework-specific ergonomics. Those packages should only wrap lifecycle cleanup and delegate all behavior to core.
+Thin optional packages should only wrap lifecycle cleanup and delegate all behavior to core. Current packages:
+
+- `@webmcp-kit/vue`
+- `@webmcp-kit/react`
+- `@webmcp-kit/svelte`
