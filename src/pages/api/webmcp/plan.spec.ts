@@ -74,6 +74,33 @@ describe('/api/webmcp/plan', () => {
       error: 'Cloudflare Workers AI server mode needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN on the server, or a custom planner endpoint.'
     })
   })
+
+  it('returns a clear error when the Cloudflare AI binding is local-only', async () => {
+    env.AI = {
+      run: async () => {
+        throw new Error('Binding AI needs to be run remotely')
+      }
+    } as unknown as typeof env.AI
+
+    const response = await POST(createContext({
+      provider: 'cloudflare-binding',
+      model: '@cf/google/gemma-4-26b-a4b-it',
+      message: 'Select all liquids from the list',
+      tools: [
+        {
+          name: 'select_items',
+          description: 'Select checklist items.',
+          inputSchema: { type: 'object' }
+        }
+      ],
+      context: {}
+    }))
+
+    expect(response.status).toBe(502)
+    expect(await response.json()).toEqual({
+      error: 'Cloudflare AI binding is running in local stub mode. Restart dev with `npm run dev:cf` so the Astro Cloudflare adapter enables remote bindings, or use a Cloudflare preview deployment.'
+    })
+  })
 })
 
 function createContext(body: unknown) {

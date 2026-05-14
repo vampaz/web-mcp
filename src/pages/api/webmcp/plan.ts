@@ -237,6 +237,12 @@ function getJsonHeaders(): HeadersInit {
 }
 
 function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message
+  if (error instanceof Error) {
+    if (error.message.includes('Binding AI needs to be run remotely')) {
+      return 'Cloudflare AI binding is running in local stub mode. Restart dev with `npm run dev:cf` so the Astro Cloudflare adapter enables remote bindings, or use a Cloudflare preview deployment.'
+    }
+
+    return error.message
+  }
   return 'Server planner failed'
 }

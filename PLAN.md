@@ -147,7 +147,7 @@ This is not a new protocol. It is an adoption layer for WebMCP.
     - Verify: dev overlay appears in dev mode
   - [x] Step 9.3: Build Vue invoice workflow
     - Files: `src/components/WebMcpDemo.vue`
-    - Verify: create, send, and void invoice tools are route/state scoped
+    - Verify: create-invoice tool is registered with confirmation metadata and updates demo state
   - [x] Step 9.4: Build product/cart workflow in the active demo
     - Files: `src/components/WebMcpDemo.vue`
     - Verify: search, add-to-cart, and checkout tools use guards and confirmations
