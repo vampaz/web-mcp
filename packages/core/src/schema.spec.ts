@@ -20,6 +20,15 @@ describe('schema validation', () => {
     })).toEqual([])
   })
 
+  it('accepts anyOf schemas', () => {
+    expect(validateJsonSchema({
+      anyOf: [
+        { type: 'string' },
+        { type: 'null' }
+      ]
+    })).toEqual([])
+  })
+
   it('rejects unsupported schema types', () => {
     expect(validateJsonSchema({
       type: 'date'
@@ -146,6 +155,27 @@ describe('schema validation', () => {
       }
     })).toEqual([
       '/lineItems/1/quantity expected integer, got number.'
+    ])
+  })
+
+  it('validates values against anyOf schemas', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        note: {
+          anyOf: [
+            { type: 'string' },
+            { type: 'null' }
+          ]
+        }
+      },
+      required: ['note']
+    }
+
+    expect(validateJsonValue({ note: null }, schema)).toEqual([])
+    expect(validateJsonValue({ note: 'paid' }, schema)).toEqual([])
+    expect(validateJsonValue({ note: 42 }, schema)).toEqual([
+      '/note did not match any allowed schema.'
     ])
   })
 })

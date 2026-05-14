@@ -31,6 +31,7 @@ function validateSchemaNode(schema: unknown, path: string, errors: string[]): vo
   validateProperties(node, path, errors)
   validateRequired(node, path, errors)
   validateItems(node, path, errors)
+  validateAnyOf(node, path, errors)
   validateEnum(node, path, errors)
   validateNumberKeyword(node.minimum, `${path}.minimum`, errors)
   validateNumberKeyword(node.maximum, `${path}.maximum`, errors)
@@ -42,6 +43,14 @@ function validateSchemaNode(schema: unknown, path: string, errors: string[]): vo
 
 function validateType(schema: JsonSchema, path: string, errors: string[]): void {
   if (schema.type === undefined) return
+
+  if (typeof schema.type === 'string' && supportedTypes.has(schema.type)) return
+
+  if (Array.isArray(schema.type) && schema.type.length > 0 && schema.type.every(function isSupportedType(type) {
+    return typeof type === 'string' && supportedTypes.has(type)
+  })) {
+    return
+  }
 
   if (typeof schema.type !== 'string' || !supportedTypes.has(schema.type)) {
     errors.push(`${path}.type must be one of ${Array.from(supportedTypes).join(', ')}.`)
@@ -87,6 +96,19 @@ function validateItems(schema: JsonSchema, path: string, errors: string[]): void
   validateSchemaNode(schema.items, `${path}.items`, errors)
 }
 
+function validateAnyOf(schema: JsonSchema, path: string, errors: string[]): void {
+  if (schema.anyOf === undefined) return
+
+  if (!Array.isArray(schema.anyOf) || schema.anyOf.length === 0) {
+    errors.push(`${path}.anyOf must be a non-empty array of schemas.`)
+    return
+  }
+
+  for (const [index, anyOfSchema] of schema.anyOf.entries()) {
+    validateSchemaNode(anyOfSchema, `${path}.anyOf[${index}]`, errors)
+  }
+}
+
 function validateEnum(schema: JsonSchema, path: string, errors: string[]): void {
   if (schema.enum === undefined) return
 
@@ -106,7 +128,7 @@ function validateNumberKeyword(value: unknown, path: string, errors: string[]): 
 function validateIntegerKeyword(value: unknown, path: string, errors: string[]): void {
   if (value === undefined) return
 
-  if (!Number.isInteger(value) || value < 0) {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
     errors.push(`${path} must be a non-negative integer.`)
   }
 }
@@ -136,7 +158,12 @@ function validateAdditionalProperties(schema: JsonSchema, path: string, errors: 
 
 function validateValueNode(value: unknown, schema: JsonSchema, path: string, errors: string[]): void {
   if (schema.type && !matchesJsonSchemaType(value, schema.type)) {
-    errors.push(`${formatValuePath(path)} expected ${schema.type}, got ${getJsonValueType(value)}.`)
+    errors.push(`${formatValuePath(path)} expected ${formatExpectedType(schema.type)}, got ${getJsonValueType(value)}.`)
+    return
+  }
+
+  if (schema.anyOf && !matchesAnyOf(value, schema.anyOf)) {
+    errors.push(`${formatValuePath(path)} did not match any allowed schema.`)
     return
   }
 
@@ -232,7 +259,13 @@ function validateStringValue(value: unknown, schema: JsonSchema, path: string, e
   }
 }
 
-function matchesJsonSchemaType(value: unknown, type: string): boolean {
+function matchesJsonSchemaType(value: unknown, type: string | string[]): boolean {
+  if (Array.isArray(type)) {
+    return type.some(function matchesAllowedType(allowedType) {
+      return matchesJsonSchemaType(value, allowedType)
+    })
+  }
+
   if (type === 'array') return Array.isArray(value)
   if (type === 'integer') return Number.isInteger(value)
   if (type === 'null') return value === null
@@ -240,6 +273,16 @@ function matchesJsonSchemaType(value: unknown, type: string): boolean {
   if (type === 'object') return isJsonObject(value)
 
   return typeof value === type
+}
+
+function matchesAnyOf(value: unknown, schemas: JsonSchema[]): boolean {
+  return schemas.some(function matchesAnyOfSchema(schema) {
+    return validateJsonValue(value, schema).length === 0
+  })
+}
+
+function formatExpectedType(type: string | string[]): string {
+  return Array.isArray(type) ? type.join(' or ') : type
 }
 
 function getJsonValueType(value: unknown): string {

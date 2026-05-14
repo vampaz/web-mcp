@@ -1,8 +1,9 @@
 export interface JsonSchema {
-  type?: string
+  type?: string | string[]
   properties?: Record<string, JsonSchema>
   required?: string[]
   items?: JsonSchema
+  anyOf?: JsonSchema[]
   enum?: unknown[]
   minimum?: number
   maximum?: number
