@@ -7,6 +7,8 @@ interface WindowWithLanguageModel extends Window {
     availability: (options?: unknown) => Promise<'available' | 'downloadable' | 'downloading' | 'unavailable'>
     create: (options?: unknown) => Promise<{
       prompt: (message: string) => Promise<string>
+      destroy?: () => void
+      dispose?: () => void
     }>
   }
 }
@@ -93,6 +95,43 @@ describe('planner', () => {
     expect(plan.toolName).toBe('add_to_cart')
     expect(plan.input.quantity).toBe(10)
     expect(plan.reason).toContain('Used deterministic fallback')
+  })
+
+  it('reports malformed Chrome AI JSON distinctly before falling back', async () => {
+    ;(window as WindowWithLanguageModel).LanguageModel = {
+      availability: async () => 'available',
+      create: async () => ({
+        prompt: async () => 'not json'
+      })
+    }
+
+    const planner = await createChromeAIPlanner()
+    const plan = await planner.plan('Find docks', [])
+
+    expect(plan.toolName).toBe('search_products')
+    expect(plan.reason).toContain('Chrome built-in AI returned unparseable JSON')
+  })
+
+  it('disposes Chrome AI sessions when the planner is disposed', async () => {
+    const destroy = vi.fn()
+    ;(window as WindowWithLanguageModel).LanguageModel = {
+      availability: async () => 'available',
+      create: async () => ({
+        destroy,
+        prompt: async () => JSON.stringify({
+          toolName: 'search_products',
+          input: { query: 'dock' },
+          confidence: 0.9,
+          reason: 'Chrome chose product search.'
+        })
+      })
+    }
+
+    const planner = await createChromeAIPlanner()
+    await planner.plan('Find docks', [])
+    planner.dispose?.()
+
+    expect(destroy).toHaveBeenCalledOnce()
   })
 
   it('creates a direct heuristic planner', () => {
@@ -386,6 +425,52 @@ describe('planner', () => {
     }))
     const fetchOptions = (fetch.mock.calls as unknown as Array<[string, RequestInit]>)[0]?.[1]
     expect(String(fetchOptions?.body)).toContain('"model":"@cf/qwen/qwq-32b"')
+  })
+
+  it('plans through Cloudflare Workers AI REST with a user key', async () => {
+    const fetch = vi.fn(async () => Response.json({
+      result: {
+        response: JSON.stringify({
+          toolName: 'select_items',
+          input: { ids: ['item_8'] },
+          confidence: 0.87,
+          reason: 'Cloudflare REST selected liquids.'
+        })
+      }
+    }))
+    vi.stubGlobal('fetch', fetch)
+
+    const planner = await createConfiguredPlanner({
+      provider: 'cloudflare-workers-ai',
+      accountId: 'account-123',
+      model: '@cf/google/gemma-4-26b-a4b-it',
+      auth: {
+        mode: 'user-key',
+        apiKey: 'cf-token'
+      }
+    })
+    const plan = await planner.plan('Select all liquids', [
+      {
+        name: 'select_items',
+        description: 'Select checklist items by ID.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute: () => []
+      }
+    ])
+
+    expect(plan.input).toEqual({
+      ids: ['item_8']
+    })
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.cloudflare.com/client/v4/accounts/account-123/ai/run/@cf/google/gemma-4-26b-a4b-it',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer cf-token'
+        })
+      })
+    )
   })
 
   it('does not allow Cloudflare binding mode without a server endpoint', async () => {

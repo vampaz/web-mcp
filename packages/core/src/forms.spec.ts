@@ -104,4 +104,49 @@ describe('form helpers', () => {
     expect(registration.warnings).toContain('Form field "email" is exposed without validation constraints.')
     expect(registration.warnings).toContain('Sensitive form field "password" should require explicit confirmation or be excluded.')
   })
+
+  it('infers checkbox fields and data-tool-description overrides', () => {
+    document.body.innerHTML = `
+      <form>
+        <input name="acceptedTerms" type="checkbox" data-tool-description="Whether the user accepted the terms." />
+      </form>
+    `
+
+    const form = document.querySelector('form')
+    if (!form) throw new Error('Expected test form.')
+
+    expect(inferFormInputSchema(form).properties?.acceptedTerms).toEqual({
+      type: 'boolean',
+      description: 'Whether the user accepted the terms.'
+    })
+  })
+
+  it('fills radio groups through RadioNodeList fields', async () => {
+    document.body.innerHTML = `
+      <form>
+        <label>Low <input name="priority" type="radio" value="low" /></label>
+        <label>High <input name="priority" type="radio" value="high" /></label>
+      </form>
+    `
+
+    const form = document.querySelector('form')
+    if (!form) throw new Error('Expected test form.')
+
+    registerFormTool({
+      form,
+      name: 'set_ticket_priority',
+      description: 'Set the support ticket priority from the current form fields.'
+    })
+
+    await invokeTool({
+      toolName: 'set_ticket_priority',
+      input: {
+        priority: 'high'
+      }
+    })
+
+    const priority = form.elements.namedItem('priority')
+    expect(priority).toBeInstanceOf(RadioNodeList)
+    expect((priority as RadioNodeList).value).toBe('high')
+  })
 })

@@ -36,7 +36,7 @@ If Chrome built-in AI is unavailable, downloadable, or still initializing, the p
 
 ## Inspecting Tools
 
-During development, mount `@webmcp-kit/devtools` to inspect registered tools, warnings, prompt previews, sample inputs, and invocation history.
+During development or preview deployments, mount `@webmcp-kit/devtools` to inspect registered tools, warnings, prompt previews, sample inputs, and invocation history. The demo gates the overlay behind `import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIEW === 'true'`.
 
 ## Chrome And Lighthouse Inspection
 

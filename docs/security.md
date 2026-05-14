@@ -57,3 +57,5 @@ const unsubscribe = subscribeWebMCPKitEvents(function handleEvent(event) {
 
 unsubscribe()
 ```
+
+Event payloads can include invocation details in `detail`, including tool inputs and outputs for invocation events. Treat event subscribers as trusted application code, and do not forward event details to analytics, logs, or third-party services without redaction.

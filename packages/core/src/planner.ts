@@ -9,6 +9,8 @@ import type {
 
 interface LanguageModelSession {
   prompt: (message: string, options?: ChromeAIPromptOptions) => Promise<string>
+  destroy?: () => void
+  dispose?: () => void
 }
 
 interface LanguageModelApi {
@@ -227,7 +229,7 @@ async function planWithChromeAI(
 ): Promise<ToolPlan> {
   const response = await session.prompt(createPlannerPrompt(message, tools, context), { responseConstraint: toolPlanSchema })
 
-  return JSON.parse(response) as ToolPlan
+  return parseToolPlanJson(response, 'Chrome built-in AI')
 }
 
 function createChromeAISession(languageModel: LanguageModelApi): Promise<LanguageModelSession> {
@@ -565,7 +567,28 @@ function createActiveChromePlanner(
           reason: `Chrome built-in AI could not plan this command (${getErrorMessage(error)}). Used deterministic fallback.`
         }
       }
+    },
+    dispose() {
+      disposeChromeAISession(session)
+      session = undefined
     }
+  }
+}
+
+function disposeChromeAISession(session: LanguageModelSession | undefined): void {
+  if (typeof session?.destroy === 'function') {
+    session.destroy()
+    return
+  }
+
+  session?.dispose?.()
+}
+
+function parseToolPlanJson(value: string, source: string): ToolPlan {
+  try {
+    return JSON.parse(value) as ToolPlan
+  } catch {
+    throw new Error(`${source} returned unparseable JSON`)
   }
 }
 

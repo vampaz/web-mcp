@@ -117,6 +117,7 @@ export interface ToolPlanner {
   status: 'ready' | 'downloadable' | 'downloading' | 'unavailable' | 'fallback' | 'needs-key'
   detail: string
   plan: (message: string, tools: WebMCPTool[], context?: PlannerContext) => Promise<ToolPlan>
+  dispose?: () => void
 }
 
 export interface WebMCPKitEvent {

@@ -265,6 +265,7 @@ const plannerApiKey = ref('')
 const plannerAccountId = ref('')
 const plannerAuthMode = ref<'server' | 'user-key'>('user-key')
 const showCloudflareBinding = import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIEW === 'true'
+const showDevtools = import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIEW === 'true'
 const cloudflareBindingModels = [
   {
     id: '@cf/google/gemma-4-26b-a4b-it',
@@ -358,6 +359,7 @@ const activity = ref<ActivityItem[]>([
     tone: 'info'
   }
 ])
+let currentPlanner: ToolPlanner | undefined
 
 watch(plannerProvider, function handlePlannerProviderChanged(provider) {
   if (provider === 'openrouter') {
@@ -396,7 +398,9 @@ onMounted(async function handleMounted() {
   registerSupportFormTool()
   refreshTools()
   unregisterCallbacks.push(installWebMCPKitTestBridge())
-  devtoolsOverlay = mountDevtoolsOverlay({ initiallyOpen: true })
+  if (showDevtools) {
+    devtoolsOverlay = mountDevtoolsOverlay({ initiallyOpen: true })
+  }
 
   await refreshPlanner()
 })
@@ -405,6 +409,7 @@ onUnmounted(function handleUnmounted() {
   for (const unregister of unregisterCallbacks) {
     unregister()
   }
+  currentPlanner?.dispose?.()
   devtoolsOverlay?.destroy()
 })
 
@@ -663,7 +668,9 @@ async function getCurrentPlanner() {
 
 async function refreshPlanner() {
   const plannerConfig = getSelectedPlannerConfig()
+  currentPlanner?.dispose?.()
   const planner = plannerConfig ? await createConfiguredPlanner(plannerConfig) : await createBestPlanner()
+  currentPlanner = planner
   plannerName.value = `${planner.name} (${planner.status})`
   plannerDetail.value = planner.detail
   window.__webMCPKitDemoPlanner = planner
