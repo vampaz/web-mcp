@@ -20,6 +20,7 @@
       <div>
         <span>Planner</span>
         <strong>{{ plannerName }}</strong>
+        <small>{{ plannerDetail }}</small>
       </div>
       <div>
         <span>Registered tools</span>
@@ -32,6 +33,76 @@
         <div class="panel-heading">
           <p class="eyebrow">Ask the app</p>
           <h2>Natural language command</h2>
+        </div>
+
+        <div class="planner-panel">
+          <label>
+            Provider
+            <select v-model="plannerProvider">
+              <option value="auto">Auto</option>
+              <option value="chrome-built-in">Chrome built-in AI</option>
+              <option value="local">Local fallback</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="openai">OpenAI</option>
+              <option value="openai-compatible">OpenAI-compatible</option>
+              <option v-if="showCloudflareBinding" value="cloudflare-binding">Cloudflare binding (dev/preview)</option>
+              <option value="cloudflare-workers-ai">Cloudflare Workers AI (REST)</option>
+            </select>
+          </label>
+
+          <label v-if="usesRemotePlanner && plannerProvider !== 'cloudflare-binding'">
+            Model
+            <input v-model="plannerModel" type="text" />
+          </label>
+
+          <label v-if="plannerProvider === 'cloudflare-binding'">
+            Binding model
+            <select v-model="plannerModel">
+              <option v-for="model in cloudflareBindingModels" :key="model.id" :value="model.id">
+                {{ model.label }}
+              </option>
+            </select>
+          </label>
+
+          <label v-if="plannerProvider === 'openai-compatible'">
+            Base URL
+            <input v-model="plannerBaseUrl" type="url" placeholder="http://localhost:1234/v1" />
+          </label>
+
+          <label v-if="plannerProvider === 'cloudflare-workers-ai' && plannerAuthMode === 'user-key'">
+            Cloudflare account ID
+            <input v-model="plannerAccountId" type="text" />
+          </label>
+
+          <label v-if="usesRemotePlanner && plannerProvider !== 'cloudflare-binding'">
+            Auth mode
+            <select v-model="plannerAuthMode">
+              <option value="server">Server endpoint</option>
+              <option value="user-key">User key in browser</option>
+            </select>
+          </label>
+
+          <label v-if="usesRemotePlanner && (plannerAuthMode === 'server' || plannerProvider === 'cloudflare-binding')">
+            {{ plannerProvider === 'cloudflare-binding' ? 'Binding endpoint' : 'Planner endpoint' }}
+            <input v-model="plannerEndpoint" type="text" placeholder="/api/webmcp/plan" />
+          </label>
+
+          <label v-if="usesRemotePlanner && plannerAuthMode === 'user-key' && plannerProvider !== 'cloudflare-binding'">
+            User API key
+            <input v-model="plannerApiKey" type="password" autocomplete="off" placeholder="Stored in memory for this demo" />
+          </label>
+
+          <p v-if="usesRemotePlanner && plannerAuthMode === 'user-key' && plannerProvider !== 'cloudflare-binding'" class="planner-warning">
+            User-key mode is simple and has no server, but the key is visible to this browser page. Use it for local experiments or user-owned keys, not shared production app secrets.
+          </p>
+
+          <p v-if="plannerProvider === 'cloudflare-binding'" class="planner-warning">
+            Cloudflare binding mode is only exposed in local development or preview builds. It calls the selected endpoint and expects that endpoint to use an `AI` binding.
+          </p>
+
+          <p v-if="plannerProvider === 'cloudflare-workers-ai' && plannerAuthMode === 'server'" class="planner-warning">
+            Cloudflare Workers AI REST server mode needs `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` on the server, or a custom endpoint.
+          </p>
         </div>
 
         <textarea
@@ -54,6 +125,15 @@
           <button type="button" @click="setPrompt('Open a support ticket about billing access')">
             Support
           </button>
+          <button type="button" @click="setPrompt('Select the first five items')">
+            First five
+          </button>
+          <button type="button" @click="setPrompt('Select all the foods that are French')">
+            French foods
+          </button>
+          <button type="button" @click="setPrompt('Select all the ones that are roots')">
+            Roots
+          </button>
         </div>
 
         <button class="primary-action" type="button" @click="runPrompt">
@@ -64,28 +144,32 @@
           <span>Selected tool</span>
           <strong>{{ lastPlan.toolName }}</strong>
           <p>{{ lastPlan.reason }}</p>
+          <p class="planner-used">Planned by {{ lastPlannerUsed }}</p>
           <code>{{ JSON.stringify(lastPlan.input, null, 2) }}</code>
         </div>
       </div>
 
-      <aside class="tools-panel">
+      <aside class="tools-panel support-panel">
         <div class="panel-heading">
-          <p class="eyebrow">Registry</p>
-          <h2>Exposed tools</h2>
+          <p class="eyebrow">Form helper</p>
+          <h2>Support ticket form</h2>
         </div>
 
-        <button
-          v-for="registration in registeredTools"
-          :key="registration.tool.name"
-          type="button"
-          class="tool-card"
-          :class="{ active: selectedToolName === registration.tool.name }"
-          @click="selectTool(registration.tool.name)"
-        >
-          <span>{{ registration.mode }}</span>
-          <strong>{{ registration.tool.name }}</strong>
-          <small>{{ registration.tool.description }}</small>
-        </button>
+        <form ref="supportForm" class="support-form" @submit.prevent="submitSupportForm">
+          <label>
+            Subject
+            <input v-model="supportSubject" name="subject" required data-tool-description="Short issue summary." />
+          </label>
+          <label>
+            Details
+            <textarea v-model="supportBody" name="body" required rows="5" data-tool-description="Detailed issue description." />
+          </label>
+          <button class="primary-action" type="submit">Create ticket</button>
+        </form>
+
+        <p class="helper-copy">
+          This form is registered through `registerFormTool()`, which applies WebMCP form metadata and exposes the same action to the devtools overlay.
+        </p>
       </aside>
     </section>
 
@@ -126,32 +210,123 @@
         </div>
       </article>
     </section>
+
+    <section class="selection-panel">
+      <div class="panel-heading">
+        <p class="eyebrow">Selection tools</p>
+        <h2>Ten-item checklist</h2>
+      </div>
+
+      <div class="selection-summary">
+        <strong>{{ selectedItems.length }} selected</strong>
+        <span>Try “select the first five items”, “select French foods”, “select roots”, or “clear the selection”.</span>
+      </div>
+
+      <div class="checklist-grid">
+        <label v-for="(item, index) in selectableItems" :key="item.id" class="checklist-item">
+          <input v-model="item.selected" type="checkbox" />
+          <span>{{ index + 1 }}. {{ item.name }}</span>
+          <em>{{ item.description }}</em>
+        </label>
+      </div>
+    </section>
   </main>
 </template>
 
 <script setup lang="ts">
 import {
   createBestPlanner,
+  createConfiguredPlanner,
   defineTool,
   getSupportLabel,
+  installWebMCPKitTestBridge,
   invokeTool,
   listTools,
   registerTool,
-  type RegisteredTool,
-  type ToolPlan
+  registerFormTool,
+  type PlannerProviderConfig,
+  type PlannerProviderKind,
+  type ToolPlan,
+  type ToolPlanner
 } from '@webmcp-kit/core'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { mountDevtoolsOverlay, type DevtoolsOverlay } from '@webmcp-kit/devtools'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
-import type { ActivityItem, CartLine, Invoice, Product, SupportTicket } from '@/interfaces/demo'
+import type { ActivityItem, CartLine, Invoice, Product, SelectableItem, SupportTicket } from '@/interfaces/demo'
 
 const prompt = ref('Create an invoice for Acme for 500 euros')
 const plannerName = ref('Loading')
+const plannerDetail = ref('Checking Chrome built-in AI availability.')
+const plannerProvider = ref<PlannerProviderKind>('auto')
+const plannerModel = ref('openrouter/auto')
+const plannerBaseUrl = ref('')
+const plannerEndpoint = ref('/api/webmcp/plan')
+const plannerApiKey = ref('')
+const plannerAccountId = ref('')
+const plannerAuthMode = ref<'server' | 'user-key'>('user-key')
+const showCloudflareBinding = import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIEW === 'true'
+const showDevtools = import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIEW === 'true'
+const cloudflareBindingModels = [
+  {
+    id: '@cf/google/gemma-4-26b-a4b-it',
+    label: 'Gemma 4 26B A4B'
+  },
+  {
+    id: '@cf/moonshotai/kimi-k2.6',
+    label: 'Kimi K2.6'
+  },
+  {
+    id: '@cf/zai-org/glm-4.7-flash',
+    label: 'GLM 4.7 Flash'
+  },
+  {
+    id: '@cf/qwen/qwen3-30b-a3b-fp8',
+    label: 'Qwen3 30B A3B FP8'
+  },
+  {
+    id: '@cf/openai/gpt-oss-20b',
+    label: 'GPT OSS 20B'
+  },
+  {
+    id: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
+    label: 'DeepSeek R1 Distill Qwen 32B'
+  },
+  {
+    id: '@cf/qwen/qwq-32b',
+    label: 'Qwen QwQ 32B'
+  },
+  {
+    id: '@cf/meta/llama-3.1-8b-instruct',
+    label: 'Llama 3.1 8B Instruct'
+  },
+  {
+    id: '@cf/meta/llama-3.2-3b-instruct',
+    label: 'Llama 3.2 3B Instruct'
+  }
+]
+const lastPlannerUsed = ref('No command has run yet')
 const selectedToolName = ref('create_invoice')
-const registeredTools = ref<RegisteredTool[]>([])
+const registeredTools = ref<ReturnType<typeof listTools>>([])
 const lastPlan = ref<ToolPlan | null>(null)
 const unregisterCallbacks: Array<() => void> = []
+const supportForm = ref<HTMLFormElement | null>(null)
+const supportSubject = ref('Billing access')
+const supportBody = ref('I cannot open the latest invoice from the workspace.')
+let devtoolsOverlay: DevtoolsOverlay | undefined
 const supportLabel = computed(function getCurrentSupportLabel() {
   return getSupportLabel()
+})
+const selectedItems = computed(function getSelectedItems() {
+  return selectableItems.value.filter(function filterSelected(item) {
+    return item.selected
+  })
+})
+const usesRemotePlanner = computed(function getUsesRemotePlanner() {
+  return plannerProvider.value === 'openrouter'
+    || plannerProvider.value === 'openai'
+    || plannerProvider.value === 'openai-compatible'
+    || plannerProvider.value === 'cloudflare-binding'
+    || plannerProvider.value === 'cloudflare-workers-ai'
 })
 
 const invoices = ref<Invoice[]>([
@@ -161,6 +336,18 @@ const products = ref<Product[]>([
   { id: 'kbd-01', name: 'Low-profile keyboard', category: 'Input', price: 129 },
   { id: 'dock-02', name: 'Travel USB-C dock', category: 'Connectivity', price: 89 },
   { id: 'cam-03', name: 'Desk camera', category: 'Video', price: 149 }
+])
+const selectableItems = ref<SelectableItem[]>([
+  { id: 'item_1', name: 'Apple', category: 'fruit', description: 'fruit, food, common snack', selected: false },
+  { id: 'item_2', name: 'Banana', category: 'fruit', description: 'fruit, food, tropical snack', selected: false },
+  { id: 'item_3', name: 'Carrot', category: 'vegetable', description: 'root vegetable, food', selected: false },
+  { id: 'item_4', name: 'Croissant', category: 'bakery', description: 'French bakery food, pastry', selected: false },
+  { id: 'item_5', name: 'Orange', category: 'fruit', description: 'fruit, food, citrus', selected: false },
+  { id: 'item_6', name: 'Spinach', category: 'vegetable', description: 'leaf vegetable, food', selected: false },
+  { id: 'item_7', name: 'Baguette', category: 'bakery', description: 'French bakery food, bread', selected: false },
+  { id: 'item_8', name: 'Water', category: 'drink', description: 'drink, beverage, not food', selected: false },
+  { id: 'item_9', name: 'Beetroot', category: 'vegetable', description: 'root vegetable, food', selected: false },
+  { id: 'item_10', name: 'Coffee', category: 'drink', description: 'drink, beverage, not food', selected: false }
 ])
 const cart = ref<CartLine[]>([])
 const tickets = ref<SupportTicket[]>([])
@@ -172,21 +359,58 @@ const activity = ref<ActivityItem[]>([
     tone: 'info'
   }
 ])
+let currentPlanner: ToolPlanner | undefined
+
+watch(plannerProvider, function handlePlannerProviderChanged(provider) {
+  if (provider === 'openrouter') {
+    plannerModel.value = 'openrouter/auto'
+    plannerAuthMode.value = 'user-key'
+    return
+  }
+
+  if (provider === 'openai') {
+    plannerModel.value = 'gpt-4.1-mini'
+    plannerAuthMode.value = 'user-key'
+    return
+  }
+
+  if (provider === 'cloudflare-workers-ai') {
+    plannerModel.value = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b'
+    plannerAuthMode.value = 'server'
+    return
+  }
+
+  if (provider === 'cloudflare-binding') {
+    plannerModel.value = cloudflareBindingModels[0].id
+    plannerAuthMode.value = 'server'
+    plannerEndpoint.value = '/api/webmcp/plan'
+    return
+  }
+
+  if (provider === 'openai-compatible') {
+    plannerModel.value = ''
+    plannerAuthMode.value = 'user-key'
+  }
+})
 
 onMounted(async function handleMounted() {
   registerDemoTools()
+  registerSupportFormTool()
   refreshTools()
+  unregisterCallbacks.push(installWebMCPKitTestBridge())
+  if (showDevtools) {
+    devtoolsOverlay = mountDevtoolsOverlay({ initiallyOpen: true })
+  }
 
-  const planner = await createBestPlanner()
-  plannerName.value = planner.name
-
-  window.__webMCPKitDemoPlanner = planner
+  await refreshPlanner()
 })
 
 onUnmounted(function handleUnmounted() {
   for (const unregister of unregisterCallbacks) {
     unregister()
   }
+  currentPlanner?.dispose?.()
+  devtoolsOverlay?.destroy()
 })
 
 function registerDemoTools() {
@@ -266,10 +490,17 @@ function registerDemoTools() {
       },
       required: ['productId', 'quantity']
     },
+    guard(input) {
+      return products.value.some(function hasProduct(item) {
+        return item.id === String(input.productId ?? '')
+      }) || 'Product is not available in the current catalog.'
+    },
     execute(input) {
       const product = products.value.find(function findProduct(item) {
-        return item.id === input.productId
-      }) ?? products.value[0]
+        return item.id === String(input.productId ?? '')
+      })
+      if (!product) throw new Error('Product is not available in the current catalog.')
+
       const line = {
         productId: product.id,
         name: product.name,
@@ -285,45 +516,110 @@ function registerDemoTools() {
   })).unregister)
 
   unregisterCallbacks.push(registerTool(defineTool({
-    name: 'create_support_ticket',
-    description: 'Create a support ticket from a user issue and mark it as open for triage.',
+    name: 'checkout_cart',
+    description: 'Checkout the current cart and clear all cart lines after explicit confirmation.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+      additionalProperties: false
+    },
+    confirmation: {
+      required: true,
+      reason: 'Checkout clears the cart and represents a purchase action.'
+    },
+    guard() {
+      return cart.value.length > 0 || 'Cart is empty.'
+    },
+    execute() {
+      const lines = [...cart.value]
+      const total = lines.reduce(function sumCart(sum, line) {
+        return sum + line.price * line.quantity
+      }, 0)
+      cart.value = []
+      addActivity('Checkout completed', `${lines.length} lines for €${total}`, 'success')
+
+      return {
+        lines,
+        total
+      }
+    }
+  })).unregister)
+
+  unregisterCallbacks.push(registerTool(defineTool({
+    name: 'select_items',
+    description: 'Select checklist items by stable item IDs from the current visible checklist context.',
     inputSchema: {
       type: 'object',
       properties: {
-        subject: {
-          type: 'string',
-          description: 'Short issue summary.'
-        },
-        body: {
-          type: 'string',
-          description: 'Detailed issue description.'
+        ids: {
+          type: 'array',
+          items: {
+            type: 'string'
+          },
+          description: 'Stable IDs of checklist items to select.'
         }
       },
-      required: ['subject', 'body']
+      required: ['ids']
     },
     execute(input) {
-      const ticket = {
-        id: `ticket_${Date.now()}`,
-        subject: String(input.subject ?? 'Support request'),
-        body: String(input.body ?? ''),
-        status: 'open' as const
-      }
-      tickets.value = [ticket, ...tickets.value]
-      addActivity('Ticket opened', ticket.subject, 'success')
-      return ticket
+      const ids = Array.isArray(input.ids) ? input.ids.map(String) : []
+      selectableItems.value = selectableItems.value.map(function mapItem(item) {
+        return {
+          ...item,
+          selected: ids.includes(item.id)
+        }
+      })
+      addActivity('Items selected', `Selected ${selectedItems.value.length} checklist items`, 'success')
+      return selectedItems.value
     }
   })).unregister)
+
+  unregisterCallbacks.push(registerTool(defineTool({
+    name: 'clear_item_selection',
+    description: 'Clear every selected checkbox in the visible ten-item checklist.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      additionalProperties: false
+    },
+    execute() {
+      selectableItems.value = selectableItems.value.map(function mapItem(item) {
+        return {
+          ...item,
+          selected: false
+        }
+      })
+      addActivity('Selection cleared', 'No checklist items are selected', 'info')
+      return []
+    }
+  })).unregister)
+
+}
+
+function registerSupportFormTool() {
+  if (!supportForm.value) return
+
+  unregisterCallbacks.push(registerFormTool({
+    form: supportForm.value,
+    name: 'create_support_ticket',
+    description: 'Create a support ticket from the visible support form and mark it as open for triage.',
+    execute(input) {
+      return createSupportTicket(String(input.subject ?? 'Support request'), String(input.body ?? ''))
+    }
+  }).unregister)
 }
 
 async function runPrompt() {
-  const planner = window.__webMCPKitDemoPlanner
+  const planner = await getCurrentPlanner()
   if (!planner) return
 
   const tools = listTools().map(function mapRegistration(registration) {
     return registration.tool
   })
-  const plan = await planner.plan(prompt.value, tools)
+  const plan = await planner.plan(prompt.value, tools, getPlannerContext())
   lastPlan.value = plan
+  lastPlannerUsed.value = `${planner.name} (${planner.status})`
   selectedToolName.value = plan.toolName
 
   const registration = listTools().find(function findRegistration(item) {
@@ -344,16 +640,111 @@ async function runPrompt() {
   }
 }
 
-function selectTool(toolName: string) {
-  selectedToolName.value = toolName
-}
-
 function setPrompt(nextPrompt: string) {
   prompt.value = nextPrompt
 }
 
+async function submitSupportForm() {
+  const result = await invokeTool({
+    toolName: 'create_support_ticket',
+    input: {
+      subject: supportSubject.value,
+      body: supportBody.value
+    }
+  })
+
+  if (result.status !== 'success') {
+    addActivity('Ticket blocked', result.error ?? 'The ticket form could not run.', 'warning')
+  }
+}
+
 function refreshTools() {
   registeredTools.value = listTools()
+}
+
+async function getCurrentPlanner() {
+  return refreshPlanner()
+}
+
+async function refreshPlanner() {
+  const plannerConfig = getSelectedPlannerConfig()
+  currentPlanner?.dispose?.()
+  const planner = plannerConfig ? await createConfiguredPlanner(plannerConfig) : await createBestPlanner()
+  currentPlanner = planner
+  plannerName.value = `${planner.name} (${planner.status})`
+  plannerDetail.value = planner.detail
+  window.__webMCPKitDemoPlanner = planner
+
+  return planner
+}
+
+function getSelectedPlannerConfig(): PlannerProviderConfig | undefined {
+  if (plannerProvider.value === 'auto') return undefined
+
+  if (plannerProvider.value === 'chrome-built-in' || plannerProvider.value === 'local') {
+    return {
+      provider: plannerProvider.value,
+      auth: {
+        mode: 'none'
+      }
+    }
+  }
+
+  if (plannerProvider.value === 'cloudflare-binding') {
+    return {
+      provider: plannerProvider.value,
+      model: plannerModel.value || cloudflareBindingModels[0].id,
+      auth: {
+        mode: 'server',
+        endpoint: plannerEndpoint.value
+      }
+    }
+  }
+
+  return {
+    provider: plannerProvider.value,
+    model: plannerModel.value || undefined,
+    baseUrl: plannerBaseUrl.value || undefined,
+    accountId: plannerAccountId.value || undefined,
+    auth: plannerAuthMode.value === 'server'
+      ? {
+          mode: 'server',
+          endpoint: plannerEndpoint.value
+        }
+      : {
+          mode: 'user-key',
+          apiKey: plannerApiKey.value || undefined
+        }
+  }
+}
+
+function getPlannerContext() {
+  return {
+    checklistItems: selectableItems.value.map(function mapChecklistItem(item, index) {
+      return {
+        id: item.id,
+        position: index + 1,
+        name: item.name,
+        category: item.category,
+        description: item.description,
+        selected: item.selected
+      }
+    }),
+    products: products.value,
+    invoices: invoices.value
+  }
+}
+
+function createSupportTicket(subject: string, body: string): SupportTicket {
+  const ticket = {
+    id: `ticket_${Date.now()}`,
+    subject,
+    body,
+    status: 'open' as const
+  }
+  tickets.value = [ticket, ...tickets.value]
+  addActivity('Ticket opened', ticket.subject, 'success')
+  return ticket
 }
 
 function addActivity(title: string, detail: string, tone: ActivityItem['tone']) {
@@ -371,9 +762,11 @@ function addActivity(title: string, detail: string, tone: ActivityItem['tone']) 
 declare global {
   interface Window {
     __webMCPKitDemoPlanner?: {
-      name: string
-      available: boolean
-      plan: (message: string, tools: ReturnType<typeof listTools>[number]['tool'][]) => Promise<ToolPlan>
+      name: ToolPlanner['name']
+      available: ToolPlanner['available']
+      status: ToolPlanner['status']
+      detail: ToolPlanner['detail']
+      plan: (message: string, tools: ReturnType<typeof listTools>[number]['tool'][], context?: ReturnType<typeof getPlannerContext>) => Promise<ToolPlan>
     }
   }
 }
@@ -444,7 +837,8 @@ h2 {
 
 .status-strip,
 .workbench,
-.state-grid {
+.state-grid,
+.selection-panel {
   display: grid;
   gap: 16px;
 }
@@ -457,7 +851,8 @@ h2 {
 .status-strip div,
 .command-panel,
 .tools-panel,
-.state-panel {
+.state-panel,
+.selection-panel {
   border: 1px solid rgba(244, 240, 232, 0.14);
   background: rgba(12, 17, 16, 0.72);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.26);
@@ -471,9 +866,14 @@ h2 {
 }
 
 .status-strip span,
-.plan-card span {
+.plan-card span,
+.status-strip small {
   color: #9ea8a1;
   font-size: 0.78rem;
+}
+
+.status-strip span,
+.plan-card span {
   text-transform: uppercase;
 }
 
@@ -524,9 +924,48 @@ textarea:focus {
   margin: 14px 0;
 }
 
+.planner-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid rgba(244, 240, 232, 0.14);
+  background: rgba(244, 240, 232, 0.04);
+}
+
+.planner-panel label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: #c9d1cb;
+  font-size: 0.86rem;
+}
+
+.planner-panel input,
+.planner-panel select {
+  min-width: 0;
+  min-height: 42px;
+  padding: 10px;
+  border: 1px solid rgba(244, 240, 232, 0.18);
+  background: #f4f0e8;
+  color: #0c1110;
+  font: inherit;
+}
+
+.planner-warning {
+  grid-column: 1 / -1;
+  margin: 0;
+  border-left: 3px solid #e8be53;
+  padding-left: 10px;
+  color: #e7d7a5;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
 .prompt-examples button,
 .primary-action,
-.tool-card {
+.support-form input {
   border: 1px solid rgba(244, 240, 232, 0.18);
   color: #f4f0e8;
   background: rgba(244, 240, 232, 0.06);
@@ -545,28 +984,33 @@ textarea:focus {
   font-weight: 900;
 }
 
-.tool-card {
+.support-form {
   display: grid;
-  width: 100%;
-  gap: 7px;
-  padding: 16px;
-  text-align: left;
+  gap: 12px;
 }
 
-.tool-card + .tool-card {
-  margin-top: 10px;
+.support-form label {
+  display: grid;
+  gap: 8px;
+  color: #c9d1cb;
+  font-size: 0.92rem;
 }
 
-.tool-card.active {
-  border-color: #30a779;
-  background: rgba(48, 167, 121, 0.16);
+.support-form input {
+  min-height: 46px;
+  padding: 12px;
+  outline: none;
 }
 
-.tool-card span,
-.tool-card small,
 .state-row em,
-.empty-state {
+.empty-state,
+.helper-copy {
   color: #9ea8a1;
+}
+
+.helper-copy {
+  margin: 14px 0 0;
+  line-height: 1.5;
 }
 
 .plan-card {
@@ -583,6 +1027,11 @@ textarea:focus {
   color: #c9d1cb;
 }
 
+.planner-used {
+  color: #e8be53;
+  font-size: 0.88rem;
+}
+
 code {
   display: block;
   overflow: auto;
@@ -595,6 +1044,62 @@ code {
 .state-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-top: 16px;
+}
+
+.selection-panel {
+  margin-top: 16px;
+  padding: clamp(18px, 3vw, 28px);
+}
+
+.selection-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  align-items: baseline;
+  color: #c9d1cb;
+}
+
+.selection-summary strong {
+  color: #30a779;
+  font-size: 1.2rem;
+}
+
+.selection-summary span {
+  color: #9ea8a1;
+}
+
+.checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.checklist-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid rgba(244, 240, 232, 0.12);
+  background: rgba(244, 240, 232, 0.05);
+}
+
+.checklist-item input {
+  inline-size: 18px;
+  block-size: 18px;
+  accent-color: #30a779;
+}
+
+.checklist-item span {
+  color: #f4f0e8;
+  overflow-wrap: anywhere;
+}
+
+.checklist-item em {
+  grid-column: 2;
+  color: #9ea8a1;
+  font-size: 0.78rem;
+  font-style: normal;
 }
 
 .state-panel h2 {
@@ -624,7 +1129,12 @@ code {
 @media (max-width: 980px) {
   .hero-panel,
   .workbench,
-  .state-grid {
+  .state-grid,
+  .checklist-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .planner-panel {
     grid-template-columns: 1fr;
   }
 

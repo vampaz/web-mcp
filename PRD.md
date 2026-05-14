@@ -25,6 +25,7 @@ The main product bet: most teams will not adopt WebMCP by hand if every form, co
 - A development overlay for inspecting, testing, and replaying registered tools.
 - A fallback registry for browsers and test environments that do not expose native WebMCP yet.
 - Optional adapters that export tool definitions to MCP, OpenAI tools, test runners, and documentation.
+- A planner-provider router that can use Chrome built-in AI, OpenRouter, OpenAI, OpenAI-compatible endpoints, Cloudflare Workers AI, Cloudflare AI bindings in dev/preview, or local fallback planning.
 
 ### 2.3 What It Is Not
 
@@ -98,6 +99,10 @@ function hasNativeWebMCP(): boolean {
 | **Guard** | A permission or business-rule check that runs before invocation. |
 | **Confirmation** | A human approval step for sensitive or destructive actions. |
 | **Recipe** | A reusable tool pattern for common flows such as search, filter, add-to-cart, book, submit, export, or undo. |
+| **Planner Provider** | A model backend that converts a user request plus app context into a validated WebMCP tool plan. |
+| **User-Key Mode** | A simple mode where the user provides a provider key directly in the browser. The key is visible to the page and should not be used for shared production app secrets. |
+| **Server Mode** | A safer mode where the browser calls a server or Worker endpoint and provider secrets stay server-side. |
+| **Cloudflare Binding Mode** | A development and preview-only server mode where the browser selects an approved Workers AI model and the planning endpoint calls `env.AI.run()` through an `AI` binding. |
 
 ---
 
@@ -181,6 +186,11 @@ function hasNativeWebMCP(): boolean {
 | F37 | Expose a local MCP bridge for development and non-browser clients. | P2 |
 | F38 | Generate `llms.txt` or docs snippets that describe app capabilities. | P2 |
 | F39 | Provide analytics hooks for registration, invocation, success, failure, and confirmation. | P1 |
+| F40 | Let developers configure a planner provider and model at initialization. | P0 |
+| F41 | Support a development provider selector when no planner is configured. | P0 |
+| F42 | Support both server-side auth and explicit browser user-key auth, with clear warnings. | P0 |
+| F43 | Validate model-produced plans before invoking tools. | P0 |
+| F44 | Expose Cloudflare binding mode only in local development and preview deployments. | P1 |
 
 ---
 
@@ -196,6 +206,7 @@ function hasNativeWebMCP(): boolean {
 | NF6 | Performance | Tool registration should be effectively invisible in app startup cost. |
 | NF7 | Privacy | Do not transmit schemas, inputs, outputs, or API keys to WebMCP Kit services. |
 | NF8 | Stability | Prefer adapters around unstable browser APIs to app-wide rewrites. |
+| NF9 | Secret handling | App-owned provider keys must use server mode; user-key mode must be explicit and documented as browser-visible. |
 
 ---
 

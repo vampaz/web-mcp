@@ -1,8 +1,23 @@
 export { defineTool } from './define-tool'
+export {
+  createToolCatalog,
+  formatToolCatalogMarkdown,
+  type ToolCatalog,
+  type ToolCatalogEntry,
+  type ToolCatalogOptions
+} from './adapters/catalog'
+export { formatOpenAITool, formatOpenAITools, type OpenAIFunctionTool } from './adapters/openai'
 export { emitWebMCPKitEvent, subscribeWebMCPKitEvents } from './events'
+export { inferFormInputSchema, registerFormTool, type FormInput, type RegisterFormToolOptions } from './forms'
 export type {
   JsonSchema,
+  PlannerContext,
+  PlannerAuth,
+  PlannerProviderConfig,
+  PlannerProviderKind,
+  PlannerRequest,
   RegisteredTool,
+  RegistrySnapshot,
   ToolConfirmation,
   ToolContext,
   ToolInvocation,
@@ -13,6 +28,20 @@ export type {
   WebMCPKitEvent,
   WebMCPTool
 } from './interfaces/tool'
-export { createBestPlanner, createChromeAIPlanner, createHeuristicPlanner } from './planner'
-export { clearToolsForTest, getTool, invokeTool, listTools, registerTool } from './registry'
+export { createWebMCPKit, type WebMCPKit, type WebMCPKitOptions } from './kit'
+export {
+  createBestPlanner,
+  createChromeAIPlanner,
+  createConfiguredPlanner,
+  createHeuristicPlanner,
+  createRemotePlanner
+} from './planner'
+export { clearToolsForTest, getRegistrySnapshot, getTool, invokeTool, listTools, registerTool } from './registry'
+export { validateJsonSchema } from './schema'
 export { getSupportLabel, isWebMCPSupported } from './support'
+export {
+  installWebMCPKitTestBridge,
+  type TestBridgeSnapshot,
+  type TestBridgeTool,
+  type WebMCPKitTestBridge
+} from './test-bridge'

@@ -1,0 +1,17 @@
+name = "web-mcp"
+main = "./src/worker.ts"
+compatibility_date = "2026-05-13"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+preview_urls = true
+
+[assets]
+binding = "ASSETS"
+directory = "./dist"
+
+[ai]
+binding = "AI"
+remote = true
+
+[vars]
+PUBLIC_WEBMCP_PREVIEW = "true"

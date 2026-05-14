@@ -1,0 +1,9 @@
+import type { Ai, ExecutionContext } from '@cloudflare/workers-types'
+
+export interface CloudflareEnv {
+  AI?: Ai
+  CLOUDFLARE_ACCOUNT_ID?: string
+  CLOUDFLARE_API_TOKEN?: string
+}
+
+export type CloudflareExecutionContext = ExecutionContext

@@ -1,8 +1,9 @@
 import { assertValidTool } from './define-tool'
 import { emitWebMCPKitEvent } from './events'
-import type { RegisteredTool, ToolInvocation, ToolInvocationResult, WebMCPTool } from './interfaces/tool'
+import type { RegisteredTool, RegistrySnapshot, ToolInvocation, ToolInvocationResult, WebMCPTool } from './interfaces/tool'
 import { registerNativeTool } from './native-adapter'
 import { getToolWarnings } from './quality'
+import { getSupportLabel, isWebMCPSupported } from './support'
 
 const registeredTools = new Map<string, RegisteredTool>()
 
@@ -15,15 +16,18 @@ export function registerTool<TInput = Record<string, unknown>, TOutput = unknown
     registeredTools.get(tool.name)?.unregister()
   }
 
-  const unregisterNative = registerNativeTool(tool)
-  const warnings = getToolWarnings(tool)
+  const nativeRegistration = registerNativeTool(tool)
+  const warnings = [
+    ...getToolWarnings(tool),
+    ...(nativeRegistration?.warnings ?? [])
+  ]
 
   const registration: RegisteredTool<TInput, TOutput> = {
     tool,
-    mode: unregisterNative ? 'native-and-fallback' : 'fallback',
+    mode: nativeRegistration ? 'native-and-fallback' : 'fallback',
     warnings,
     unregister() {
-      unregisterNative?.()
+      nativeRegistration?.unregister?.()
       registeredTools.delete(tool.name)
       emitWebMCPKitEvent({
         type: 'unregistered',
@@ -52,6 +56,17 @@ export function getTool(name: string): RegisteredTool | undefined {
   return registeredTools.get(name)
 }
 
+export function getRegistrySnapshot(): RegistrySnapshot {
+  const tools = listTools()
+
+  return {
+    supportLabel: getSupportLabel(),
+    nativeWebMCP: isWebMCPSupported(),
+    toolCount: tools.length,
+    tools
+  }
+}
+
 export async function invokeTool<TOutput = unknown>(
   invocation: ToolInvocation
 ): Promise<ToolInvocationResult<TOutput>> {
@@ -68,6 +83,14 @@ export async function invokeTool<TOutput = unknown>(
     )
   }
 
+  const invocationId = invocation.id ?? createInvocationId()
+  const trackedInvocation = {
+    ...invocation,
+    id: invocationId
+  }
+
+  emitWebMCPKitEvent({ type: 'invoked', toolName: invocation.toolName, timestamp: Date.now(), detail: trackedInvocation })
+
   const availability = registration.tool.scope?.()
   if (availability && !availability.available) {
     const result = createResult<TOutput>(
@@ -77,6 +100,7 @@ export async function invokeTool<TOutput = unknown>(
       undefined,
       availability.reason ?? 'Tool is not available in the current state.'
     )
+    result.invocationId = invocationId
     emitWebMCPKitEvent({ type: 'blocked', toolName: invocation.toolName, timestamp: Date.now(), detail: result })
     return result
   }
@@ -89,6 +113,7 @@ export async function invokeTool<TOutput = unknown>(
       undefined,
       registration.tool.confirmation.reason
     )
+    result.invocationId = invocationId
     emitWebMCPKitEvent({ type: 'blocked', toolName: invocation.toolName, timestamp: Date.now(), detail: result })
     return result
   }
@@ -102,17 +127,17 @@ export async function invokeTool<TOutput = unknown>(
       undefined,
       typeof guardResult === 'string' ? guardResult : 'Tool guard blocked invocation.'
     )
+    result.invocationId = invocationId
     emitWebMCPKitEvent({ type: 'blocked', toolName: invocation.toolName, timestamp: Date.now(), detail: result })
     return result
   }
-
-  emitWebMCPKitEvent({ type: 'invoked', toolName: invocation.toolName, timestamp: Date.now(), detail: invocation })
 
   try {
     const output = await registration.tool.execute(invocation.input, {
       source: invocation.source ?? 'fallback'
     })
     const result = createResult<TOutput>(invocation.toolName, 'success', startedAt, output as TOutput)
+    result.invocationId = invocationId
     emitWebMCPKitEvent({ type: 'succeeded', toolName: invocation.toolName, timestamp: Date.now(), detail: result })
     return result
   } catch (error) {
@@ -123,6 +148,7 @@ export async function invokeTool<TOutput = unknown>(
       undefined,
       error instanceof Error ? error.message : 'Tool invocation failed.'
     )
+    result.invocationId = invocationId
     emitWebMCPKitEvent({ type: 'failed', toolName: invocation.toolName, timestamp: Date.now(), detail: result })
     return result
   }
@@ -146,4 +172,8 @@ function createResult<TOutput>(
     error,
     durationMs: Math.round(performance.now() - startedAt)
   }
+}
+
+function createInvocationId(): string {
+  return `invocation_${Date.now()}_${Math.random().toString(16).slice(2)}`
 }

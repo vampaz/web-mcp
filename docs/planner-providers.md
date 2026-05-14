@@ -1,0 +1,175 @@
+# Planner Providers
+
+WebMCP Kit can plan tool calls with different model providers. The app still owns tools, schemas, guards, confirmations, and execution. Providers only choose which registered tool to call and which JSON input to pass.
+
+## Production: Server Mode
+
+Use server mode when the key belongs to the app or company.
+
+```ts
+import { createWebMCPKit } from '@webmcp-kit/core'
+
+const kit = await createWebMCPKit({
+  planner: {
+    provider: 'openrouter',
+    model: 'openrouter/auto',
+    auth: {
+      mode: 'server',
+      endpoint: '/api/webmcp/plan'
+    }
+  }
+})
+```
+
+The browser sends the planning request to `endpoint`. The server or Worker stores the provider secret and calls OpenRouter, OpenAI, Cloudflare Workers AI, or another provider. This is the right mode for public apps and SaaS products.
+
+## Simple Experiments: User-Key Mode
+
+Use user-key mode when the key belongs to the person using the browser, or for local experiments.
+
+```ts
+const kit = await createWebMCPKit({
+  planner: {
+    provider: 'openrouter',
+    model: 'openrouter/auto',
+    auth: {
+      mode: 'user-key',
+      apiKey: userProvidedKey
+    }
+  }
+})
+```
+
+This has no server hop, but the key is visible to the page and browser developer tools. Do not use user-key mode for shared production app secrets.
+
+## Provider Examples
+
+Chrome built-in AI:
+
+```ts
+await createWebMCPKit({
+  planner: {
+    provider: 'chrome-built-in',
+    auth: { mode: 'none' }
+  }
+})
+```
+
+OpenAI:
+
+```ts
+await createWebMCPKit({
+  planner: {
+    provider: 'openai',
+    model: 'gpt-4.1-mini',
+    auth: {
+      mode: 'user-key',
+      apiKey: userProvidedOpenAIKey
+    }
+  }
+})
+```
+
+OpenAI-compatible endpoint:
+
+```ts
+await createWebMCPKit({
+  planner: {
+    provider: 'openai-compatible',
+    model: 'qwen-coder',
+    baseUrl: 'http://localhost:1234/v1',
+    auth: {
+      mode: 'user-key',
+      apiKey: localEndpointKey
+    }
+  }
+})
+```
+
+Cloudflare Workers AI through the Astro Cloudflare adapter:
+
+```ts
+await createWebMCPKit({
+  planner: {
+    provider: 'cloudflare-workers-ai',
+    model: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
+    auth: {
+      mode: 'server',
+      endpoint: '/api/webmcp/plan'
+    }
+  }
+})
+```
+
+The demo includes `/api/webmcp/plan` for Cloudflare server planning. For `provider: 'cloudflare-workers-ai'`, that route uses `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` from the server environment. For `provider: 'cloudflare-binding'`, it uses the Astro Cloudflare adapter and expects a Cloudflare runtime with `env.AI`.
+
+Cloudflare binding mode for local development and preview deployments:
+
+```ts
+await createWebMCPKit({
+  planner: {
+    provider: 'cloudflare-binding',
+    model: '@cf/google/gemma-4-26b-a4b-it',
+    auth: {
+      mode: 'server',
+      endpoint: '/api/webmcp/plan'
+    }
+  }
+})
+```
+
+This mode is intentionally endpoint-only. The browser never receives a Cloudflare token; it sends the selected model and planning payload to the app endpoint. The app is configured with `@astrojs/cloudflare`, `src/worker.ts`, and `wrangler.toml`; `wrangler.toml` declares the `AI` binding with `remote = true` so local development can use the real Cloudflare Workers AI binding when the dev server is restarted under that adapter. In the demo selector this option is shown only when `import.meta.env.DEV` is true or `PUBLIC_WEBMCP_PREVIEW=true`.
+
+For local binding mode, start the dev server normally. The project enables Cloudflare remote bindings by default for `npm run dev`:
+
+```sh
+npm run dev
+```
+
+If you see `Binding AI needs to be run remotely`, the server was started before remote bindings were enabled. Stop the current dev server and restart it with `npm run dev`.
+
+For the separate `cloudflare-workers-ai` REST mode, add `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` to `.dev.vars` or the server environment instead.
+
+The handler shape is:
+
+```ts
+interface Env {
+  AI: Ai
+}
+
+export default {
+  async fetch(request: Request, env: Env) {
+    const body = await request.json() as {
+      model: string
+      message: string
+      tools: unknown[]
+      context: unknown
+    }
+
+    const result = await env.AI.run(body.model, {
+      messages: [
+        {
+          role: 'system',
+          content: 'Return only a JSON WebMCP tool plan.'
+        },
+        {
+          role: 'user',
+          content: JSON.stringify(body)
+        }
+      ],
+      temperature: 0
+    })
+
+    return Response.json(JSON.parse(result.response))
+  }
+}
+```
+
+## Devtools Selection
+
+If an app does not provide a planner config, development builds can expose a provider selector. That selector should be honest about auth mode:
+
+- Server endpoint: safer for app-owned keys.
+- User key in browser: simpler, but visible to the page.
+
+WebMCP Kit validates provider output before invocation. If a provider fails, returns malformed JSON, or selects an unknown tool, the planner falls back to deterministic local planning.

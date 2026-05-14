@@ -47,7 +47,15 @@ export interface RegisteredTool<TInput = Record<string, unknown>, TOutput = unkn
   unregister: () => void
 }
 
+export interface RegistrySnapshot {
+  supportLabel: string
+  nativeWebMCP: boolean
+  toolCount: number
+  tools: RegisteredTool[]
+}
+
 export interface ToolInvocation<TInput = Record<string, unknown>> {
+  id?: string
   toolName: string
   input: TInput
   confirmed?: boolean
@@ -55,6 +63,7 @@ export interface ToolInvocation<TInput = Record<string, unknown>> {
 }
 
 export interface ToolInvocationResult<TOutput = unknown> {
+  invocationId?: string
   toolName: string
   status: 'success' | 'error' | 'blocked' | 'unavailable'
   output?: TOutput
@@ -69,10 +78,46 @@ export interface ToolPlan {
   reason: string
 }
 
+export interface PlannerContext {
+  [key: string]: unknown
+}
+
+export type PlannerProviderKind =
+  | 'auto'
+  | 'chrome-built-in'
+  | 'local'
+  | 'openai'
+  | 'openrouter'
+  | 'openai-compatible'
+  | 'cloudflare-binding'
+  | 'cloudflare-workers-ai'
+
+export type PlannerAuth =
+  | { mode: 'none' }
+  | { mode: 'server', endpoint: string }
+  | { mode: 'user-key', apiKey?: string, storageKey?: string, allowInProduction?: boolean }
+
+export interface PlannerProviderConfig {
+  provider: PlannerProviderKind
+  model?: string
+  baseUrl?: string
+  accountId?: string
+  auth?: PlannerAuth
+}
+
+export interface PlannerRequest {
+  message: string
+  tools: WebMCPTool[]
+  context: PlannerContext
+}
+
 export interface ToolPlanner {
   name: string
   available: boolean
-  plan: (message: string, tools: WebMCPTool[]) => Promise<ToolPlan>
+  status: 'ready' | 'downloadable' | 'downloading' | 'unavailable' | 'fallback' | 'needs-key'
+  detail: string
+  plan: (message: string, tools: WebMCPTool[], context?: PlannerContext) => Promise<ToolPlan>
+  dispose?: () => void
 }
 
 export interface WebMCPKitEvent {

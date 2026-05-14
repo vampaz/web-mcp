@@ -1,0 +1,13 @@
+{
+  "name": "@webmcp-kit/mcp-bridge",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@webmcp-kit/core": "0.0.0"
+  }
+}

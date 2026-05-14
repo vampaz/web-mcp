@@ -1,0 +1,17 @@
+{
+  "name": "@webmcp-kit/testing",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./playwright": "./src/playwright.ts"
+  },
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@webmcp-kit/core": "0.0.0"
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1.60.0"
+  }
+}

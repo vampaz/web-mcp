@@ -26,6 +26,14 @@ export interface SupportTicket {
   status: 'open' | 'triaged'
 }
 
+export interface SelectableItem {
+  id: string
+  name: string
+  category: 'fruit' | 'vegetable' | 'bakery' | 'drink'
+  description: string
+  selected: boolean
+}
+
 export interface ActivityItem {
   id: string
   title: string

@@ -12,9 +12,14 @@ interface NativeHandle {
   dispose?: () => void
 }
 
+export interface NativeToolRegistration {
+  unregister?: () => void
+  warnings: string[]
+}
+
 export function registerNativeTool<TInput = Record<string, unknown>, TOutput = unknown>(
   tool: WebMCPTool<TInput, TOutput>
-): (() => void) | undefined {
+): NativeToolRegistration | undefined {
   if (!isWebMCPSupported()) return undefined
 
   const registerTool = (navigator as NavigatorWithModelContext).modelContext?.registerTool
@@ -30,18 +35,36 @@ export function registerNativeTool<TInput = Record<string, unknown>, TOutput = u
       }
     }) as NativeHandle | undefined
 
-    return function unregisterNativeTool() {
-      if (typeof handle?.unregister === 'function') {
-        handle.unregister()
-        return
-      }
-
-      if (typeof handle?.dispose === 'function') {
-        handle.dispose()
-      }
+    return {
+      unregister: getNativeUnregister(handle),
+      warnings: getNativeHandleWarnings(handle)
     }
   } catch (error) {
     console.warn('[WebMCP Kit] Native registration failed; using fallback registry.', error)
     return undefined
   }
+}
+
+function getNativeUnregister(handle: NativeHandle | undefined): (() => void) | undefined {
+  if (typeof handle?.unregister === 'function') {
+    return function unregisterNativeTool() {
+      handle.unregister?.()
+    }
+  }
+
+  if (typeof handle?.dispose === 'function') {
+    return function disposeNativeTool() {
+      handle.dispose?.()
+    }
+  }
+
+  return undefined
+}
+
+function getNativeHandleWarnings(handle: NativeHandle | undefined): string[] {
+  if (!handle || typeof handle !== 'object') return []
+
+  if (typeof handle.unregister === 'function' || typeof handle.dispose === 'function') return []
+
+  return ['Native WebMCP registration returned a handle without unregister or dispose; local unregister cannot remove the native tool.']
 }
