@@ -1,4 +1,5 @@
 import type { WebMCPTool } from './interfaces/tool'
+import { formatJsonValueValidationError, validateJsonValue } from './schema'
 import { isWebMCPSupported } from './support'
 
 interface NavigatorWithModelContext extends Navigator {
@@ -31,6 +32,11 @@ export function registerNativeTool<TInput = Record<string, unknown>, TOutput = u
       description: tool.description,
       inputSchema: tool.inputSchema,
       execute(input: TInput) {
+        const inputValidationErrors = validateJsonValue(input, tool.inputSchema)
+        if (inputValidationErrors.length > 0) {
+          throw new Error(formatJsonValueValidationError(inputValidationErrors))
+        }
+
         return tool.execute(input, { source: 'native' })
       }
     }) as NativeHandle | undefined

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { defineTool } from './define-tool'
 import { clearToolsForTest, invokeTool, listTools, registerTool } from './registry'
@@ -69,5 +69,45 @@ describe('registry', () => {
     })
 
     expect(confirmed.status).toBe('success')
+  })
+
+  it('returns an error before handlers run when input validation fails', async () => {
+    const guard = vi.fn(function allowInvocation() {
+      return true
+    })
+    const execute = vi.fn(function createInvoice() {
+      return { id: 'inv_1' }
+    })
+
+    registerTool(defineTool({
+      name: 'create_invoice',
+      description: 'Create an invoice for a customer and open it in the current workspace.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          customerName: { type: 'string' },
+          amount: { type: 'number', minimum: 0.01 }
+        },
+        required: ['customerName', 'amount'],
+        additionalProperties: false
+      },
+      confirmation: {
+        required: true,
+        reason: 'Creates a billable invoice.'
+      },
+      guard,
+      execute
+    }))
+
+    const result = await invokeTool({
+      toolName: 'create_invoice',
+      input: { customerName: 123, amount: 'not-a-number' },
+      confirmed: true
+    })
+
+    expect(result.status).toBe('error')
+    expect(result.error).toBe('input validation failed: /customerName expected string, got integer. /amount expected number, got string.')
+    expect(guard).not.toHaveBeenCalled()
+    expect(execute).not.toHaveBeenCalled()
   })
 })

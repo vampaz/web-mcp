@@ -3,6 +3,7 @@ import { emitWebMCPKitEvent } from './events'
 import type { RegisteredTool, RegistrySnapshot, ToolInvocation, ToolInvocationResult, WebMCPTool } from './interfaces/tool'
 import { registerNativeTool } from './native-adapter'
 import { getToolWarnings } from './quality'
+import { formatJsonValueValidationError, validateJsonValue } from './schema'
 import { getSupportLabel, isWebMCPSupported } from './support'
 
 const registeredTools = new Map<string, RegisteredTool>()
@@ -102,6 +103,20 @@ export async function invokeTool<TOutput = unknown>(
     )
     result.invocationId = invocationId
     emitWebMCPKitEvent({ type: 'blocked', toolName: invocation.toolName, timestamp: Date.now(), detail: result })
+    return result
+  }
+
+  const inputValidationErrors = validateJsonValue(invocation.input, registration.tool.inputSchema)
+  if (inputValidationErrors.length > 0) {
+    const result = createResult<TOutput>(
+      invocation.toolName,
+      'error',
+      startedAt,
+      undefined,
+      formatJsonValueValidationError(inputValidationErrors)
+    )
+    result.invocationId = invocationId
+    emitWebMCPKitEvent({ type: 'failed', toolName: invocation.toolName, timestamp: Date.now(), detail: result })
     return result
   }
 

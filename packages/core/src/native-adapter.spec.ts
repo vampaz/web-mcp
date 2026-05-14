@@ -184,4 +184,36 @@ describe('native WebMCP adapter', () => {
       source: 'native'
     })
   })
+
+  it('validates native input before executing handlers', () => {
+    let nativeExecute: ((input: Record<string, unknown>) => unknown) | undefined
+    const execute = vi.fn(function searchProducts(input: Record<string, unknown>) {
+      return input
+    })
+
+    ;(navigator as NavigatorWithModelContext).modelContext = {
+      registerTool: vi.fn(function registerNativeToolMock(nativeTool) {
+        nativeExecute = nativeTool.execute
+        return undefined
+      })
+    }
+
+    registerTool(defineTool({
+      name: 'search_products',
+      description: 'Search the local product catalog and return matching products for the current shopper.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' }
+        },
+        required: ['query']
+      },
+      execute
+    }))
+
+    expect(function invokeNativeTool() {
+      nativeExecute?.({ query: 42 })
+    }).toThrow('input validation failed: /query expected string, got integer.')
+    expect(execute).not.toHaveBeenCalled()
+  })
 })
