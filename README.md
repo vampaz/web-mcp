@@ -1,6 +1,6 @@
 # WebMCP Kit
 
-WebMCP Kit is a local-first TypeScript toolkit for adding WebMCP tools to real web apps. It registers tools with native WebMCP browser APIs when they exist, keeps a fallback registry for development and tests, and gives teams a practical path to build agent-ready UI without inventing a new protocol.
+WebMCP Kit is a local-first TypeScript toolkit for exposing real web app actions as safe, typed WebMCP tools. It lets apps register narrow actions with schemas, guards, confirmations, and lifecycle cleanup, then progressively connects those tools to native browser WebMCP, local devtools, tests, and planner-driven demos.
 
 ## Status
 
@@ -10,6 +10,15 @@ This repository is an early MVP. Chrome WebMCP and Chrome built-in AI are emergi
 2. Keep a fallback registry for unsupported browsers, tests, demos, and devtools.
 3. Use Chrome built-in AI planning when `LanguageModel` is available.
 4. Fall back to deterministic local planning when browser AI is unavailable.
+
+The current aim is not to replace app code or invent a new agent runtime. The kit gives existing web apps a small adoption layer for making selected user-facing actions callable by browsers, tests, local tools, or planners while the app keeps ownership of validation, confirmation, authorization, and execution.
+
+What is in this repo now:
+
+- Core tool registration, native WebMCP wrapping, fallback invocation, validation, confirmations, events, planners, and form helpers.
+- Optional Vue, React, and Svelte lifecycle helpers that delegate to core registration.
+- Devtools, Playwright helpers, and a local MCP-style bridge for development and testing.
+- An Astro + Vue + Cloudflare demo that exercises planner providers, Cloudflare Workers AI, and fallback behavior.
 
 ## Quick Start
 
@@ -40,7 +49,8 @@ const registration = registerTool(defineTool({
         description: 'The invoice amount.'
       }
     },
-    required: ['customerName', 'amount']
+    required: ['customerName', 'amount'],
+    additionalProperties: false
   },
   confirmation: {
     required: true,
@@ -66,6 +76,16 @@ registration.unregister()
 - `isWebMCPSupported()` checks for native WebMCP registration support.
 - `createBestPlanner()` uses Chrome built-in AI when available, otherwise a deterministic local planner.
 - `installWebMCPKitTestBridge()` exposes a kit-specific test bridge for Playwright and local QA.
+
+## Framework Helpers
+
+The framework packages are intentionally thin lifecycle adapters. They register tools through `@webmcp-kit/core` and unregister them when the owning component scope is disposed.
+
+- `@webmcp-kit/vue`: `useWebMCPTool()` for Vue effect scopes, with reactive `when` support.
+- `@webmcp-kit/react`: `useWebMCPTool()` for React components.
+- `@webmcp-kit/svelte`: `useWebMCPTool()` for Svelte components, including readable-store `when` support.
+
+See [Vue](./docs/vue.md), [React](./docs/react.md), [Svelte](./docs/svelte.md), and [Framework Extensions](./docs/framework-extensions.md).
 
 ## Planner Providers
 
