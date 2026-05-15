@@ -37,6 +37,8 @@ setConfirmationHandler(async function confirmTool(tool, input, reason) {
 
 WebMCP Kit enforces confirmation before execution in both fallback and native wrapper paths. If no handler is configured, browser runtimes fall back to `window.confirm()`.
 
+The `confirmed: true` invocation flag is for trusted automation and bridge calls that have already performed approval. Normal application flows should use `setConfirmationHandler()` so the app owns the user-facing approval step.
+
 ## Guards And Scope
 
 Use guards for input-specific blocking:

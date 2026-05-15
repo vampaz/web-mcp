@@ -426,6 +426,15 @@ function planWithHeuristics(message: string, tools: WebMCPTool[], context: Plann
     }
   }
 
+  if (normalizedMessage.includes('checkout') || normalizedMessage.includes('check out')) {
+    return {
+      toolName: pickToolName(tools, 'checkout_cart'),
+      input: {},
+      confidence: 0.7,
+      reason: 'Matched checkout wording for a confirmed cart mutation.'
+    }
+  }
+
   if (normalizedMessage.includes('cart') || normalizedMessage.includes('card') || normalizedMessage.includes('add ')) {
     return {
       toolName: pickToolName(tools, 'add_to_cart'),

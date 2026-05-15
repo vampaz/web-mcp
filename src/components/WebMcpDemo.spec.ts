@@ -28,7 +28,7 @@ describe('WebMcpDemo', () => {
     document.body.innerHTML = ''
   })
 
-  it('registers tools and executes a natural language command', async () => {
+  it('starts with a read-only search command', async () => {
     const wrapper = mountWithDeps(WebMcpDemo)
     await flushPromises()
 
@@ -38,8 +38,9 @@ describe('WebMcpDemo', () => {
     await wrapper.find('.primary-action').trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Invoice created')
-    expect(wrapper.text()).toContain('Acme')
+    expect(wrapper.text()).toContain('Products searched')
+    expect(wrapper.text()).toContain('dock')
+    expect(window.confirm).not.toHaveBeenCalled()
   })
 
   it('selects checklist items from AI-chosen context IDs', async () => {

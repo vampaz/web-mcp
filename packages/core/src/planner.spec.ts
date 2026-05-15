@@ -163,6 +163,14 @@ describe('planner', () => {
     })
   })
 
+  it('routes checkout commands to the confirmed checkout tool', async () => {
+    const planner = createHeuristicPlanner()
+    const plan = await planner.plan('Checkout the cart.', [])
+
+    expect(plan.toolName).toBe('checkout_cart')
+    expect(plan.input).toEqual({})
+  })
+
   it('plans positional checklist selection', async () => {
     const planner = createHeuristicPlanner()
     const plan = await planner.plan('Select the first five items', [], {

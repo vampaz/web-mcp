@@ -109,18 +109,21 @@
           v-model="prompt"
           rows="4"
           aria-label="Natural language command"
-          placeholder="Create an invoice for Acme for 500 euros"
+          placeholder="Find portable dock products"
         />
 
         <div class="prompt-examples">
-          <button type="button" @click="setPrompt('Create an invoice for Northwind for 500 euros')">
-            Invoice
-          </button>
           <button type="button" @click="setPrompt('Find portable dock products')">
             Search
           </button>
+          <button type="button" @click="setPrompt('Create an invoice for Northwind for 500 euros')">
+            Invoice
+          </button>
           <button type="button" @click="setPrompt('Add a keyboard to the cart')">
             Cart
+          </button>
+          <button type="button" @click="setPrompt('Checkout the cart')">
+            Checkout
           </button>
           <button type="button" @click="setPrompt('Open a support ticket about billing access')">
             Support
@@ -244,6 +247,7 @@ import {
   listTools,
   registerTool,
   registerFormTool,
+  setConfirmationHandler,
   type PlannerProviderConfig,
   type PlannerProviderKind,
   type ToolPlan,
@@ -254,7 +258,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import type { ActivityItem, CartLine, Invoice, Product, SelectableItem, SupportTicket } from '@/interfaces/demo'
 
-const prompt = ref('Create an invoice for Acme for 500 euros')
+const prompt = ref('Find portable dock products')
 const plannerName = ref('Loading')
 const plannerDetail = ref('Checking Chrome built-in AI availability.')
 const plannerProvider = ref<PlannerProviderKind>('auto')
@@ -305,7 +309,7 @@ const cloudflareBindingModels = [
   }
 ]
 const lastPlannerUsed = ref('No command has run yet')
-const selectedToolName = ref('create_invoice')
+const selectedToolName = ref('search_products')
 const registeredTools = ref<ReturnType<typeof listTools>>([])
 const lastPlan = ref<ToolPlan | null>(null)
 const unregisterCallbacks: Array<() => void> = []
@@ -394,6 +398,7 @@ watch(plannerProvider, function handlePlannerProviderChanged(provider) {
 })
 
 onMounted(async function handleMounted() {
+  setConfirmationHandler(confirmToolInvocation)
   registerDemoTools()
   registerSupportFormTool()
   refreshTools()
@@ -411,6 +416,7 @@ onUnmounted(function handleUnmounted() {
   }
   currentPlanner?.dispose?.()
   devtoolsOverlay?.destroy()
+  setConfirmationHandler(undefined)
 })
 
 function registerDemoTools() {
@@ -430,7 +436,8 @@ function registerDemoTools() {
           description: 'The invoice amount in euros.'
         }
       },
-      required: ['customerName', 'amount']
+      required: ['customerName', 'amount'],
+      additionalProperties: false
     },
     confirmation: {
       required: true,
@@ -460,7 +467,8 @@ function registerDemoTools() {
           description: 'Search words for product name or category.'
         }
       },
-      required: ['query']
+      required: ['query'],
+      additionalProperties: false
     },
     execute(input) {
       const query = String(input.query ?? '').toLowerCase()
@@ -488,7 +496,8 @@ function registerDemoTools() {
           description: 'How many units to add.'
         }
       },
-      required: ['productId', 'quantity']
+      required: ['productId', 'quantity'],
+      additionalProperties: false
     },
     guard(input) {
       return products.value.some(function hasProduct(item) {
@@ -560,7 +569,8 @@ function registerDemoTools() {
           description: 'Stable IDs of checklist items to select.'
         }
       },
-      required: ['ids']
+      required: ['ids'],
+      additionalProperties: false
     },
     execute(input) {
       const ids = Array.isArray(input.ids) ? input.ids.map(String) : []
@@ -635,6 +645,11 @@ async function runPrompt() {
 
 function setPrompt(nextPrompt: string) {
   prompt.value = nextPrompt
+}
+
+function confirmToolInvocation(tool: { name: string }, input: unknown, reason: string): boolean {
+  addActivity('Confirmation requested', `${tool.name}: ${reason}`, 'warning')
+  return window.confirm(`${reason}\n\n${JSON.stringify(input, null, 2)}`)
 }
 
 async function submitSupportForm() {
@@ -724,7 +739,8 @@ function getPlannerContext() {
       }
     }),
     products: products.value,
-    invoices: invoices.value
+    invoices: invoices.value,
+    cart: cart.value
   }
 }
 
