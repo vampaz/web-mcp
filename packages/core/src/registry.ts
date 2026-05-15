@@ -1,4 +1,5 @@
 import { assertValidTool } from './define-tool'
+import { requestToolConfirmation } from './confirmation'
 import { emitWebMCPKitEvent } from './events'
 import type { RegisteredTool, RegistrySnapshot, ToolInvocation, ToolInvocationResult, WebMCPTool } from './interfaces/tool'
 import { registerNativeTool } from './native-adapter'
@@ -120,7 +121,13 @@ export async function invokeTool<TOutput = unknown>(
     return result
   }
 
-  if (registration.tool.confirmation?.required && !invocation.confirmed) {
+  const confirmed = invocation.confirmed === true || (
+    registration.tool.confirmation?.required
+      ? await requestToolConfirmation(registration.tool, invocation.input)
+      : true
+  )
+
+  if (registration.tool.confirmation?.required && !confirmed) {
     const result = createResult<TOutput>(
       invocation.toolName,
       'blocked',

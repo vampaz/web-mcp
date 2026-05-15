@@ -1,34 +1,32 @@
-# React Recipe
+# React Hook
 
-Use the framework-agnostic core API inside an effect.
+Use `useWebMCPTool` to register a tool while the component is mounted. The hook syncs after renders, so `when` can read current route or component state.
 
 ```tsx
-import { useEffect } from 'react'
-import { defineTool, registerTool } from '@webmcp-kit/core'
+import { defineTool } from '@webmcp-kit/core'
+import { useWebMCPTool } from '@webmcp-kit/react'
 
 export function CartTools() {
-  useEffect(function registerCartTools() {
-    const registration = registerTool(defineTool({
-      name: 'add_to_cart',
-      description: 'Add a known product to the current cart.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          productId: { type: 'string' },
-          quantity: { type: 'integer', minimum: 1 }
-        },
-        required: ['productId', 'quantity'],
-        additionalProperties: false
+  useWebMCPTool(defineTool({
+    name: 'add_to_cart',
+    description: 'Add a known product to the current cart.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        productId: { type: 'string' },
+        quantity: { type: 'integer', minimum: 1 }
       },
-      execute(input) {
-        return input
-      }
-    }))
-
-    return function unregisterCartTools() {
-      registration.unregister()
+      required: ['productId', 'quantity'],
+      additionalProperties: false
+    },
+    execute(input) {
+      return input
     }
-  }, [])
+  }), {
+    when: function isCartRoute() {
+      return window.location.pathname.startsWith('/cart')
+    }
+  })
 
   return null
 }

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { defineTool } from './define-tool'
+import { setConfirmationHandler } from './index'
 import { clearToolsForTest, registerTool } from './registry'
 import { isWebMCPSupported } from './support'
 
@@ -13,11 +14,13 @@ interface NavigatorWithModelContext extends Navigator {
 describe('native WebMCP adapter', () => {
   beforeEach(() => {
     clearToolsForTest()
+    setConfirmationHandler(undefined)
     delete (navigator as NavigatorWithModelContext).modelContext
   })
 
   afterEach(() => {
     clearToolsForTest()
+    setConfirmationHandler(undefined)
     delete (navigator as NavigatorWithModelContext).modelContext
   })
 
@@ -185,7 +188,7 @@ describe('native WebMCP adapter', () => {
     })
   })
 
-  it('validates native input before executing handlers', () => {
+  it('validates native input before executing handlers', async () => {
     let nativeExecute: ((input: Record<string, unknown>) => unknown) | undefined
     const execute = vi.fn(function searchProducts(input: Record<string, unknown>) {
       return input
@@ -211,9 +214,50 @@ describe('native WebMCP adapter', () => {
       execute
     }))
 
-    expect(function invokeNativeTool() {
-      nativeExecute?.({ query: 42 })
-    }).toThrow('input validation failed: /query expected string, got integer.')
+    await expect(nativeExecute?.({ query: 42 })).rejects.toThrow('input validation failed: /query expected string, got integer.')
     expect(execute).not.toHaveBeenCalled()
+  })
+
+  it('uses the configured confirmation handler before native execution', async () => {
+    let nativeExecute: ((input: Record<string, unknown>) => unknown) | undefined
+    const confirm = vi.fn(function confirmInvocation() {
+      return true
+    })
+    const execute = vi.fn(function voidInvoice(input: Record<string, unknown>) {
+      return input
+    })
+
+    setConfirmationHandler(confirm)
+    ;(navigator as NavigatorWithModelContext).modelContext = {
+      registerTool: vi.fn(function registerNativeToolMock(nativeTool) {
+        nativeExecute = nativeTool.execute
+        return undefined
+      })
+    }
+
+    registerTool(defineTool({
+      name: 'void_invoice',
+      description: 'Void an existing invoice after the user has reviewed the pending action.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          invoiceId: { type: 'string' }
+        },
+        required: ['invoiceId']
+      },
+      confirmation: {
+        required: true,
+        reason: 'Voiding an invoice cannot be undone in this demo.'
+      },
+      execute
+    }))
+
+    await expect(nativeExecute?.({ invoiceId: 'inv_1' })).resolves.toEqual({ invoiceId: 'inv_1' })
+    expect(confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'void_invoice' }),
+      { invoiceId: 'inv_1' },
+      'Voiding an invoice cannot be undone in this demo.'
+    )
+    expect(execute).toHaveBeenCalledWith({ invoiceId: 'inv_1' }, { source: 'native' })
   })
 })

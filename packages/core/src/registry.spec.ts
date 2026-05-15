@@ -1,11 +1,16 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { defineTool } from './define-tool'
-import { clearToolsForTest, invokeTool, listTools, registerTool } from './registry'
+import { clearToolsForTest, invokeTool, listTools, registerTool, setConfirmationHandler } from './index'
 
 describe('registry', () => {
   beforeEach(() => {
     clearToolsForTest()
+    setConfirmationHandler(undefined)
+  })
+
+  afterEach(() => {
+    setConfirmationHandler(undefined)
   })
 
   it('registers and invokes a fallback tool', async () => {
@@ -36,6 +41,10 @@ describe('registry', () => {
   })
 
   it('blocks sensitive tools until confirmed', async () => {
+    setConfirmationHandler(function rejectConfirmation() {
+      return false
+    })
+
     registerTool(defineTool({
       name: 'void_invoice',
       description: 'Void an existing invoice after the user has reviewed the pending action.',
@@ -71,13 +80,55 @@ describe('registry', () => {
     expect(confirmed.status).toBe('success')
   })
 
+  it('uses a configured confirmation handler for sensitive tools', async () => {
+    const confirm = vi.fn(function confirmInvocation() {
+      return true
+    })
+    setConfirmationHandler(confirm)
+
+    registerTool(defineTool({
+      name: 'void_invoice',
+      description: 'Void an existing invoice after the user has reviewed the pending action.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          invoiceId: { type: 'string' }
+        },
+        required: ['invoiceId']
+      },
+      confirmation: {
+        required: true,
+        reason: 'Voiding an invoice cannot be undone in this demo.'
+      },
+      execute() {
+        return { voided: true }
+      }
+    }))
+
+    const result = await invokeTool({
+      toolName: 'void_invoice',
+      input: { invoiceId: 'inv_1' }
+    })
+
+    expect(result.status).toBe('success')
+    expect(confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'void_invoice' }),
+      { invoiceId: 'inv_1' },
+      'Voiding an invoice cannot be undone in this demo.'
+    )
+  })
+
   it('returns an error before handlers run when input validation fails', async () => {
+    const confirm = vi.fn(function confirmInvocation() {
+      return true
+    })
     const guard = vi.fn(function allowInvocation() {
       return true
     })
     const execute = vi.fn(function createInvoice() {
       return { id: 'inv_1' }
     })
+    setConfirmationHandler(confirm)
 
     registerTool(defineTool({
       name: 'create_invoice',
@@ -107,6 +158,7 @@ describe('registry', () => {
 
     expect(result.status).toBe('error')
     expect(result.error).toBe('input validation failed: /customerName expected string, got integer. /amount expected number, got string.')
+    expect(confirm).not.toHaveBeenCalled()
     expect(guard).not.toHaveBeenCalled()
     expect(execute).not.toHaveBeenCalled()
   })

@@ -1,16 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { clearToolsForTest, defineTool, registerTool } from '@webmcp-kit/core'
+import { clearToolsForTest, defineTool, registerTool, setConfirmationHandler } from '@webmcp-kit/core'
 
 import { createLocalMCPBridge } from './index'
 
 describe('local MCP bridge', () => {
   beforeEach(() => {
     clearToolsForTest()
+    setConfirmationHandler(undefined)
   })
 
   afterEach(() => {
     clearToolsForTest()
+    setConfirmationHandler(undefined)
   })
 
   it('lists and invokes fallback-registered tools with MCP-style requests', async () => {
@@ -85,6 +87,10 @@ describe('local MCP bridge', () => {
   })
 
   it('requires explicit confirmation for confirmed tools', async () => {
+    setConfirmationHandler(function rejectConfirmation() {
+      return false
+    })
+
     registerTool(defineTool({
       name: 'checkout_cart',
       description: 'Checkout the current cart and clear all cart lines after explicit confirmation.',

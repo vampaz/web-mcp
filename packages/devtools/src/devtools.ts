@@ -313,14 +313,11 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
     if (!parsedInput.ok) return
 
     const invocationId = createInvocationId()
-    const registration = listTools().find((item) => item.tool.name === toolName)
-    const confirmed = registration?.tool.confirmation?.required ? window.confirm(registration.tool.confirmation.reason) : true
 
     const invocation = {
       id: invocationId,
       toolName,
       input: parsedInput.input,
-      confirmed,
       source: 'devtools'
     } satisfies ToolInvocation
     await invokeTool(invocation)
