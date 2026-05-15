@@ -23,17 +23,31 @@ What is in this repo now:
 ## Quick Start
 
 ```ts
+import { defineTool, registerTool } from '@webmcp-kit/core'
+
+registerTool(defineTool({
+  name: 'search_products',
+  description: 'Search the local product catalog.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string' }
+    },
+    required: ['query'],
+    additionalProperties: false
+  },
+  execute(input) {
+    return searchProducts(String(input.query))
+  }
+}))
+```
+
+For tools that change important state, add confirmation metadata and configure one app-level approval handler:
+
+```ts
 import { defineTool, registerTool, setConfirmationHandler } from '@webmcp-kit/core'
 
-setConfirmationHandler(async function confirmTool(tool, input, reason) {
-  return showConfirmationModal({
-    title: `Run ${tool.name}?`,
-    body: reason,
-    preview: JSON.stringify(input, null, 2)
-  })
-})
-
-const registration = registerTool(defineTool({
+registerTool(defineTool({
   name: 'create_invoice',
   description: 'Create a draft invoice for a customer and add it to the invoice list.',
   inputSchema: {
@@ -61,7 +75,13 @@ const registration = registerTool(defineTool({
   }
 }))
 
-registration.unregister()
+setConfirmationHandler(async function confirmTool(tool, input, reason) {
+  return showConfirmationModal({
+    title: `Run ${tool.name}?`,
+    body: reason,
+    preview: JSON.stringify(input, null, 2)
+  })
+})
 ```
 
 ## Core API

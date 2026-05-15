@@ -134,8 +134,8 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 All 10 planned docs exist and are well-written:
 
 - `README.md` — Clean, clear positioning ("not a new protocol"), quick start, good examples.
-- `PLAN.md` — Exhaustive implementation plan with all phases checked off.
-- `PRD.md` — Production-quality PRD with personas, functional/non-functional requirements, open questions.
+- `Dev-Docs/PLAN.md` — Exhaustive implementation plan with all phases checked off.
+- `Dev-Docs/PRD.md` — Production-quality PRD with personas, functional/non-functional requirements, open questions.
 - `docs/getting-started.md` — First-tool example in plain JS.
 - `docs/browser-support.md` — Native WebMCP, Early Preview status, feature detection, fallback behavior.
 - `docs/security.md` — Untrusted inputs, permissions, confirmations, redaction, audit hooks.

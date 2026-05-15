@@ -20,6 +20,7 @@ WebMCP Kit is an ESM-only TypeScript npm workspace for exposing app actions as W
 - `src`: Astro + Vue demo app and Cloudflare planner endpoint.
 - `tests/e2e`: Playwright demo coverage.
 - `docs`: user-facing docs; keep examples aligned with source behavior.
+- `Dev-Docs`: development planning docs, PRDs, implementation plans, and internal review notes.
 
 ## Environment
 
