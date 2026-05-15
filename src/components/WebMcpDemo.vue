@@ -622,16 +622,9 @@ async function runPrompt() {
   lastPlannerUsed.value = `${planner.name} (${planner.status})`
   selectedToolName.value = plan.toolName
 
-  const registration = listTools().find(function findRegistration(item) {
-    return item.tool.name === plan.toolName
-  })
-  const needsConfirmation = registration?.tool.confirmation?.required === true
-  const confirmed = needsConfirmation ? window.confirm(registration?.tool.confirmation?.reason ?? 'Confirm this action?') : true
-
   const result = await invokeTool({
     toolName: plan.toolName,
     input: plan.input,
-    confirmed,
     source: 'planner'
   })
 

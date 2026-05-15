@@ -14,7 +14,15 @@ This repository is an early MVP. Chrome WebMCP and Chrome built-in AI are emergi
 ## Quick Start
 
 ```ts
-import { defineTool, registerTool } from '@webmcp-kit/core'
+import { defineTool, registerTool, setConfirmationHandler } from '@webmcp-kit/core'
+
+setConfirmationHandler(async function confirmTool(tool, input, reason) {
+  return showConfirmationModal({
+    title: `Run ${tool.name}?`,
+    body: reason,
+    preview: JSON.stringify(input, null, 2)
+  })
+})
 
 const registration = registerTool(defineTool({
   name: 'create_invoice',
@@ -52,6 +60,7 @@ registration.unregister()
 - `defineTool(tool)` validates and preserves a typed tool definition.
 - `registerTool(tool)` registers with native WebMCP when available and always stores the tool in the fallback registry.
 - `invokeTool({ toolName, input, confirmed })` invokes fallback-registered tools for devtools, tests, and demos.
+- `setConfirmationHandler(handler)` configures one global async confirmation provider for tools with `confirmation.required`.
 - `listTools()` returns active registrations.
 - `getRegistrySnapshot()` returns support mode, tool count, and registered tools.
 - `isWebMCPSupported()` checks for native WebMCP registration support.

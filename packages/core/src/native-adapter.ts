@@ -1,3 +1,4 @@
+import { requestToolConfirmation } from './confirmation'
 import type { WebMCPTool } from './interfaces/tool'
 import { formatJsonValueValidationError, validateJsonValue } from './schema'
 import { isWebMCPSupported } from './support'
@@ -31,10 +32,17 @@ export function registerNativeTool<TInput = Record<string, unknown>, TOutput = u
       name: tool.name,
       description: tool.description,
       inputSchema: tool.inputSchema,
-      execute(input: TInput) {
+      async execute(input: TInput) {
         const inputValidationErrors = validateJsonValue(input, tool.inputSchema)
         if (inputValidationErrors.length > 0) {
           throw new Error(formatJsonValueValidationError(inputValidationErrors))
+        }
+
+        if (tool.confirmation?.required) {
+          const confirmed = await requestToolConfirmation(tool, input)
+          if (!confirmed) {
+            throw new Error(tool.confirmation.reason)
+          }
         }
 
         return tool.execute(input, { source: 'native' })

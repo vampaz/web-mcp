@@ -21,7 +21,21 @@ confirmation: {
 }
 ```
 
-The fallback registry enforces confirmation before execution. Native browser behavior depends on the browser API, but the metadata is still part of the registered tool definition.
+Configure one app-level confirmation handler so tools can use your modal or approval UI instead of blocking browser prompts:
+
+```ts
+import { setConfirmationHandler } from '@webmcp-kit/core'
+
+setConfirmationHandler(async function confirmTool(tool, input, reason) {
+  return showConfirmationModal({
+    title: `Run ${tool.name}?`,
+    body: reason,
+    preview: JSON.stringify(input, null, 2)
+  })
+})
+```
+
+WebMCP Kit enforces confirmation before execution in both fallback and native wrapper paths. If no handler is configured, browser runtimes fall back to `window.confirm()`.
 
 ## Guards And Scope
 

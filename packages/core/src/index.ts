@@ -1,4 +1,5 @@
 export { defineTool } from './define-tool'
+export { setConfirmationHandler, type ConfirmationHandler, type ConfirmationTool } from './confirmation'
 export {
   createToolCatalog,
   formatToolCatalogMarkdown,

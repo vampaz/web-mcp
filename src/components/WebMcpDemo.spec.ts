@@ -106,6 +106,7 @@ describe('WebMcpDemo', () => {
     })
     await flushPromises()
 
+    vi.mocked(window.confirm).mockReturnValueOnce(false)
     await expect(invokeTool({
       toolName: 'checkout_cart',
       input: {}
