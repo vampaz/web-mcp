@@ -97,6 +97,24 @@ describe('planner', () => {
     expect(plan.reason).toContain('Used deterministic fallback')
   })
 
+  it('does not fall back when Chrome AI is explicitly selected', async () => {
+    ;(window as WindowWithLanguageModel).LanguageModel = {
+      availability: async () => 'available',
+      create: async () => {
+        throw new Error('user activation required')
+      }
+    }
+
+    const planner = await createConfiguredPlanner({
+      provider: 'chrome-built-in',
+      auth: {
+        mode: 'none'
+      }
+    })
+
+    await expect(planner.plan('Add ten keyboards to the cart.', [])).rejects.toThrow('Chrome built-in AI could not plan this command')
+  })
+
   it('reports malformed Chrome AI JSON distinctly before falling back', async () => {
     ;(window as WindowWithLanguageModel).LanguageModel = {
       availability: async () => 'available',
@@ -190,6 +208,32 @@ describe('planner', () => {
     })
   })
 
+  it('plans checklist selection from visible item names in current app context', async () => {
+    const planner = createHeuristicPlanner()
+    const plan = await planner.plan('Select all items with water', [
+      {
+        name: 'select_items',
+        description: 'Select checklist items by ID.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute: () => []
+      }
+    ], {
+      checklistItems: [
+        { id: 'item_1', name: 'Apple' },
+        { id: 'item_8', name: 'Water' },
+        { id: 'item_16', name: 'Sparkling water' },
+        { id: 'item_20', name: 'Tea' }
+      ]
+    })
+
+    expect(plan.toolName).toBe('select_items')
+    expect(plan.input).toEqual({
+      ids: ['item_8', 'item_16']
+    })
+  })
+
   it('does not route semantic checklist selection to product search in fallback mode', async () => {
     const planner = createHeuristicPlanner()
     const plan = await planner.plan('Select all the items that are French food.', [
@@ -267,7 +311,7 @@ describe('planner', () => {
         mode: 'user-key'
       }
     })
-    const plan = await planner.plan('Select all the items that are French food.', [
+    const tools = [
       {
         name: 'select_items',
         description: 'Select checklist items by ID.',
@@ -276,11 +320,10 @@ describe('planner', () => {
         },
         execute: () => []
       }
-    ])
+    ]
 
     expect(planner.status).toBe('needs-key')
-    expect(plan.toolName).toBe('select_items')
-    expect(plan.reason).toContain('needs a user API key')
+    await expect(planner.plan('Select all the items that are French food.', tools)).rejects.toThrow('OpenRouter needs a user API key')
   })
 
   it('plans through OpenRouter with a user key in the browser', async () => {
@@ -366,7 +409,7 @@ describe('planner', () => {
     expect(String(fetchOptions?.body)).not.toContain('test-key')
   })
 
-  it('includes server endpoint error details in fallback reasons', async () => {
+  it('reports server endpoint error details for explicit providers', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({
       error: 'Cloudflare Workers AI server mode needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN on the server, or a custom planner endpoint.'
     }, {
@@ -381,7 +424,7 @@ describe('planner', () => {
         endpoint: '/api/webmcp/plan'
       }
     })
-    const plan = await planner.plan('Select all liquids', [
+    await expect(planner.plan('Select all liquids', [
       {
         name: 'select_items',
         description: 'Select checklist items by ID.',
@@ -390,10 +433,7 @@ describe('planner', () => {
         },
         execute: () => []
       }
-    ])
-
-    expect(plan.reason).toContain('CLOUDFLARE_ACCOUNT_ID')
-    expect(plan.reason).toContain('custom planner endpoint')
+    ])).rejects.toThrow('CLOUDFLARE_ACCOUNT_ID')
   })
 
   it('plans through a Cloudflare binding server endpoint with the selected model', async () => {

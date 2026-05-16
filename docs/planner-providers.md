@@ -118,15 +118,15 @@ await createWebMCPKit({
 })
 ```
 
-This mode is intentionally endpoint-only. The browser never receives a Cloudflare token; it sends the selected model and planning payload to the app endpoint. The app is configured with `@astrojs/cloudflare`, `src/worker.ts`, and `wrangler.toml`; `wrangler.toml` declares the `AI` binding with `remote = true` so local development can use the real Cloudflare Workers AI binding when the dev server is restarted under that adapter. In the demo selector this option is shown only when `import.meta.env.DEV` is true or `PUBLIC_WEBMCP_PREVIEW=true`.
+This mode is intentionally endpoint-only. The browser never receives a Cloudflare token; it sends the selected model and planning payload to the app endpoint. The app is configured with `@astrojs/cloudflare`, `src/worker.ts`, and `wrangler.toml`; `wrangler.toml` declares the `AI` binding with `remote = true`, and Astro enables remote bindings by default, so local development and preview deployments use the real Cloudflare Workers AI binding. In the demo selector this option is shown only when `import.meta.env.DEV` is true or `PUBLIC_WEBMCP_PREVIEW=true`.
 
-For local binding mode, start the dev server normally. The project enables Cloudflare remote bindings by default for `npm run dev`:
+For local binding mode, start the dev server normally:
 
 ```sh
 npm run dev
 ```
 
-If you see `Binding AI needs to be run remotely`, the server was started before remote bindings were enabled. Stop the current dev server and restart it with `npm run dev`.
+When a provider is explicitly selected, WebMCP Kit uses that provider. It does not silently switch the command to deterministic local planning.
 
 For the separate `cloudflare-workers-ai` REST mode, add `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` to `.dev.vars` or the server environment instead.
 

@@ -106,7 +106,7 @@ export function createHeuristicPlanner(): ToolPlanner {
   }
 }
 
-export async function createChromeAIPlanner(): Promise<ToolPlanner> {
+export async function createChromeAIPlanner(strict = false): Promise<ToolPlanner> {
   const languageModel = getLanguageModel()
 
   if (!languageModel) {
@@ -116,6 +116,7 @@ export async function createChromeAIPlanner(): Promise<ToolPlanner> {
       status: 'unavailable',
       detail: 'The browser does not expose the Chrome built-in AI LanguageModel API.',
       async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
+        if (strict) throw new Error('Chrome built-in AI is unavailable.')
         return planWithHeuristics(message, tools, context)
       }
     }
@@ -124,7 +125,7 @@ export async function createChromeAIPlanner(): Promise<ToolPlanner> {
   try {
     const availability = await languageModel.availability(chromeAITextOptions)
     if (availability === 'unavailable') {
-      return createUnavailableChromePlanner('Chrome reports that built-in AI is unavailable in this environment.')
+      return createUnavailableChromePlanner('Chrome reports that built-in AI is unavailable in this environment.', strict)
     }
 
     if (availability === 'downloadable' || availability === 'downloading') {
@@ -133,17 +134,19 @@ export async function createChromeAIPlanner(): Promise<ToolPlanner> {
         availability,
         availability === 'downloadable'
           ? 'Chrome built-in AI can be used after Chrome downloads the model from a user command.'
-          : 'Chrome is downloading the built-in AI model and will plan when the session is ready.'
+          : 'Chrome is downloading the built-in AI model and will plan when the session is ready.',
+        strict
       )
     }
 
     return createActiveChromePlanner(
       languageModel,
       'ready',
-      'Chrome built-in AI is available. The model session will start from the next user command.'
+      'Chrome built-in AI is available. The model session will start from the next user command.',
+      strict
     )
   } catch {
-    return createUnavailableChromePlanner('Chrome built-in AI could not create a planning session.')
+    return createUnavailableChromePlanner('Chrome built-in AI could not create a planning session.', strict)
   }
 }
 
@@ -157,7 +160,7 @@ export async function createBestPlanner(): Promise<ToolPlanner> {
 export async function createConfiguredPlanner(config?: PlannerProviderConfig): Promise<ToolPlanner> {
   if (!config || config.provider === 'auto') return createBestPlanner()
 
-  if (config.provider === 'chrome-built-in') return createChromeAIPlanner()
+  if (config.provider === 'chrome-built-in') return createChromeAIPlanner(true)
   if (config.provider === 'local') return createHeuristicPlanner()
 
   return createRemotePlanner(config)
@@ -177,11 +180,8 @@ export function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner 
       available: false,
       status: 'unavailable',
       detail: `${providerLabel} needs server endpoint mode so the browser talks to a local or preview Worker with an AI binding.`,
-      async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
-        return {
-          ...planWithHeuristics(message, tools, context),
-          reason: `${providerLabel} needs server endpoint mode. Used deterministic fallback.`
-        }
+      async plan() {
+        throw new Error(`${providerLabel} needs server endpoint mode.`)
       }
     }
   }
@@ -192,11 +192,8 @@ export function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner 
       available: false,
       status: 'needs-key',
       detail: `${providerLabel} needs a user API key. In user-key mode the key is stored in the browser and visible to this page.`,
-      async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
-        return {
-          ...planWithHeuristics(message, tools, context),
-          reason: `${providerLabel} needs a user API key. Used deterministic fallback.`
-        }
+      async plan() {
+        throw new Error(`${providerLabel} needs a user API key.`)
       }
     }
   }
@@ -212,10 +209,7 @@ export function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner 
         validateRemotePlan(plan, tools)
         return plan
       } catch (error) {
-        return {
-          ...planWithHeuristics(message, tools, context),
-          reason: `${providerLabel} could not plan this command (${getErrorMessage(error)}). Used deterministic fallback.`
-        }
+        throw new Error(`${providerLabel} could not plan this command (${getErrorMessage(error)})`)
       }
     }
   }
@@ -468,6 +462,20 @@ function planWithHeuristics(message: string, tools: WebMCPTool[], context: Plann
   }
 
   if (normalizedMessage.includes('select') && hasTool(tools, 'select_items')) {
+    const ids = getSemanticContextItemIds(normalizedMessage, context)
+    if (ids.length > 0) {
+      return {
+        toolName: 'select_items',
+        input: {
+          ids
+        },
+        confidence: 0.64,
+        reason: 'Matched visible checklist item metadata from the current app context.'
+      }
+    }
+  }
+
+  if (normalizedMessage.includes('select') && hasTool(tools, 'select_items')) {
     return {
       toolName: 'select_items',
       input: {
@@ -542,6 +550,59 @@ function getFirstContextItemIds(context: PlannerContext, count: number): string[
     .filter((id): id is string => Boolean(id))
 }
 
+function getSemanticContextItemIds(normalizedMessage: string, context: PlannerContext): string[] {
+  const items = Array.isArray(context.checklistItems) ? context.checklistItems : []
+  const terms = getChecklistSelectionTerms(normalizedMessage)
+  if (terms.length === 0) return []
+
+  return items
+    .filter(function itemMatchesTerms(item) {
+      const searchableText = getContextItemSearchableText(item)
+      return terms.every(function hasTerm(term) {
+        return termMatchesText(term, searchableText)
+      })
+    })
+    .map(function mapItemId(item) {
+      return getContextItemId(item)
+    })
+    .filter((id): id is string => Boolean(id))
+}
+
+function getChecklistSelectionTerms(normalizedMessage: string): string[] {
+  return normalizedMessage
+    .split(/\W+/)
+    .filter(function keepChecklistTerm(term) {
+      return term.length > 2 && ![
+        'all',
+        'and',
+        'are',
+        'for',
+        'item',
+        'items',
+        'one',
+        'ones',
+        'select',
+        'that',
+        'the',
+        'those',
+        'with'
+      ].includes(term)
+    })
+}
+
+function getContextItemSearchableText(item: unknown): string {
+  if (!item || typeof item !== 'object') return ''
+  const record = item as Record<string, unknown>
+  const name = record.name
+  return typeof name === 'string' ? name.toLowerCase() : ''
+}
+
+function termMatchesText(term: string, searchableText: string): boolean {
+  if (searchableText.includes(term)) return true
+  if (term.endsWith('s') && searchableText.includes(term.slice(0, -1))) return true
+  return !term.endsWith('s') && searchableText.includes(`${term}s`)
+}
+
 function getContextItemId(item: unknown): string | undefined {
   if (!item || typeof item !== 'object' || !('id' in item)) return undefined
 
@@ -557,7 +618,8 @@ function getLanguageModel(): LanguageModelApi | undefined {
 function createActiveChromePlanner(
   languageModel: LanguageModelApi,
   status: 'ready' | 'downloadable' | 'downloading',
-  detail: string
+  detail: string,
+  strict = false
 ): ToolPlanner {
   let session: LanguageModelSession | undefined
 
@@ -571,6 +633,8 @@ function createActiveChromePlanner(
         session ??= await createChromeAISession(languageModel)
         return await planWithChromeAI(session, message, tools, context)
       } catch (error) {
+        if (strict) throw new Error(`Chrome built-in AI could not plan this command (${getErrorMessage(error)})`)
+
         return {
           ...planWithHeuristics(message, tools, context),
           reason: `Chrome built-in AI could not plan this command (${getErrorMessage(error)}). Used deterministic fallback.`
@@ -601,13 +665,14 @@ function parseToolPlanJson(value: string, source: string): ToolPlan {
   }
 }
 
-function createUnavailableChromePlanner(detail: string): ToolPlanner {
+function createUnavailableChromePlanner(detail: string, strict = false): ToolPlanner {
   return {
     name: 'Chrome built-in AI',
     available: false,
     status: 'unavailable',
     detail,
     async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
+      if (strict) throw new Error(detail)
       return planWithHeuristics(message, tools, context)
     }
   }

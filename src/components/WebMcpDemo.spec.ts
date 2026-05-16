@@ -28,18 +28,19 @@ describe('WebMcpDemo', () => {
     document.body.innerHTML = ''
   })
 
-  it('starts with a read-only search command', async () => {
+  it('starts with a checklist selection command', async () => {
     const wrapper = mountWithDeps(WebMcpDemo)
     await flushPromises()
 
     expect(wrapper.text()).toContain('Registered tools')
-    expect(document.body.textContent).toContain('create_invoice')
+    expect(wrapper.text()).toContain('select_items')
+    expect(wrapper.text()).toContain('Selectable item list')
 
-    await wrapper.find('.primary-action').trigger('click')
+    await wrapper.find('.palette-command').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Products searched')
-    expect(wrapper.text()).toContain('dock')
+    expect(wrapper.text()).toContain('Selection updated')
+    expect(wrapper.text()).toContain('5 selected')
     expect(window.confirm).not.toHaveBeenCalled()
   })
 
@@ -70,15 +71,15 @@ describe('WebMcpDemo', () => {
     const wrapper = mountWithDeps(WebMcpDemo)
     await flushPromises()
 
-    await wrapper.find('textarea[aria-label="Natural language command"]').setValue('Select all the foods that are French')
-    await wrapper.find('.primary-action').trigger('click')
+    await wrapper.find('input[aria-label="Natural language command"]').setValue('Select all the foods that are French')
+    await wrapper.find('.palette-command').trigger('submit')
     await flushPromises()
 
     expect(wrapper.text()).toContain('2 selected')
     expect(wrapper.text()).toContain('Selected 2 checklist items')
 
-    await wrapper.find('textarea[aria-label="Natural language command"]').setValue('Select all the ones that are roots')
-    await wrapper.find('.primary-action').trigger('click')
+    await wrapper.find('input[aria-label="Natural language command"]').setValue('Select all the ones that are roots')
+    await wrapper.find('.palette-command').trigger('submit')
     await flushPromises()
 
     expect(wrapper.text()).toContain('2 selected')

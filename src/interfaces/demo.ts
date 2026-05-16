@@ -29,8 +29,6 @@ export interface SupportTicket {
 export interface SelectableItem {
   id: string
   name: string
-  category: 'fruit' | 'vegetable' | 'bakery' | 'drink'
-  description: string
   selected: boolean
 }
 
@@ -39,4 +37,16 @@ export interface ActivityItem {
   title: string
   detail: string
   tone: 'info' | 'success' | 'warning' | 'error'
+}
+
+export interface PlannerModelOption {
+  id: string
+  label: string
+}
+
+export interface OutcomeRow {
+  id: string
+  title: string
+  value: string
+  meta: string
 }

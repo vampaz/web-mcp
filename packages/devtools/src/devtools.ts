@@ -17,6 +17,7 @@ export interface DevtoolsOverlay {
 export interface MountDevtoolsOptions {
   container?: HTMLElement
   initiallyOpen?: boolean
+  placement?: 'fixed' | 'inline'
 }
 
 interface HistoryItem {
@@ -39,6 +40,10 @@ const overlayStyles = `
   color: #f4f0e8;
   font-family: Avenir Next, Avenir, Corbel, Segoe UI, sans-serif;
 }
+.wmk-devtools--inline {
+  position: static;
+  width: 100%;
+}
 .wmk-devtools button,
 .wmk-devtools textarea {
   font: inherit;
@@ -53,6 +58,15 @@ const overlayStyles = `
   cursor: pointer;
   box-shadow: 0 16px 42px rgba(0, 0, 0, 0.34);
 }
+.wmk-devtools--inline .wmk-devtools__toggle {
+  float: none;
+  width: 100%;
+  margin-top: 14px;
+  border-color: rgba(244, 240, 232, 0.18);
+  background: rgba(244, 240, 232, 0.06);
+  color: #f4f0e8;
+  box-shadow: none;
+}
 .wmk-devtools__panel {
   clear: both;
   display: grid;
@@ -65,6 +79,9 @@ const overlayStyles = `
   background: rgba(9, 11, 11, 0.94);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.46);
   backdrop-filter: blur(18px);
+}
+.wmk-devtools--inline .wmk-devtools__panel {
+  max-height: none;
 }
 .wmk-devtools__panel[hidden] {
   display: none;
@@ -179,7 +196,7 @@ const overlayStyles = `
 
 export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): DevtoolsOverlay {
   const root = document.createElement('section')
-  root.className = 'wmk-devtools'
+  root.className = options.placement === 'inline' ? 'wmk-devtools wmk-devtools--inline' : 'wmk-devtools'
   root.setAttribute('aria-label', 'WebMCP Kit devtools')
 
   const style = document.createElement('style')

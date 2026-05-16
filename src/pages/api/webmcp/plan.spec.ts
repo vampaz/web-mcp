@@ -98,7 +98,7 @@ describe('/api/webmcp/plan', () => {
 
     expect(response.status).toBe(502)
     expect(await response.json()).toEqual({
-      error: 'Cloudflare AI binding is running in local stub mode. Restart dev with `npm run dev:cf` so the Astro Cloudflare adapter enables remote bindings, or use a Cloudflare preview deployment.'
+      error: 'Cloudflare AI binding is not connected to remote Workers AI in this dev session.'
     })
   })
 })
