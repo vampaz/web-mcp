@@ -147,7 +147,7 @@ function createPlannerMessages(body: PlannerRequestBody): CloudflareAiInput['mes
         `Current app context:\n${JSON.stringify(body.context ?? {}, null, 2)}`,
         `Available tools:\n${JSON.stringify(body.tools ?? [], null, 2)}`,
         'Use stable IDs from context when selecting existing items.',
-        'Expected shape: {"toolName":"select_items","input":{"ids":["item_8"]},"confidence":0.9,"reason":"Selected matching checklist items."}'
+        'Expected shape: {"toolName":"tool_name","input":{"id":"stable_id_from_context"},"confidence":0.9,"reason":"Brief reason for the selected tool."}'
       ].join('\n\n')
     }
   ]

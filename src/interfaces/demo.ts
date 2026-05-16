@@ -2,7 +2,10 @@ export interface Invoice {
   id: string
   customerName: string
   amount: number
-  status: 'draft' | 'sent' | 'void'
+  status: 'draft' | 'sent' | 'overdue' | 'paid' | 'void'
+  dueDate: string
+  owner: string
+  selected: boolean
 }
 
 export interface Product {
@@ -23,13 +26,9 @@ export interface SupportTicket {
   id: string
   subject: string
   body: string
-  status: 'open' | 'triaged'
-}
-
-export interface SelectableItem {
-  id: string
-  name: string
-  selected: boolean
+  status: 'new' | 'triaged' | 'in_progress' | 'resolved'
+  priority: 'low' | 'medium' | 'high' | 'urgent'
+  assignee: string
 }
 
 export interface ActivityItem {
@@ -49,4 +48,24 @@ export interface OutcomeRow {
   title: string
   value: string
   meta: string
+}
+
+export interface InvoiceDraft {
+  amount: number
+  customerName: string
+  dueDate: string
+  owner: string
+  status: Invoice['status']
+}
+
+export interface InvoiceFilters {
+  query: string
+  status: 'all' | Invoice['status']
+}
+
+export interface DemoSettings {
+  confirmationsEnabled: boolean
+  density: 'comfortable' | 'compact'
+  notificationsEnabled: boolean
+  plannerConfidence: number
 }

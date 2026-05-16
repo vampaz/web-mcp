@@ -28,42 +28,46 @@ describe('WebMcpDemo', () => {
     document.body.innerHTML = ''
   })
 
-  it('starts with a checklist selection command', async () => {
+  it('starts with an invoice selection command', async () => {
     const wrapper = mountWithDeps(WebMcpDemo)
     await flushPromises()
 
     expect(wrapper.text()).toContain('Registered tools')
-    expect(wrapper.text()).toContain('select_items')
-    expect(wrapper.text()).toContain('Selectable item list')
+    expect(wrapper.text()).toContain('select_invoices')
+    expect(wrapper.text()).toContain('Invoice operations')
 
     await wrapper.find('.palette-command').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Selection updated')
-    expect(wrapper.text()).toContain('5 selected')
+    expect(wrapper.text()).toContain('Invoices selected')
+    expect(wrapper.text()).toContain('2 selected')
     expect(window.confirm).not.toHaveBeenCalled()
   })
 
-  it('selects checklist items from AI-chosen context IDs', async () => {
+  it('operates invoice table controls from AI-chosen context IDs', async () => {
     ;(window as WindowWithLanguageModel).LanguageModel = {
       availability: async () => 'available',
       create: async () => ({
         prompt: async (message: string) => {
-          if (message.includes('French')) {
+          if (message.includes('Open the Stark')) {
             return JSON.stringify({
-              toolName: 'select_items',
-              input: { ids: ['item_4', 'item_7'] },
-              confidence: 0.94,
-              reason: 'Selected French foods from current checklist context.'
+              toolName: 'open_invoice',
+              input: { id: 'inv_104' },
+              confidence: 0.91,
+              reason: 'Opened the matching invoice row.'
             })
           }
 
-          return JSON.stringify({
-            toolName: 'select_items',
-            input: { ids: ['item_3', 'item_9'] },
-            confidence: 0.91,
-            reason: 'Selected root vegetables from current checklist context.'
-          })
+          if (message.includes('overdue')) {
+            return JSON.stringify({
+              toolName: 'select_invoices',
+              input: { ids: ['inv_101', 'inv_104'] },
+              confidence: 0.94,
+              reason: 'Selected overdue invoices from current invoice context.'
+            })
+          }
+
+          throw new Error('Unexpected prompt')
         }
       })
     }
@@ -71,19 +75,19 @@ describe('WebMcpDemo', () => {
     const wrapper = mountWithDeps(WebMcpDemo)
     await flushPromises()
 
-    await wrapper.find('input[aria-label="Natural language command"]').setValue('Select all the foods that are French')
+    await wrapper.find('input[aria-label="Natural language command"]').setValue('Select overdue invoices')
     await wrapper.find('.palette-command').trigger('submit')
     await flushPromises()
 
     expect(wrapper.text()).toContain('2 selected')
-    expect(wrapper.text()).toContain('Selected 2 checklist items')
+    expect(wrapper.text()).toContain('Northwind')
 
-    await wrapper.find('input[aria-label="Natural language command"]').setValue('Select all the ones that are roots')
+    await wrapper.find('input[aria-label="Natural language command"]').setValue('Open the Stark invoice')
     await wrapper.find('.palette-command').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('2 selected')
-    expect(wrapper.text()).toContain('Beetroot')
+    expect(wrapper.text()).toContain('Invoice opened')
+    expect(wrapper.text()).toContain('Stark Industries')
   })
 
   it('guards and confirms cart checkout', async () => {

@@ -408,6 +408,63 @@ function createToolCatalog(tools: WebMCPTool[]) {
 function planWithHeuristics(message: string, tools: WebMCPTool[], context: PlannerContext = {}): ToolPlan {
   const normalizedMessage = message.toLowerCase()
 
+  if (normalizedMessage.includes('invoice') && normalizedMessage.includes('sort') && hasTool(tools, 'sort_invoices')) {
+    return {
+      toolName: 'sort_invoices',
+      input: {
+        sortBy: normalizedMessage.includes('amount') ? 'amount' : normalizedMessage.includes('customer') ? 'customerName' : 'dueDate',
+        direction: normalizedMessage.includes('desc') || normalizedMessage.includes('highest') ? 'desc' : 'asc'
+      },
+      confidence: 0.7,
+      reason: 'Matched invoice table sorting wording.'
+    }
+  }
+
+  if (normalizedMessage.includes('invoice') && normalizedMessage.includes('open') && hasTool(tools, 'open_invoice')) {
+    return {
+      toolName: 'open_invoice',
+      input: {
+        id: getMatchingInvoiceIds(normalizedMessage, context)[0] ?? getFirstInvoiceId(context)
+      },
+      confidence: 0.68,
+      reason: 'Matched invoice drawer open wording.'
+    }
+  }
+
+  if (normalizedMessage.includes('invoice') && normalizedMessage.includes('select') && hasTool(tools, 'select_invoices')) {
+    return {
+      toolName: 'select_invoices',
+      input: {
+        ids: getMatchingInvoiceIds(normalizedMessage, context)
+      },
+      confidence: 0.72,
+      reason: 'Matched invoice row selection wording against current invoice context.'
+    }
+  }
+
+  if (normalizedMessage.includes('invoice') && (normalizedMessage.includes('filter') || normalizedMessage.includes('show')) && hasTool(tools, 'filter_invoices')) {
+    return {
+      toolName: 'filter_invoices',
+      input: {
+        status: getInvoiceStatusFromMessage(normalizedMessage),
+        minAmount: messageRequestsMinimumAmount(normalizedMessage) ? extractAmount(message) : undefined
+      },
+      confidence: 0.7,
+      reason: 'Matched invoice table filter wording.'
+    }
+  }
+
+  if (normalizedMessage.includes('invoice') && (normalizedMessage.includes('mark') || normalizedMessage.includes('status')) && hasTool(tools, 'update_selected_invoice_status')) {
+    return {
+      toolName: 'update_selected_invoice_status',
+      input: {
+        status: getInvoiceStatusFromMessage(normalizedMessage)
+      },
+      confidence: 0.68,
+      reason: 'Matched invoice status mutation wording.'
+    }
+  }
+
   if (normalizedMessage.includes('invoice')) {
     return {
       toolName: pickToolName(tools, 'create_invoice'),
@@ -566,6 +623,84 @@ function getSemanticContextItemIds(normalizedMessage: string, context: PlannerCo
       return getContextItemId(item)
     })
     .filter((id): id is string => Boolean(id))
+}
+
+function getMatchingInvoiceIds(normalizedMessage: string, context: PlannerContext): string[] {
+  const invoices = Array.isArray(context.invoices) ? context.invoices : []
+  const status = getInvoiceStatusFromMessage(normalizedMessage)
+  const wantsUnpaid = messageRequestsUnpaid(normalizedMessage)
+  return invoices
+    .filter(function invoiceMatches(invoice) {
+      if (!invoice || typeof invoice !== 'object') return false
+      const record = invoice as Record<string, unknown>
+      const searchableText = `${record.customerName ?? ''} ${record.owner ?? ''} ${record.status ?? ''} ${record.id ?? ''}`.toLowerCase()
+      const matchesStatus = wantsUnpaid
+        ? record.status !== 'paid' && record.status !== 'void'
+        : status === 'all' || record.status === status
+      const matchesAmount = messageRequestsMinimumAmount(normalizedMessage) && typeof record.amount === 'number'
+        ? record.amount >= extractAmount(normalizedMessage)
+        : true
+      return matchesStatus && matchesAmount && normalizedMessage.split(/\W+/).every(function hasTerm(term) {
+        if (isIgnoredInvoiceTerm(term)) return true
+        return searchableText.includes(term)
+      })
+    })
+    .map((invoice) => getContextItemId(invoice))
+    .filter((id): id is string => Boolean(id))
+}
+
+function getFirstInvoiceId(context: PlannerContext): string {
+  const invoices = Array.isArray(context.invoices) ? context.invoices : []
+  return getContextItemId(invoices[0]) ?? ''
+}
+
+function getInvoiceStatusFromMessage(normalizedMessage: string): string {
+  if (messageRequestsUnpaid(normalizedMessage)) return 'all'
+  if (normalizedMessage.includes('overdue')) return 'overdue'
+  if (/\bpaid\b/.test(normalizedMessage)) return 'paid'
+  if (normalizedMessage.includes('sent')) return 'sent'
+  if (normalizedMessage.includes('draft')) return 'draft'
+  if (normalizedMessage.includes('void')) return 'void'
+  return 'all'
+}
+
+function messageRequestsUnpaid(normalizedMessage: string): boolean {
+  return /\bunpaid\b/.test(normalizedMessage) || normalizedMessage.includes('not paid')
+}
+
+function messageRequestsMinimumAmount(normalizedMessage: string): boolean {
+  return normalizedMessage.includes('over')
+    || normalizedMessage.includes('above')
+    || normalizedMessage.includes('greater than')
+    || normalizedMessage.includes('more than')
+    || normalizedMessage.includes('at least')
+}
+
+function isIgnoredInvoiceTerm(term: string): boolean {
+  return term.length <= 2
+    || /^\d+$/.test(term)
+    || [
+      'all',
+      'above',
+      'amount',
+      'are',
+      'at',
+      'greater',
+      'invoice',
+      'invoices',
+      'least',
+      'more',
+      'not',
+      'open',
+      'over',
+      'select',
+      'show',
+      'than',
+      'that',
+      'the',
+      'unpaid',
+      'with'
+    ].includes(term)
 }
 
 function getChecklistSelectionTerms(normalizedMessage: string): string[] {

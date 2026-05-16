@@ -234,6 +234,56 @@ describe('planner', () => {
     })
   })
 
+  it('plans invoice selection from business state and amount wording', async () => {
+    const planner = createHeuristicPlanner()
+    const plan = await planner.plan('Select unpaid invoices over 500', [
+      {
+        name: 'select_invoices',
+        description: 'Select invoice rows by ID.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute: () => []
+      }
+    ], {
+      invoices: [
+        { id: 'inv_1', customerName: 'Northwind', amount: 920, status: 'overdue' },
+        { id: 'inv_2', customerName: 'Initech', amount: 640, status: 'paid' },
+        { id: 'inv_3', customerName: 'Aperture Labs', amount: 1480, status: 'draft' },
+        { id: 'inv_4', customerName: 'Globex', amount: 230, status: 'sent' }
+      ]
+    })
+
+    expect(plan.toolName).toBe('select_invoices')
+    expect(plan.input).toEqual({
+      ids: ['inv_1', 'inv_3']
+    })
+  })
+
+  it('plans invoice opening from the visible customer name', async () => {
+    const planner = createHeuristicPlanner()
+    const plan = await planner.plan('Open the Stark invoice', [
+      {
+        name: 'open_invoice',
+        description: 'Open invoice detail.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute: () => []
+      }
+    ], {
+      invoices: [
+        { id: 'inv_1', customerName: 'Northwind', amount: 920, status: 'overdue' },
+        { id: 'inv_2', customerName: 'Stark Industries', amount: 2310, status: 'overdue' }
+      ]
+    })
+
+    expect(plan.toolName).toBe('open_invoice')
+    expect(plan.input).toEqual({
+      id: 'inv_2'
+    })
+  })
+
   it('does not route semantic checklist selection to product search in fallback mode', async () => {
     const planner = createHeuristicPlanner()
     const plan = await planner.plan('Select all the items that are French food.', [

@@ -20,6 +20,22 @@
         </button>
       </form>
 
+      <div class="palette-result" aria-live="polite">
+        <div class="result-main">
+          <span :class="['result-state', outcomeTone]">{{ outcomeLabel }}</span>
+          <strong>{{ outcomeTitle }}</strong>
+          <em>{{ selectedToolName }}</em>
+        </div>
+        <p>{{ outcomeDetail }} <span v-if="affectedRows.length === 0">{{ affectedStateEmpty }}</span></p>
+        <div v-if="affectedRows.length > 0" class="result-rows">
+          <div v-for="row in affectedRows" :key="row.id" class="result-row">
+            <span>{{ row.title }}</span>
+            <strong>{{ row.value }}</strong>
+            <em>{{ row.meta }}</em>
+          </div>
+        </div>
+      </div>
+
       <details class="palette-settings">
         <summary>
           <span>Planner</span>
@@ -69,18 +85,24 @@
 <script setup lang="ts">
 import type { PlannerProviderKind } from '@webmcp-kit/core'
 
-import type { PlannerModelOption } from '@/interfaces/demo'
+import type { OutcomeRow, PlannerModelOption } from '@/interfaces/demo'
 
 interface Props {
+  affectedRows: OutcomeRow[]
+  affectedStateEmpty: string
   cloudflareBindingModels: PlannerModelOption[]
   commandButtonLabel: string
   isCommandRunning: boolean
+  outcomeDetail: string
+  outcomeLabel: string
+  outcomeTitle: string
   outcomeTone: string
   plannerModel: string
   plannerModelLabel: string
   plannerName: string
   plannerProvider: PlannerProviderKind
   prompt: string
+  selectedToolName: string
   showCloudflareBinding: boolean
   usesRemotePlanner: boolean
 }
@@ -141,7 +163,7 @@ function getInputValue(event: Event): string {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
-  padding: 10px;
+  padding: 8px;
 }
 
 .palette-input-shell {
@@ -149,7 +171,7 @@ function getInputValue(event: Event): string {
   gap: 10px;
   align-items: center;
   min-width: 0;
-  min-height: 48px;
+  min-height: 42px;
   padding: 0 12px;
   border: 1px solid rgba(244, 240, 232, 0.28);
   background: #f4f0e8;
@@ -167,7 +189,7 @@ function getInputValue(event: Event): string {
 .palette-input-shell input {
   flex: 1;
   min-width: 0;
-  min-height: 46px;
+  min-height: 40px;
   border: 0;
   outline: 0;
   background: transparent;
@@ -177,7 +199,7 @@ function getInputValue(event: Event): string {
 
 .palette-run {
   min-width: 112px;
-  min-height: 48px;
+  min-height: 42px;
   border: 1px solid #e8be53;
   background: #e8be53;
   color: #0c1110;
@@ -195,12 +217,121 @@ function getInputValue(event: Event): string {
   border-top: 1px solid rgba(244, 240, 232, 0.12);
 }
 
+.palette-result {
+  display: grid;
+  gap: 5px;
+  padding: 0 8px 8px;
+}
+
+.result-main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.result-state {
+  padding: 3px 7px;
+  border: 1px solid rgba(244, 240, 232, 0.18);
+  color: #9ea8a1;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.result-state.success {
+  border-color: rgba(48, 167, 121, 0.42);
+  color: #30a779;
+}
+
+.result-state.error,
+.result-state.failed {
+  border-color: rgba(243, 154, 141, 0.5);
+  color: #f39a8d;
+}
+
+.result-state.running {
+  border-color: rgba(232, 190, 83, 0.5);
+  color: #e8be53;
+}
+
+.result-state.blocked,
+.result-state.unavailable {
+  border-color: rgba(232, 190, 83, 0.5);
+  color: #e8be53;
+}
+
+.result-main strong,
+.result-main em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result-main strong {
+  color: #f4f0e8;
+}
+
+.result-main em,
+.palette-result p,
+.palette-result p span,
+.result-row em {
+  color: #9ea8a1;
+  font-style: normal;
+}
+
+.palette-result p {
+  margin: 0;
+  overflow: hidden;
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result-rows {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 6px;
+}
+
+.result-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 0.65fr);
+  gap: 3px 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid rgba(244, 240, 232, 0.12);
+  background: rgba(244, 240, 232, 0.035);
+}
+
+.result-row span,
+.result-row em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result-row span {
+  color: #f4f0e8;
+}
+
+.result-row strong {
+  color: #e8be53;
+}
+
+.result-row em {
+  font-size: 0.78rem;
+}
+
 .palette-settings summary {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
-  min-height: 38px;
+  min-height: 34px;
   padding: 0 12px;
   cursor: pointer;
   color: #9ea8a1;
@@ -257,8 +388,14 @@ function getInputValue(event: Event): string {
 
 @media (max-width: 620px) {
   .palette-command,
-  .palette-settings-row {
+  .palette-settings-row,
+  .result-main,
+  .result-rows {
     grid-template-columns: 1fr;
+  }
+
+  .palette-result p {
+    white-space: normal;
   }
 }
 </style>
