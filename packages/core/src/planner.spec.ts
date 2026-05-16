@@ -234,6 +234,60 @@ describe('planner', () => {
     })
   })
 
+  it('infers semantic checklist groups from visible item names', async () => {
+    const planner = createHeuristicPlanner()
+    const tools = [
+      {
+        name: 'select_items',
+        description: 'Select checklist items by ID.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute: () => []
+      }
+    ]
+    const context = {
+      checklistItems: [
+        { id: 'item_1', name: 'Apple' },
+        { id: 'item_4', name: 'Croissant' },
+        { id: 'item_7', name: 'Baguette' },
+        { id: 'item_8', name: 'Water' },
+        { id: 'item_10', name: 'Coffee' },
+        { id: 'item_13', name: 'Brie' },
+        { id: 'item_16', name: 'Sparkling water' },
+        { id: 'item_18', name: 'Pain au chocolat' },
+        { id: 'item_20', name: 'Tea' },
+        { id: 'item_22', name: 'Quiche' },
+        { id: 'item_23', name: 'Rice' }
+      ]
+    }
+
+    await expect(planner.plan('Select all French items', tools, context)).resolves.toMatchObject({
+      toolName: 'select_items',
+      input: {
+        ids: ['item_4', 'item_7', 'item_13', 'item_18', 'item_22']
+      }
+    })
+    await expect(planner.plan('Select all liquids', tools, context)).resolves.toMatchObject({
+      toolName: 'select_items',
+      input: {
+        ids: ['item_8', 'item_10', 'item_16', 'item_20']
+      }
+    })
+    await expect(planner.plan('Select all fruits', tools, context)).resolves.toMatchObject({
+      toolName: 'select_items',
+      input: {
+        ids: ['item_1']
+      }
+    })
+    await expect(planner.plan('Select all pantry items', tools, context)).resolves.toMatchObject({
+      toolName: 'select_items',
+      input: {
+        ids: ['item_23']
+      }
+    })
+  })
+
   it('plans invoice selection from business state and amount wording', async () => {
     const planner = createHeuristicPlanner()
     const plan = await planner.plan('Select unpaid invoices over 500', [

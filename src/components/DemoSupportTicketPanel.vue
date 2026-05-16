@@ -1,8 +1,7 @@
 <template>
   <aside class="tools-panel support-panel">
     <div class="panel-heading">
-      <p class="eyebrow">Registered form tool</p>
-      <h2>Support ticket</h2>
+      <h2>Support</h2>
     </div>
 
     <form ref="supportForm" class="support-form" @submit.prevent="submitForm">
@@ -16,10 +15,6 @@
       </label>
       <button class="primary-action" type="submit">Create ticket</button>
     </form>
-
-    <p class="helper-copy">
-      This form is registered through `registerFormTool()`, which applies WebMCP form metadata and exposes the same action to the devtools overlay.
-    </p>
   </aside>
 </template>
 
@@ -75,15 +70,6 @@ function getInputValue(event: Event): string {
   display: grid;
   gap: 8px;
   margin-bottom: 18px;
-}
-
-.eyebrow {
-  margin: 0;
-  color: #e8be53;
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
 }
 
 h2 {
@@ -142,9 +128,4 @@ textarea:focus {
   font-weight: 900;
 }
 
-.helper-copy {
-  margin: 14px 0 0;
-  color: #9ea8a1;
-  line-height: 1.5;
-}
 </style>

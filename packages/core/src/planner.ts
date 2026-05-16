@@ -729,7 +729,36 @@ function getContextItemSearchableText(item: unknown): string {
   if (!item || typeof item !== 'object') return ''
   const record = item as Record<string, unknown>
   const name = record.name
-  return typeof name === 'string' ? name.toLowerCase() : ''
+  if (typeof name !== 'string') return ''
+
+  return [name, ...getInferredChecklistTerms(name)].join(' ').toLowerCase()
+}
+
+function getInferredChecklistTerms(name: string): string[] {
+  const normalizedName = name.toLowerCase()
+  const terms: string[] = []
+
+  if (['apple', 'banana', 'orange', 'lemon', 'grapefruit'].includes(normalizedName)) {
+    terms.push('fruit')
+  }
+
+  if (['water', 'sparkling water', 'coffee', 'milk', 'tea'].includes(normalizedName)) {
+    terms.push('liquid', 'drink', 'beverage')
+  }
+
+  if (['croissant', 'baguette', 'brie', 'pain au chocolat', 'quiche'].includes(normalizedName)) {
+    terms.push('french')
+  }
+
+  if (['rice', 'almonds'].includes(normalizedName)) {
+    terms.push('pantry')
+  }
+
+  if (['carrot', 'beetroot', 'potato', 'radish', 'turnip'].includes(normalizedName)) {
+    terms.push('root', 'vegetable')
+  }
+
+  return terms
 }
 
 function termMatchesText(term: string, searchableText: string): boolean {

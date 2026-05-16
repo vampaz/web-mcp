@@ -1,8 +1,7 @@
 <template>
   <section class="cart-editor">
     <div class="panel-heading">
-      <p class="eyebrow">Line item controls</p>
-      <h2>Cart editor</h2>
+      <h2>Cart</h2>
     </div>
 
     <div class="product-picker">
@@ -119,15 +118,6 @@ function getInputValue(event: Event): string {
   gap: 8px;
 }
 
-.eyebrow {
-  margin: 0;
-  color: #e8be53;
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
 h2 {
   margin: 0;
   font-size: clamp(1.05rem, 1.5vw, 1.32rem);
@@ -137,9 +127,13 @@ h2 {
 .cart-footer,
 .cart-line {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 86px auto;
   gap: 8px;
   align-items: end;
+}
+
+.product-picker {
+  display: flex;
+  flex-wrap: wrap;
 }
 
 .cart-line {
@@ -176,6 +170,7 @@ button {
   padding: 8px 10px;
   background: rgba(244, 240, 232, 0.06);
   color: #f4f0e8;
+  white-space: nowrap;
 }
 
 button:disabled {
@@ -186,6 +181,19 @@ button:disabled {
 .cart-footer {
   grid-template-columns: 120px minmax(0, 1fr) auto;
   align-items: end;
+}
+
+.product-picker label:first-child {
+  flex: 1 1 100%;
+}
+
+.product-picker label:not(:first-child) {
+  flex: 0 0 92px;
+}
+
+.product-picker button {
+  flex: 0 0 auto;
+  min-width: 88px;
 }
 
 .cart-footer span,

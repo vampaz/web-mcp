@@ -28,23 +28,23 @@ describe('WebMcpDemo', () => {
     document.body.innerHTML = ''
   })
 
-  it('starts with an invoice selection command', async () => {
+  it('starts with a semantic inventory selection command', async () => {
     const wrapper = mountWithDeps(WebMcpDemo)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Registered tools')
-    expect(wrapper.text()).toContain('select_invoices')
-    expect(wrapper.text()).toContain('Invoice operations')
+    expect(wrapper.text()).toContain('Inventory')
+    expect(wrapper.text()).toContain('Invoices')
 
     await wrapper.find('.palette-command').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Invoices selected')
-    expect(wrapper.text()).toContain('2 selected')
+    expect(wrapper.text()).toContain('5 selected')
+    expect(wrapper.text()).toContain('Croissant')
+    expect(wrapper.text()).toContain('Pain au chocolat')
     expect(window.confirm).not.toHaveBeenCalled()
   })
 
-  it('operates invoice table controls from AI-chosen context IDs', async () => {
+  it('operates visible controls from AI-chosen context IDs', async () => {
     ;(window as WindowWithLanguageModel).LanguageModel = {
       availability: async () => 'available',
       create: async () => ({
@@ -58,12 +58,12 @@ describe('WebMcpDemo', () => {
             })
           }
 
-          if (message.includes('overdue')) {
+          if (message.includes('French')) {
             return JSON.stringify({
-              toolName: 'select_invoices',
-              input: { ids: ['inv_101', 'inv_104'] },
+              toolName: 'select_items',
+              input: { ids: ['item_4', 'item_7'] },
               confidence: 0.94,
-              reason: 'Selected overdue invoices from current invoice context.'
+              reason: 'Selected French items from current inventory context.'
             })
           }
 
@@ -75,18 +75,17 @@ describe('WebMcpDemo', () => {
     const wrapper = mountWithDeps(WebMcpDemo)
     await flushPromises()
 
-    await wrapper.find('input[aria-label="Natural language command"]').setValue('Select overdue invoices')
+    await wrapper.find('input[aria-label="Natural language command"]').setValue('Select all French items')
     await wrapper.find('.palette-command').trigger('submit')
     await flushPromises()
 
     expect(wrapper.text()).toContain('2 selected')
-    expect(wrapper.text()).toContain('Northwind')
+    expect(wrapper.text()).toContain('Croissant')
 
     await wrapper.find('input[aria-label="Natural language command"]').setValue('Open the Stark invoice')
     await wrapper.find('.palette-command').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Invoice opened')
     expect(wrapper.text()).toContain('Stark Industries')
   })
 
@@ -133,7 +132,6 @@ describe('WebMcpDemo', () => {
     })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Checkout completed')
     expect(wrapper.text()).toContain('No cart lines yet.')
   })
 })

@@ -103,6 +103,14 @@ await createWebMCPKit({
 
 The demo includes `/api/webmcp/plan` for Cloudflare server planning. For `provider: 'cloudflare-workers-ai'`, that route uses `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` from the server environment. For `provider: 'cloudflare-binding'`, it uses the Astro Cloudflare adapter and expects a Cloudflare runtime with `env.AI`.
 
+For local development, keep Wrangler authentication in an ignored project `.env` file instead of relying on the global interactive OAuth refresh token:
+
+```sh
+cp .env.example .env
+```
+
+Then fill in `CLOUDFLARE_API_TOKEN`. `CLOUDFLARE_ACCOUNT_ID` is already present in `.env.example` for this project. This keeps `npm run dev` and remote AI bindings on stable project-local credentials while avoiding committed secrets.
+
 Cloudflare binding mode for local development and preview deployments:
 
 ```ts
@@ -128,7 +136,7 @@ npm run dev
 
 When a provider is explicitly selected, WebMCP Kit uses that provider. It does not silently switch the command to deterministic local planning.
 
-For the separate `cloudflare-workers-ai` REST mode, add `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` to `.dev.vars` or the server environment instead.
+For the separate `cloudflare-workers-ai` REST mode, use the same `.env` values or another server environment that provides `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`.
 
 The handler shape is:
 

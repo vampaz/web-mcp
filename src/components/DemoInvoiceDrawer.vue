@@ -1,7 +1,6 @@
 <template>
   <aside class="invoice-drawer">
     <div class="panel-heading">
-      <p class="eyebrow">Form drawer</p>
       <h2>{{ activeInvoice ? 'Invoice detail' : 'New invoice' }}</h2>
     </div>
 
@@ -92,15 +91,6 @@ function getInputValue(event: Event): string {
 .panel-heading {
   display: grid;
   gap: 8px;
-}
-
-.eyebrow {
-  margin: 0;
-  color: #e8be53;
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
 }
 
 h2 {

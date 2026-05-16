@@ -8,6 +8,12 @@ export interface Invoice {
   selected: boolean
 }
 
+export interface SelectableItem {
+  id: string
+  name: string
+  selected: boolean
+}
+
 export interface Product {
   id: string
   name: string
@@ -31,23 +37,9 @@ export interface SupportTicket {
   assignee: string
 }
 
-export interface ActivityItem {
-  id: string
-  title: string
-  detail: string
-  tone: 'info' | 'success' | 'warning' | 'error'
-}
-
 export interface PlannerModelOption {
   id: string
   label: string
-}
-
-export interface OutcomeRow {
-  id: string
-  title: string
-  value: string
-  meta: string
 }
 
 export interface InvoiceDraft {
@@ -66,6 +58,4 @@ export interface InvoiceFilters {
 export interface DemoSettings {
   confirmationsEnabled: boolean
   density: 'comfortable' | 'compact'
-  notificationsEnabled: boolean
-  plannerConfidence: number
 }

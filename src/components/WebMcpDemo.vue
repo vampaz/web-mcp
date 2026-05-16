@@ -3,18 +3,11 @@
     <DemoCommandPalette
       :cloudflare-binding-models="cloudflareBindingModels"
       :command-button-label="commandButtonLabel"
-      :affected-rows="affectedRows"
-      :affected-state-empty="affectedStateEmpty"
       :is-command-running="isCommandRunning"
-      :outcome-tone="outcomeTone"
-      :outcome-detail="outcomeDetail"
-      :outcome-label="outcomeLabel"
-      :outcome-title="outcomeTitle"
       :planner-model="plannerModel"
       :planner-model-label="plannerModelLabel"
       :planner-name="plannerName"
       :planner-provider="plannerProvider"
-      :selected-tool-name="activeToolName"
       :prompt="prompt"
       :show-cloudflare-binding="showCloudflareBinding"
       :uses-remote-planner="usesRemotePlanner"
@@ -22,6 +15,14 @@
       @update:planner-model="plannerModel = $event"
       @update:planner-provider="plannerProvider = $event"
       @update:prompt="prompt = $event"
+    />
+
+    <DemoSemanticInventory
+      :items="selectableItems"
+      :selected-count="selectedItems.length"
+      @clear-selection="clearItemSelection"
+      @select-all="selectAllItems"
+      @toggle-item="setItemSelected"
     />
 
     <DemoInvoiceTable
@@ -45,14 +46,7 @@
       @update:status="invoiceFilters.status = $event"
     />
 
-    <DemoRuntimeStatus
-      :planner-detail="plannerDetail"
-      :planner-name="plannerName"
-      :registered-tools-count="registeredTools.length"
-      :support-label="supportLabel"
-    />
-
-    <section class="tool-surface">
+    <section class="app-panels">
       <DemoSupportTicketPanel
         ref="supportTicketPanel"
         :body="supportBody"
@@ -62,10 +56,6 @@
         @update:subject="supportSubject = $event"
       />
 
-      <DemoActivityPanel ref="activityPanel" :activity="activity" />
-    </section>
-
-    <section class="operations-grid">
       <DemoInvoiceDrawer
         :active-invoice="activeInvoice"
         :draft="invoiceDraft"
@@ -85,8 +75,6 @@
         @remove-line="removeCartLine"
         @update-line="updateCartLineQuantity"
       />
-
-      <DemoSettingsPanel :settings="settings" @update:settings="updateSettings" />
     </section>
 
     <DemoTicketBoard
@@ -94,6 +82,14 @@
       @update-ticket-assignee="updateTicketAssignee"
       @update-ticket-priority="updateTicketPriority"
       @update-ticket-status="updateTicketStatus"
+    />
+
+    <DemoRuntimeStatus
+      ref="runtimeStatusPanel"
+      :planner-detail="plannerDetail"
+      :planner-name="plannerName"
+      :registered-tools-count="registeredTools.length"
+      :support-label="supportLabel"
     />
   </main>
 </template>
@@ -119,22 +115,21 @@ import {
 import { mountDevtoolsOverlay, type DevtoolsOverlay } from '@webmcp-kit/devtools'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
-import DemoActivityPanel from '@/components/DemoActivityPanel.vue'
 import DemoCartEditor from '@/components/DemoCartEditor.vue'
 import DemoCommandPalette from '@/components/DemoCommandPalette.vue'
 import DemoInvoiceDrawer from '@/components/DemoInvoiceDrawer.vue'
 import DemoInvoiceTable from '@/components/DemoInvoiceTable.vue'
 import DemoRuntimeStatus from '@/components/DemoRuntimeStatus.vue'
-import DemoSettingsPanel from '@/components/DemoSettingsPanel.vue'
+import DemoSemanticInventory from '@/components/DemoSemanticInventory.vue'
 import DemoSupportTicketPanel from '@/components/DemoSupportTicketPanel.vue'
 import DemoTicketBoard from '@/components/DemoTicketBoard.vue'
-import type { ActivityItem, CartLine, DemoSettings, Invoice, InvoiceDraft, InvoiceFilters, OutcomeRow, Product, SupportTicket } from '@/interfaces/demo'
+import type { CartLine, DemoSettings, Invoice, InvoiceDraft, InvoiceFilters, Product, SelectableItem, SupportTicket } from '@/interfaces/demo'
 import {
   getCloudflareBindingModels,
-  getInitialActivity,
   getInitialDemoSettings,
   getInitialInvoiceDraft,
   getInitialInvoices,
+  getInitialSelectableItems,
   getInitialProducts,
   getInitialTickets
 } from '@/utils/demo-data'
@@ -143,7 +138,7 @@ const showCloudflareBinding = import.meta.env.DEV || import.meta.env.PUBLIC_WEBM
 const showDevtools = import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIEW === 'true'
 const shouldDefaultToCloudflareBinding = showCloudflareBinding && import.meta.env.MODE !== 'test'
 const cloudflareBindingModels = getCloudflareBindingModels()
-const prompt = ref('Select overdue invoices')
+const prompt = ref('Select all French items')
 const plannerName = ref('Loading')
 const plannerDetail = ref(shouldDefaultToCloudflareBinding ? 'Using the Cloudflare AI binding planner endpoint.' : 'Checking Chrome built-in AI availability.')
 const plannerProvider = ref<PlannerProviderKind>(shouldDefaultToCloudflareBinding ? 'cloudflare-binding' : 'auto')
@@ -154,19 +149,24 @@ const plannerApiKey = ref('')
 const plannerAccountId = ref('')
 const plannerAuthMode = ref<'server' | 'user-key'>(shouldDefaultToCloudflareBinding ? 'server' : 'user-key')
 const lastPlannerUsed = ref('No command has run yet')
-const selectedToolName = ref('select_invoices')
+const selectedToolName = ref('select_items')
 const registeredTools = ref<ReturnType<typeof listTools>>([])
 const lastPlan = ref<ToolPlan | null>(null)
 const lastResult = ref<ToolInvocationResult | null>(null)
 const commandPhase = ref<'idle' | 'preparing' | 'planning' | 'executing' | 'completed' | 'failed'>('idle')
 const unregisterCallbacks: Array<() => void> = []
 const supportTicketPanel = ref<{ supportForm: HTMLFormElement | null } | null>(null)
-const activityPanel = ref<{ devtoolsHost: HTMLElement | null } | null>(null)
+const runtimeStatusPanel = ref<{ devtoolsHost: HTMLElement | null } | null>(null)
 const supportSubject = ref('Billing access')
 const supportBody = ref('I cannot open the latest invoice from the workspace.')
 let devtoolsOverlay: DevtoolsOverlay | undefined
 const supportLabel = computed(function getCurrentSupportLabel() {
   return getSupportLabel()
+})
+const selectedItems = computed(function getSelectedItems() {
+  return selectableItems.value.filter(function filterSelectedItem(item) {
+    return item.selected
+  })
 })
 const selectedInvoices = computed(function getSelectedInvoices() {
   return invoices.value.filter(function filterSelectedInvoice(invoice) {
@@ -218,9 +218,6 @@ const plannerModelLabel = computed(function getPlannerModelLabel() {
   if (plannerProvider.value === 'auto') return 'Best available'
   return 'Provider managed'
 })
-const activeToolName = computed(function getActiveToolName() {
-  return lastPlan.value?.toolName ?? selectedToolName.value
-})
 const isCommandRunning = computed(function getIsCommandRunning() {
   return commandPhase.value === 'preparing'
     || commandPhase.value === 'planning'
@@ -232,145 +229,12 @@ const commandButtonLabel = computed(function getCommandButtonLabel() {
   if (commandPhase.value === 'executing') return 'Running...'
   return 'Run'
 })
-const outcomeTone = computed(function getOutcomeTone() {
-  if (isCommandRunning.value) return 'running'
-  if (!lastResult.value) return 'idle'
-  return lastResult.value.status
-})
-const outcomeLabel = computed(function getOutcomeLabel() {
-  if (commandPhase.value === 'preparing') return 'Preparing'
-  if (commandPhase.value === 'planning') return 'Planning'
-  if (commandPhase.value === 'executing') return 'Executing'
-  if (!lastResult.value) return 'Ready'
-  return lastResult.value.status
-})
-const outcomeTitle = computed(function getOutcomeTitle() {
-  if (commandPhase.value === 'preparing') return 'Collecting tools and app context'
-  if (commandPhase.value === 'planning') return 'Provider is choosing the tool'
-  if (commandPhase.value === 'executing') return `${selectedToolName.value} is running`
-  if (!lastResult.value) return 'Run a command to see the app change'
-  if (lastResult.value.status === 'success') return getToolSuccessTitle(lastResult.value.toolName)
-  if (lastResult.value.status === 'blocked') return `${getToolDisplayName(lastResult.value.toolName)} was blocked`
-  if (lastResult.value.status === 'unavailable') return `${getToolDisplayName(lastResult.value.toolName)} is unavailable`
 
-  return `${getToolDisplayName(lastResult.value.toolName)} failed`
-})
-const outcomeDetail = computed(function getOutcomeDetail() {
-  if (commandPhase.value === 'preparing') return 'The demo is reading the registered tools and visible app state before planning.'
-  if (commandPhase.value === 'planning') return `${lastPlannerUsed.value} is turning the command into a tool call.`
-  if (commandPhase.value === 'executing') return `Running ${selectedToolName.value} with the planned input.`
-  if (!lastResult.value) return 'The selected tool, generated input, confirmation status, and affected state will stay visible here.'
-  if (lastResult.value.error) return lastResult.value.error
-
-  return `Completed in ${lastResult.value.durationMs}ms.`
-})
-const affectedStateEmpty = computed(function getAffectedStateEmpty() {
-  if (!lastResult.value) return 'Nothing has run yet.'
-  if (lastResult.value.status !== 'success') return 'No state changed.'
-  if (activeToolName.value === 'checkout_cart') return 'Checkout completed with no cart lines.'
-
-  return 'No matching state is visible yet.'
-})
-const affectedRows = computed(function getAffectedRows(): OutcomeRow[] {
-  if (!lastResult.value) return []
-
-  if (activeToolName.value === 'search_products') {
-    return getProductRows(Array.isArray(lastResult.value.output) ? lastResult.value.output : [])
-  }
-
-  if (activeToolName.value === 'filter_invoices' || activeToolName.value === 'sort_invoices') {
-    return visibleInvoices.value.slice(0, 4).map(function mapInvoice(invoice) {
-      return {
-        id: invoice.id,
-        title: invoice.customerName,
-        value: `€${invoice.amount}`,
-        meta: `${invoice.status} · ${invoice.dueDate}`
-      }
-    })
-  }
-
-  if (activeToolName.value === 'select_invoices' || activeToolName.value === 'update_selected_invoice_status') {
-    return selectedInvoices.value.slice(0, 4).map(function mapInvoice(invoice) {
-      return {
-        id: invoice.id,
-        title: invoice.customerName,
-        value: `€${invoice.amount}`,
-        meta: invoice.status
-      }
-    })
-  }
-
-  if (activeToolName.value === 'create_invoice') {
-    return invoices.value.slice(0, 3).map(function mapInvoice(invoice) {
-      return {
-        id: invoice.id,
-        title: invoice.customerName,
-        value: `€${invoice.amount}`,
-        meta: invoice.status
-      }
-    })
-  }
-
-  if (activeToolName.value === 'add_to_cart') {
-    return getCartRows(cart.value)
-  }
-
-  if (activeToolName.value === 'update_cart_quantity' || activeToolName.value === 'remove_from_cart' || activeToolName.value === 'apply_cart_discount') {
-    return getCartRows(cart.value)
-  }
-
-  if (activeToolName.value === 'update_ticket') {
-    return tickets.value.slice(0, 3).map(function mapTicket(ticket) {
-      return {
-        id: ticket.id,
-        title: ticket.subject,
-        value: ticket.status,
-        meta: `${ticket.priority} · ${ticket.assignee}`
-      }
-    })
-  }
-
-  if (activeToolName.value === 'update_demo_settings') {
-    return [
-      {
-        id: 'settings',
-        title: settings.value.confirmationsEnabled ? 'Confirmations enabled' : 'Confirmations disabled',
-        value: settings.value.density,
-        meta: `${settings.value.plannerConfidence}% threshold`
-      }
-    ]
-  }
-
-  if (activeToolName.value === 'checkout_cart') {
-    return getCartRows(getCheckoutLines(lastResult.value.output))
-  }
-
-  if (activeToolName.value === 'create_support_ticket') {
-    return tickets.value.slice(0, 3).map(function mapTicket(ticket) {
-      return {
-        id: ticket.id,
-        title: ticket.subject,
-        value: ticket.status,
-        meta: ticket.body
-      }
-    })
-  }
-
-  return activity.value.slice(0, 3).map(function mapActivity(item) {
-    return {
-      id: item.id,
-      title: item.title,
-      value: item.tone,
-      meta: item.detail
-    }
-  })
-})
-
+const selectableItems = ref<SelectableItem[]>(getInitialSelectableItems())
 const invoices = ref<Invoice[]>(getInitialInvoices())
 const products = ref<Product[]>(getInitialProducts())
 const cart = ref<CartLine[]>([])
 const tickets = ref<SupportTicket[]>(getInitialTickets())
-const activity = ref<ActivityItem[]>(getInitialActivity())
 const invoiceFilters = ref<InvoiceFilters>({
   query: '',
   status: 'all'
@@ -413,9 +277,9 @@ onMounted(async function handleMounted() {
   registerSupportFormTool()
   refreshTools()
   unregisterCallbacks.push(installWebMCPKitTestBridge())
-  if (showDevtools && activityPanel.value?.devtoolsHost) {
+  if (showDevtools && runtimeStatusPanel.value?.devtoolsHost) {
     devtoolsOverlay = mountDevtoolsOverlay({
-      container: activityPanel.value.devtoolsHost,
+      container: runtimeStatusPanel.value.devtoolsHost,
       initiallyOpen: false,
       placement: 'inline'
     })
@@ -434,6 +298,50 @@ onUnmounted(function handleUnmounted() {
 })
 
 function registerDemoTools() {
+  unregisterCallbacks.push(registerTool(defineTool({
+    name: 'select_items',
+    description: 'Select visible inventory items by stable item IDs.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ids: {
+          type: 'array',
+          items: {
+            type: 'string'
+          },
+          description: 'Stable item IDs to select from the visible inventory.'
+        }
+      },
+      required: ['ids'],
+      additionalProperties: false
+    },
+    execute(input) {
+      const ids = Array.isArray(input.ids) ? input.ids.map(String) : []
+      selectableItems.value = selectableItems.value.map(function mapItem(item) {
+        return {
+          ...item,
+          selected: ids.includes(item.id)
+        }
+      })
+      return selectedItems.value
+    }
+  })).unregister)
+
+  unregisterCallbacks.push(registerTool(defineTool({
+    name: 'clear_item_selection',
+    description: 'Clear the current semantic inventory selection.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+      additionalProperties: false
+    },
+    execute() {
+      clearItemSelection()
+      return []
+    }
+  })).unregister)
+
   unregisterCallbacks.push(registerTool(defineTool({
     name: 'create_invoice',
     description: 'Create a draft invoice for a customer and add it to the local invoice list.',
@@ -477,7 +385,6 @@ function registerDemoTools() {
       }
       invoices.value = [invoice, ...invoices.value]
       activeInvoiceId.value = invoice.id
-      addActivity('Invoice created', `${invoice.customerName} for €${invoice.amount}`, 'success')
       return invoice
     }
   })).unregister)
@@ -520,7 +427,6 @@ function registerDemoTools() {
         })
       }
 
-      addActivity('Invoices filtered', `${visibleInvoices.value.length} invoices visible`, 'info')
       return {
         filters: invoiceFilters.value,
         visibleInvoices: visibleInvoices.value
@@ -549,7 +455,6 @@ function registerDemoTools() {
     execute(input) {
       invoiceSortKey.value = isInvoiceSortKey(input.sortBy) ? input.sortBy : 'dueDate'
       invoiceSortDirection.value = input.direction === 'desc' ? 'desc' : 'asc'
-      addActivity('Invoices sorted', `${invoiceSortKey.value} ${invoiceSortDirection.value}`, 'info')
       return visibleInvoices.value
     }
   })).unregister)
@@ -579,7 +484,6 @@ function registerDemoTools() {
           selected: ids.includes(invoice.id)
         }
       })
-      addActivity('Invoices selected', `${selectedInvoices.value.length} invoice rows selected`, 'success')
       return selectedInvoices.value
     }
   })).unregister)
@@ -606,7 +510,6 @@ function registerDemoTools() {
     execute(input) {
       activeInvoiceId.value = String(input.id)
       const invoice = activeInvoice.value
-      addActivity('Invoice opened', invoice?.customerName ?? activeInvoiceId.value, 'info')
       return invoice
     }
   })).unregister)
@@ -642,7 +545,6 @@ function registerDemoTools() {
           status
         }
       })
-      addActivity('Invoice status updated', `${selectedInvoices.value.length} invoices marked ${status}`, 'success')
       return selectedInvoices.value
     }
   })).unregister)
@@ -670,7 +572,6 @@ function registerDemoTools() {
           return searchableText.includes(token)
         })
       })
-      addActivity('Products searched', `${matches.length} matches for "${query}"`, 'info')
       return matches
     }
   })).unregister)
@@ -704,7 +605,6 @@ function registerDemoTools() {
       const line = cart.value.find(function findLine(item) {
         return item.productId === String(input.productId ?? '')
       })
-      addActivity('Cart updated', `${line?.name ?? input.productId} added`, 'success')
       return line
     }
   })).unregister)
@@ -733,7 +633,6 @@ function registerDemoTools() {
     },
     execute(input) {
       updateCartLineQuantity(String(input.productId), Number(input.quantity ?? 1))
-      addActivity('Cart quantity changed', `${input.productId} set to ${input.quantity}`, 'success')
       return cart.value
     }
   })).unregister)
@@ -757,7 +656,6 @@ function registerDemoTools() {
     },
     execute(input) {
       removeCartLine(String(input.productId ?? ''))
-      addActivity('Cart line removed', String(input.productId ?? ''), 'info')
       return cart.value
     }
   })).unregister)
@@ -779,7 +677,6 @@ function registerDemoTools() {
     },
     execute(input) {
       cartDiscountPercent.value = Math.max(0, Math.min(100, Number(input.percent ?? 0)))
-      addActivity('Cart discount applied', `${cartDiscountPercent.value}%`, 'success')
       return {
         discountPercent: cartDiscountPercent.value,
         total: cartTotal.value
@@ -807,8 +704,6 @@ function registerDemoTools() {
       const lines = [...cart.value]
       const total = cartTotal.value
       cart.value = []
-      addActivity('Checkout completed', `${lines.length} lines for €${total}`, 'success')
-
       return {
         lines,
         total
@@ -855,46 +750,9 @@ function registerDemoTools() {
           status: isTicketStatus(input.status) ? input.status : ticket.status
         }
       })
-      addActivity('Ticket updated', String(input.id), 'success')
       return tickets.value.find(function findTicket(ticket) {
         return ticket.id === String(input.id)
       })
-    }
-  })).unregister)
-
-  unregisterCallbacks.push(registerTool(defineTool({
-    name: 'update_demo_settings',
-    description: 'Update visible assistant behavior settings such as confirmations, density, notifications, and confidence threshold.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        confirmationsEnabled: {
-          type: 'boolean'
-        },
-        density: {
-          type: 'string',
-          enum: ['comfortable', 'compact']
-        },
-        notificationsEnabled: {
-          type: 'boolean'
-        },
-        plannerConfidence: {
-          type: 'number',
-          minimum: 0,
-          maximum: 100
-        }
-      },
-      additionalProperties: false
-    },
-    execute(input) {
-      updateSettings({
-        confirmationsEnabled: typeof input.confirmationsEnabled === 'boolean' ? input.confirmationsEnabled : undefined,
-        density: input.density === 'comfortable' || input.density === 'compact' ? input.density : undefined,
-        notificationsEnabled: typeof input.notificationsEnabled === 'boolean' ? input.notificationsEnabled : undefined,
-        plannerConfidence: typeof input.plannerConfidence === 'number' ? input.plannerConfidence : undefined
-      })
-      addActivity('Settings updated', `${settings.value.density}, confirmations ${settings.value.confirmationsEnabled ? 'on' : 'off'}`, 'success')
-      return settings.value
     }
   })).unregister)
 
@@ -912,6 +770,34 @@ function registerSupportFormTool() {
       return createSupportTicket(String(input.subject ?? 'Support request'), String(input.body ?? ''))
     }
   }).unregister)
+}
+
+function setItemSelected(id: string, selected: boolean) {
+  selectableItems.value = selectableItems.value.map(function mapItem(item) {
+    if (item.id !== id) return item
+    return {
+      ...item,
+      selected
+    }
+  })
+}
+
+function selectAllItems() {
+  selectableItems.value = selectableItems.value.map(function mapItem(item) {
+    return {
+      ...item,
+      selected: true
+    }
+  })
+}
+
+function clearItemSelection() {
+  selectableItems.value = selectableItems.value.map(function mapItem(item) {
+    return {
+      ...item,
+      selected: false
+    }
+  })
 }
 
 function setInvoiceSelected(id: string, selected: boolean) {
@@ -953,7 +839,6 @@ function markSelectedInvoices(status: Invoice['status']) {
       status
     }
   })
-  addActivity('Invoice status updated', `${selectedInvoices.value.length} invoices marked ${status}`, 'success')
 }
 
 function openInvoice(id: string) {
@@ -979,7 +864,6 @@ function createInvoiceFromDraft() {
   }
   invoices.value = [invoice, ...invoices.value]
   activeInvoiceId.value = invoice.id
-  addActivity('Invoice created', `${invoice.customerName} for €${invoice.amount}`, 'success')
 }
 
 function addSelectedProductToCart() {
@@ -1059,15 +943,6 @@ function updateTicketPriority(id: string, priority: SupportTicket['priority']) {
   })
 }
 
-function updateSettings(nextSettings: Partial<DemoSettings>) {
-  settings.value = {
-    ...settings.value,
-    ...Object.fromEntries(Object.entries(nextSettings).filter(function keepDefinedValue([, value]) {
-      return value !== undefined
-    }))
-  }
-}
-
 async function runPrompt() {
   if (isCommandRunning.value) return
 
@@ -1106,7 +981,6 @@ async function runPrompt() {
       durationMs: 0
     }
     commandPhase.value = 'failed'
-    addActivity('Planning failed', errorMessage, 'warning')
     return
   }
   lastPlan.value = plan
@@ -1121,14 +995,10 @@ async function runPrompt() {
   lastResult.value = result
   commandPhase.value = result.status === 'success' ? 'completed' : 'failed'
 
-  if (result.status !== 'success') {
-    addActivity('Command blocked', result.error ?? 'The selected tool could not run.', 'warning')
-  }
 }
 
 function confirmToolInvocation(tool: { name: string }, input: unknown, reason: string): boolean {
   if (!settings.value.confirmationsEnabled) return true
-  addActivity('Confirmation requested', `${tool.name}: ${reason}`, 'warning')
   return window.confirm(`${reason}\n\n${JSON.stringify(input, null, 2)}`)
 }
 
@@ -1145,9 +1015,6 @@ async function submitSupportForm() {
   })
   lastResult.value = result
 
-  if (result.status !== 'success') {
-    addActivity('Ticket blocked', result.error ?? 'The ticket form could not run.', 'warning')
-  }
 }
 
 function refreshTools() {
@@ -1212,6 +1079,14 @@ function getSelectedPlannerConfig(): PlannerProviderConfig | undefined {
 
 function getPlannerContext() {
   return {
+    checklistItems: selectableItems.value.map(function mapChecklistItem(item, index) {
+      return {
+        id: item.id,
+        name: item.name,
+        position: index + 1,
+        selected: item.selected
+      }
+    }),
     products: products.value,
     invoices: invoices.value,
     invoiceFilters: invoiceFilters.value,
@@ -1221,44 +1096,6 @@ function getPlannerContext() {
     tickets: tickets.value,
     settings: settings.value
   }
-}
-
-function getToolDisplayName(toolName: string): string {
-  if (toolName === 'filter_invoices') return 'Invoice table'
-  if (toolName === 'sort_invoices') return 'Invoice table'
-  if (toolName === 'select_invoices') return 'Invoice selection'
-  if (toolName === 'open_invoice') return 'Invoice drawer'
-  if (toolName === 'update_selected_invoice_status') return 'Invoice status'
-  if (toolName === 'search_products') return 'Product search'
-  if (toolName === 'create_invoice') return 'Invoice'
-  if (toolName === 'add_to_cart') return 'Cart'
-  if (toolName === 'update_cart_quantity') return 'Cart'
-  if (toolName === 'remove_from_cart') return 'Cart'
-  if (toolName === 'apply_cart_discount') return 'Cart'
-  if (toolName === 'checkout_cart') return 'Checkout'
-  if (toolName === 'update_ticket') return 'Ticket board'
-  if (toolName === 'update_demo_settings') return 'Settings'
-  if (toolName === 'create_support_ticket') return 'Support ticket'
-  return toolName
-}
-
-function getToolSuccessTitle(toolName: string): string {
-  if (toolName === 'filter_invoices') return 'Invoice table filtered'
-  if (toolName === 'sort_invoices') return 'Invoice table sorted'
-  if (toolName === 'select_invoices') return 'Invoices selected'
-  if (toolName === 'open_invoice') return 'Invoice opened'
-  if (toolName === 'update_selected_invoice_status') return 'Invoice status updated'
-  if (toolName === 'search_products') return 'Product search completed'
-  if (toolName === 'create_invoice') return 'Invoice created'
-  if (toolName === 'add_to_cart') return 'Cart updated'
-  if (toolName === 'update_cart_quantity') return 'Cart quantity updated'
-  if (toolName === 'remove_from_cart') return 'Cart line removed'
-  if (toolName === 'apply_cart_discount') return 'Cart discount applied'
-  if (toolName === 'checkout_cart') return 'Checkout completed'
-  if (toolName === 'update_ticket') return 'Ticket updated'
-  if (toolName === 'update_demo_settings') return 'Settings updated'
-  if (toolName === 'create_support_ticket') return 'Support ticket created'
-  return `${toolName} completed`
 }
 
 function createSupportTicket(subject: string, body: string): SupportTicket {
@@ -1271,36 +1108,12 @@ function createSupportTicket(subject: string, body: string): SupportTicket {
     assignee: 'Unassigned'
   }
   tickets.value = [ticket, ...tickets.value]
-  addActivity('Ticket opened', ticket.subject, 'success')
   return ticket
-}
-
-function addActivity(title: string, detail: string, tone: ActivityItem['tone']) {
-  activity.value = [
-    {
-      id: `activity_${Date.now()}`,
-      title,
-      detail,
-      tone
-    },
-    ...activity.value
-  ].slice(0, 6)
 }
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message
   return 'Planner failed'
-}
-
-function getProductRows(value: unknown[]): OutcomeRow[] {
-  return value.filter(isProduct).map(function mapProduct(product) {
-    return {
-      id: product.id,
-      title: product.name,
-      value: `€${product.price}`,
-      meta: product.category
-    }
-  })
 }
 
 function getSearchTokens(query: string): string[] {
@@ -1311,25 +1124,6 @@ function getSearchTokens(query: string): string[] {
     })
 
   return tokens.length > 0 ? tokens : [query]
-}
-
-function getCartRows(lines: CartLine[]): OutcomeRow[] {
-  return lines.map(function mapCartLine(line) {
-    return {
-      id: line.productId,
-      title: line.name,
-      value: `${line.quantity}x`,
-      meta: `€${line.price}`
-    }
-  })
-}
-
-function getCheckoutLines(output: unknown): CartLine[] {
-  if (!output || typeof output !== 'object' || !('lines' in output) || !Array.isArray(output.lines)) {
-    return []
-  }
-
-  return output.lines.filter(isCartLine)
 }
 
 function isInvoiceStatus(value: unknown): value is Invoice['status'] {
@@ -1352,32 +1146,6 @@ function isTicketPriority(value: unknown): value is SupportTicket['priority'] {
   return value === 'low' || value === 'medium' || value === 'high' || value === 'urgent'
 }
 
-function isProduct(value: unknown): value is Product {
-  return !!value
-    && typeof value === 'object'
-    && 'id' in value
-    && 'name' in value
-    && 'category' in value
-    && 'price' in value
-    && typeof value.id === 'string'
-    && typeof value.name === 'string'
-    && typeof value.category === 'string'
-    && typeof value.price === 'number'
-}
-
-function isCartLine(value: unknown): value is CartLine {
-  return !!value
-    && typeof value === 'object'
-    && 'productId' in value
-    && 'name' in value
-    && 'quantity' in value
-    && 'price' in value
-    && typeof value.productId === 'string'
-    && typeof value.name === 'string'
-    && typeof value.quantity === 'number'
-    && typeof value.price === 'number'
-}
-
 declare global {
   interface Window {
     __webMCPKitDemoPlanner?: {
@@ -1398,27 +1166,17 @@ declare global {
   padding: 8px 0 80px;
 }
 
-.tool-surface {
-  display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(360px, 1.05fr);
+.app-panels {
+  display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   align-items: start;
   margin-top: 16px;
+  margin-bottom: 16px;
 }
 
-.operations-grid {
-  display: grid;
-  grid-template-columns: minmax(280px, 0.85fr) minmax(360px, 1.15fr) minmax(260px, 0.7fr);
-  gap: 16px;
-  align-items: start;
-  margin-top: 16px;
-}
-
-@media (max-width: 980px) {
-  .tool-surface,
-  .operations-grid {
-    grid-template-columns: 1fr;
-  }
+.app-panels > * {
+  flex: 1 1 340px;
 }
 
 @media (max-width: 620px) {

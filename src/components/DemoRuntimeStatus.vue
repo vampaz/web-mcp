@@ -1,22 +1,30 @@
 <template>
-  <section class="status-strip" aria-label="Runtime status">
-    <div>
-      <span>WebMCP</span>
-      <strong>{{ supportLabel }}</strong>
-    </div>
-    <div>
-      <span>Planner</span>
-      <strong>{{ plannerName }}</strong>
-      <small>{{ plannerDetail }}</small>
-    </div>
-    <div>
-      <span>Registered tools</span>
-      <strong>{{ registeredToolsCount }}</strong>
-    </div>
-  </section>
+  <details class="diagnostics-panel">
+    <summary>Developer diagnostics</summary>
+
+    <section class="status-strip" aria-label="Runtime status">
+      <div>
+        <span>WebMCP</span>
+        <strong>{{ supportLabel }}</strong>
+      </div>
+      <div>
+        <span>Planner</span>
+        <strong>{{ plannerName }}</strong>
+        <small>{{ plannerDetail }}</small>
+      </div>
+      <div>
+        <span>Registered tools</span>
+        <strong>{{ registeredToolsCount }}</strong>
+      </div>
+    </section>
+
+    <div ref="devtoolsHost" class="devtools-host" />
+  </details>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
+
 interface Props {
   plannerDetail: string
   plannerName: string
@@ -25,24 +33,36 @@ interface Props {
 }
 
 withDefaults(defineProps<Props>(), {})
+const devtoolsHost = ref<HTMLElement | null>(null)
+
+defineExpose({
+  devtoolsHost
+})
 </script>
 
 <style scoped>
+.diagnostics-panel {
+  margin-top: 16px;
+  border: 1px solid rgba(244, 240, 232, 0.14);
+  background: rgba(8, 12, 11, 0.86);
+}
+
+.diagnostics-panel summary {
+  padding: 9px 10px;
+  cursor: pointer;
+  color: #9ea8a1;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
 .status-strip {
-  position: fixed;
-  right: 16px;
-  bottom: 12px;
-  left: 16px;
-  z-index: 1001;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
-  width: min(1440px, calc(100% - 32px));
-  margin: 0 auto;
-  border: 1px solid rgba(244, 240, 232, 0.14);
+  width: 100%;
+  border-top: 1px solid rgba(244, 240, 232, 0.14);
   background: rgba(8, 12, 11, 0.96);
-  box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.36);
-  backdrop-filter: blur(18px);
 }
 
 .status-strip div {
@@ -83,6 +103,10 @@ withDefaults(defineProps<Props>(), {})
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.devtools-host {
+  border-top: 1px solid rgba(244, 240, 232, 0.14);
 }
 
 @media (max-width: 980px) {

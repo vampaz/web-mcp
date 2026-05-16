@@ -1,4 +1,4 @@
-import type { ActivityItem, DemoSettings, Invoice, InvoiceDraft, PlannerModelOption, Product, SupportTicket } from '@/interfaces/demo'
+import type { DemoSettings, Invoice, InvoiceDraft, PlannerModelOption, Product, SelectableItem, SupportTicket } from '@/interfaces/demo'
 
 export function getCloudflareBindingModels(): PlannerModelOption[] {
   return [
@@ -54,22 +54,40 @@ export function getInitialInvoices(): Invoice[] {
   ]
 }
 
+export function getInitialSelectableItems(): SelectableItem[] {
+  return [
+    { id: 'item_1', name: 'Apple', selected: false },
+    { id: 'item_2', name: 'Banana', selected: false },
+    { id: 'item_3', name: 'Carrot', selected: false },
+    { id: 'item_4', name: 'Croissant', selected: false },
+    { id: 'item_5', name: 'Orange', selected: false },
+    { id: 'item_6', name: 'Spinach', selected: false },
+    { id: 'item_7', name: 'Baguette', selected: false },
+    { id: 'item_8', name: 'Water', selected: false },
+    { id: 'item_9', name: 'Beetroot', selected: false },
+    { id: 'item_10', name: 'Coffee', selected: false },
+    { id: 'item_11', name: 'Lemon', selected: false },
+    { id: 'item_12', name: 'Potato', selected: false },
+    { id: 'item_13', name: 'Brie', selected: false },
+    { id: 'item_14', name: 'Milk', selected: false },
+    { id: 'item_15', name: 'Almonds', selected: false },
+    { id: 'item_16', name: 'Sparkling water', selected: false },
+    { id: 'item_17', name: 'Radish', selected: false },
+    { id: 'item_18', name: 'Pain au chocolat', selected: false },
+    { id: 'item_19', name: 'Grapefruit', selected: false },
+    { id: 'item_20', name: 'Tea', selected: false },
+    { id: 'item_21', name: 'Yogurt', selected: false },
+    { id: 'item_22', name: 'Quiche', selected: false },
+    { id: 'item_23', name: 'Rice', selected: false },
+    { id: 'item_24', name: 'Turnip', selected: false }
+  ]
+}
+
 export function getInitialProducts(): Product[] {
   return [
     { id: 'kbd-01', name: 'Low-profile keyboard', category: 'Input', price: 129 },
     { id: 'dock-02', name: 'Travel USB-C dock', category: 'Connectivity', price: 89 },
     { id: 'cam-03', name: 'Desk camera', category: 'Video', price: 149 }
-  ]
-}
-
-export function getInitialActivity(): ActivityItem[] {
-  return [
-    {
-      id: 'activity_1',
-      title: 'Demo ready',
-      detail: 'Tools will register when the Vue island mounts.',
-      tone: 'info'
-    }
   ]
 }
 
@@ -115,8 +133,6 @@ export function getInitialInvoiceDraft(): InvoiceDraft {
 export function getInitialDemoSettings(): DemoSettings {
   return {
     confirmationsEnabled: true,
-    density: 'compact',
-    notificationsEnabled: true,
-    plannerConfidence: 72
+    density: 'compact'
   }
 }

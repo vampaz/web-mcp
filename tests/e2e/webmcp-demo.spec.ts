@@ -3,26 +3,24 @@ import { invokeWebMCPTool, listWebMCPTools, waitForWebMCPTool } from '@webmcp-ki
 
 type LanguageModelAvailability = 'available' | 'downloadable' | 'downloading' | 'unavailable'
 
-test('uses Chrome AI context to select and open invoice rows', async function testInvoiceSelection({ page }) {
+test('uses Chrome AI context to select semantic inventory items and open records', async function testSemanticInventorySelection({ page }) {
   await installLanguageModelMock(page, 'downloadable')
   await page.goto('/')
-  await page.waitForSelector('text=Invoice operations')
+  await expect(page.getByRole('heading', { name: 'Inventory' })).toBeVisible()
   await selectPlannerProvider(page, 'chrome-built-in')
 
-  await expect(page.locator('.status-strip strong').filter({ hasText: 'Chrome built-in AI (downloadable)' })).toBeVisible()
-
-  await page.getByLabel('Natural language command').fill('Select overdue invoices')
+  await page.getByLabel('Natural language command').fill('Select all French items')
   await page.getByRole('button', { name: 'Run' }).click()
 
-  await expect(page.getByText('2 selected')).toBeVisible()
-  await expect(getInvoiceInput(page, 'Northwind')).toBeChecked()
-  await expect(getInvoiceInput(page, 'Stark Industries')).toBeChecked()
-  await expect(getInvoiceInput(page, 'Initech')).not.toBeChecked()
+  await expect(page.getByText('5 selected')).toBeVisible()
+  await expect(getItemInput(page, 'Croissant')).toBeChecked()
+  await expect(getItemInput(page, 'Baguette')).toBeChecked()
+  await expect(getItemInput(page, 'Pain au chocolat')).toBeChecked()
+  await expect(getItemInput(page, 'Apple')).not.toBeChecked()
 
   await page.getByLabel('Natural language command').fill('Open the Stark invoice')
   await page.getByRole('button', { name: 'Run' }).click()
 
-  await expect(page.locator('.result-main strong').filter({ hasText: 'Invoice opened' })).toBeVisible()
   await expect(page.locator('.active-record strong').filter({ hasText: 'Stark Industries' })).toBeVisible()
 
   const promptMessages = await page.evaluate(function getPromptMessages() {
@@ -30,64 +28,61 @@ test('uses Chrome AI context to select and open invoice rows', async function te
   })
 
   expect(promptMessages[0]).toContain('Current app context')
-  expect(promptMessages[0]).toContain('Northwind')
-  expect(promptMessages[0]).toContain('Stark Industries')
+  expect(promptMessages[0]).toContain('Croissant')
+  expect(promptMessages[0]).toContain('Pain au chocolat')
 })
 
-test('uses the local planner for invoice table selections when AI is unavailable', async function testFallbackInvoiceSelection({ page }) {
+test('uses the local planner for semantic item selections when AI is unavailable', async function testFallbackItemSelection({ page }) {
   await installUnavailableLanguageModelMock(page)
   await page.goto('/')
-  await page.waitForSelector('text=Invoice operations')
+  await expect(page.getByRole('heading', { name: 'Inventory' })).toBeVisible()
   await selectPlannerProvider(page, 'local')
 
-  await expect(page.locator('.status-strip strong').filter({ hasText: 'Local heuristic planner (fallback)' })).toBeVisible()
-
-  await page.getByLabel('Natural language command').fill('Select unpaid invoices over 500')
+  await page.getByLabel('Natural language command').fill('Select all liquids')
   await page.getByRole('button', { name: 'Run' }).click()
 
-  await expect(page.getByText('6 selected')).toBeVisible()
-  await expect(page.locator('.result-main strong').filter({ hasText: 'Invoices selected' })).toBeVisible()
-  await expect(getInvoiceInput(page, 'Initech')).not.toBeChecked()
-  await expect(getInvoiceInput(page, 'Globex')).not.toBeChecked()
+  await expect(page.getByText('5 selected')).toBeVisible()
+  await expect(getItemInput(page, 'Water')).toBeChecked()
+  await expect(getItemInput(page, 'Coffee')).toBeChecked()
+  await expect(getItemInput(page, 'Milk')).toBeChecked()
+  await expect(getItemInput(page, 'Apple')).not.toBeChecked()
 })
 
 test('rechecks Chrome AI before running a command if the page mounted with fallback', async function testPlannerRefresh({ page }) {
   await page.goto('/')
-  await page.waitForSelector('text=Invoice operations')
+  await expect(page.getByRole('heading', { name: 'Inventory' })).toBeVisible()
   await selectPlannerProvider(page, 'auto')
 
-  await expect(page.locator('.status-strip strong').filter({ hasText: 'Local heuristic planner (fallback)' })).toBeVisible()
   await installLanguageModelInPage(page, 'available')
 
-  await page.getByLabel('Natural language command').fill('Select overdue invoices')
+  await page.getByLabel('Natural language command').fill('Select all fruits')
   await page.getByRole('button', { name: 'Run' }).click()
 
-  await expect(page.locator('.status-strip strong').filter({ hasText: 'Chrome built-in AI (ready)' })).toBeVisible()
-  await expect(getInvoiceInput(page, 'Northwind')).toBeChecked()
-  await expect(getInvoiceInput(page, 'Stark Industries')).toBeChecked()
+  await expect(getItemInput(page, 'Apple')).toBeChecked()
+  await expect(getItemInput(page, 'Grapefruit')).toBeChecked()
 })
 
 test('exposes registered tools through Playwright helpers', async function testPlaywrightHelpers({ page }) {
   await installLanguageModelMock(page, 'available')
   await page.goto('/')
-  await waitForWebMCPTool(page, 'select_invoices')
+  await waitForWebMCPTool(page, 'select_items')
 
   const tools = await listWebMCPTools(page)
   expect(tools.map(function getToolName(tool) {
     return tool.name
-  })).toContain('select_invoices')
+  })).toContain('select_items')
 
   const result = await invokeWebMCPTool(page, {
-    toolName: 'select_invoices',
+    toolName: 'select_items',
     input: {
-      ids: ['inv_101', 'inv_104']
+      ids: ['item_4', 'item_7']
     },
     source: 'planner'
   })
 
   expect(result.status).toBe('success')
-  await expect(getInvoiceInput(page, 'Northwind')).toBeChecked()
-  await expect(getInvoiceInput(page, 'Stark Industries')).toBeChecked()
+  await expect(getItemInput(page, 'Croissant')).toBeChecked()
+  await expect(getItemInput(page, 'Baguette')).toBeChecked()
 })
 
 test('plans through a selected user-key provider', async function testUserKeyProviderSelection({ page }) {
@@ -103,10 +98,10 @@ test('plans through a selected user-key provider', async function testUserKeyPro
           {
             message: {
               content: JSON.stringify({
-                toolName: 'select_invoices',
-                input: { ids: ['inv_101', 'inv_104'] },
+                toolName: 'select_items',
+                input: { ids: ['item_4', 'item_7', 'item_13', 'item_18', 'item_22'] },
                 confidence: 0.94,
-                reason: 'OpenRouter selected overdue invoices from current invoice context.'
+                reason: 'OpenRouter selected French items from current inventory context.'
               })
             }
           }
@@ -116,15 +111,14 @@ test('plans through a selected user-key provider', async function testUserKeyPro
   })
 
   await page.goto('/')
-  await page.waitForSelector('text=Invoice operations')
+  await expect(page.getByRole('heading', { name: 'Inventory' })).toBeVisible()
   await selectPlannerProvider(page, 'openrouter')
 
-  await page.getByLabel('Natural language command').fill('Select overdue invoices')
+  await page.getByLabel('Natural language command').fill('Select all French items')
   await page.getByRole('button', { name: 'Run' }).click()
 
-  await expect(page.locator('.status-strip strong').filter({ hasText: 'OpenRouter (ready)' })).toBeVisible()
-  await expect(getInvoiceInput(page, 'Northwind')).toBeChecked()
-  await expect(getInvoiceInput(page, 'Stark Industries')).toBeChecked()
+  await expect(getItemInput(page, 'Croissant')).toBeChecked()
+  await expect(getItemInput(page, 'Quiche')).toBeChecked()
 })
 
 test('plans through the dev Cloudflare binding provider', async function testCloudflareBindingProviderSelection({ page }) {
@@ -132,30 +126,29 @@ test('plans through the dev Cloudflare binding provider', async function testClo
     expect(request.postDataJSON()).toMatchObject({
       provider: 'cloudflare-binding',
       model: '@cf/qwen/qwq-32b',
-      message: 'Select overdue invoices'
+      message: 'Select all French items'
     })
 
     await route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({
-        toolName: 'select_invoices',
-        input: { ids: ['inv_101', 'inv_104'] },
+        toolName: 'select_items',
+        input: { ids: ['item_4', 'item_7', 'item_13', 'item_18', 'item_22'] },
         confidence: 0.92,
-        reason: 'Cloudflare binding selected overdue invoices from current invoice context.'
+        reason: 'Cloudflare binding selected French items from current inventory context.'
       })
     })
   })
 
   await page.goto('/')
-  await page.waitForSelector('text=Invoice operations')
+  await expect(page.getByRole('heading', { name: 'Inventory' })).toBeVisible()
   await selectPlannerProvider(page, 'cloudflare-binding')
   await page.getByLabel('Model').selectOption('@cf/qwen/qwq-32b')
-  await page.getByLabel('Natural language command').fill('Select overdue invoices')
+  await page.getByLabel('Natural language command').fill('Select all French items')
   await page.getByRole('button', { name: 'Run' }).click()
 
-  await expect(page.locator('.status-strip strong').filter({ hasText: 'Cloudflare binding (ready)' })).toBeVisible()
-  await expect(getInvoiceInput(page, 'Northwind')).toBeChecked()
-  await expect(getInvoiceInput(page, 'Stark Industries')).toBeChecked()
+  await expect(getItemInput(page, 'Croissant')).toBeChecked()
+  await expect(getItemInput(page, 'Quiche')).toBeChecked()
 })
 
 async function installLanguageModelMock(page: Page, availability: LanguageModelAvailability) {
@@ -197,8 +190,8 @@ async function selectPlannerProvider(page: Page, provider: string) {
   await page.getByLabel('Provider').selectOption(provider)
 }
 
-function getInvoiceInput(page: Page, customerName: string) {
-  return page.getByLabel(`Select ${customerName}`)
+function getItemInput(page: Page, itemName: string) {
+  return page.getByLabel(`Select ${itemName}`)
 }
 
 function installLanguageModel(targetWindow: Window, mockAvailability: LanguageModelAvailability) {
@@ -227,12 +220,21 @@ function installLanguageModel(targetWindow: Window, mockAvailability: LanguageMo
             })
           }
 
-          if (request.includes('overdue')) {
+          if (request.includes('French')) {
             return JSON.stringify({
-              toolName: 'select_invoices',
-              input: { ids: ['inv_101', 'inv_104'] },
+              toolName: 'select_items',
+              input: { ids: ['item_4', 'item_7', 'item_13', 'item_18', 'item_22'] },
               confidence: 0.94,
-              reason: 'Selected overdue invoices from current invoice context.'
+              reason: 'Selected French items from current inventory context.'
+            })
+          }
+
+          if (request.includes('fruits')) {
+            return JSON.stringify({
+              toolName: 'select_items',
+              input: { ids: ['item_1', 'item_2', 'item_5', 'item_11', 'item_19'] },
+              confidence: 0.94,
+              reason: 'Selected fruits from current inventory context.'
             })
           }
 

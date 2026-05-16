@@ -1,8 +1,7 @@
 <template>
   <section class="ticket-board">
     <div class="panel-heading">
-      <p class="eyebrow">Status controls</p>
-      <h2>Ticket board</h2>
+      <h2>Tickets</h2>
     </div>
 
     <div class="board-columns">
@@ -12,24 +11,24 @@
           <strong>{{ ticket.subject }}</strong>
           <span>{{ ticket.body }}</span>
           <div class="ticket-controls">
-            <select :value="ticket.status" :aria-label="`Status for ${ticket.subject}`" @change="updateStatus(ticket.id, $event)">
-              <option value="new">New</option>
-              <option value="triaged">Triaged</option>
-              <option value="in_progress">In progress</option>
-              <option value="resolved">Resolved</option>
+            <select :key="`${ticket.id}-status-${ticket.status}`" :value="ticket.status" :aria-label="`Status for ${ticket.subject}`" @change="updateStatus(ticket.id, $event)">
+              <option value="new" :selected="ticket.status === 'new'">New</option>
+              <option value="triaged" :selected="ticket.status === 'triaged'">Triaged</option>
+              <option value="in_progress" :selected="ticket.status === 'in_progress'">In progress</option>
+              <option value="resolved" :selected="ticket.status === 'resolved'">Resolved</option>
             </select>
-            <select :value="ticket.assignee" :aria-label="`Assignee for ${ticket.subject}`" @change="updateAssignee(ticket.id, $event)">
-              <option>Unassigned</option>
-              <option>Carlos</option>
-              <option>Marta</option>
-              <option>Rui</option>
-              <option>Sofia</option>
+            <select :key="`${ticket.id}-assignee-${ticket.assignee}`" :value="ticket.assignee" :aria-label="`Assignee for ${ticket.subject}`" @change="updateAssignee(ticket.id, $event)">
+              <option value="Unassigned" :selected="ticket.assignee === 'Unassigned'">Unassigned</option>
+              <option value="Carlos" :selected="ticket.assignee === 'Carlos'">Carlos</option>
+              <option value="Marta" :selected="ticket.assignee === 'Marta'">Marta</option>
+              <option value="Rui" :selected="ticket.assignee === 'Rui'">Rui</option>
+              <option value="Sofia" :selected="ticket.assignee === 'Sofia'">Sofia</option>
             </select>
-            <select :value="ticket.priority" :aria-label="`Priority for ${ticket.subject}`" @change="updatePriority(ticket.id, $event)">
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
+            <select :key="`${ticket.id}-priority-${ticket.priority}`" :value="ticket.priority" :aria-label="`Priority for ${ticket.subject}`" @change="updatePriority(ticket.id, $event)">
+              <option value="low" :selected="ticket.priority === 'low'">Low</option>
+              <option value="medium" :selected="ticket.priority === 'medium'">Medium</option>
+              <option value="high" :selected="ticket.priority === 'high'">High</option>
+              <option value="urgent" :selected="ticket.priority === 'urgent'">Urgent</option>
             </select>
           </div>
         </div>
@@ -100,15 +99,6 @@ function getInputValue(event: Event): string {
 .panel-heading {
   display: grid;
   gap: 8px;
-}
-
-.eyebrow {
-  margin: 0;
-  color: #e8be53;
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
 }
 
 h2,

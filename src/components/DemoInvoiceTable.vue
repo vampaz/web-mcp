@@ -2,8 +2,7 @@
   <section class="invoice-workspace" :class="density">
     <div class="workspace-header">
       <div>
-        <p class="eyebrow">Primary WebMCP surface</p>
-        <h2>Invoice operations</h2>
+        <h2>Invoices</h2>
       </div>
       <div class="workspace-summary">
         <strong>{{ selectedCount }} selected</strong>
@@ -196,15 +195,6 @@ function getInputValue(event: Event): string {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-}
-
-.eyebrow {
-  margin: 0 0 8px;
-  color: #e8be53;
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
 }
 
 h2 {
