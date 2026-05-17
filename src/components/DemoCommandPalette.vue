@@ -19,6 +19,9 @@
           {{ commandButtonLabel }}
         </button>
       </form>
+      <p class="visually-hidden" aria-live="polite" aria-atomic="true">
+        {{ commandStatusLabel }}
+      </p>
 
       <details class="palette-settings">
         <summary>
@@ -78,6 +81,7 @@ import type { PlannerModelOption } from '@/interfaces/demo'
 interface Props {
   cloudflareBindingModels: PlannerModelOption[]
   commandButtonLabel: string
+  commandStatusLabel: string
   isCommandRunning: boolean
   plannerModel: string
   plannerModelLabel: string
@@ -179,6 +183,11 @@ function getInputValue(event: Event): string {
   font: inherit;
 }
 
+.palette-input-shell:focus-within {
+  outline: 2px solid #e8be53;
+  outline-offset: 2px;
+}
+
 .palette-run {
   min-width: 112px;
   min-height: 42px;
@@ -190,9 +199,29 @@ function getInputValue(event: Event): string {
   white-space: nowrap;
 }
 
+.palette-run:focus-visible,
+.palette-settings summary:focus-visible,
+.palette-settings-row select:focus-visible,
+.palette-settings-row input:focus-visible {
+  outline: 2px solid #e8be53;
+  outline-offset: 2px;
+}
+
 .palette-run:disabled {
   cursor: progress;
   opacity: 0.78;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .palette-settings {

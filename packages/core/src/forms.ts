@@ -86,18 +86,36 @@ function fillForm(form: HTMLFormElement, input: FormInput): void {
 
     if (field instanceof RadioNodeList) {
       field.value = Array.isArray(value) ? value[0] ?? '' : String(value)
+      dispatchRadioGroupEvents(field)
       continue
     }
 
     if (field instanceof HTMLInputElement && field.type === 'checkbox') {
       field.checked = Boolean(value)
+      dispatchFieldEvents(field)
       continue
     }
 
     if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) {
       field.value = Array.isArray(value) ? value[0] ?? '' : String(value)
+      dispatchFieldEvents(field)
     }
   }
+}
+
+function dispatchRadioGroupEvents(field: RadioNodeList): void {
+  for (let index = 0; index < field.length; index += 1) {
+    const item = field.item(index)
+    if (item instanceof HTMLInputElement && item.checked) {
+      dispatchFieldEvents(item)
+      return
+    }
+  }
+}
+
+function dispatchFieldEvents(field: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement): void {
+  field.dispatchEvent(new Event('input', { bubbles: true }))
+  field.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
 function getFieldDescription(field: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement): string {

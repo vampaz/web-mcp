@@ -14,6 +14,10 @@ export function subscribeWebMCPKitEvents(listener: Listener): () => void {
 
 export function emitWebMCPKitEvent(event: WebMCPKitEvent): void {
   for (const listener of listeners) {
-    listener(event)
+    try {
+      listener(event)
+    } catch (error) {
+      console.error('WebMCP Kit event listener failed.', error)
+    }
   }
 }

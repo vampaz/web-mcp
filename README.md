@@ -156,7 +156,9 @@ Apps can install the test bridge in development or test builds:
 ```ts
 import { installWebMCPKitTestBridge } from '@webmcp-kit/core'
 
-installWebMCPKitTestBridge()
+if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
+  installWebMCPKitTestBridge()
+}
 ```
 
 Playwright tests can then inspect and invoke tools through the page:
@@ -171,6 +173,8 @@ await invokeWebMCPTool(page, {
   source: 'planner'
 })
 ```
+
+The test bridge does not accept caller-provided confirmation bypasses. Confirmed tools still go through the app confirmation handler or browser confirmation fallback.
 
 ## Local Demo
 

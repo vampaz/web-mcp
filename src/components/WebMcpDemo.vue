@@ -3,6 +3,7 @@
     <DemoCommandPalette
       :cloudflare-binding-models="cloudflareBindingModels"
       :command-button-label="commandButtonLabel"
+      :command-status-label="commandStatusLabel"
       :is-command-running="isCommandRunning"
       :planner-model="plannerModel"
       :planner-model-label="plannerModelLabel"
@@ -136,6 +137,7 @@ import {
 
 const showCloudflareBinding = import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIEW === 'true'
 const showDevtools = import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIEW === 'true'
+const shouldInstallTestBridge = import.meta.env.DEV || import.meta.env.MODE === 'test'
 const shouldDefaultToCloudflareBinding = showCloudflareBinding && import.meta.env.MODE !== 'test'
 const cloudflareBindingModels = getCloudflareBindingModels()
 const prompt = ref('Select all French items')
@@ -229,6 +231,14 @@ const commandButtonLabel = computed(function getCommandButtonLabel() {
   if (commandPhase.value === 'executing') return 'Running...'
   return 'Run'
 })
+const commandStatusLabel = computed(function getCommandStatusLabel() {
+  if (commandPhase.value === 'idle') return 'No command has run yet.'
+  if (commandPhase.value === 'preparing') return 'Preparing command.'
+  if (commandPhase.value === 'planning') return 'Planning command.'
+  if (commandPhase.value === 'executing') return `Running ${selectedToolName.value}.`
+  if (commandPhase.value === 'completed') return `${lastResult.value?.toolName ?? 'Command'} completed.`
+  return `${lastResult.value?.toolName ?? 'Command'} failed.`
+})
 
 const selectableItems = ref<SelectableItem[]>(getInitialSelectableItems())
 const invoices = ref<Invoice[]>(getInitialInvoices())
@@ -276,7 +286,9 @@ onMounted(async function handleMounted() {
   registerDemoTools()
   registerSupportFormTool()
   refreshTools()
-  unregisterCallbacks.push(installWebMCPKitTestBridge())
+  if (shouldInstallTestBridge) {
+    unregisterCallbacks.push(installWebMCPKitTestBridge())
+  }
   if (showDevtools && runtimeStatusPanel.value?.devtoolsHost) {
     devtoolsOverlay = mountDevtoolsOverlay({
       container: runtimeStatusPanel.value.devtoolsHost,

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
+import { setConfirmationHandler } from './confirmation'
 import { defineTool } from './define-tool'
 import { clearToolsForTest, registerTool } from './registry'
 import { installWebMCPKitTestBridge } from './test-bridge'
@@ -7,6 +8,7 @@ import { installWebMCPKitTestBridge } from './test-bridge'
 describe('test bridge', () => {
   beforeEach(() => {
     clearToolsForTest()
+    setConfirmationHandler(undefined)
     delete window.__webMCPKit
   })
 
@@ -53,5 +55,44 @@ describe('test bridge', () => {
 
     uninstall()
     expect(window.__webMCPKit).toBeUndefined()
+  })
+
+  it('does not let test callers bypass confirmation', async () => {
+    setConfirmationHandler(function rejectConfirmation() {
+      return false
+    })
+
+    registerTool(defineTool({
+      name: 'checkout_cart',
+      description: 'Checkout the current cart.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        required: [],
+        additionalProperties: false
+      },
+      confirmation: {
+        required: true,
+        reason: 'Checkout requires approval.'
+      },
+      execute() {
+        return {
+          ok: true
+        }
+      }
+    }))
+
+    installWebMCPKitTestBridge()
+
+    const result = await window.__webMCPKit?.invokeTool({
+      toolName: 'checkout_cart',
+      input: {},
+      confirmed: true
+    })
+
+    expect(result).toMatchObject({
+      status: 'blocked',
+      error: 'Checkout requires approval.'
+    })
   })
 })

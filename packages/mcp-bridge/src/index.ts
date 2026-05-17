@@ -31,7 +31,7 @@ export interface MCPBridgeResponse {
 
 export interface MCPBridge {
   listTools: () => MCPBridgeTool[]
-  callTool: (name: string, input: Record<string, unknown>, confirmed?: boolean) => Promise<ToolInvocationResult>
+  callTool: (name: string, input: Record<string, unknown>) => Promise<ToolInvocationResult>
   handleRequest: (request: MCPBridgeRequest) => Promise<MCPBridgeResponse>
 }
 
@@ -47,11 +47,10 @@ function listToolsForBridge(): MCPBridgeTool[] {
   return listTools().map(toBridgeTool)
 }
 
-async function callTool(name: string, input: Record<string, unknown>, confirmed = false): Promise<ToolInvocationResult> {
+async function callTool(name: string, input: Record<string, unknown>): Promise<ToolInvocationResult> {
   return invokeTool({
     toolName: name,
     input,
-    confirmed,
     source: 'fallback'
   })
 }
@@ -70,13 +69,12 @@ async function handleRequest(request: MCPBridgeRequest): Promise<MCPBridgeRespon
   if (request.method === 'tools/call') {
     const name = request.params?.name
     const input = request.params?.arguments ?? {}
-    const confirmed = request.params?.confirmed === true
 
     if (typeof name !== 'string' || !isRecord(input)) {
       return createErrorResponse(request, -32602, 'Expected params.name and params.arguments.')
     }
 
-    const result = await callTool(name, input, confirmed)
+    const result = await callTool(name, input)
 
     return {
       jsonrpc: '2.0',

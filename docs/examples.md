@@ -100,14 +100,15 @@ setConfirmationHandler(async function confirmTool(tool, input, reason) {
 import { expect, test } from '@playwright/test'
 import { invokeWebMCPTool, waitForWebMCPTool } from '@webmcp-kit/testing/playwright'
 
-test('checks out a cart through the WebMCP test bridge', async function testCheckout({ page }) {
-  await page.goto('/cart')
-  await waitForWebMCPTool(page, 'checkout_cart')
+test('selects items through the WebMCP test bridge', async function testSelectItems({ page }) {
+  await page.goto('/')
+  await waitForWebMCPTool(page, 'select_items')
 
   const result = await invokeWebMCPTool(page, {
-    toolName: 'checkout_cart',
-    input: {},
-    confirmed: true,
+    toolName: 'select_items',
+    input: {
+      ids: ['item_4', 'item_7']
+    },
     source: 'planner'
   })
 
@@ -115,4 +116,4 @@ test('checks out a cart through the WebMCP test bridge', async function testChec
 })
 ```
 
-Use `confirmed: true` only from trusted automation or bridge code that has already performed the approval step. Normal app flows should rely on `setConfirmationHandler()`.
+The test bridge does not let tests bypass confirmation by passing `confirmed: true`. Confirmed tools still use the app confirmation handler or the browser confirmation fallback.
