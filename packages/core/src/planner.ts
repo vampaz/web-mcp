@@ -6,6 +6,7 @@ import type {
   ToolPlanner,
   WebMCPTool
 } from './interfaces/tool'
+import { formatJsonValueValidationError, validateJsonValue } from './schema'
 
 interface LanguageModelSession {
   prompt: (message: string, options?: ChromeAIPromptOptions) => Promise<string>
@@ -331,7 +332,7 @@ async function planWithOpenAICompatible(
   const content = payload.choices?.[0]?.message?.content
   if (!content) throw new Error('provider returned no message content')
 
-  return JSON.parse(content) as ToolPlan
+  return parseToolPlanJson(content, getProviderLabel(config))
 }
 
 async function planWithCloudflareRest(
@@ -370,7 +371,7 @@ async function planWithCloudflareRest(
   const content = payload.result?.response
   if (!content) throw new Error('Cloudflare returned no response content')
 
-  return JSON.parse(content) as ToolPlan
+  return parseToolPlanJson(content, 'Cloudflare Workers AI')
 }
 
 function createPlannerMessages(message: string, tools: WebMCPTool[], context: PlannerContext) {
@@ -823,10 +824,26 @@ function disposeChromeAISession(session: LanguageModelSession | undefined): void
 
 function parseToolPlanJson(value: string, source: string): ToolPlan {
   try {
-    return JSON.parse(value) as ToolPlan
+    return JSON.parse(normalizeJsonText(value)) as ToolPlan
   } catch {
     throw new Error(`${source} returned unparseable JSON`)
   }
+}
+
+function normalizeJsonText(value: string): string {
+  const trimmedValue = value.trim()
+  if (!trimmedValue) throw new Error('empty JSON')
+
+  const fencedMatch = trimmedValue.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
+  if (fencedMatch?.[1]) return fencedMatch[1].trim()
+
+  const firstBraceIndex = trimmedValue.indexOf('{')
+  const lastBraceIndex = trimmedValue.lastIndexOf('}')
+  if (firstBraceIndex !== -1 && lastBraceIndex > firstBraceIndex) {
+    return trimmedValue.slice(firstBraceIndex, lastBraceIndex + 1)
+  }
+
+  return trimmedValue
 }
 
 function createUnavailableChromePlanner(detail: string, strict = false): ToolPlanner {
@@ -848,7 +865,13 @@ function validateRemotePlan(plan: ToolPlan, tools: WebMCPTool[]): void {
   if (!plan.input || typeof plan.input !== 'object' || Array.isArray(plan.input)) throw new Error('provider returned a plan with invalid input')
   if (typeof plan.confidence !== 'number') throw new Error('provider returned a plan without numeric confidence')
   if (typeof plan.reason !== 'string') throw new Error('provider returned a plan without reason')
-  if (!tools.some((tool) => tool.name === plan.toolName)) throw new Error(`provider selected unknown tool "${plan.toolName}"`)
+  const selectedTool = tools.find((tool) => tool.name === plan.toolName)
+  if (!selectedTool) throw new Error(`provider selected unknown tool "${plan.toolName}"`)
+
+  const inputValidationErrors = validateJsonValue(plan.input, selectedTool.inputSchema)
+  if (inputValidationErrors.length > 0) {
+    throw new Error(`provider returned invalid input for "${plan.toolName}": ${formatJsonValueValidationError(inputValidationErrors)}`)
+  }
 }
 
 function getPlannerApiKey(provider: PlannerProviderConfig['provider'], auth: PlannerAuth): string | undefined {

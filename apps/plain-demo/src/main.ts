@@ -23,6 +23,7 @@ const supportStatus = document.querySelector<HTMLElement>('[data-support-status]
 const productList = document.querySelector<HTMLUListElement>('[data-products]')
 const cartList = document.querySelector<HTMLUListElement>('[data-cart]')
 const searchForm = document.querySelector<HTMLFormElement>('[data-search-form]')
+const env = (import.meta as ImportMeta & { env?: { DEV?: boolean, MODE?: string } }).env
 
 if (supportStatus) {
   supportStatus.textContent = getSupportLabel()
@@ -83,7 +84,9 @@ registerTool(defineTool({
   }
 }))
 
-installWebMCPKitTestBridge()
+if (env?.DEV || env?.MODE === 'test') {
+  installWebMCPKitTestBridge()
+}
 mountDevtoolsOverlay({ initiallyOpen: true })
 
 searchForm?.addEventListener('submit', function handleSubmit(event) {

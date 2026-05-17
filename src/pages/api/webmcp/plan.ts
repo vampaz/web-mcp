@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro'
+import { formatJsonValueValidationError, type JsonSchema, validateJsonValue } from '@webmcp-kit/core'
 
 import type { CloudflareEnv } from '@/interfaces/cloudflare'
 
@@ -29,7 +30,7 @@ type PlannerRequestBody = {
   tools?: Array<{
     name?: string
     description?: string
-    inputSchema?: unknown
+    inputSchema?: JsonSchema
   }>
   context?: unknown
 }
@@ -52,11 +53,15 @@ const allowedCloudflareModels = new Set([
   '@cf/meta/llama-3.1-8b-instruct',
   '@cf/qwen/qwq-32b'
 ])
+const maxPlannerRequestBytes = 128 * 1024
 
 export const prerender = false
 
 export const POST: APIRoute = async function planWithServerProvider({ request, locals }) {
-  const body = await readPlannerRequest(request)
+  const requestBody = await readPlannerRequest(request)
+  if ('error' in requestBody) return json({ error: requestBody.error }, requestBody.status)
+
+  const body = requestBody.body
   if (!body.model || !allowedCloudflareModels.has(body.model)) return json({ error: 'Unsupported Cloudflare model' }, 400)
   if (!body.message || !Array.isArray(body.tools)) return json({ error: 'Invalid planner request' }, 400)
   const env = await getCloudflareEnv(locals)
@@ -70,7 +75,7 @@ export const POST: APIRoute = async function planWithServerProvider({ request, l
       return json(await planWithCloudflareRest(body, env))
     }
   } catch (error) {
-    return json({ error: getErrorMessage(error) }, 502)
+    return json({ error: getPublicErrorMessage(error) }, 502)
   }
 
   return json({ error: 'Unsupported server planner provider' }, 400)
@@ -126,11 +131,35 @@ async function planWithCloudflareRest(body: PlannerRequestBody, env: CloudflareE
   return parseAndValidatePlan(payload.result?.response?.trim(), body.tools)
 }
 
-async function readPlannerRequest(request: Request): Promise<PlannerRequestBody> {
+type PlannerRequestReadResult =
+  | { body: PlannerRequestBody, error?: never, status?: never }
+  | { body?: never, error: string, status: number }
+
+async function readPlannerRequest(request: Request): Promise<PlannerRequestReadResult> {
+  const contentLength = Number(request.headers.get('content-length') ?? 0)
+  if (contentLength > maxPlannerRequestBytes) {
+    return {
+      error: 'Planner request is too large.',
+      status: 413
+    }
+  }
+
   try {
-    return await request.json() as PlannerRequestBody
+    const text = await request.text()
+    if (text.length > maxPlannerRequestBytes) {
+      return {
+        error: 'Planner request is too large.',
+        status: 413
+      }
+    }
+
+    return {
+      body: JSON.parse(text) as PlannerRequestBody
+    }
   } catch {
-    return {}
+    return {
+      body: {}
+    }
   }
 }
 
@@ -199,10 +228,18 @@ function validatePlan(plan: ToolPlan, tools: PlannerRequestBody['tools']): void 
   if (!plan.input || typeof plan.input !== 'object' || Array.isArray(plan.input)) throw new Error('Invalid input')
   if (typeof plan.confidence !== 'number') throw new Error('Invalid confidence')
   if (typeof plan.reason !== 'string') throw new Error('Invalid reason')
-  if (!tools?.some(function hasSelectedTool(tool) {
+  const selectedTool = tools?.find(function hasSelectedTool(tool) {
     return tool.name === plan.toolName
-  })) {
+  })
+  if (!selectedTool) {
     throw new Error('Unknown tool')
+  }
+
+  if (!selectedTool.inputSchema) throw new Error('Selected tool has no input schema')
+
+  const inputValidationErrors = validateJsonValue(plan.input, selectedTool.inputSchema)
+  if (inputValidationErrors.length > 0) {
+    throw new Error(`Invalid tool input: ${formatJsonValueValidationError(inputValidationErrors)}`)
   }
 }
 
@@ -236,13 +273,15 @@ function getJsonHeaders(): HeadersInit {
   }
 }
 
-function getErrorMessage(error: unknown): string {
+function getPublicErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     if (error.message.includes('Binding AI needs to be run remotely')) {
       return 'Cloudflare AI binding is not connected to remote Workers AI in this dev session.'
     }
 
-    return error.message
+    if (error.message.includes('CLOUDFLARE_ACCOUNT_ID') || error.message.includes('CLOUDFLARE_API_TOKEN')) {
+      return 'Cloudflare Workers AI server mode needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN on the server, or a custom planner endpoint.'
+    }
   }
   return 'Server planner failed'
 }

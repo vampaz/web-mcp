@@ -116,7 +116,7 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 | **User-key visibility** | ✅ Clearly documented. The demo sidebar warns: "the key is visible to this browser page." The PRD and planner docs repeat this. |
 | **Server mode for secrets** | ✅ App-owned keys use server endpoints. The `plan.ts` endpoint never exposes secrets to the browser. |
 | **Input validation** | ✅ `defineTool` validates schemas at registration. `invokeTool` passes raw input to handlers; handlers are responsible for their own validation. This is documented in the security guide. |
-| **Confirmation enforcement** | ✅ `invokeTool` blocks actions without confirmation. The devtools overlay uses `window.confirm()`. MCP bridge requires explicit `confirmed: true` param. |
+| **Confirmation enforcement** | ✅ `invokeTool` blocks actions without confirmation. The devtools overlay uses `window.confirm()`. MCP/test bridge callers cannot bypass confirmation with request params. |
 | **Guard execution** | ✅ Guards run after scope/confirmation checks and before execution. Both `false` and string (reason) returns are handled. |
 | **Event data** | ✅ Events include tool name and timestamp but no input/output by default. `detail` contains invocation data but is only visible through the subscription API, not transmitted. |
 | **Devtools secrets** | ✅ Invocation history shows input/output in the DOM, which is appropriate for a dev tool. Not exposed in production builds. |

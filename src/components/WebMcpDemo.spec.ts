@@ -39,6 +39,7 @@ describe('WebMcpDemo', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('5 selected')
+    expect(wrapper.find('[aria-live="polite"]').text()).toBe('select_items completed.')
     expect(wrapper.text()).toContain('Croissant')
     expect(wrapper.text()).toContain('Pain au chocolat')
     expect(window.confirm).not.toHaveBeenCalled()

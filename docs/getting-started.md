@@ -68,7 +68,9 @@ devtools.destroy()
 ```ts
 import { installWebMCPKitTestBridge } from '@webmcp-kit/core'
 
-installWebMCPKitTestBridge()
+if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
+  installWebMCPKitTestBridge()
+}
 ```
 
 Playwright tests can then import helpers from `@webmcp-kit/testing/playwright`.

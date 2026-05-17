@@ -41,7 +41,10 @@ export function installWebMCPKitTestBridge(target: Window = window): () => void 
       return createToolSummaries()
     },
     invokeTool(invocation) {
-      return invokeTool(invocation)
+      return invokeTool({
+        ...invocation,
+        confirmed: false
+      })
     }
   }
 

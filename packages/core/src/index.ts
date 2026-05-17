@@ -38,7 +38,7 @@ export {
   createRemotePlanner
 } from './planner'
 export { clearToolsForTest, getRegistrySnapshot, getTool, invokeTool, listTools, registerTool } from './registry'
-export { validateJsonSchema } from './schema'
+export { formatJsonValueValidationError, validateJsonSchema, validateJsonValue } from './schema'
 export { getSupportLabel, isWebMCPSupported } from './support'
 export {
   installWebMCPKitTestBridge,

@@ -101,6 +101,71 @@ describe('/api/webmcp/plan', () => {
       error: 'Cloudflare AI binding is not connected to remote Workers AI in this dev session.'
     })
   })
+
+  it('rejects oversized planner requests before calling Cloudflare', async () => {
+    const run = vi.fn()
+    env.AI = {
+      run
+    } as unknown as typeof env.AI
+
+    const response = await POST(createContext({
+      provider: 'cloudflare-binding',
+      model: '@cf/google/gemma-4-26b-a4b-it',
+      message: 'x'.repeat(140 * 1024),
+      tools: [],
+      context: {}
+    }))
+
+    expect(response.status).toBe(413)
+    expect(await response.json()).toEqual({
+      error: 'Planner request is too large.'
+    })
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  it('rejects plans whose input does not match the selected tool schema', async () => {
+    env.AI = {
+      run: vi.fn(async () => ({
+        response: JSON.stringify({
+          toolName: 'select_items',
+          input: {},
+          confidence: 0.89,
+          reason: 'Selected liquids.'
+        })
+      }))
+    } as unknown as typeof env.AI
+
+    const response = await POST(createContext({
+      provider: 'cloudflare-binding',
+      model: '@cf/google/gemma-4-26b-a4b-it',
+      message: 'Select all items with water',
+      tools: [
+        {
+          name: 'select_items',
+          description: 'Select checklist items.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              ids: {
+                type: 'array',
+                items: {
+                  type: 'string'
+                }
+              }
+            },
+            required: ['ids'],
+            additionalProperties: false
+          }
+        }
+      ],
+      context: {}
+    }))
+
+    expect(response.status).toBe(502)
+    expect(await response.json()).toEqual({
+      error: 'Server planner failed'
+    })
+  })
 })
 
 function createContext(body: unknown) {

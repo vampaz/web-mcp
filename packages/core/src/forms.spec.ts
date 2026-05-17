@@ -149,4 +149,58 @@ describe('form helpers', () => {
     expect(priority).toBeInstanceOf(RadioNodeList)
     expect((priority as RadioNodeList).value).toBe('high')
   })
+
+  it('dispatches input and change events when filling fields', async () => {
+    const events: string[] = []
+    document.body.innerHTML = `
+      <form>
+        <input name="subject" />
+        <textarea name="body"></textarea>
+        <input name="accepted" type="checkbox" />
+        <label>Low <input name="priority" type="radio" value="low" /></label>
+        <label>High <input name="priority" type="radio" value="high" /></label>
+      </form>
+    `
+
+    const form = document.querySelector('form')
+    if (!form) throw new Error('Expected test form.')
+
+    form.addEventListener('input', function handleInput(event) {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+        events.push(`input:${event.target.name}`)
+      }
+    })
+    form.addEventListener('change', function handleChange(event) {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+        events.push(`change:${event.target.name}`)
+      }
+    })
+
+    registerFormTool({
+      form,
+      name: 'update_support_ticket',
+      description: 'Update the support ticket form fields.'
+    })
+
+    await invokeTool({
+      toolName: 'update_support_ticket',
+      input: {
+        subject: 'Billing',
+        body: 'Cannot access invoices.',
+        accepted: true,
+        priority: 'high'
+      }
+    })
+
+    expect(events).toEqual([
+      'input:subject',
+      'change:subject',
+      'input:body',
+      'change:body',
+      'input:accepted',
+      'change:accepted',
+      'input:priority',
+      'change:priority'
+    ])
+  })
 })

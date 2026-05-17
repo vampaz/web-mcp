@@ -151,10 +151,10 @@ describe('local MCP bridge', () => {
         content: [
           {
             type: 'text',
-            text: JSON.stringify({ ok: true })
+            text: JSON.stringify('Checkout clears the cart.')
           }
         ],
-        isError: false
+        isError: true
       }
     })
   })

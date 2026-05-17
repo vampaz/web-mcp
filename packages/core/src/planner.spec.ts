@@ -435,12 +435,12 @@ describe('planner', () => {
       choices: [
         {
           message: {
-            content: JSON.stringify({
+            content: `Here is the plan:\n\n\`\`\`json\n${JSON.stringify({
               toolName: 'select_items',
               input: { ids: ['item_4', 'item_7'] },
               confidence: 0.92,
               reason: 'OpenRouter selected French foods.'
-            })
+            })}\n\`\`\``
           }
         }
       ]
@@ -475,6 +475,45 @@ describe('planner', () => {
         Authorization: 'Bearer test-key'
       })
     }))
+  })
+
+  it('rejects remote planner input that does not match the selected tool schema', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      toolName: 'select_items',
+      input: {},
+      confidence: 0.88,
+      reason: 'Server planner selected the tool but omitted input.'
+    })))
+
+    const planner = await createConfiguredPlanner({
+      provider: 'cloudflare-binding',
+      model: '@cf/qwen/qwq-32b',
+      auth: {
+        mode: 'server',
+        endpoint: '/api/webmcp/plan'
+      }
+    })
+
+    await expect(planner.plan('Select all liquids', [
+      {
+        name: 'select_items',
+        description: 'Select checklist items by ID.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            ids: {
+              type: 'array',
+              items: {
+                type: 'string'
+              }
+            }
+          },
+          required: ['ids'],
+          additionalProperties: false
+        },
+        execute: () => []
+      }
+    ])).rejects.toThrow('provider returned invalid input')
   })
 
   it('plans through a server endpoint without browser secrets', async () => {
