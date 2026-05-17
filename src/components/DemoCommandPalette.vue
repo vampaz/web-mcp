@@ -10,12 +10,12 @@
             aria-label="Natural language command"
             autocomplete="off"
             spellcheck="false"
-            placeholder="Tell the page what to do..."
+            placeholder="Try: Select all French items"
             @input="updatePrompt"
           />
         </label>
 
-        <button class="palette-run" type="submit" :disabled="isCommandRunning" :aria-busy="isCommandRunning">
+        <button class="palette-run" type="submit" :disabled="isCommandRunning || !prompt.trim()" :aria-busy="isCommandRunning">
           {{ commandButtonLabel }}
         </button>
       </form>

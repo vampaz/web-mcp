@@ -140,7 +140,7 @@ const showDevtools = import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIE
 const shouldInstallTestBridge = import.meta.env.DEV || import.meta.env.MODE === 'test'
 const shouldDefaultToCloudflareBinding = showCloudflareBinding && import.meta.env.MODE !== 'test'
 const cloudflareBindingModels = getCloudflareBindingModels()
-const prompt = ref('Select all French items')
+const prompt = ref('')
 const plannerName = ref('Loading')
 const plannerDetail = ref(shouldDefaultToCloudflareBinding ? 'Using the Cloudflare AI binding planner endpoint.' : 'Checking Chrome built-in AI availability.')
 const plannerProvider = ref<PlannerProviderKind>(shouldDefaultToCloudflareBinding ? 'cloudflare-binding' : 'auto')
@@ -956,7 +956,7 @@ function updateTicketPriority(id: string, priority: SupportTicket['priority']) {
 }
 
 async function runPrompt() {
-  if (isCommandRunning.value) return
+  if (isCommandRunning.value || !prompt.value.trim()) return
 
   commandPhase.value = 'preparing'
   lastPlan.value = null

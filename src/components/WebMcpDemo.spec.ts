@@ -28,13 +28,19 @@ describe('WebMcpDemo', () => {
     document.body.innerHTML = ''
   })
 
-  it('starts with a semantic inventory selection command', async () => {
+  it('starts with an empty command input and placeholder example', async () => {
     const wrapper = mountWithDeps(WebMcpDemo)
     await flushPromises()
 
     expect(wrapper.text()).toContain('Inventory')
     expect(wrapper.text()).toContain('Invoices')
 
+    const commandInput = wrapper.find('input[aria-label="Natural language command"]')
+    expect(commandInput.element).toHaveProperty('value', '')
+    expect(commandInput.attributes('placeholder')).toBe('Try: Select all French items')
+    expect(wrapper.find('.palette-run').attributes()).toHaveProperty('disabled')
+
+    await commandInput.setValue('Select all French items')
     await wrapper.find('.palette-command').trigger('submit')
     await flushPromises()
 
