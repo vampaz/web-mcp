@@ -28,12 +28,20 @@ export async function requestToolConfirmation(
   const reason = tool.confirmation?.reason ?? 'Confirm this action?'
 
   if (confirmationHandler) {
-    return confirmationHandler(tool, input, reason)
+    try {
+      return await confirmationHandler(tool, input, reason)
+    } catch (error) {
+      throw new Error(`Confirmation handler failed: ${getErrorMessage(error)}`)
+    }
   }
 
   if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
     warnAboutWindowConfirmFallback()
-    return window.confirm(reason)
+    try {
+      return window.confirm(reason)
+    } catch (error) {
+      throw new Error(`Confirmation handler failed: ${getErrorMessage(error)}`)
+    }
   }
 
   return false
@@ -50,4 +58,8 @@ function isProduction(): boolean {
   const runtime = globalThis as { process?: { env?: { NODE_ENV?: string } } }
 
   return runtime.process?.env?.NODE_ENV === 'production'
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'unknown error'
 }

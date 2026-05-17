@@ -27,7 +27,7 @@ describe('/api/webmcp/plan', () => {
     const response = await POST(createContext({
       provider: 'cloudflare-binding',
       model: '@cf/google/gemma-4-26b-a4b-it',
-      message: 'Select all liquids from the list',
+      message: 'Select all items with water',
       tools: [
         {
           name: 'select_items',
@@ -58,7 +58,7 @@ describe('/api/webmcp/plan', () => {
     const response = await POST(createContext({
       provider: 'cloudflare-workers-ai',
       model: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
-      message: 'Select all liquids from the list',
+      message: 'Select all items with water',
       tools: [
         {
           name: 'select_items',
@@ -85,7 +85,7 @@ describe('/api/webmcp/plan', () => {
     const response = await POST(createContext({
       provider: 'cloudflare-binding',
       model: '@cf/google/gemma-4-26b-a4b-it',
-      message: 'Select all liquids from the list',
+      message: 'Select all items with water',
       tools: [
         {
           name: 'select_items',
@@ -98,7 +98,7 @@ describe('/api/webmcp/plan', () => {
 
     expect(response.status).toBe(502)
     expect(await response.json()).toEqual({
-      error: 'Cloudflare AI binding is running in local stub mode. Restart dev with `npm run dev:cf` so the Astro Cloudflare adapter enables remote bindings, or use a Cloudflare preview deployment.'
+      error: 'Cloudflare AI binding is not connected to remote Workers AI in this dev session.'
     })
   })
 })

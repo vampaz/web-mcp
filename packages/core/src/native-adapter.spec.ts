@@ -260,4 +260,41 @@ describe('native WebMCP adapter', () => {
     )
     expect(execute).toHaveBeenCalledWith({ invoiceId: 'inv_1' }, { source: 'native' })
   })
+
+  it('normalizes confirmation handler failures before native execution', async () => {
+    let nativeExecute: ((input: Record<string, unknown>) => unknown) | undefined
+    const execute = vi.fn(function voidInvoice(input: Record<string, unknown>) {
+      return input
+    })
+
+    setConfirmationHandler(async function failConfirmation() {
+      throw new Error('modal crashed')
+    })
+    ;(navigator as NavigatorWithModelContext).modelContext = {
+      registerTool: vi.fn(function registerNativeToolMock(nativeTool) {
+        nativeExecute = nativeTool.execute
+        return undefined
+      })
+    }
+
+    registerTool(defineTool({
+      name: 'void_invoice',
+      description: 'Void an existing invoice after the user has reviewed the pending action.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          invoiceId: { type: 'string' }
+        },
+        required: ['invoiceId']
+      },
+      confirmation: {
+        required: true,
+        reason: 'Voiding an invoice cannot be undone in this demo.'
+      },
+      execute
+    }))
+
+    await expect(nativeExecute?.({ invoiceId: 'inv_1' })).rejects.toThrow('Confirmation handler failed: modal crashed')
+    expect(execute).not.toHaveBeenCalled()
+  })
 })

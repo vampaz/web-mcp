@@ -3,28 +3,25 @@ import { invokeWebMCPTool, listWebMCPTools, waitForWebMCPTool } from '@webmcp-ki
 
 type LanguageModelAvailability = 'available' | 'downloadable' | 'downloading' | 'unavailable'
 
-test('uses Chrome AI context to select semantic checklist items', async function testSemanticChecklistSelection({ page }) {
+test('uses Chrome AI context to select semantic inventory items and open records', async function testSemanticInventorySelection({ page }) {
   await installLanguageModelMock(page, 'downloadable')
   await page.goto('/')
-  await page.waitForSelector('text=Ten-item checklist')
+  await expect(page.getByRole('heading', { name: 'Inventory' })).toBeVisible()
+  await selectPlannerProvider(page, 'chrome-built-in')
 
-  await expect(page.getByText('Chrome built-in AI (downloadable)')).toBeVisible()
+  await page.getByLabel('Natural language command').fill('Select all French items')
+  await page.getByRole('button', { name: 'Run' }).click()
 
-  await page.getByLabel('Natural language command').fill('Select all the items that are French food.')
-  await page.getByRole('button', { name: 'Run command' }).click()
+  await expect(page.getByText('5 selected')).toBeVisible()
+  await expect(getItemInput(page, 'Croissant')).toBeChecked()
+  await expect(getItemInput(page, 'Baguette')).toBeChecked()
+  await expect(getItemInput(page, 'Pain au chocolat')).toBeChecked()
+  await expect(getItemInput(page, 'Apple')).not.toBeChecked()
 
-  await expect(page.getByText('2 selected')).toBeVisible()
-  await expect(getChecklistInput(page, '4. Croissant')).toBeChecked()
-  await expect(getChecklistInput(page, '7. Baguette')).toBeChecked()
-  await expect(getChecklistInput(page, '3. Carrot')).not.toBeChecked()
+  await page.getByLabel('Natural language command').fill('Open the Stark invoice')
+  await page.getByRole('button', { name: 'Run' }).click()
 
-  await page.getByLabel('Natural language command').fill('Select all the ones that are roots')
-  await page.getByRole('button', { name: 'Run command' }).click()
-
-  await expect(page.getByText('2 selected')).toBeVisible()
-  await expect(getChecklistInput(page, '3. Carrot')).toBeChecked()
-  await expect(getChecklistInput(page, '9. Beetroot')).toBeChecked()
-  await expect(getChecklistInput(page, '4. Croissant')).not.toBeChecked()
+  await expect(page.locator('.active-record strong').filter({ hasText: 'Stark Industries' })).toBeVisible()
 
   const promptMessages = await page.evaluate(function getPromptMessages() {
     return (window as Window & { __webMCPPromptMessages?: string[] }).__webMCPPromptMessages ?? []
@@ -32,40 +29,37 @@ test('uses Chrome AI context to select semantic checklist items', async function
 
   expect(promptMessages[0]).toContain('Current app context')
   expect(promptMessages[0]).toContain('Croissant')
-  expect(promptMessages[0]).toContain('Baguette')
+  expect(promptMessages[0]).toContain('Pain au chocolat')
 })
 
-test('does not turn semantic checklist selection into product search when AI is unavailable', async function testFallbackSemanticSelection({ page }) {
+test('uses the local planner for semantic item selections when AI is unavailable', async function testFallbackItemSelection({ page }) {
   await installUnavailableLanguageModelMock(page)
   await page.goto('/')
-  await page.waitForSelector('text=Ten-item checklist')
+  await expect(page.getByRole('heading', { name: 'Inventory' })).toBeVisible()
+  await selectPlannerProvider(page, 'local')
 
-  await expect(page.getByText('Local heuristic planner (fallback)')).toBeVisible()
+  await page.getByLabel('Natural language command').fill('Select all liquids')
+  await page.getByRole('button', { name: 'Run' }).click()
 
-  await page.getByLabel('Natural language command').fill('Select all the items that are French food.')
-  await page.getByRole('button', { name: 'Run command' }).click()
-
-  await expect(page.getByText('Selected tool')).toBeVisible()
-  await expect(page.locator('.plan-card strong').filter({ hasText: 'select_items' })).toBeVisible()
-  await expect(page.getByText('Fallback planner cannot infer semantic checklist selection')).toBeVisible()
-  await expect(page.getByText('Products searched')).not.toBeVisible()
-  await expect(getChecklistInput(page, '4. Croissant')).not.toBeChecked()
-  await expect(getChecklistInput(page, '7. Baguette')).not.toBeChecked()
+  await expect(page.getByText('5 selected')).toBeVisible()
+  await expect(getItemInput(page, 'Water')).toBeChecked()
+  await expect(getItemInput(page, 'Coffee')).toBeChecked()
+  await expect(getItemInput(page, 'Milk')).toBeChecked()
+  await expect(getItemInput(page, 'Apple')).not.toBeChecked()
 })
 
 test('rechecks Chrome AI before running a command if the page mounted with fallback', async function testPlannerRefresh({ page }) {
   await page.goto('/')
-  await page.waitForSelector('text=Ten-item checklist')
+  await expect(page.getByRole('heading', { name: 'Inventory' })).toBeVisible()
+  await selectPlannerProvider(page, 'auto')
 
-  await expect(page.getByText('Local heuristic planner (fallback)')).toBeVisible()
   await installLanguageModelInPage(page, 'available')
 
-  await page.getByLabel('Natural language command').fill('Select all the items that are French food.')
-  await page.getByRole('button', { name: 'Run command' }).click()
+  await page.getByLabel('Natural language command').fill('Select all fruits')
+  await page.getByRole('button', { name: 'Run' }).click()
 
-  await expect(page.locator('.status-strip strong').filter({ hasText: 'Chrome built-in AI (ready)' })).toBeVisible()
-  await expect(getChecklistInput(page, '4. Croissant')).toBeChecked()
-  await expect(getChecklistInput(page, '7. Baguette')).toBeChecked()
+  await expect(getItemInput(page, 'Apple')).toBeChecked()
+  await expect(getItemInput(page, 'Grapefruit')).toBeChecked()
 })
 
 test('exposes registered tools through Playwright helpers', async function testPlaywrightHelpers({ page }) {
@@ -87,11 +81,14 @@ test('exposes registered tools through Playwright helpers', async function testP
   })
 
   expect(result.status).toBe('success')
-  await expect(getChecklistInput(page, '4. Croissant')).toBeChecked()
-  await expect(getChecklistInput(page, '7. Baguette')).toBeChecked()
+  await expect(getItemInput(page, 'Croissant')).toBeChecked()
+  await expect(getItemInput(page, 'Baguette')).toBeChecked()
 })
 
 test('plans through a selected user-key provider', async function testUserKeyProviderSelection({ page }) {
+  await page.addInitScript(function storePlannerKey() {
+    localStorage.setItem('webmcp-kit:openrouter:api-key', 'local-user-key')
+  })
   await page.route('https://openrouter.ai/api/v1/chat/completions', async function fulfillOpenRouter(route, request) {
     expect(request.headers().authorization).toBe('Bearer local-user-key')
     await route.fulfill({
@@ -102,9 +99,9 @@ test('plans through a selected user-key provider', async function testUserKeyPro
             message: {
               content: JSON.stringify({
                 toolName: 'select_items',
-                input: { ids: ['item_4', 'item_7'] },
+                input: { ids: ['item_4', 'item_7', 'item_13', 'item_18', 'item_22'] },
                 confidence: 0.94,
-                reason: 'OpenRouter selected French foods from current checklist context.'
+                reason: 'OpenRouter selected French items from current inventory context.'
               })
             }
           }
@@ -114,16 +111,14 @@ test('plans through a selected user-key provider', async function testUserKeyPro
   })
 
   await page.goto('/')
-  await page.waitForSelector('text=Ten-item checklist')
+  await expect(page.getByRole('heading', { name: 'Inventory' })).toBeVisible()
+  await selectPlannerProvider(page, 'openrouter')
 
-  await page.getByLabel('Provider').selectOption('openrouter')
-  await page.getByLabel('User API key').fill('local-user-key')
-  await page.getByLabel('Natural language command').fill('Select all the items that are French food.')
-  await page.getByRole('button', { name: 'Run command' }).click()
+  await page.getByLabel('Natural language command').fill('Select all French items')
+  await page.getByRole('button', { name: 'Run' }).click()
 
-  await expect(page.locator('.status-strip strong').filter({ hasText: 'OpenRouter (ready)' })).toBeVisible()
-  await expect(getChecklistInput(page, '4. Croissant')).toBeChecked()
-  await expect(getChecklistInput(page, '7. Baguette')).toBeChecked()
+  await expect(getItemInput(page, 'Croissant')).toBeChecked()
+  await expect(getItemInput(page, 'Quiche')).toBeChecked()
 })
 
 test('plans through the dev Cloudflare binding provider', async function testCloudflareBindingProviderSelection({ page }) {
@@ -131,129 +126,45 @@ test('plans through the dev Cloudflare binding provider', async function testClo
     expect(request.postDataJSON()).toMatchObject({
       provider: 'cloudflare-binding',
       model: '@cf/qwen/qwq-32b',
-      message: 'Select all the ones that are roots'
+      message: 'Select all French items'
     })
 
     await route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({
         toolName: 'select_items',
-        input: { ids: ['item_3', 'item_9'] },
+        input: { ids: ['item_4', 'item_7', 'item_13', 'item_18', 'item_22'] },
         confidence: 0.92,
-        reason: 'Cloudflare binding selected roots from current checklist context.'
+        reason: 'Cloudflare binding selected French items from current inventory context.'
       })
     })
   })
 
   await page.goto('/')
-  await page.waitForSelector('text=Ten-item checklist')
+  await expect(page.getByRole('heading', { name: 'Inventory' })).toBeVisible()
+  await selectPlannerProvider(page, 'cloudflare-binding')
+  await page.getByLabel('Model').selectOption('@cf/qwen/qwq-32b')
+  await page.getByLabel('Natural language command').fill('Select all French items')
+  await page.getByRole('button', { name: 'Run' }).click()
 
-  await page.getByLabel('Provider').selectOption('cloudflare-binding')
-  await page.getByLabel('Binding model').selectOption('@cf/qwen/qwq-32b')
-  await page.getByLabel('Natural language command').fill('Select all the ones that are roots')
-  await page.getByRole('button', { name: 'Run command' }).click()
-
-  await expect(page.locator('.status-strip strong').filter({ hasText: 'Cloudflare binding (ready)' })).toBeVisible()
-  await expect(getChecklistInput(page, '3. Carrot')).toBeChecked()
-  await expect(getChecklistInput(page, '9. Beetroot')).toBeChecked()
+  await expect(getItemInput(page, 'Croissant')).toBeChecked()
+  await expect(getItemInput(page, 'Quiche')).toBeChecked()
 })
 
 async function installLanguageModelMock(page: Page, availability: LanguageModelAvailability) {
-  await page.addInitScript(function mockLanguageModel(mockAvailability) {
-    const browserWindow = window as Window & {
-      LanguageModel?: unknown
-      __webMCPPromptMessages?: string[]
-    }
-
-    browserWindow.__webMCPPromptMessages = []
-    browserWindow.LanguageModel = {
-      availability: async function getAvailability() {
-        return mockAvailability
-      },
-      create: async function createSession() {
-        return {
-          prompt: async function planFromPrompt(message: string) {
-            browserWindow.__webMCPPromptMessages?.push(message)
-            const request = message.match(/User request: ([\s\S]*?)\n\nCurrent app context/)?.[1] ?? message
-
-            if (request.includes('French')) {
-              return JSON.stringify({
-                toolName: 'select_items',
-                input: { ids: ['item_4', 'item_7'] },
-                confidence: 0.94,
-                reason: 'Selected French foods from current checklist context.'
-              })
-            }
-
-            if (request.includes('roots')) {
-              return JSON.stringify({
-                toolName: 'select_items',
-                input: { ids: ['item_3', 'item_9'] },
-                confidence: 0.91,
-                reason: 'Selected root foods from current checklist context.'
-              })
-            }
-
-            return JSON.stringify({
-              toolName: 'search_products',
-              input: { query: 'dock' },
-              confidence: 0.6,
-              reason: 'Default mock response.'
-            })
-          }
-        }
-      }
-    }
-  }, availability)
+  await page.addInitScript({
+    content: `(${installLanguageModel.toString()})(window, ${JSON.stringify(availability)})`
+  })
 }
 
 async function installLanguageModelInPage(page: Page, availability: LanguageModelAvailability) {
-  await page.evaluate(function mockLanguageModel(mockAvailability) {
-    const browserWindow = window as Window & {
-      LanguageModel?: unknown
-      __webMCPPromptMessages?: string[]
-    }
-
-    browserWindow.__webMCPPromptMessages = []
-    browserWindow.LanguageModel = {
-      availability: async function getAvailability() {
-        return mockAvailability
-      },
-      create: async function createSession() {
-        return {
-          prompt: async function planFromPrompt(message: string) {
-            browserWindow.__webMCPPromptMessages?.push(message)
-            const request = message.match(/User request: ([\s\S]*?)\n\nCurrent app context/)?.[1] ?? message
-
-            if (request.includes('French')) {
-              return JSON.stringify({
-                toolName: 'select_items',
-                input: { ids: ['item_4', 'item_7'] },
-                confidence: 0.94,
-                reason: 'Selected French foods from current checklist context.'
-              })
-            }
-
-            if (request.includes('roots')) {
-              return JSON.stringify({
-                toolName: 'select_items',
-                input: { ids: ['item_3', 'item_9'] },
-                confidence: 0.91,
-                reason: 'Selected root foods from current checklist context.'
-              })
-            }
-
-            return JSON.stringify({
-              toolName: 'search_products',
-              input: { query: 'dock' },
-              confidence: 0.6,
-              reason: 'Default mock response.'
-            })
-          }
-        }
-      }
-    }
-  }, availability)
+  await page.evaluate(function mockLanguageModel(options) {
+    const install = new Function(`return (${options.source})`)() as (targetWindow: Window, mockAvailability: LanguageModelAvailability) => void
+    install(window, options.availability)
+  }, {
+    availability,
+    source: installLanguageModel.toString()
+  })
 }
 
 async function installUnavailableLanguageModelMock(page: Page) {
@@ -269,6 +180,72 @@ async function installUnavailableLanguageModelMock(page: Page) {
   })
 }
 
-function getChecklistInput(page: Page, labelText: string) {
-  return page.locator('.checklist-item', { hasText: labelText }).locator('input')
+async function selectPlannerProvider(page: Page, provider: string) {
+  const settings = page.locator('.palette-settings')
+  if (!(await settings.evaluate(function isOpen(element) {
+    return (element as HTMLDetailsElement).open
+  }))) {
+    await settings.locator('summary').click()
+  }
+  await page.getByLabel('Provider').selectOption(provider)
+}
+
+function getItemInput(page: Page, itemName: string) {
+  return page.getByLabel(`Select ${itemName}`)
+}
+
+function installLanguageModel(targetWindow: Window, mockAvailability: LanguageModelAvailability) {
+  const browserWindow = targetWindow as Window & {
+    LanguageModel?: unknown
+    __webMCPPromptMessages?: string[]
+  }
+
+  browserWindow.__webMCPPromptMessages = []
+  browserWindow.LanguageModel = {
+    availability: async function getAvailability() {
+      return mockAvailability
+    },
+    create: async function createSession() {
+      return {
+        prompt: async function planFromPrompt(message: string) {
+          browserWindow.__webMCPPromptMessages?.push(message)
+          const request = message.match(/User request: ([\s\S]*?)\n\nCurrent app context/)?.[1] ?? message
+
+          if (request.includes('Stark')) {
+            return JSON.stringify({
+              toolName: 'open_invoice',
+              input: { id: 'inv_104' },
+              confidence: 0.91,
+              reason: 'Opened the matching invoice row.'
+            })
+          }
+
+          if (request.includes('French')) {
+            return JSON.stringify({
+              toolName: 'select_items',
+              input: { ids: ['item_4', 'item_7', 'item_13', 'item_18', 'item_22'] },
+              confidence: 0.94,
+              reason: 'Selected French items from current inventory context.'
+            })
+          }
+
+          if (request.includes('fruits')) {
+            return JSON.stringify({
+              toolName: 'select_items',
+              input: { ids: ['item_1', 'item_2', 'item_5', 'item_11', 'item_19'] },
+              confidence: 0.94,
+              reason: 'Selected fruits from current inventory context.'
+            })
+          }
+
+          return JSON.stringify({
+            toolName: 'search_products',
+            input: { query: 'dock' },
+            confidence: 0.6,
+            reason: 'Default mock response.'
+          })
+        }
+      }
+    }
+  }
 }

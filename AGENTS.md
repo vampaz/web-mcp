@@ -20,7 +20,7 @@ WebMCP Kit is an ESM-only TypeScript npm workspace for exposing app actions as W
 - `src`: Astro + Vue demo app and Cloudflare planner endpoint.
 - `tests/e2e`: Playwright demo coverage.
 - `docs`: user-facing docs; keep examples aligned with source behavior.
-- `Dev-Docs`: development planning docs, PRDs, implementation plans, and internal review notes.
+- `Dev-Docs`: development planning docs, PRDs, implementation plans, publishing notes, and internal review notes.
 
 ## Environment
 
@@ -28,7 +28,7 @@ WebMCP Kit is an ESM-only TypeScript npm workspace for exposing app actions as W
 - Package manager: npm workspaces with checked-in `package-lock.json`.
 - Do not use `npx`; use package scripts or `npm exec <tool> -- ...`.
 - `.npmrc` sets `min-release-age=4`; preserve it.
-- Dev server: `npm run dev`, port `60001`, `CLOUDFLARE_REMOTE_BINDINGS=true`.
+- Dev server: `npm run dev`, port `60001`.
 - Astro uses the Cloudflare adapter and Caddy TLS default domain `web-mcp.localtest.me`.
 
 ## Style

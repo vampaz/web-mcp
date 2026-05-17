@@ -106,7 +106,7 @@ export function createHeuristicPlanner(): ToolPlanner {
   }
 }
 
-export async function createChromeAIPlanner(): Promise<ToolPlanner> {
+export async function createChromeAIPlanner(strict = false): Promise<ToolPlanner> {
   const languageModel = getLanguageModel()
 
   if (!languageModel) {
@@ -116,6 +116,7 @@ export async function createChromeAIPlanner(): Promise<ToolPlanner> {
       status: 'unavailable',
       detail: 'The browser does not expose the Chrome built-in AI LanguageModel API.',
       async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
+        if (strict) throw new Error('Chrome built-in AI is unavailable.')
         return planWithHeuristics(message, tools, context)
       }
     }
@@ -124,7 +125,7 @@ export async function createChromeAIPlanner(): Promise<ToolPlanner> {
   try {
     const availability = await languageModel.availability(chromeAITextOptions)
     if (availability === 'unavailable') {
-      return createUnavailableChromePlanner('Chrome reports that built-in AI is unavailable in this environment.')
+      return createUnavailableChromePlanner('Chrome reports that built-in AI is unavailable in this environment.', strict)
     }
 
     if (availability === 'downloadable' || availability === 'downloading') {
@@ -133,17 +134,19 @@ export async function createChromeAIPlanner(): Promise<ToolPlanner> {
         availability,
         availability === 'downloadable'
           ? 'Chrome built-in AI can be used after Chrome downloads the model from a user command.'
-          : 'Chrome is downloading the built-in AI model and will plan when the session is ready.'
+          : 'Chrome is downloading the built-in AI model and will plan when the session is ready.',
+        strict
       )
     }
 
     return createActiveChromePlanner(
       languageModel,
       'ready',
-      'Chrome built-in AI is available. The model session will start from the next user command.'
+      'Chrome built-in AI is available. The model session will start from the next user command.',
+      strict
     )
   } catch {
-    return createUnavailableChromePlanner('Chrome built-in AI could not create a planning session.')
+    return createUnavailableChromePlanner('Chrome built-in AI could not create a planning session.', strict)
   }
 }
 
@@ -157,7 +160,7 @@ export async function createBestPlanner(): Promise<ToolPlanner> {
 export async function createConfiguredPlanner(config?: PlannerProviderConfig): Promise<ToolPlanner> {
   if (!config || config.provider === 'auto') return createBestPlanner()
 
-  if (config.provider === 'chrome-built-in') return createChromeAIPlanner()
+  if (config.provider === 'chrome-built-in') return createChromeAIPlanner(true)
   if (config.provider === 'local') return createHeuristicPlanner()
 
   return createRemotePlanner(config)
@@ -177,11 +180,8 @@ export function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner 
       available: false,
       status: 'unavailable',
       detail: `${providerLabel} needs server endpoint mode so the browser talks to a local or preview Worker with an AI binding.`,
-      async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
-        return {
-          ...planWithHeuristics(message, tools, context),
-          reason: `${providerLabel} needs server endpoint mode. Used deterministic fallback.`
-        }
+      async plan() {
+        throw new Error(`${providerLabel} needs server endpoint mode.`)
       }
     }
   }
@@ -192,11 +192,8 @@ export function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner 
       available: false,
       status: 'needs-key',
       detail: `${providerLabel} needs a user API key. In user-key mode the key is stored in the browser and visible to this page.`,
-      async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
-        return {
-          ...planWithHeuristics(message, tools, context),
-          reason: `${providerLabel} needs a user API key. Used deterministic fallback.`
-        }
+      async plan() {
+        throw new Error(`${providerLabel} needs a user API key.`)
       }
     }
   }
@@ -212,10 +209,7 @@ export function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner 
         validateRemotePlan(plan, tools)
         return plan
       } catch (error) {
-        return {
-          ...planWithHeuristics(message, tools, context),
-          reason: `${providerLabel} could not plan this command (${getErrorMessage(error)}). Used deterministic fallback.`
-        }
+        throw new Error(`${providerLabel} could not plan this command (${getErrorMessage(error)})`)
       }
     }
   }
@@ -414,6 +408,63 @@ function createToolCatalog(tools: WebMCPTool[]) {
 function planWithHeuristics(message: string, tools: WebMCPTool[], context: PlannerContext = {}): ToolPlan {
   const normalizedMessage = message.toLowerCase()
 
+  if (normalizedMessage.includes('invoice') && normalizedMessage.includes('sort') && hasTool(tools, 'sort_invoices')) {
+    return {
+      toolName: 'sort_invoices',
+      input: {
+        sortBy: normalizedMessage.includes('amount') ? 'amount' : normalizedMessage.includes('customer') ? 'customerName' : 'dueDate',
+        direction: normalizedMessage.includes('desc') || normalizedMessage.includes('highest') ? 'desc' : 'asc'
+      },
+      confidence: 0.7,
+      reason: 'Matched invoice table sorting wording.'
+    }
+  }
+
+  if (normalizedMessage.includes('invoice') && normalizedMessage.includes('open') && hasTool(tools, 'open_invoice')) {
+    return {
+      toolName: 'open_invoice',
+      input: {
+        id: getMatchingInvoiceIds(normalizedMessage, context)[0] ?? getFirstInvoiceId(context)
+      },
+      confidence: 0.68,
+      reason: 'Matched invoice drawer open wording.'
+    }
+  }
+
+  if (normalizedMessage.includes('invoice') && normalizedMessage.includes('select') && hasTool(tools, 'select_invoices')) {
+    return {
+      toolName: 'select_invoices',
+      input: {
+        ids: getMatchingInvoiceIds(normalizedMessage, context)
+      },
+      confidence: 0.72,
+      reason: 'Matched invoice row selection wording against current invoice context.'
+    }
+  }
+
+  if (normalizedMessage.includes('invoice') && (normalizedMessage.includes('filter') || normalizedMessage.includes('show')) && hasTool(tools, 'filter_invoices')) {
+    return {
+      toolName: 'filter_invoices',
+      input: {
+        status: getInvoiceStatusFromMessage(normalizedMessage),
+        minAmount: messageRequestsMinimumAmount(normalizedMessage) ? extractAmount(message) : undefined
+      },
+      confidence: 0.7,
+      reason: 'Matched invoice table filter wording.'
+    }
+  }
+
+  if (normalizedMessage.includes('invoice') && (normalizedMessage.includes('mark') || normalizedMessage.includes('status')) && hasTool(tools, 'update_selected_invoice_status')) {
+    return {
+      toolName: 'update_selected_invoice_status',
+      input: {
+        status: getInvoiceStatusFromMessage(normalizedMessage)
+      },
+      confidence: 0.68,
+      reason: 'Matched invoice status mutation wording.'
+    }
+  }
+
   if (normalizedMessage.includes('invoice')) {
     return {
       toolName: pickToolName(tools, 'create_invoice'),
@@ -423,6 +474,15 @@ function planWithHeuristics(message: string, tools: WebMCPTool[], context: Plann
       },
       confidence: 0.72,
       reason: 'Matched invoice wording and extracted an amount if present.'
+    }
+  }
+
+  if (normalizedMessage.includes('checkout') || normalizedMessage.includes('check out')) {
+    return {
+      toolName: pickToolName(tools, 'checkout_cart'),
+      input: {},
+      confidence: 0.7,
+      reason: 'Matched checkout wording for a confirmed cart mutation.'
     }
   }
 
@@ -455,6 +515,20 @@ function planWithHeuristics(message: string, tools: WebMCPTool[], context: Plann
       input: {},
       confidence: 0.7,
       reason: 'Matched checklist clear-selection wording.'
+    }
+  }
+
+  if (normalizedMessage.includes('select') && hasTool(tools, 'select_items')) {
+    const ids = getSemanticContextItemIds(normalizedMessage, context)
+    if (ids.length > 0) {
+      return {
+        toolName: 'select_items',
+        input: {
+          ids
+        },
+        confidence: 0.64,
+        reason: 'Matched visible checklist item metadata from the current app context.'
+      }
     }
   }
 
@@ -533,6 +607,166 @@ function getFirstContextItemIds(context: PlannerContext, count: number): string[
     .filter((id): id is string => Boolean(id))
 }
 
+function getSemanticContextItemIds(normalizedMessage: string, context: PlannerContext): string[] {
+  const items = Array.isArray(context.checklistItems) ? context.checklistItems : []
+  const terms = getChecklistSelectionTerms(normalizedMessage)
+  if (terms.length === 0) return []
+
+  return items
+    .filter(function itemMatchesTerms(item) {
+      const searchableText = getContextItemSearchableText(item)
+      return terms.every(function hasTerm(term) {
+        return termMatchesText(term, searchableText)
+      })
+    })
+    .map(function mapItemId(item) {
+      return getContextItemId(item)
+    })
+    .filter((id): id is string => Boolean(id))
+}
+
+function getMatchingInvoiceIds(normalizedMessage: string, context: PlannerContext): string[] {
+  const invoices = Array.isArray(context.invoices) ? context.invoices : []
+  const status = getInvoiceStatusFromMessage(normalizedMessage)
+  const wantsUnpaid = messageRequestsUnpaid(normalizedMessage)
+  return invoices
+    .filter(function invoiceMatches(invoice) {
+      if (!invoice || typeof invoice !== 'object') return false
+      const record = invoice as Record<string, unknown>
+      const searchableText = `${record.customerName ?? ''} ${record.owner ?? ''} ${record.status ?? ''} ${record.id ?? ''}`.toLowerCase()
+      const matchesStatus = wantsUnpaid
+        ? record.status !== 'paid' && record.status !== 'void'
+        : status === 'all' || record.status === status
+      const matchesAmount = messageRequestsMinimumAmount(normalizedMessage) && typeof record.amount === 'number'
+        ? record.amount >= extractAmount(normalizedMessage)
+        : true
+      return matchesStatus && matchesAmount && normalizedMessage.split(/\W+/).every(function hasTerm(term) {
+        if (isIgnoredInvoiceTerm(term)) return true
+        return searchableText.includes(term)
+      })
+    })
+    .map((invoice) => getContextItemId(invoice))
+    .filter((id): id is string => Boolean(id))
+}
+
+function getFirstInvoiceId(context: PlannerContext): string {
+  const invoices = Array.isArray(context.invoices) ? context.invoices : []
+  return getContextItemId(invoices[0]) ?? ''
+}
+
+function getInvoiceStatusFromMessage(normalizedMessage: string): string {
+  if (messageRequestsUnpaid(normalizedMessage)) return 'all'
+  if (normalizedMessage.includes('overdue')) return 'overdue'
+  if (/\bpaid\b/.test(normalizedMessage)) return 'paid'
+  if (normalizedMessage.includes('sent')) return 'sent'
+  if (normalizedMessage.includes('draft')) return 'draft'
+  if (normalizedMessage.includes('void')) return 'void'
+  return 'all'
+}
+
+function messageRequestsUnpaid(normalizedMessage: string): boolean {
+  return /\bunpaid\b/.test(normalizedMessage) || normalizedMessage.includes('not paid')
+}
+
+function messageRequestsMinimumAmount(normalizedMessage: string): boolean {
+  return normalizedMessage.includes('over')
+    || normalizedMessage.includes('above')
+    || normalizedMessage.includes('greater than')
+    || normalizedMessage.includes('more than')
+    || normalizedMessage.includes('at least')
+}
+
+function isIgnoredInvoiceTerm(term: string): boolean {
+  return term.length <= 2
+    || /^\d+$/.test(term)
+    || [
+      'all',
+      'above',
+      'amount',
+      'are',
+      'at',
+      'greater',
+      'invoice',
+      'invoices',
+      'least',
+      'more',
+      'not',
+      'open',
+      'over',
+      'select',
+      'show',
+      'than',
+      'that',
+      'the',
+      'unpaid',
+      'with'
+    ].includes(term)
+}
+
+function getChecklistSelectionTerms(normalizedMessage: string): string[] {
+  return normalizedMessage
+    .split(/\W+/)
+    .filter(function keepChecklistTerm(term) {
+      return term.length > 2 && ![
+        'all',
+        'and',
+        'are',
+        'for',
+        'item',
+        'items',
+        'one',
+        'ones',
+        'select',
+        'that',
+        'the',
+        'those',
+        'with'
+      ].includes(term)
+    })
+}
+
+function getContextItemSearchableText(item: unknown): string {
+  if (!item || typeof item !== 'object') return ''
+  const record = item as Record<string, unknown>
+  const name = record.name
+  if (typeof name !== 'string') return ''
+
+  return [name, ...getInferredChecklistTerms(name)].join(' ').toLowerCase()
+}
+
+function getInferredChecklistTerms(name: string): string[] {
+  const normalizedName = name.toLowerCase()
+  const terms: string[] = []
+
+  if (['apple', 'banana', 'orange', 'lemon', 'grapefruit'].includes(normalizedName)) {
+    terms.push('fruit')
+  }
+
+  if (['water', 'sparkling water', 'coffee', 'milk', 'tea'].includes(normalizedName)) {
+    terms.push('liquid', 'drink', 'beverage')
+  }
+
+  if (['croissant', 'baguette', 'brie', 'pain au chocolat', 'quiche'].includes(normalizedName)) {
+    terms.push('french')
+  }
+
+  if (['rice', 'almonds'].includes(normalizedName)) {
+    terms.push('pantry')
+  }
+
+  if (['carrot', 'beetroot', 'potato', 'radish', 'turnip'].includes(normalizedName)) {
+    terms.push('root', 'vegetable')
+  }
+
+  return terms
+}
+
+function termMatchesText(term: string, searchableText: string): boolean {
+  if (searchableText.includes(term)) return true
+  if (term.endsWith('s') && searchableText.includes(term.slice(0, -1))) return true
+  return !term.endsWith('s') && searchableText.includes(`${term}s`)
+}
+
 function getContextItemId(item: unknown): string | undefined {
   if (!item || typeof item !== 'object' || !('id' in item)) return undefined
 
@@ -548,7 +782,8 @@ function getLanguageModel(): LanguageModelApi | undefined {
 function createActiveChromePlanner(
   languageModel: LanguageModelApi,
   status: 'ready' | 'downloadable' | 'downloading',
-  detail: string
+  detail: string,
+  strict = false
 ): ToolPlanner {
   let session: LanguageModelSession | undefined
 
@@ -562,6 +797,8 @@ function createActiveChromePlanner(
         session ??= await createChromeAISession(languageModel)
         return await planWithChromeAI(session, message, tools, context)
       } catch (error) {
+        if (strict) throw new Error(`Chrome built-in AI could not plan this command (${getErrorMessage(error)})`)
+
         return {
           ...planWithHeuristics(message, tools, context),
           reason: `Chrome built-in AI could not plan this command (${getErrorMessage(error)}). Used deterministic fallback.`
@@ -592,13 +829,14 @@ function parseToolPlanJson(value: string, source: string): ToolPlan {
   }
 }
 
-function createUnavailableChromePlanner(detail: string): ToolPlanner {
+function createUnavailableChromePlanner(detail: string, strict = false): ToolPlanner {
   return {
     name: 'Chrome built-in AI',
     available: false,
     status: 'unavailable',
     detail,
     async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
+      if (strict) throw new Error(detail)
       return planWithHeuristics(message, tools, context)
     }
   }

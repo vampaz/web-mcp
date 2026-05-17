@@ -10,7 +10,6 @@ if (fs.existsSync('./.dev.vars')) {
 }
 
 const cloudflareConfigPath = process.env.CLOUDFLARE_CONFIG_PATH?.trim()
-const remoteBindings = process.env.CLOUDFLARE_REMOTE_BINDINGS === 'true'
 const caddyTlsDomain = process.env.CADDY_TLS_DOMAIN?.trim() || 'web-mcp.localtest.me'
 
 export default defineConfig({
@@ -23,8 +22,7 @@ export default defineConfig({
     allowedHosts: true
   },
   adapter: cloudflare({
-    configPath: cloudflareConfigPath || undefined,
-    remoteBindings
+    configPath: cloudflareConfigPath || undefined
   }),
   integrations: [vue()],
   vite: {

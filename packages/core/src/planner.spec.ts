@@ -97,6 +97,24 @@ describe('planner', () => {
     expect(plan.reason).toContain('Used deterministic fallback')
   })
 
+  it('does not fall back when Chrome AI is explicitly selected', async () => {
+    ;(window as WindowWithLanguageModel).LanguageModel = {
+      availability: async () => 'available',
+      create: async () => {
+        throw new Error('user activation required')
+      }
+    }
+
+    const planner = await createConfiguredPlanner({
+      provider: 'chrome-built-in',
+      auth: {
+        mode: 'none'
+      }
+    })
+
+    await expect(planner.plan('Add ten keyboards to the cart.', [])).rejects.toThrow('Chrome built-in AI could not plan this command')
+  })
+
   it('reports malformed Chrome AI JSON distinctly before falling back', async () => {
     ;(window as WindowWithLanguageModel).LanguageModel = {
       availability: async () => 'available',
@@ -163,6 +181,14 @@ describe('planner', () => {
     })
   })
 
+  it('routes checkout commands to the confirmed checkout tool', async () => {
+    const planner = createHeuristicPlanner()
+    const plan = await planner.plan('Checkout the cart.', [])
+
+    expect(plan.toolName).toBe('checkout_cart')
+    expect(plan.input).toEqual({})
+  })
+
   it('plans positional checklist selection', async () => {
     const planner = createHeuristicPlanner()
     const plan = await planner.plan('Select the first five items', [], {
@@ -179,6 +205,136 @@ describe('planner', () => {
     expect(plan.toolName).toBe('select_items')
     expect(plan.input).toEqual({
       ids: ['item_1', 'item_2', 'item_3', 'item_4', 'item_5']
+    })
+  })
+
+  it('plans checklist selection from visible item names in current app context', async () => {
+    const planner = createHeuristicPlanner()
+    const plan = await planner.plan('Select all items with water', [
+      {
+        name: 'select_items',
+        description: 'Select checklist items by ID.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute: () => []
+      }
+    ], {
+      checklistItems: [
+        { id: 'item_1', name: 'Apple' },
+        { id: 'item_8', name: 'Water' },
+        { id: 'item_16', name: 'Sparkling water' },
+        { id: 'item_20', name: 'Tea' }
+      ]
+    })
+
+    expect(plan.toolName).toBe('select_items')
+    expect(plan.input).toEqual({
+      ids: ['item_8', 'item_16']
+    })
+  })
+
+  it('infers semantic checklist groups from visible item names', async () => {
+    const planner = createHeuristicPlanner()
+    const tools = [
+      {
+        name: 'select_items',
+        description: 'Select checklist items by ID.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute: () => []
+      }
+    ]
+    const context = {
+      checklistItems: [
+        { id: 'item_1', name: 'Apple' },
+        { id: 'item_4', name: 'Croissant' },
+        { id: 'item_7', name: 'Baguette' },
+        { id: 'item_8', name: 'Water' },
+        { id: 'item_10', name: 'Coffee' },
+        { id: 'item_13', name: 'Brie' },
+        { id: 'item_16', name: 'Sparkling water' },
+        { id: 'item_18', name: 'Pain au chocolat' },
+        { id: 'item_20', name: 'Tea' },
+        { id: 'item_22', name: 'Quiche' },
+        { id: 'item_23', name: 'Rice' }
+      ]
+    }
+
+    await expect(planner.plan('Select all French items', tools, context)).resolves.toMatchObject({
+      toolName: 'select_items',
+      input: {
+        ids: ['item_4', 'item_7', 'item_13', 'item_18', 'item_22']
+      }
+    })
+    await expect(planner.plan('Select all liquids', tools, context)).resolves.toMatchObject({
+      toolName: 'select_items',
+      input: {
+        ids: ['item_8', 'item_10', 'item_16', 'item_20']
+      }
+    })
+    await expect(planner.plan('Select all fruits', tools, context)).resolves.toMatchObject({
+      toolName: 'select_items',
+      input: {
+        ids: ['item_1']
+      }
+    })
+    await expect(planner.plan('Select all pantry items', tools, context)).resolves.toMatchObject({
+      toolName: 'select_items',
+      input: {
+        ids: ['item_23']
+      }
+    })
+  })
+
+  it('plans invoice selection from business state and amount wording', async () => {
+    const planner = createHeuristicPlanner()
+    const plan = await planner.plan('Select unpaid invoices over 500', [
+      {
+        name: 'select_invoices',
+        description: 'Select invoice rows by ID.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute: () => []
+      }
+    ], {
+      invoices: [
+        { id: 'inv_1', customerName: 'Northwind', amount: 920, status: 'overdue' },
+        { id: 'inv_2', customerName: 'Initech', amount: 640, status: 'paid' },
+        { id: 'inv_3', customerName: 'Aperture Labs', amount: 1480, status: 'draft' },
+        { id: 'inv_4', customerName: 'Globex', amount: 230, status: 'sent' }
+      ]
+    })
+
+    expect(plan.toolName).toBe('select_invoices')
+    expect(plan.input).toEqual({
+      ids: ['inv_1', 'inv_3']
+    })
+  })
+
+  it('plans invoice opening from the visible customer name', async () => {
+    const planner = createHeuristicPlanner()
+    const plan = await planner.plan('Open the Stark invoice', [
+      {
+        name: 'open_invoice',
+        description: 'Open invoice detail.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute: () => []
+      }
+    ], {
+      invoices: [
+        { id: 'inv_1', customerName: 'Northwind', amount: 920, status: 'overdue' },
+        { id: 'inv_2', customerName: 'Stark Industries', amount: 2310, status: 'overdue' }
+      ]
+    })
+
+    expect(plan.toolName).toBe('open_invoice')
+    expect(plan.input).toEqual({
+      id: 'inv_2'
     })
   })
 
@@ -259,7 +415,7 @@ describe('planner', () => {
         mode: 'user-key'
       }
     })
-    const plan = await planner.plan('Select all the items that are French food.', [
+    const tools = [
       {
         name: 'select_items',
         description: 'Select checklist items by ID.',
@@ -268,11 +424,10 @@ describe('planner', () => {
         },
         execute: () => []
       }
-    ])
+    ]
 
     expect(planner.status).toBe('needs-key')
-    expect(plan.toolName).toBe('select_items')
-    expect(plan.reason).toContain('needs a user API key')
+    await expect(planner.plan('Select all the items that are French food.', tools)).rejects.toThrow('OpenRouter needs a user API key')
   })
 
   it('plans through OpenRouter with a user key in the browser', async () => {
@@ -358,7 +513,7 @@ describe('planner', () => {
     expect(String(fetchOptions?.body)).not.toContain('test-key')
   })
 
-  it('includes server endpoint error details in fallback reasons', async () => {
+  it('reports server endpoint error details for explicit providers', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({
       error: 'Cloudflare Workers AI server mode needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN on the server, or a custom planner endpoint.'
     }, {
@@ -373,7 +528,7 @@ describe('planner', () => {
         endpoint: '/api/webmcp/plan'
       }
     })
-    const plan = await planner.plan('Select all liquids', [
+    await expect(planner.plan('Select all liquids', [
       {
         name: 'select_items',
         description: 'Select checklist items by ID.',
@@ -382,10 +537,7 @@ describe('planner', () => {
         },
         execute: () => []
       }
-    ])
-
-    expect(plan.reason).toContain('CLOUDFLARE_ACCOUNT_ID')
-    expect(plan.reason).toContain('custom planner endpoint')
+    ])).rejects.toThrow('CLOUDFLARE_ACCOUNT_ID')
   })
 
   it('plans through a Cloudflare binding server endpoint with the selected model', async () => {

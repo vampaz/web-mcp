@@ -20,6 +20,8 @@ What is in this repo now:
 - Devtools, Playwright helpers, and a local MCP-style bridge for development and testing.
 - An Astro + Vue + Cloudflare demo that exercises planner providers, Cloudflare Workers AI, and fallback behavior.
 
+Packages are still private while the MVP API settles. See [Package Publishing Shape](./Dev-Docs/PACKAGE-PUBLISHING.md) for the release-readiness checklist and package boundary notes.
+
 ## Quick Start
 
 ```ts
@@ -106,6 +108,8 @@ The framework packages are intentionally thin lifecycle adapters. They register 
 - `@webmcp-kit/svelte`: `useWebMCPTool()` for Svelte components, including readable-store `when` support.
 
 See [Vue](./docs/vue.md), [React](./docs/react.md), [Svelte](./docs/svelte.md), and [Framework Extensions](./docs/framework-extensions.md).
+
+For copy-paste snippets, see [Examples](./docs/examples.md).
 
 ## Planner Providers
 

@@ -118,6 +118,77 @@ describe('registry', () => {
     )
   })
 
+  it('returns an error when the confirmation handler fails', async () => {
+    const execute = vi.fn(function voidInvoice() {
+      return { voided: true }
+    })
+    setConfirmationHandler(async function failConfirmation() {
+      throw new Error('modal crashed')
+    })
+
+    registerTool(defineTool({
+      name: 'void_invoice',
+      description: 'Void an existing invoice after the user has reviewed the pending action.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          invoiceId: { type: 'string' }
+        },
+        required: ['invoiceId']
+      },
+      confirmation: {
+        required: true,
+        reason: 'Voiding an invoice cannot be undone in this demo.'
+      },
+      execute
+    }))
+
+    await expect(invokeTool({
+      toolName: 'void_invoice',
+      input: { invoiceId: 'inv_1' }
+    })).resolves.toMatchObject({
+      status: 'error',
+      error: 'Confirmation handler failed: modal crashed'
+    })
+    expect(execute).not.toHaveBeenCalled()
+  })
+
+  it('skips the confirmation handler when an invocation is already confirmed', async () => {
+    const confirm = vi.fn(function rejectConfirmation() {
+      return false
+    })
+    setConfirmationHandler(confirm)
+
+    registerTool(defineTool({
+      name: 'void_invoice',
+      description: 'Void an existing invoice after the user has reviewed the pending action.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          invoiceId: { type: 'string' }
+        },
+        required: ['invoiceId']
+      },
+      confirmation: {
+        required: true,
+        reason: 'Voiding an invoice cannot be undone in this demo.'
+      },
+      execute(input) {
+        return input
+      }
+    }))
+
+    await expect(invokeTool({
+      toolName: 'void_invoice',
+      input: { invoiceId: 'inv_1' },
+      confirmed: true
+    })).resolves.toMatchObject({
+      status: 'success',
+      output: { invoiceId: 'inv_1' }
+    })
+    expect(confirm).not.toHaveBeenCalled()
+  })
+
   it('returns an error before handlers run when input validation fails', async () => {
     const confirm = vi.fn(function confirmInvocation() {
       return true

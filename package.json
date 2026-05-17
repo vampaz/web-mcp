@@ -8,8 +8,7 @@
   ],
   "scripts": {
     "start": "astro dev",
-    "dev": "CLOUDFLARE_REMOTE_BINDINGS=true astro dev",
-    "dev:cf": "CLOUDFLARE_REMOTE_BINDINGS=true astro dev",
+    "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
     "test": "vitest --run",

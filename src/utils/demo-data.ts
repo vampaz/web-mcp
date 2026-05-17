@@ -1,0 +1,138 @@
+import type { DemoSettings, Invoice, InvoiceDraft, PlannerModelOption, Product, SelectableItem, SupportTicket } from '@/interfaces/demo'
+
+export function getCloudflareBindingModels(): PlannerModelOption[] {
+  return [
+    {
+      id: '@cf/google/gemma-4-26b-a4b-it',
+      label: 'Gemma 4 26B A4B'
+    },
+    {
+      id: '@cf/moonshotai/kimi-k2.6',
+      label: 'Kimi K2.6'
+    },
+    {
+      id: '@cf/zai-org/glm-4.7-flash',
+      label: 'GLM 4.7 Flash'
+    },
+    {
+      id: '@cf/qwen/qwen3-30b-a3b-fp8',
+      label: 'Qwen3 30B A3B FP8'
+    },
+    {
+      id: '@cf/openai/gpt-oss-20b',
+      label: 'GPT OSS 20B'
+    },
+    {
+      id: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
+      label: 'DeepSeek R1 Distill Qwen 32B'
+    },
+    {
+      id: '@cf/qwen/qwq-32b',
+      label: 'Qwen QwQ 32B'
+    },
+    {
+      id: '@cf/meta/llama-3.1-8b-instruct',
+      label: 'Llama 3.1 8B Instruct'
+    },
+    {
+      id: '@cf/meta/llama-3.2-3b-instruct',
+      label: 'Llama 3.2 3B Instruct'
+    }
+  ]
+}
+
+export function getInitialInvoices(): Invoice[] {
+  return [
+    { id: 'inv_100', customerName: 'Globex', amount: 230, status: 'sent', dueDate: '2026-05-20', owner: 'Marta', selected: false },
+    { id: 'inv_101', customerName: 'Northwind', amount: 920, status: 'overdue', dueDate: '2026-05-05', owner: 'Carlos', selected: false },
+    { id: 'inv_102', customerName: 'Aperture Labs', amount: 1480, status: 'draft', dueDate: '2026-05-28', owner: 'Sofia', selected: false },
+    { id: 'inv_103', customerName: 'Initech', amount: 640, status: 'paid', dueDate: '2026-05-11', owner: 'Rui', selected: false },
+    { id: 'inv_104', customerName: 'Stark Industries', amount: 2310, status: 'overdue', dueDate: '2026-05-02', owner: 'Carlos', selected: false },
+    { id: 'inv_105', customerName: 'Umbrella Health', amount: 790, status: 'sent', dueDate: '2026-05-23', owner: 'Marta', selected: false },
+    { id: 'inv_106', customerName: 'Soylent Systems', amount: 510, status: 'draft', dueDate: '2026-06-01', owner: 'Sofia', selected: false },
+    { id: 'inv_107', customerName: 'Wayne Logistics', amount: 1750, status: 'sent', dueDate: '2026-05-18', owner: 'Rui', selected: false }
+  ]
+}
+
+export function getInitialSelectableItems(): SelectableItem[] {
+  return [
+    { id: 'item_1', name: 'Apple', selected: false },
+    { id: 'item_2', name: 'Banana', selected: false },
+    { id: 'item_3', name: 'Carrot', selected: false },
+    { id: 'item_4', name: 'Croissant', selected: false },
+    { id: 'item_5', name: 'Orange', selected: false },
+    { id: 'item_6', name: 'Spinach', selected: false },
+    { id: 'item_7', name: 'Baguette', selected: false },
+    { id: 'item_8', name: 'Water', selected: false },
+    { id: 'item_9', name: 'Beetroot', selected: false },
+    { id: 'item_10', name: 'Coffee', selected: false },
+    { id: 'item_11', name: 'Lemon', selected: false },
+    { id: 'item_12', name: 'Potato', selected: false },
+    { id: 'item_13', name: 'Brie', selected: false },
+    { id: 'item_14', name: 'Milk', selected: false },
+    { id: 'item_15', name: 'Almonds', selected: false },
+    { id: 'item_16', name: 'Sparkling water', selected: false },
+    { id: 'item_17', name: 'Radish', selected: false },
+    { id: 'item_18', name: 'Pain au chocolat', selected: false },
+    { id: 'item_19', name: 'Grapefruit', selected: false },
+    { id: 'item_20', name: 'Tea', selected: false },
+    { id: 'item_21', name: 'Yogurt', selected: false },
+    { id: 'item_22', name: 'Quiche', selected: false },
+    { id: 'item_23', name: 'Rice', selected: false },
+    { id: 'item_24', name: 'Turnip', selected: false }
+  ]
+}
+
+export function getInitialProducts(): Product[] {
+  return [
+    { id: 'kbd-01', name: 'Low-profile keyboard', category: 'Input', price: 129 },
+    { id: 'dock-02', name: 'Travel USB-C dock', category: 'Connectivity', price: 89 },
+    { id: 'cam-03', name: 'Desk camera', category: 'Video', price: 149 }
+  ]
+}
+
+export function getInitialTickets(): SupportTicket[] {
+  return [
+    {
+      id: 'ticket_1',
+      subject: 'Billing access',
+      body: 'Cannot open the latest invoice from the workspace.',
+      status: 'new',
+      priority: 'high',
+      assignee: 'Unassigned'
+    },
+    {
+      id: 'ticket_2',
+      subject: 'Camera order',
+      body: 'Customer asked for an updated delivery estimate.',
+      status: 'triaged',
+      priority: 'medium',
+      assignee: 'Marta'
+    },
+    {
+      id: 'ticket_3',
+      subject: 'Checkout confirmation',
+      body: 'Need review of checkout confirmation copy.',
+      status: 'in_progress',
+      priority: 'low',
+      assignee: 'Carlos'
+    }
+  ]
+}
+
+export function getInitialInvoiceDraft(): InvoiceDraft {
+  return {
+    amount: 500,
+    customerName: 'Northwind',
+    dueDate: '2026-05-30',
+    owner: 'Carlos',
+    status: 'draft'
+  }
+}
+
+export function getInitialDemoSettings(): DemoSettings {
+  return {
+    confirmationsEnabled: true,
+    density: 'compact'
+  }
+}

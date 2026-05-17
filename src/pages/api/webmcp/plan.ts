@@ -147,7 +147,7 @@ function createPlannerMessages(body: PlannerRequestBody): CloudflareAiInput['mes
         `Current app context:\n${JSON.stringify(body.context ?? {}, null, 2)}`,
         `Available tools:\n${JSON.stringify(body.tools ?? [], null, 2)}`,
         'Use stable IDs from context when selecting existing items.',
-        'Expected shape: {"toolName":"select_items","input":{"ids":["item_8"]},"confidence":0.9,"reason":"Selected matching checklist items."}'
+        'Expected shape: {"toolName":"tool_name","input":{"id":"stable_id_from_context"},"confidence":0.9,"reason":"Brief reason for the selected tool."}'
       ].join('\n\n')
     }
   ]
@@ -239,7 +239,7 @@ function getJsonHeaders(): HeadersInit {
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     if (error.message.includes('Binding AI needs to be run remotely')) {
-      return 'Cloudflare AI binding is running in local stub mode. Restart dev with `npm run dev:cf` so the Astro Cloudflare adapter enables remote bindings, or use a Cloudflare preview deployment.'
+      return 'Cloudflare AI binding is not connected to remote Workers AI in this dev session.'
     }
 
     return error.message

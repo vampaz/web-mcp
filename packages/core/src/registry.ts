@@ -121,11 +121,23 @@ export async function invokeTool<TOutput = unknown>(
     return result
   }
 
-  const confirmed = invocation.confirmed === true || (
-    registration.tool.confirmation?.required
-      ? await requestToolConfirmation(registration.tool, invocation.input)
-      : true
-  )
+  let confirmed = invocation.confirmed === true || !registration.tool.confirmation?.required
+  if (!confirmed) {
+    try {
+      confirmed = await requestToolConfirmation(registration.tool, invocation.input)
+    } catch (error) {
+      const result = createResult<TOutput>(
+        invocation.toolName,
+        'error',
+        startedAt,
+        undefined,
+        error instanceof Error ? error.message : 'Confirmation handler failed.'
+      )
+      result.invocationId = invocationId
+      emitWebMCPKitEvent({ type: 'failed', toolName: invocation.toolName, timestamp: Date.now(), detail: result })
+      return result
+    }
+  }
 
   if (registration.tool.confirmation?.required && !confirmed) {
     const result = createResult<TOutput>(
