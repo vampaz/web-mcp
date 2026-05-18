@@ -19,3 +19,5 @@ The demo uses:
 - `demo/wrangler.toml` with `main = "@astrojs/cloudflare/entrypoints/server"` and an `AI` binding
 
 For Cloudflare Workers Builds, use `npm run build` as the build command and `npm run deploy` as the deploy command.
+
+During integration, call `getIntegrationHealthReport()` from client-side app code or open the devtools overlay to confirm that Astro islands have mounted and registered their WebMCP tools.

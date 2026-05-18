@@ -21,6 +21,10 @@ export function setConfirmationHandler(handler: ConfirmationHandler | undefined)
   warnedAboutWindowConfirm = false
 }
 
+export function hasConfirmationHandler(): boolean {
+  return confirmationHandler !== undefined
+}
+
 export async function requestToolConfirmation(
   tool: ConfirmationTool,
   input: unknown

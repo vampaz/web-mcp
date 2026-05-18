@@ -95,9 +95,43 @@ setConfirmationHandler(async function confirmTool(tool, input, reason) {
 - `setConfirmationHandler(handler)` configures one global async confirmation provider for tools with `confirmation.required`.
 - `listTools()` returns active registrations.
 - `getRegistrySnapshot()` returns support mode, tool count, and registered tools.
+- `getIntegrationHealthReport()` returns developer-facing diagnostics for missing tools, weak schemas, missing confirmation handlers, unavailable tools, and planner status.
+- `assertWebMCPIntegration()` throws when the current integration has blocking errors.
 - `isWebMCPSupported()` checks for native WebMCP registration support.
 - `createBestPlanner()` uses Chrome built-in AI when available, otherwise a deterministic local planner.
 - `installWebMCPKitTestBridge()` exposes a kit-specific test bridge for Playwright and local QA.
+
+## Integration Health
+
+Use the health report while wiring WebMCP into an app:
+
+```ts
+import { getIntegrationHealthReport } from '@webmcp-kit/core'
+
+const report = getIntegrationHealthReport({ planner: kit.planner })
+
+if (report.status !== 'ready') {
+  console.table(report.diagnostics)
+}
+```
+
+The report shape is intentionally small:
+
+```ts
+interface IntegrationHealthReport {
+  status: 'ready' | 'warning' | 'error'
+  summary: string
+  diagnostics: Array<{
+    severity: 'info' | 'warning' | 'error'
+    title: string
+    detail: string
+    action: string
+    toolName?: string
+  }>
+}
+```
+
+The devtools overlay shows the same report, so developers can see whether tools are registered, schemas are strict, confirmations are installed, and the selected planner is usable.
 
 ## Framework Helpers
 

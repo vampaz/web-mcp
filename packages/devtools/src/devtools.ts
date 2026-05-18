@@ -1,8 +1,10 @@
 import {
+  getIntegrationHealthReport,
   getSupportLabel,
   invokeTool,
   listTools,
   subscribeWebMCPKitEvents,
+  type IntegrationDiagnostic,
   type JsonSchema,
   type ToolInvocation,
   type ToolInvocationResult,
@@ -99,6 +101,71 @@ const overlayStyles = `
 .wmk-devtools__history {
   color: #9ea8a1;
   font-size: 12px;
+}
+.wmk-devtools__health {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(244, 240, 232, 0.13);
+  background: rgba(244, 240, 232, 0.04);
+}
+.wmk-devtools__health-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.wmk-devtools__health-title {
+  color: #f4f0e8;
+  font-weight: 900;
+}
+.wmk-devtools__health-summary {
+  color: #c9d1cb;
+  font-size: 12px;
+}
+.wmk-devtools__badge {
+  border: 1px solid rgba(244, 240, 232, 0.18);
+  padding: 3px 7px;
+  color: #f4f0e8;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+.wmk-devtools__badge--ready {
+  border-color: #30a779;
+  color: #30a779;
+}
+.wmk-devtools__badge--warning {
+  border-color: #e8be53;
+  color: #e8be53;
+}
+.wmk-devtools__badge--error {
+  border-color: #f39a8d;
+  color: #f39a8d;
+}
+.wmk-devtools__diagnostics {
+  display: grid;
+  gap: 8px;
+}
+.wmk-devtools__diagnostic {
+  display: grid;
+  gap: 3px;
+  border-left: 3px solid rgba(244, 240, 232, 0.22);
+  padding-left: 8px;
+  color: #c9d1cb;
+  font-size: 12px;
+}
+.wmk-devtools__diagnostic--warning {
+  border-left-color: #e8be53;
+}
+.wmk-devtools__diagnostic--error {
+  border-left-color: #f39a8d;
+}
+.wmk-devtools__diagnostic strong {
+  color: #f4f0e8;
+}
+.wmk-devtools__diagnostic span {
+  color: #9ea8a1;
 }
 .wmk-devtools__title {
   margin: 3px 0 0;
@@ -278,6 +345,7 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
 
   function render() {
     const registrations = listTools()
+    const healthReport = getIntegrationHealthReport()
     root.innerHTML = `
       <button class="wmk-devtools__toggle" type="button" data-action="toggle">
         ${open ? 'Hide' : 'Tools'} (${registrations.length})
@@ -290,6 +358,20 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
           </div>
           <div class="wmk-devtools__status">${escapeHtml(getSupportLabel())}</div>
         </header>
+        <section class="wmk-devtools__health" aria-label="Integration health">
+          <div class="wmk-devtools__health-header">
+            <div>
+              <div class="wmk-devtools__health-title">Integration health</div>
+              <div class="wmk-devtools__health-summary">${escapeHtml(healthReport.summary)}</div>
+            </div>
+            <span class="wmk-devtools__badge wmk-devtools__badge--${escapeHtml(healthReport.status)}">${escapeHtml(healthReport.status)}</span>
+          </div>
+          ${healthReport.diagnostics.length === 0 ? '<div class="wmk-devtools__health-summary">No integration issues found.</div>' : `
+            <div class="wmk-devtools__diagnostics">
+              ${healthReport.diagnostics.slice(0, 6).map(formatDiagnostic).join('')}
+            </div>
+          `}
+        </section>
         ${registrations.map((registration) => `
           <article class="wmk-devtools__tool">
             <div class="wmk-devtools__meta">${escapeHtml(registration.mode)}</div>
@@ -420,6 +502,16 @@ function createSampleValue(key: string, schema: JsonSchema): unknown {
   if (key.toLowerCase().includes('id')) return 'sample-id'
   if (key.toLowerCase().includes('name')) return 'Acme Corp'
   return 'Sample value'
+}
+
+function formatDiagnostic(diagnostic: IntegrationDiagnostic): string {
+  return `
+    <article class="wmk-devtools__diagnostic wmk-devtools__diagnostic--${escapeHtml(diagnostic.severity)}">
+      <strong>${escapeHtml(diagnostic.title)}</strong>
+      <span>${escapeHtml(diagnostic.detail)}</span>
+      <span>${escapeHtml(diagnostic.action)}</span>
+    </article>
+  `
 }
 
 function toHistoryItem(id: number, event: WebMCPKitEvent, invocation?: ToolInvocation): HistoryItem {

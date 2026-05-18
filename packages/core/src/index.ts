@@ -9,8 +9,11 @@ export {
 } from './adapters/catalog'
 export { formatOpenAITool, formatOpenAITools, type OpenAIFunctionTool } from './adapters/openai'
 export { emitWebMCPKitEvent, subscribeWebMCPKitEvents } from './events'
+export { assertWebMCPIntegration, getIntegrationHealthReport, type IntegrationHealthOptions } from './diagnostics'
 export { inferFormInputSchema, registerFormTool, type FormInput, type RegisterFormToolOptions } from './forms'
 export type {
+  IntegrationDiagnostic,
+  IntegrationHealthReport,
   JsonSchema,
   PlannerContext,
   PlannerAuth,

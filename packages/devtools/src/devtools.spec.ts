@@ -31,7 +31,8 @@ describe('devtools overlay', () => {
           customerName: { type: 'string' },
           amount: { type: 'number', minimum: 1 }
         },
-        required: ['customerName', 'amount']
+        required: ['customerName', 'amount'],
+        additionalProperties: false
       },
       execute
     }))
@@ -39,6 +40,8 @@ describe('devtools overlay', () => {
     const overlay = mountDevtoolsOverlay()
 
     expect(document.body.textContent).toContain('Tool Inspector')
+    expect(document.body.textContent).toContain('Integration health')
+    expect(document.body.textContent).toContain('1 tool registered and ready.')
     expect(document.body.textContent).toContain('create_invoice')
     expect(document.body.textContent).toContain('Quality 100%')
     expect(document.body.textContent).toContain('Prompt preview')
@@ -74,7 +77,8 @@ describe('devtools overlay', () => {
         type: 'object',
         properties: {
           amount: { type: 'number', minimum: 1 }
-        }
+        },
+        additionalProperties: false
       },
       execute
     }))
@@ -110,7 +114,8 @@ describe('devtools overlay', () => {
         type: 'object',
         properties: {
           amount: { type: 'number', minimum: 1 }
-        }
+        },
+        additionalProperties: false
       },
       execute
     }))
@@ -134,6 +139,17 @@ describe('devtools overlay', () => {
 
     expect(document.body.textContent).toContain('"amount": 1')
     expect(document.body.textContent).toContain('"amount": 2')
+
+    overlay.destroy()
+  })
+
+  it('shows integration errors when no tools are registered', () => {
+    const overlay = mountDevtoolsOverlay()
+
+    expect(document.body.textContent).toContain('Integration health')
+    expect(document.body.textContent).toContain('1 integration error found.')
+    expect(document.body.textContent).toContain('No WebMCP tools are registered')
+    expect(document.body.textContent).toContain('Register a tool with registerTool()')
 
     overlay.destroy()
   })

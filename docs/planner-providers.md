@@ -136,6 +136,8 @@ npm run dev
 
 When a provider is explicitly selected, WebMCP Kit uses that provider. It does not silently switch the command to deterministic local planning.
 
+Pass the selected planner to `getIntegrationHealthReport({ planner })` during development to expose provider readiness in the same diagnostics used by the devtools overlay.
+
 For the separate `cloudflare-workers-ai` REST mode, use the same `.env` values or another server environment that provides `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`.
 
 The handler shape is:

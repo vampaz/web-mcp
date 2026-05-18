@@ -1,5 +1,9 @@
 <template>
   <main class="demo-shell">
+    <nav class="demo-nav" aria-label="Demo resources">
+      <a href="/readme/">README</a>
+    </nav>
+
     <DemoCommandPalette
       :cloudflare-binding-models="cloudflareBindingModels"
       :command-button-label="commandButtonLabel"
@@ -1176,6 +1180,28 @@ declare global {
   width: min(1440px, calc(100% - 32px));
   margin: 0 auto;
   padding: 8px 0 80px;
+}
+
+.demo-nav {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.demo-nav a {
+  border: 1px solid rgba(244, 240, 232, 0.18);
+  padding: 6px 10px;
+  color: #c9d1cb;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.demo-nav a:hover,
+.demo-nav a:focus-visible {
+  border-color: #e8be53;
+  color: #e8be53;
 }
 
 .app-panels {

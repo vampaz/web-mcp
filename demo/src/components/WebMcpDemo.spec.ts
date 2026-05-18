@@ -34,6 +34,7 @@ describe('WebMcpDemo', () => {
 
     expect(wrapper.text()).toContain('Inventory')
     expect(wrapper.text()).toContain('Invoices')
+    expect(wrapper.find('a[href="/readme/"]').text()).toBe('README')
 
     const commandInput = wrapper.find('input[aria-label="Natural language command"]')
     expect(commandInput.element).toHaveProperty('value', '')

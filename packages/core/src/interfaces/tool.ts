@@ -55,6 +55,24 @@ export interface RegistrySnapshot {
   tools: RegisteredTool[]
 }
 
+export interface IntegrationDiagnostic {
+  id: string
+  severity: 'info' | 'warning' | 'error'
+  title: string
+  detail: string
+  action: string
+  toolName?: string
+}
+
+export interface IntegrationHealthReport {
+  status: 'ready' | 'warning' | 'error'
+  summary: string
+  supportLabel: string
+  nativeWebMCP: boolean
+  toolCount: number
+  diagnostics: IntegrationDiagnostic[]
+}
+
 export interface ToolInvocation<TInput = Record<string, unknown>> {
   id?: string
   toolName: string

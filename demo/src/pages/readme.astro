@@ -1,0 +1,158 @@
+---
+import { createMarkdownProcessor } from '@astrojs/markdown-remark'
+
+import '@/styles/global.css'
+import readmeMarkdown from '../../../README.md?raw'
+
+export const prerender = true
+
+const readmeUrl = new URL('../../../README.md', import.meta.url)
+const markdown = await createMarkdownProcessor({
+  syntaxHighlight: 'prism'
+})
+const renderedReadme = await markdown.render(readmeMarkdown, {
+  fileURL: readmeUrl.pathname
+})
+const readmeHtml = resolveRepositoryLinks(renderedReadme.code)
+
+function resolveRepositoryLinks(html: string): string {
+  return html.replaceAll('href="./', 'href="https://github.com/vampaz/web-mcp/blob/master/')
+}
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="WebMCP Kit README documentation" />
+    <link rel="icon" href="/webmcp-circuit.svg" type="image/svg+xml" />
+    <title>WebMCP Kit README</title>
+  </head>
+  <body>
+    <main class="readme-shell">
+      <header class="readme-header">
+        <a class="readme-back" href="/">Back to demo</a>
+        <p>Repository README</p>
+      </header>
+
+      <article class="readme-document" set:html={readmeHtml} />
+    </main>
+  </body>
+</html>
+
+<style>
+  .readme-shell {
+    width: min(980px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 24px 0 80px;
+  }
+
+  .readme-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid rgba(244, 240, 232, 0.16);
+    padding-bottom: 14px;
+    color: #9ea8a1;
+  }
+
+  .readme-header p {
+    margin: 0;
+    color: #e8be53;
+    font-size: 0.76rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .readme-back,
+  .readme-document a {
+    color: #e8be53;
+    text-underline-offset: 0.2em;
+  }
+
+  .readme-back {
+    font-weight: 800;
+    text-decoration: none;
+  }
+
+  .readme-back:hover,
+  .readme-document a:hover {
+    text-decoration: underline;
+  }
+
+  .readme-document {
+    color: #d7ddd8;
+    font-size: 1rem;
+    line-height: 1.65;
+  }
+
+  .readme-document :global(h1),
+  .readme-document :global(h2),
+  .readme-document :global(h3) {
+    color: #f4f0e8;
+    line-height: 1.15;
+  }
+
+  .readme-document :global(h1) {
+    margin: 0 0 16px;
+    font-size: clamp(2rem, 6vw, 3.5rem);
+  }
+
+  .readme-document :global(h2) {
+    margin: 36px 0 12px;
+    border-top: 1px solid rgba(244, 240, 232, 0.14);
+    padding-top: 24px;
+    font-size: clamp(1.35rem, 3vw, 2rem);
+  }
+
+  .readme-document :global(h3) {
+    margin: 26px 0 10px;
+    font-size: 1.2rem;
+  }
+
+  .readme-document :global(p),
+  .readme-document :global(ul),
+  .readme-document :global(ol) {
+    margin: 0 0 16px;
+  }
+
+  .readme-document :global(li + li) {
+    margin-top: 6px;
+  }
+
+  .readme-document :global(code) {
+    border: 1px solid rgba(244, 240, 232, 0.14);
+    background: rgba(244, 240, 232, 0.08);
+    color: #f4f0e8;
+    padding: 0.08em 0.32em;
+    font-family: SFMono-Regular, Consolas, Liberation Mono, monospace;
+    font-size: 0.92em;
+  }
+
+  .readme-document :global(pre) {
+    overflow-x: auto;
+    margin: 16px 0 22px;
+    border: 1px solid rgba(244, 240, 232, 0.14);
+    background: #101514;
+    padding: 16px;
+  }
+
+  .readme-document :global(pre code) {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    color: #f4f0e8;
+  }
+
+  @media (max-width: 620px) {
+    .readme-shell {
+      width: min(100% - 20px, 980px);
+      padding-top: 16px;
+      padding-bottom: 48px;
+    }
+  }
+</style>
