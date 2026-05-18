@@ -191,6 +191,19 @@ http://localhost:60001/
 
 The demo exposes invoice, product search, cart, and support-ticket tools. It shows whether the app is running with native WebMCP or fallback mode, then lets you run natural-language commands against the registered tools.
 
+## Cloudflare Deployment
+
+Use these settings for the Worker build:
+
+```txt
+Root directory: /
+Install command: npm ci
+Build command: npm run build
+Deploy command: npm run deploy
+```
+
+`npm run deploy` runs Wrangler from the demo workspace, so Astro's generated deploy config and `demo/wrangler.toml` are used together.
+
 ## Development
 
 ```sh

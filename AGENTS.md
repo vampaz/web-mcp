@@ -73,7 +73,7 @@ WebMCP Kit is an ESM-only TypeScript npm workspace for exposing app actions as W
 
 ## Cloudflare And Dependencies
 
-- `demo/wrangler.toml` uses `demo/src/worker.ts`, assets from `demo/dist`, and an `AI` binding.
+- `demo/wrangler.toml` uses the Astro Cloudflare adapter entrypoint, assets from `demo/dist`, and an `AI` binding.
 - Do not deploy with Wrangler unless asked; deployment is push-based.
 - Keep `/api/webmcp/plan` server-side for app-owned secrets and validate returned plans.
 - Prefer existing libraries. If dependencies change, use latest versions and keep lockfile changes intentional.

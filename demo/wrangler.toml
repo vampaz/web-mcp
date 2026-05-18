@@ -1,5 +1,5 @@
 name = "web-mcp"
-main = "./src/worker.ts"
+main = "@astrojs/cloudflare/entrypoints/server"
 account_id = "1be30ba84b25839e5cc0d507256f0fc8"
 compatibility_date = "2026-05-13"
 compatibility_flags = ["nodejs_compat"]

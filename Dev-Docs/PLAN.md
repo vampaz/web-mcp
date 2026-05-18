@@ -135,7 +135,7 @@ This is not a new protocol. It is an adoption layer for WebMCP.
     - Files: `packages/core/src/planner.ts`, `demo/src/components/WebMcpDemo.vue`, `docs/planner-providers.md`
     - Verify: unit and E2E tests cover model selection through the mocked binding endpoint
   - [x] Step 8.5.5: Wire Astro Cloudflare adapter for AI bindings
-    - Files: `demo/astro.config.mjs`, `demo/wrangler.toml`, `demo/src/worker.ts`, `demo/src/pages/api/webmcp/plan.ts`
+    - Files: `demo/astro.config.mjs`, `demo/wrangler.toml`, `demo/src/pages/api/webmcp/plan.ts`
     - Verify: route tests cover planning through the Cloudflare `AI` binding shape
 
 - [x] Phase 9: Demo Application

@@ -126,7 +126,7 @@ await createWebMCPKit({
 })
 ```
 
-This mode is intentionally endpoint-only. The browser never receives a Cloudflare token; it sends the selected model and planning payload to the app endpoint. The demo app is configured with `@astrojs/cloudflare`, `demo/src/worker.ts`, and `demo/wrangler.toml`; `demo/wrangler.toml` declares the `AI` binding with `remote = true`, and Astro enables remote bindings by default, so local development, preview deployments, and production deployments use the real Cloudflare Workers AI binding.
+This mode is intentionally endpoint-only. The browser never receives a Cloudflare token; it sends the selected model and planning payload to the app endpoint. The demo app is configured with `@astrojs/cloudflare` and `demo/wrangler.toml`; `demo/wrangler.toml` uses the Astro Cloudflare adapter entrypoint, declares the `AI` binding with `remote = true`, and Astro enables remote bindings by default, so local development, preview deployments, and production deployments use the real Cloudflare Workers AI binding.
 
 For local binding mode, start the dev server normally:
 

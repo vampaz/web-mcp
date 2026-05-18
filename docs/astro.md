@@ -15,6 +15,7 @@ For Cloudflare Workers AI planner mode, keep secrets and bindings on the server 
 The demo uses:
 
 - `@astrojs/cloudflare`
-- `demo/src/worker.ts`
 - `demo/src/pages/api/webmcp/plan.ts`
-- `demo/wrangler.toml` with an `AI` binding
+- `demo/wrangler.toml` with `main = "@astrojs/cloudflare/entrypoints/server"` and an `AI` binding
+
+For Cloudflare Workers Builds, use `npm run build` as the build command and `npm run deploy` as the deploy command.
