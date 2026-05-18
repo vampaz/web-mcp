@@ -39,6 +39,7 @@ describe('WebMcpDemo', () => {
     expect(commandInput.element).toHaveProperty('value', '')
     expect(commandInput.attributes('placeholder')).toBe('Try: Select all French items')
     expect(wrapper.find('.palette-run').attributes()).toHaveProperty('disabled')
+    expect(wrapper.find('option[value="cloudflare-binding"]').exists()).toBe(true)
 
     await commandInput.setValue('Select all French items')
     await wrapper.find('.palette-command').trigger('submit')

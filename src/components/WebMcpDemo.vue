@@ -135,7 +135,7 @@ import {
   getInitialTickets
 } from '@/utils/demo-data'
 
-const showCloudflareBinding = import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIEW === 'true'
+const showCloudflareBinding = true
 const showDevtools = import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIEW === 'true'
 const shouldInstallTestBridge = import.meta.env.DEV || import.meta.env.MODE === 'test'
 const shouldDefaultToCloudflareBinding = showCloudflareBinding && import.meta.env.MODE !== 'test'

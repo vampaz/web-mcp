@@ -120,7 +120,7 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 | **Guard execution** | ✅ Guards run after scope/confirmation checks and before execution. Both `false` and string (reason) returns are handled. |
 | **Event data** | ✅ Events include tool name and timestamp but no input/output by default. `detail` contains invocation data but is only visible through the subscription API, not transmitted. |
 | **Devtools secrets** | ✅ Invocation history shows input/output in the DOM, which is appropriate for a dev tool. Not exposed in production builds. |
-| **Cloudflare binding mode** | ✅ Gated behind `import.meta.env.DEV \|\| import.meta.env.PUBLIC_WEBMCP_PREVIEW === 'true'`. The demo hides it from normal production builds. |
+| **Cloudflare binding mode** | ✅ Available in local, preview, and production deployments through the server endpoint and Cloudflare `AI` binding. |
 
 ### Minor concerns
 

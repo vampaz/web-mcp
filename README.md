@@ -147,7 +147,7 @@ await createWebMCPKit({
 
 See [Planner Providers](./docs/planner-providers.md) for OpenRouter, OpenAI, OpenAI-compatible, Cloudflare Workers AI, Chrome built-in AI, and local fallback examples.
 
-For local development and preview deployments, the demo also exposes `cloudflare-binding`: a server-endpoint-only mode where the browser selects from approved Cloudflare Workers AI models and the Astro Cloudflare runtime endpoint uses an `AI` binding. It is not shown in normal production builds by default.
+The demo also exposes `cloudflare-binding` in local, preview, and production deployments: a server-endpoint-only mode where the browser selects from approved Cloudflare Workers AI models and the Astro Cloudflare runtime endpoint uses an `AI` binding.
 
 ## Playwright Helpers
 

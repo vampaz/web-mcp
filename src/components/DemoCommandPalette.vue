@@ -38,7 +38,7 @@
               <option value="openrouter">OpenRouter</option>
               <option value="openai">OpenAI</option>
               <option value="openai-compatible">OpenAI-compatible</option>
-              <option v-if="showCloudflareBinding" value="cloudflare-binding">Cloudflare binding (dev/preview)</option>
+              <option v-if="showCloudflareBinding" value="cloudflare-binding">Cloudflare binding</option>
               <option value="cloudflare-workers-ai">Cloudflare Workers AI (REST)</option>
             </select>
           </label>
