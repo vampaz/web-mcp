@@ -15,6 +15,6 @@ For Cloudflare Workers AI planner mode, keep secrets and bindings on the server 
 The demo uses:
 
 - `@astrojs/cloudflare`
-- `src/worker.ts`
-- `src/pages/api/webmcp/plan.ts`
-- `wrangler.toml` with an `AI` binding
+- `demo/src/worker.ts`
+- `demo/src/pages/api/webmcp/plan.ts`
+- `demo/wrangler.toml` with an `AI` binding

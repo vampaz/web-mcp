@@ -58,7 +58,7 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 
 - **`testing/playwright.ts`**: Thin, correct Playwright helpers using `page.evaluate()` to reach the test bridge. `waitForWebMCPTool` uses `page.waitForFunction` with a proper predicate.
 
-- **Server endpoint (`src/pages/api/webmcp/plan.ts`)**: Handles both Cloudflare binding and REST modes. Whitelists approved models, strips code fences from AI responses (common with smaller models), uses `getLegacyRuntimeEnv` for compatibility.
+- **Server endpoint (`demo/src/pages/api/webmcp/plan.ts`)**: Handles both Cloudflare binding and REST modes. Whitelists approved models, strips code fences from AI responses (common with smaller models), uses `getLegacyRuntimeEnv` for compatibility.
 
 ### Issues & Recommendations
 

@@ -181,13 +181,18 @@ async function installUnavailableLanguageModelMock(page: Page) {
 }
 
 async function selectPlannerProvider(page: Page, provider: string) {
+  await waitForWebMCPTool(page, 'select_items')
+
   const settings = page.locator('.palette-settings')
   if (!(await settings.evaluate(function isOpen(element) {
     return (element as HTMLDetailsElement).open
   }))) {
     await settings.locator('summary').click()
   }
-  await page.getByLabel('Provider').selectOption(provider)
+
+  const providerSelect = page.getByLabel('Provider')
+  await providerSelect.selectOption(provider)
+  await expect(providerSelect).toHaveValue(provider)
 }
 
 function getItemInput(page: Page, itemName: string) {

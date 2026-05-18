@@ -2,9 +2,9 @@ import { defineComponent, nextTick, ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { clearToolsForTest, defineTool, invokeTool, listTools } from '@webmcp-kit/core'
-import { mountWithDeps } from '@/test-utils/mount-with-deps'
 
 import { useWebMCPTool } from './index'
+import { mountWithDeps } from './test-utils/mount-with-deps'
 
 describe('useWebMCPTool', () => {
   beforeEach(() => {

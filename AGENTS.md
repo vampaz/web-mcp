@@ -17,8 +17,8 @@ WebMCP Kit is an ESM-only TypeScript npm workspace for exposing app actions as W
 - `packages/mcp-bridge`: local MCP-style bridge over registered tools.
 - `packages/zod`: Zod-to-WebMCP tool helper.
 - `packages/vue`, `packages/react`, `packages/svelte`: thin lifecycle helpers around core `registerTool()`.
-- `src`: Astro + Vue demo app and Cloudflare planner endpoint.
-- `tests/e2e`: Playwright demo coverage.
+- `demo`: Astro + Vue demo app, Cloudflare planner endpoint, demo env example, and Playwright demo coverage.
+- `tests/integration`: cross-package integration coverage.
 - `docs`: user-facing docs; keep examples aligned with source behavior.
 - `Dev-Docs`: development planning docs, PRDs, implementation plans, publishing notes, and internal review notes.
 
@@ -28,15 +28,15 @@ WebMCP Kit is an ESM-only TypeScript npm workspace for exposing app actions as W
 - Package manager: npm workspaces with checked-in `package-lock.json`.
 - Do not use `npx`; use package scripts or `npm exec <tool> -- ...`.
 - `.npmrc` sets `min-release-age=4`; preserve it.
-- Dev server: `npm run dev`, port `60001`.
+- Dev server: `npm run dev`, delegated to `demo`, port `60001`.
 - Astro uses the Cloudflare adapter and Caddy TLS default domain `web-mcp.localtest.me`.
 
 ## Style
 
 - TypeScript strict mode, ESM imports/exports, single quotes.
 - Prefer function declarations over function expressions assigned to `const`/`let`.
-- Use workspace imports such as `@webmcp-kit/core`; use `@/` only for `src` app imports.
-- Shared app interfaces go in `src/interfaces`; package-local shared interfaces go in `packages/<name>/src/interfaces`.
+- Use workspace imports such as `@webmcp-kit/core`; use `@/` only inside `demo/src`.
+- Shared demo interfaces go in `demo/src/interfaces`; package-local shared interfaces go in `packages/<name>/src/interfaces`.
 - Vue SFC order is `template`, then `<script setup lang="ts">`, then `style`.
 - Use `withDefaults()` with `defineProps<>()` for Vue props.
 - CSS should be fluid and responsive; fixed dimensions need a concrete reason.
@@ -73,7 +73,7 @@ WebMCP Kit is an ESM-only TypeScript npm workspace for exposing app actions as W
 
 ## Cloudflare And Dependencies
 
-- `wrangler.toml` uses `src/worker.ts`, assets from `dist`, and an `AI` binding.
+- `demo/wrangler.toml` uses `demo/src/worker.ts`, assets from `demo/dist`, and an `AI` binding.
 - Do not deploy with Wrangler unless asked; deployment is push-based.
 - Keep `/api/webmcp/plan` server-side for app-owned secrets and validate returned plans.
 - Prefer existing libraries. If dependencies change, use latest versions and keep lockfile changes intentional.

@@ -3,6 +3,7 @@ import vue from '@astrojs/vue'
 import { defineConfig } from 'astro/config'
 import dotenv from 'dotenv'
 import fs from 'node:fs'
+import path from 'node:path'
 import caddyTls from 'vite-plugin-caddy-multiple-tls'
 
 if (fs.existsSync('./.dev.vars')) {
@@ -34,7 +35,7 @@ export default defineConfig({
     ],
     resolve: {
       alias: {
-        '@': '/src'
+        '@': path.resolve(import.meta.dirname, 'src')
       }
     }
   }

@@ -10,10 +10,10 @@ This is not a new protocol. It is an adoption layer for WebMCP.
 
 - `packages/core`, `packages/testing`, `packages/devtools`, and `packages/mcp-bridge` are implemented as local npm workspace packages and covered by tests.
 - The devtools overlay lives in `packages/devtools`; core remains framework-agnostic.
-- The active demo is the root Astro app in `src/pages/index.astro` and `src/components/WebMcpDemo.vue`; separate `apps/*` demos remain planned.
+- The active demo is the Astro app in `demo/src/pages/index.astro` and `demo/src/components/WebMcpDemo.vue`.
 - Planner providers now support Chrome built-in AI, deterministic fallback, server endpoints, user-provided OpenAI-compatible keys, Cloudflare REST, and Cloudflare binding mode.
-- Cloudflare binding mode is wired through the Astro Cloudflare adapter, `wrangler.toml`, and `src/pages/api/webmcp/plan.ts`.
-- `wrangler.toml` is already configured for the existing Cloudflare project/Worker named `web-mcp`.
+- Cloudflare binding mode is wired through the Astro Cloudflare adapter, `demo/wrangler.toml`, and `demo/src/pages/api/webmcp/plan.ts`.
+- `demo/wrangler.toml` is already configured for the existing Cloudflare project/Worker named `web-mcp`.
 
 ---
 
@@ -129,33 +129,30 @@ This is not a new protocol. It is an adoption layer for WebMCP.
     - Files: `packages/core/src/planner.ts`
     - Verify: server endpoint and user-key modes are covered by tests
   - [x] Step 8.5.3: Add development provider selector
-    - Files: `src/components/WebMcpDemo.vue`
+    - Files: `demo/src/components/WebMcpDemo.vue`
     - Verify: Chrome Beta E2E can select OpenRouter with a user key
   - [x] Step 8.5.4: Add Cloudflare binding planner mode
-    - Files: `packages/core/src/planner.ts`, `src/components/WebMcpDemo.vue`, `docs/planner-providers.md`
+    - Files: `packages/core/src/planner.ts`, `demo/src/components/WebMcpDemo.vue`, `docs/planner-providers.md`
     - Verify: unit and E2E tests cover model selection through the mocked binding endpoint
   - [x] Step 8.5.5: Wire Astro Cloudflare adapter for AI bindings
-    - Files: `astro.config.mjs`, `wrangler.toml`, `src/worker.ts`, `src/pages/api/webmcp/plan.ts`
+    - Files: `demo/astro.config.mjs`, `demo/wrangler.toml`, `demo/src/worker.ts`, `demo/src/pages/api/webmcp/plan.ts`
     - Verify: route tests cover planning through the Cloudflare `AI` binding shape
 
-- [x] Phase 9: Demo Applications
-  - [x] Step 9.1: Build plain JavaScript demo
-    - Files: `apps/plain-demo/index.html`, `apps/plain-demo/src/main.ts`
-    - Verify: registers native tools when available and fallback tools otherwise
-  - [x] Step 9.2: Build Astro demo
-    - Files: `astro.config.mjs`, `src/pages/index.astro`, `src/components/WebMcpDemo.vue`
+- [x] Phase 9: Demo Application
+  - [x] Step 9.1: Build Astro demo
+    - Files: `demo/astro.config.mjs`, `demo/src/pages/index.astro`, `demo/src/components/WebMcpDemo.vue`
     - Verify: dev overlay appears in dev mode
-  - [x] Step 9.3: Build Vue invoice workflow
-    - Files: `src/components/WebMcpDemo.vue`
+  - [x] Step 9.2: Build Vue invoice workflow
+    - Files: `demo/src/components/WebMcpDemo.vue`
     - Verify: create-invoice tool is registered with confirmation metadata and updates demo state
-  - [x] Step 9.4: Build product/cart workflow in the active demo
-    - Files: `src/components/WebMcpDemo.vue`
+  - [x] Step 9.3: Build product/cart workflow in the active demo
+    - Files: `demo/src/components/WebMcpDemo.vue`
     - Verify: search, add-to-cart, and checkout tools use guards and confirmations
-  - [x] Step 9.5: Build support workflow
-    - Files: `src/components/WebMcpDemo.vue`
+  - [x] Step 9.4: Build support workflow
+    - Files: `demo/src/components/WebMcpDemo.vue`
     - Verify: create-ticket tool demonstrates form helpers and schema inference
-  - [x] Step 9.6: Add browser support indicator
-    - Files: `src/components/WebMcpDemo.vue`
+  - [x] Step 9.5: Add browser support indicator
+    - Files: `demo/src/components/WebMcpDemo.vue`
     - Verify: page clearly distinguishes native WebMCP from fallback mode
 
 - [x] Phase 10: Documentation
@@ -186,7 +183,7 @@ This is not a new protocol. It is an adoption layer for WebMCP.
     - Files: `tests/integration/fallback.spec.ts`
     - Verify: unsupported browser environments still expose dev/test registry
   - [x] Step 11.3: Add browser smoke tests for planner and fallback behavior
-    - Files: `tests/e2e/webmcp-demo.spec.ts`
+    - Files: `demo/tests/e2e/webmcp-demo.spec.ts`
     - Verify: Chrome Beta tests cover Chrome AI, local fallback, provider selection, and test bridge helpers
   - [x] Step 11.4: Add Lighthouse documentation check
     - Files: `docs/browser-support.md`

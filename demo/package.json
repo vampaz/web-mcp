@@ -1,0 +1,40 @@
+{
+  "name": "@webmcp-kit/demo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "astro dev",
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "test": "vitest --run",
+    "test:e2e": "playwright test",
+    "test:watch": "vitest --watch"
+  },
+  "dependencies": {
+    "@astrojs/vue": "latest",
+    "@webmcp-kit/core": "0.0.0",
+    "@webmcp-kit/devtools": "0.0.0",
+    "astro": "latest",
+    "three": "^0.184.0",
+    "vue": "latest"
+  },
+  "devDependencies": {
+    "@astrojs/cloudflare": "^13.5.1",
+    "@cloudflare/workers-types": "^4.20260509.1",
+    "@playwright/test": "^1.60.0",
+    "@types/node": "latest",
+    "@types/three": "^0.184.1",
+    "@vitejs/plugin-vue": "latest",
+    "@vue/test-utils": "latest",
+    "@webmcp-kit/testing": "^0.0.0",
+    "dotenv": "^17.4.2",
+    "jsdom": "latest",
+    "typescript": "latest",
+    "vite": "latest",
+    "vite-plugin-caddy-multiple-tls": "^1.9.0",
+    "vitest": "latest",
+    "wrangler": "^4.90.0"
+  }
+}

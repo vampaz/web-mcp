@@ -72,18 +72,18 @@ Do not use the global API key. Do not expose the token through public client var
 
 This project uses:
 
-- `wrangler.toml` with `account_id = "1be30ba84b25839e5cc0d507256f0fc8"`.
+- `demo/wrangler.toml` with `account_id = "1be30ba84b25839e5cc0d507256f0fc8"`.
 - A remote Workers AI binding: `[ai] binding = "AI" remote = true`.
 - Astro's Cloudflare adapter for local and preview Cloudflare runtime behavior.
 
-The committed `.env.example` contains the account ID and leaves the token blank. Local development should copy it to `.env` and set `CLOUDFLARE_API_TOKEN`.
+The committed `demo/.env.example` contains the account ID and leaves the token blank. Demo development should copy it to `demo/.env` and set `CLOUDFLARE_API_TOKEN`.
 
 ## Operational Rule For Future Projects
 
 When creating or touching any Cloudflare project, check this before calling the work done:
 
 - `.env` and local variants are ignored.
-- `.env.example` exists and names required Cloudflare variables without secrets.
+- `demo/.env.example` exists and names required Cloudflare variables without secrets.
 - Docs say local dev uses `.env`, not repeated interactive OAuth.
 - `npm exec wrangler -- whoami` works from the project root after the local `.env` is present.
 

@@ -1,0 +1,4 @@
+{
+  "packageFile": "{package.json,demo/package.json,packages/*/package.json}",
+  "reject": ["@webmcp-kit/*"]
+}

@@ -106,10 +106,10 @@ The demo includes `/api/webmcp/plan` for Cloudflare server planning. For `provid
 For local development, keep Wrangler authentication in an ignored project `.env` file instead of relying on the global interactive OAuth refresh token:
 
 ```sh
-cp .env.example .env
+cp demo/.env.example demo/.env
 ```
 
-Then fill in `CLOUDFLARE_API_TOKEN`. `CLOUDFLARE_ACCOUNT_ID` is already present in `.env.example` for this project. This keeps `npm run dev` and remote AI bindings on stable project-local credentials while avoiding committed secrets.
+Then fill in `CLOUDFLARE_API_TOKEN`. `CLOUDFLARE_ACCOUNT_ID` is already present in `demo/.env.example` for this project. This keeps `npm run dev` and remote AI bindings on stable project-local credentials while avoiding committed secrets.
 
 Cloudflare binding mode for local development and preview deployments:
 
@@ -126,7 +126,7 @@ await createWebMCPKit({
 })
 ```
 
-This mode is intentionally endpoint-only. The browser never receives a Cloudflare token; it sends the selected model and planning payload to the app endpoint. The app is configured with `@astrojs/cloudflare`, `src/worker.ts`, and `wrangler.toml`; `wrangler.toml` declares the `AI` binding with `remote = true`, and Astro enables remote bindings by default, so local development, preview deployments, and production deployments use the real Cloudflare Workers AI binding.
+This mode is intentionally endpoint-only. The browser never receives a Cloudflare token; it sends the selected model and planning payload to the app endpoint. The demo app is configured with `@astrojs/cloudflare`, `demo/src/worker.ts`, and `demo/wrangler.toml`; `demo/wrangler.toml` declares the `AI` binding with `remote = true`, and Astro enables remote bindings by default, so local development, preview deployments, and production deployments use the real Cloudflare Workers AI binding.
 
 For local binding mode, start the dev server normally:
 
