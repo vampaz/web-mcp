@@ -39,8 +39,8 @@ const overlayStyles = `
   bottom: 18px;
   z-index: 2147483647;
   width: min(460px, calc(100vw - 36px));
-  color: #f4f0e8;
-  font-family: Avenir Next, Avenir, Corbel, Segoe UI, sans-serif;
+  color: #f7faf8;
+  font: 500 14px/1.45 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 .wmk-devtools--inline {
   position: static;
@@ -50,24 +50,40 @@ const overlayStyles = `
 .wmk-devtools textarea {
   font: inherit;
 }
+.wmk-devtools button:focus-visible,
+.wmk-devtools textarea:focus-visible,
+.wmk-devtools summary:focus-visible {
+  outline: 2px solid #50d7a1;
+  outline-offset: 2px;
+}
 .wmk-devtools__toggle {
   float: right;
-  border: 1px solid #e8be53;
-  background: #e8be53;
-  color: #0c1110;
-  padding: 11px 14px;
-  font-weight: 900;
+  border: 1px solid #1e9f72;
+  background: #1e9f72;
+  color: #06100c;
+  padding: 10px 14px;
+  font-weight: 800;
   cursor: pointer;
-  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.34);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.26);
+  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+.wmk-devtools__toggle:hover {
+  border-color: #34c995;
+  background: #34c995;
+  transform: translateY(-1px);
 }
 .wmk-devtools--inline .wmk-devtools__toggle {
   float: none;
   width: 100%;
-  margin-top: 14px;
-  border-color: rgba(244, 240, 232, 0.18);
-  background: rgba(244, 240, 232, 0.06);
-  color: #f4f0e8;
+  margin-top: 0;
+  border: 0;
+  border-top: 1px solid rgba(224, 234, 229, 0.08);
+  border-bottom: 1px solid rgba(224, 234, 229, 0.1);
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.035);
+  color: #e9f0ec;
   box-shadow: none;
+  transform: none;
 }
 .wmk-devtools__panel {
   clear: both;
@@ -76,14 +92,18 @@ const overlayStyles = `
   max-height: min(720px, calc(100vh - 96px));
   overflow: auto;
   margin-top: 12px;
-  padding: 16px;
-  border: 1px solid rgba(244, 240, 232, 0.18);
-  background: rgba(9, 11, 11, 0.94);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.46);
+  padding: 14px;
+  border: 1px solid rgba(224, 234, 229, 0.14);
+  background: rgba(9, 17, 14, 0.96);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
   backdrop-filter: blur(18px);
 }
 .wmk-devtools--inline .wmk-devtools__panel {
   max-height: none;
+  margin-top: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 .wmk-devtools__panel[hidden] {
   display: none;
@@ -93,21 +113,22 @@ const overlayStyles = `
   align-items: start;
   justify-content: space-between;
   gap: 16px;
+  padding: 2px 2px 6px;
 }
 .wmk-devtools__eyebrow,
 .wmk-devtools__meta,
 .wmk-devtools__warning,
 .wmk-devtools__preview,
 .wmk-devtools__history {
-  color: #9ea8a1;
+  color: #9aa8a1;
   font-size: 12px;
 }
 .wmk-devtools__health {
   display: grid;
   gap: 10px;
   padding: 12px;
-  border: 1px solid rgba(244, 240, 232, 0.13);
-  background: rgba(244, 240, 232, 0.04);
+  border: 1px solid rgba(224, 234, 229, 0.12);
+  background: rgba(255, 255, 255, 0.035);
 }
 .wmk-devtools__health-header {
   display: flex;
@@ -116,32 +137,35 @@ const overlayStyles = `
   gap: 12px;
 }
 .wmk-devtools__health-title {
-  color: #f4f0e8;
-  font-weight: 900;
+  color: #f7faf8;
+  font-weight: 800;
 }
 .wmk-devtools__health-summary {
-  color: #c9d1cb;
+  color: #c4d0c9;
   font-size: 12px;
 }
 .wmk-devtools__badge {
-  border: 1px solid rgba(244, 240, 232, 0.18);
+  border: 1px solid rgba(224, 234, 229, 0.18);
   padding: 3px 7px;
-  color: #f4f0e8;
+  color: #f7faf8;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 800;
   text-transform: uppercase;
 }
 .wmk-devtools__badge--ready {
-  border-color: #30a779;
-  color: #30a779;
+  border-color: rgba(30, 159, 114, 0.42);
+  background: rgba(30, 159, 114, 0.12);
+  color: #50d7a1;
 }
 .wmk-devtools__badge--warning {
-  border-color: #e8be53;
-  color: #e8be53;
+  border-color: rgba(232, 190, 83, 0.48);
+  background: rgba(232, 190, 83, 0.12);
+  color: #f2cc6b;
 }
 .wmk-devtools__badge--error {
-  border-color: #f39a8d;
-  color: #f39a8d;
+  border-color: rgba(243, 154, 141, 0.48);
+  background: rgba(243, 154, 141, 0.12);
+  color: #f6aca2;
 }
 .wmk-devtools__diagnostics {
   display: grid;
@@ -150,9 +174,9 @@ const overlayStyles = `
 .wmk-devtools__diagnostic {
   display: grid;
   gap: 3px;
-  border-left: 3px solid rgba(244, 240, 232, 0.22);
-  padding-left: 8px;
-  color: #c9d1cb;
+  border-left: 3px solid rgba(224, 234, 229, 0.22);
+  padding: 2px 0 2px 9px;
+  color: #c4d0c9;
   font-size: 12px;
 }
 .wmk-devtools__diagnostic--warning {
@@ -162,45 +186,47 @@ const overlayStyles = `
   border-left-color: #f39a8d;
 }
 .wmk-devtools__diagnostic strong {
-  color: #f4f0e8;
+  color: #f7faf8;
 }
 .wmk-devtools__diagnostic span {
-  color: #9ea8a1;
+  color: #9aa8a1;
 }
 .wmk-devtools__title {
   margin: 3px 0 0;
-  font-family: Georgia, Cambria, serif;
-  font-size: 28px;
-  line-height: 1;
+  color: #f7faf8;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.15;
 }
 .wmk-devtools__status {
-  color: #30a779;
+  color: #50d7a1;
   font-size: 12px;
   font-weight: 800;
   text-align: right;
 }
 .wmk-devtools__tool {
   display: grid;
-  gap: 9px;
-  padding: 12px;
-  border: 1px solid rgba(244, 240, 232, 0.13);
-  background: rgba(244, 240, 232, 0.05);
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid rgba(224, 234, 229, 0.12);
+  background: rgba(255, 255, 255, 0.035);
 }
 .wmk-devtools__tool strong {
-  color: #f4f0e8;
+  color: #f7faf8;
+  font-weight: 800;
 }
 .wmk-devtools__tool p {
   margin: 0;
-  color: #c9d1cb;
+  color: #c4d0c9;
   line-height: 1.35;
 }
 .wmk-devtools__tool textarea {
-  min-height: 88px;
+  min-height: 76px;
   width: 100%;
   resize: vertical;
-  border: 1px solid rgba(244, 240, 232, 0.18);
-  background: #f4f0e8;
-  color: #0c1110;
+  border: 1px solid rgba(224, 234, 229, 0.16);
+  background: #f6f4ee;
+  color: #101815;
   padding: 10px;
 }
 .wmk-devtools__actions {
@@ -209,16 +235,16 @@ const overlayStyles = `
   flex-wrap: wrap;
 }
 .wmk-devtools__actions button {
-  border: 1px solid rgba(244, 240, 232, 0.18);
-  background: rgba(244, 240, 232, 0.08);
-  color: #f4f0e8;
+  border: 1px solid rgba(224, 234, 229, 0.16);
+  background: rgba(255, 255, 255, 0.055);
+  color: #f7faf8;
   padding: 8px 10px;
   cursor: pointer;
 }
 .wmk-devtools__actions button:first-child {
-  border-color: #30a779;
-  background: #30a779;
-  color: #08100d;
+  border-color: #1e9f72;
+  background: #1e9f72;
+  color: #06100c;
   font-weight: 800;
 }
 .wmk-devtools__warning {
@@ -230,26 +256,27 @@ const overlayStyles = `
   font-size: 12px;
 }
 .wmk-devtools__quality {
-  color: #30a779;
+  color: #50d7a1;
   font-size: 12px;
   font-weight: 800;
 }
 .wmk-devtools__preview summary {
   cursor: pointer;
+  color: #9aa8a1;
 }
 .wmk-devtools__preview pre,
 .wmk-devtools__history pre {
   overflow: auto;
   margin: 6px 0 0;
-  padding: 8px;
-  background: rgba(0, 0, 0, 0.26);
-  color: #f4f0e8;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.24);
+  color: #e9f0ec;
   white-space: pre-wrap;
 }
 .wmk-devtools__history {
   display: grid;
   gap: 10px;
-  border-top: 1px solid rgba(244, 240, 232, 0.13);
+  border-top: 1px solid rgba(224, 234, 229, 0.12);
   padding-top: 12px;
 }
 .wmk-devtools__history-item {
@@ -348,7 +375,7 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
     const healthReport = getIntegrationHealthReport()
     root.innerHTML = `
       <button class="wmk-devtools__toggle" type="button" data-action="toggle">
-        ${open ? 'Hide' : 'Tools'} (${registrations.length})
+        ${open ? 'Hide inspector' : 'Show inspector'} · ${registrations.length} tools
       </button>
       <div class="wmk-devtools__panel" ${open ? '' : 'hidden'}>
         <header class="wmk-devtools__header">

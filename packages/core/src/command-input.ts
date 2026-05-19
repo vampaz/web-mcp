@@ -813,10 +813,20 @@ function assertCustomElementsAvailable() {
 function getStyles(): string {
   return `
     :host {
+      --webmcp-ink: #121815;
+      --webmcp-muted: #66746d;
+      --webmcp-line: #dbe5df;
+      --webmcp-soft-line: rgba(18, 24, 21, 0.09);
+      --webmcp-paper: #fbfcfa;
+      --webmcp-panel: #ffffff;
+      --webmcp-field: #f4f8f5;
+      --webmcp-accent: #1e9f72;
+      --webmcp-accent-dark: #0f6f51;
+      --webmcp-dark: #09110e;
       display: block;
       position: relative;
-      color: #101514;
-      font: 500 0.95rem/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--webmcp-ink);
+      font: 500 0.95rem/1.4 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
     * {
@@ -826,10 +836,11 @@ function getStyles(): string {
     .webmcp-command {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
-      gap: 0.5rem;
-      padding: 0.5rem;
-      border: 1px solid #cfd8d2;
-      background: #ffffff;
+      gap: 0.625rem;
+      padding: 0.625rem;
+      border: 1px solid var(--webmcp-line);
+      background: linear-gradient(180deg, #ffffff 0%, var(--webmcp-paper) 100%);
+      box-shadow: 0 16px 36px rgba(4, 10, 8, 0.12);
     }
 
     .webmcp-input-shell {
@@ -837,17 +848,25 @@ function getStyles(): string {
       align-items: center;
       min-width: 0;
       gap: 0.625rem;
-      padding: 0 0.75rem;
-      border: 1px solid #cfd8d2;
-      background: #f7faf8;
+      padding: 0 0.875rem;
+      border: 1px solid var(--webmcp-line);
+      background: var(--webmcp-field);
+      transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+    }
+
+    .webmcp-input-shell:focus-within {
+      border-color: rgba(30, 159, 114, 0.58);
+      background: #ffffff;
+      box-shadow: 0 0 0 3px rgba(30, 159, 114, 0.12);
     }
 
     .webmcp-input-shell span,
     .webmcp-settings label span {
       flex: 0 0 auto;
-      color: #5f6f68;
-      font-size: 0.75rem;
+      color: var(--webmcp-muted);
+      font-size: 0.72rem;
       font-weight: 800;
+      letter-spacing: 0;
       text-transform: uppercase;
     }
 
@@ -856,7 +875,6 @@ function getStyles(): string {
     button {
       min-width: 0;
       min-height: 2.5rem;
-      border-radius: 0;
       font: inherit;
     }
 
@@ -866,23 +884,31 @@ function getStyles(): string {
       border: 0;
       outline: 0;
       background: transparent;
-      color: #101514;
+      color: var(--webmcp-ink);
     }
 
     select,
     .webmcp-settings input {
-      padding: 0 0.625rem;
-      border: 1px solid #cfd8d2;
+      padding: 0 0.75rem;
+      border: 1px solid var(--webmcp-line);
       background: #ffffff;
     }
 
     button {
-      padding: 0 1rem;
-      border: 1px solid #101514;
-      background: #101514;
+      padding: 0 1.125rem;
+      border: 1px solid var(--webmcp-ink);
+      background: var(--webmcp-ink);
       color: #ffffff;
       font-weight: 800;
       white-space: nowrap;
+      cursor: pointer;
+      transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+    }
+
+    button:hover:not(:disabled) {
+      border-color: var(--webmcp-accent-dark);
+      background: var(--webmcp-accent-dark);
+      transform: translateY(-1px);
     }
 
     button:disabled {
@@ -890,20 +916,24 @@ function getStyles(): string {
       opacity: 0.7;
     }
 
-    .webmcp-input-shell:focus-within,
     button:focus-visible,
     summary:focus-visible,
     select:focus-visible,
     .webmcp-settings input:focus-visible {
-      outline: 2px solid #2b7fff;
+      outline: 2px solid var(--webmcp-accent);
       outline-offset: 2px;
     }
 
     .webmcp-settings,
     .webmcp-diagnostics {
-      padding: 0.35rem 0.5rem 0.5rem;
-      border-inline: 1px solid #cfd8d2;
-      border-bottom: 1px solid #cfd8d2;
+      padding: 0.5rem 0.625rem 0.625rem;
+      border-inline: 1px solid var(--webmcp-line);
+      border-bottom: 1px solid var(--webmcp-line);
+      background: rgba(255, 255, 255, 0.96);
+    }
+
+    .webmcp-settings[open],
+    .webmcp-diagnostics[open] {
       background: #ffffff;
     }
 
@@ -916,51 +946,58 @@ function getStyles(): string {
       display: inline-flex;
       min-height: 1.75rem;
       align-items: center;
+      gap: 0.45rem;
       cursor: pointer;
-      color: #5f6f68;
-      font-size: 0.75rem;
+      color: var(--webmcp-muted);
+      font-size: 0.72rem;
       font-weight: 800;
+      letter-spacing: 0;
       text-transform: uppercase;
+    }
+
+    summary::marker {
+      color: var(--webmcp-accent);
+      font-size: 0.75rem;
     }
 
     .webmcp-settings-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.5rem;
-      padding-block-start: 0.35rem;
+      gap: 0.625rem;
+      padding-block-start: 0.45rem;
     }
 
     .webmcp-settings label {
       display: grid;
       min-width: 0;
-      gap: 0.25rem;
+      gap: 0.3rem;
     }
 
     .webmcp-diagnostics-content {
       position: absolute;
       z-index: 20;
       top: 100%;
-      right: -0.5rem;
-      left: -0.5rem;
-      max-height: min(42rem, 70vh);
+      right: -0.625rem;
+      left: -0.625rem;
+      max-height: min(40rem, 68vh);
       overflow: auto;
       margin-inline: 0;
-      border: 1px solid rgba(244, 240, 232, 0.16);
+      border: 1px solid rgba(224, 234, 229, 0.18);
       border-top: 0;
-      background: #08100d;
-      box-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.28);
+      background: var(--webmcp-dark);
+      box-shadow: 0 1.2rem 2.5rem rgba(0, 0, 0, 0.32);
     }
 
     .webmcp-status {
       display: grid;
       gap: 0.15rem;
-      margin: 0.4rem 0 0;
-      color: #5f6f68;
-      font-size: 0.82rem;
+      margin: 0.45rem 0 0;
+      color: var(--webmcp-muted);
+      font-size: 0.8rem;
     }
 
     .webmcp-status strong {
-      color: #101514;
+      color: var(--webmcp-ink);
       font-size: 0.84rem;
     }
 
