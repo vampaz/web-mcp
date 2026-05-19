@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { defineWebMCPCommandInput } from './command-input'
 import { defineTool } from './define-tool'
-import type { WebMCPCommandInputElement, WebMCPCommandResultEventDetail } from './interfaces/command-input'
+import type { WebMCPCommandInputElement, WebMCPCommandPlannerEventDetail, WebMCPCommandResultEventDetail } from './interfaces/command-input'
 import type { ToolPlanner } from './interfaces/tool'
 import { clearToolsForTest, registerTool } from './registry'
 
@@ -130,9 +130,104 @@ describe('WebMCP command input', () => {
     provider.value = 'openai'
     provider.dispatchEvent(new Event('change', { bubbles: true }))
 
-    const model = element.shadowRoot?.querySelector<HTMLInputElement>('[data-model]')
-    expect(model).toBeInstanceOf(HTMLInputElement)
+    const settings = element.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-settings')
+    const model = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-model]')
+    expect(settings?.open).toBe(true)
+    expect(model).toBeInstanceOf(HTMLSelectElement)
     expect(model?.value).toBe('gpt-4.1-mini')
+  })
+
+  it('shows Cloudflare models as a dropdown after choosing Cloudflare binding', async () => {
+    const element = createCommandInputElement()
+    document.body.append(element)
+    await Promise.resolve()
+
+    const provider = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
+    if (!provider) throw new Error('Expected provider control.')
+    provider.value = 'cloudflare-binding'
+    provider.dispatchEvent(new Event('change', { bubbles: true }))
+
+    const settings = element.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-settings')
+    const model = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-model]')
+    expect(settings?.open).toBe(true)
+    expect(model).toBeInstanceOf(HTMLSelectElement)
+    expect(model?.value).toBe('@cf/moonshotai/kimi-k2.6')
+    expect(Array.from(model?.options ?? []).map(function mapOption(option) {
+      return option.value
+    })).toContain('@cf/openai/gpt-oss-20b')
+  })
+
+  it('renders slotted diagnostics inside an expandable row', async () => {
+    const element = createCommandInputElement()
+    const diagnostics = document.createElement('section')
+    diagnostics.slot = 'diagnostics'
+    diagnostics.textContent = 'Runtime diagnostics'
+    element.append(diagnostics)
+
+    document.body.append(element)
+    await Promise.resolve()
+
+    const diagnosticsRow = element.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-diagnostics')
+    const diagnosticsSlot = element.shadowRoot?.querySelector<HTMLSlotElement>('slot[name="diagnostics"]')
+    expect(diagnosticsRow).toBeInstanceOf(HTMLDetailsElement)
+    expect(diagnosticsRow?.textContent).toContain('Developer diagnostics')
+    expect(diagnosticsSlot?.assignedElements()).toEqual([diagnostics])
+  })
+
+  it('emits planner status when the selected provider changes', async () => {
+    const element = createCommandInputElement()
+    document.body.append(element)
+    await Promise.resolve()
+
+    const event = waitForCommandPlanner(element)
+    const provider = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
+    if (!provider) throw new Error('Expected provider control.')
+    provider.value = 'local'
+    provider.dispatchEvent(new Event('change', { bubbles: true }))
+
+    await expect(event).resolves.toMatchObject({
+      detail: {
+        planner: expect.objectContaining({
+          name: 'Local heuristic planner',
+          status: 'fallback'
+        })
+      }
+    })
+  })
+
+  it('keeps commands usable when selected Chrome built-in AI is unavailable', async () => {
+    registerTool(defineTool({
+      name: 'add_to_cart',
+      description: 'Add a product to the cart.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          productId: { type: 'string' },
+          quantity: { type: 'number' }
+        },
+        required: ['productId', 'quantity'],
+        additionalProperties: false
+      },
+      execute(input) {
+        return input
+      }
+    }))
+
+    const element = createCommandInputElement()
+    element.setAttribute('provider', 'chrome-built-in')
+    document.body.append(element)
+    await Promise.resolve()
+
+    const result = await element.run('Add ten keyboards to the cart.')
+
+    expect(result).toMatchObject({
+      status: 'success',
+      toolName: 'add_to_cart',
+      output: {
+        productId: 'kbd-01',
+        quantity: 10
+      }
+    })
   })
 
   it('hides controls when provider and model are fixed through configure', async () => {
@@ -200,6 +295,14 @@ function waitForCommandResult(element: WebMCPCommandInputElement): Promise<Custo
   return new Promise(function resolveCommandResult(resolve) {
     element.addEventListener('webmcp-command-result', function handleResult(event) {
       resolve(event as CustomEvent<WebMCPCommandResultEventDetail>)
+    }, { once: true })
+  })
+}
+
+function waitForCommandPlanner(element: WebMCPCommandInputElement): Promise<CustomEvent<WebMCPCommandPlannerEventDetail>> {
+  return new Promise(function resolveCommandPlanner(resolve) {
+    element.addEventListener('webmcp-command-planner', function handlePlanner(event) {
+      resolve(event as CustomEvent<WebMCPCommandPlannerEventDetail>)
     }, { once: true })
   })
 }

@@ -1,7 +1,9 @@
 <template>
-  <details class="diagnostics-panel">
-    <summary>Developer diagnostics</summary>
-
+  <section
+    class="diagnostics-content"
+    aria-label="Developer diagnostics"
+    data-webmcp-diagnostics
+  >
     <section class="status-strip" aria-label="Runtime status">
       <div>
         <span>WebMCP</span>
@@ -19,7 +21,7 @@
     </section>
 
     <div ref="devtoolsHost" class="devtools-host" />
-  </details>
+  </section>
 </template>
 
 <script setup lang="ts">
@@ -41,19 +43,8 @@ defineExpose({
 </script>
 
 <style scoped>
-.diagnostics-panel {
-  margin-top: 16px;
-  border: 1px solid rgba(244, 240, 232, 0.14);
+.diagnostics-content {
   background: rgba(8, 12, 11, 0.86);
-}
-
-.diagnostics-panel summary {
-  padding: 9px 10px;
-  cursor: pointer;
-  color: #9ea8a1;
-  font-size: 0.78rem;
-  font-weight: 900;
-  text-transform: uppercase;
 }
 
 .status-strip {

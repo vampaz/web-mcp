@@ -1011,7 +1011,7 @@ function getOpenAICompatibleBaseUrl(config: PlannerProviderConfig): string {
 function getDefaultModel(config: PlannerProviderConfig): string {
   if (config.provider === 'openrouter') return 'openrouter/auto'
   if (config.provider === 'openai') return 'gpt-4.1-mini'
-  if (config.provider === 'cloudflare-binding') return '@cf/google/gemma-4-26b-a4b-it'
+  if (config.provider === 'cloudflare-binding') return '@cf/moonshotai/kimi-k2.6'
   if (config.provider === 'cloudflare-workers-ai') return '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b'
 
   return 'default'

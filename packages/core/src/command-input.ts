@@ -13,9 +13,10 @@ import type {
   WebMCPCommandInputElement,
   WebMCPCommandInputPhase,
   WebMCPCommandPlanEventDetail,
+  WebMCPCommandPlannerEventDetail,
   WebMCPCommandResultEventDetail
 } from './interfaces/command-input'
-import { createBestPlanner, createConfiguredPlanner } from './planner'
+import { createBestPlanner, createChromeAIPlanner, createConfiguredPlanner, createHeuristicPlanner } from './planner'
 import { invokeTool, listTools } from './registry'
 
 type CommandInputConstructor = CustomElementConstructor & {
@@ -27,6 +28,8 @@ type CommandInputRuntimeState = {
   disabled: boolean
   fixedModel?: string
   fixedProvider?: PlannerProviderKind
+  hasDiagnostics: boolean
+  diagnosticsOpen: boolean
   model: string
   phase: WebMCPCommandInputPhase
   placeholder: string
@@ -34,6 +37,12 @@ type CommandInputRuntimeState = {
   plannerDetail: string
   plannerName: string
   provider: PlannerProviderKind
+  settingsOpen: boolean
+}
+
+type ModelOption = {
+  label: string
+  value: string
 }
 
 const defaultPlaceholder = 'Tell this app what to do'
@@ -74,6 +83,7 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
     private currentPlannerSignature = ''
     private currentPlannerWasCreated = false
     private isConnectedToDom = false
+    private lightDomObserver?: MutationObserver
     private plannerLoadId = 0
     private plannerRevision = 0
     private providedPlanner?: ToolPlanner
@@ -82,13 +92,16 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
     private readonly state: CommandInputRuntimeState = {
       buttonLabel: defaultButtonLabel,
       disabled: false,
+      diagnosticsOpen: false,
+      hasDiagnostics: false,
       model: defaultModel,
       phase: 'idle',
       placeholder: defaultPlaceholder,
       prompt: '',
       plannerDetail: 'Planner is waiting for a command.',
       plannerName: 'Planner',
-      provider: 'auto'
+      provider: 'auto',
+      settingsOpen: false
     }
 
     constructor() {
@@ -99,12 +112,16 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
     connectedCallback() {
       this.isConnectedToDom = true
       this.syncAttributes()
+      this.syncDiagnosticsContent()
+      this.observeLightDom()
       this.render()
       void this.refreshPlannerStatus()
     }
 
     disconnectedCallback() {
       this.isConnectedToDom = false
+      this.lightDomObserver?.disconnect()
+      this.lightDomObserver = undefined
       this.invalidatePlanner()
     }
 
@@ -262,6 +279,32 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       }
     }
 
+    private observeLightDom() {
+      this.lightDomObserver?.disconnect()
+      this.lightDomObserver = new MutationObserver(this.handleLightDomChanged.bind(this))
+      this.lightDomObserver.observe(this, {
+        attributeFilter: ['slot'],
+        attributes: true,
+        childList: true,
+        subtree: true
+      })
+    }
+
+    private handleLightDomChanged() {
+      if (this.syncDiagnosticsContent()) this.renderIfConnected()
+    }
+
+    private syncDiagnosticsContent(): boolean {
+      const hasDiagnostics = this.hasDiagnosticsContent()
+      if (this.state.hasDiagnostics === hasDiagnostics) return false
+      this.state.hasDiagnostics = hasDiagnostics
+      return true
+    }
+
+    private hasDiagnosticsContent(): boolean {
+      return Boolean(this.querySelector('[slot="diagnostics"]'))
+    }
+
     private applyAttribute(name: string, value: string | null) {
       if (name === 'account-id') this.accountId = value ?? undefined
       if (name === 'api-key') this.apiKey = value ?? undefined
@@ -285,6 +328,7 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       if (this.planner) {
         this.state.plannerName = `${this.planner.name} (${this.planner.status})`
         this.state.plannerDetail = this.planner.detail
+        this.dispatchPlannerEvent(this.planner)
         return this.planner
       }
 
@@ -296,7 +340,7 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       const loadId = this.plannerLoadId + 1
       this.plannerLoadId = loadId
       const revision = this.plannerRevision
-      const planner = plannerConfig ? await createConfiguredPlanner(plannerConfig) : await createBestPlanner()
+      const planner = await createCommandInputPlanner(plannerConfig)
       if (revision !== this.plannerRevision || loadId !== this.plannerLoadId) {
         planner.dispose?.()
         throw new Error(supersededPlannerRefreshMessage)
@@ -307,6 +351,7 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       this.currentPlannerSignature = plannerSignature
       this.state.plannerName = `${this.currentPlanner.name} (${this.currentPlanner.status})`
       this.state.plannerDetail = this.currentPlanner.detail
+      this.dispatchPlannerEvent(this.currentPlanner)
       return this.currentPlanner
     }
 
@@ -402,6 +447,16 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       }))
     }
 
+    private dispatchPlannerEvent(planner: ToolPlanner) {
+      this.dispatchEvent(new CustomEvent<WebMCPCommandPlannerEventDetail>('webmcp-command-planner', {
+        bubbles: true,
+        composed: true,
+        detail: {
+          planner
+        }
+      }))
+    }
+
     private dispatchResultEvent(message: string, plan: ToolPlan, result: ToolInvocationResult) {
       this.dispatchEvent(new CustomEvent<WebMCPCommandResultEventDetail>('webmcp-command-result', {
         bubbles: true,
@@ -440,6 +495,7 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       const provider = isPlannerProviderKind(target.value) ? target.value : 'auto'
       this.state.provider = provider
       this.state.model = getDefaultModelForProvider(provider)
+      this.state.settingsOpen = true
       this.invalidatePlanner()
       this.render()
       void this.refreshPlannerStatus()
@@ -447,10 +503,22 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
 
     private handleModelChanged(event: Event) {
       const target = event.target
-      if (!(target instanceof HTMLInputElement)) return
+      if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLSelectElement)) return
       this.state.model = target.value
       this.invalidatePlanner()
       void this.refreshPlannerStatus()
+    }
+
+    private handleSettingsToggled(event: Event) {
+      const target = event.target
+      if (!(target instanceof HTMLDetailsElement)) return
+      this.state.settingsOpen = target.open
+    }
+
+    private handleDiagnosticsToggled(event: Event) {
+      const target = event.target
+      if (!(target instanceof HTMLDetailsElement)) return
+      this.state.diagnosticsOpen = target.open
     }
 
     private handlePromptChanged(event: Event) {
@@ -470,6 +538,7 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       const model = this.state.fixedModel ?? this.state.model
       const showProviderControl = !this.planner && !this.plannerConfig && !this.state.fixedProvider
       const showModelControl = !this.planner && !this.plannerConfig && !this.state.fixedModel && usesModelInput(provider)
+      const showDiagnostics = this.state.hasDiagnostics
       const statusLabel = getStatusLabel(this.state.phase)
       const buttonLabel = this.running ? statusLabel : this.state.buttonLabel
 
@@ -493,11 +562,19 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
           </button>
         </form>
         ${showProviderControl || showModelControl ? `
-          <details class="webmcp-settings">
+          <details class="webmcp-settings" ${this.state.settingsOpen ? 'open' : ''}>
             <summary>Options</summary>
             <div class="webmcp-settings-grid">
               ${showProviderControl ? getProviderControlMarkup(provider) : ''}
-              ${showModelControl ? getModelControlMarkup(model) : ''}
+              ${showModelControl ? getModelControlMarkup(provider, model) : ''}
+            </div>
+          </details>
+        ` : ''}
+        ${showDiagnostics ? `
+          <details class="webmcp-diagnostics" ${this.state.diagnosticsOpen ? 'open' : ''}>
+            <summary>Developer diagnostics</summary>
+            <div class="webmcp-diagnostics-content">
+              <slot name="diagnostics"></slot>
             </div>
           </details>
         ` : ''}
@@ -509,13 +586,18 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
 
       const form = this.shadowRoot.querySelector<HTMLFormElement>('form')
       const input = this.shadowRoot.querySelector<HTMLInputElement>('[data-command-input]')
+      const settingsControl = this.shadowRoot.querySelector<HTMLDetailsElement>('.webmcp-settings')
+      const diagnosticsControl = this.shadowRoot.querySelector<HTMLDetailsElement>('.webmcp-diagnostics')
       const providerControl = this.shadowRoot.querySelector<HTMLSelectElement>('[data-provider]')
-      const modelControl = this.shadowRoot.querySelector<HTMLInputElement>('[data-model]')
+      const modelControl = this.shadowRoot.querySelector<HTMLInputElement | HTMLSelectElement>('[data-model]')
 
       form?.addEventListener('submit', this.handleSubmit.bind(this))
       input?.addEventListener('input', this.handlePromptChanged.bind(this))
+      settingsControl?.addEventListener('toggle', this.handleSettingsToggled.bind(this))
+      diagnosticsControl?.addEventListener('toggle', this.handleDiagnosticsToggled.bind(this))
       providerControl?.addEventListener('change', this.handleProviderChanged.bind(this))
       modelControl?.addEventListener('input', this.handleModelChanged.bind(this))
+      modelControl?.addEventListener('change', this.handleModelChanged.bind(this))
     }
   }
 
@@ -562,6 +644,14 @@ function getPlanSteps(plan: ToolPlan): ToolPlanStep[] {
   ]
 }
 
+async function createCommandInputPlanner(config: PlannerProviderConfig | undefined): Promise<ToolPlanner> {
+  if (!config) return createBestPlanner()
+  if (config.provider === 'chrome-built-in') return createChromeAIPlanner(false)
+  if (config.provider === 'local') return createHeuristicPlanner()
+
+  return createConfiguredPlanner(config)
+}
+
 function getProviderControlMarkup(provider: PlannerProviderKind): string {
   return `
     <label>
@@ -590,7 +680,19 @@ function getProviderOptionsMarkup(provider: PlannerProviderKind): string {
   }).join('')
 }
 
-function getModelControlMarkup(model: string): string {
+function getModelControlMarkup(provider: PlannerProviderKind, model: string): string {
+  const modelOptions = getModelOptions(provider)
+  if (modelOptions.length > 0) {
+    return `
+      <label>
+        <span>Model</span>
+        <select data-model>
+          ${getModelOptionsMarkup(modelOptions, model)}
+        </select>
+      </label>
+    `
+  }
+
   return `
     <label>
       <span>Model</span>
@@ -599,9 +701,47 @@ function getModelControlMarkup(model: string): string {
   `
 }
 
+function getModelOptionsMarkup(options: ModelOption[], model: string): string {
+  return options.map(function mapOption(option) {
+    return `<option value="${escapeAttribute(option.value)}" ${model === option.value ? 'selected' : ''}>${escapeHtml(option.label)}</option>`
+  }).join('')
+}
+
+function getModelOptions(provider: PlannerProviderKind): ModelOption[] {
+  if (provider === 'openai') {
+    return [
+      { label: 'GPT-4.1 mini', value: 'gpt-4.1-mini' },
+      { label: 'GPT-4.1', value: 'gpt-4.1' },
+      { label: 'GPT-4o mini', value: 'gpt-4o-mini' },
+      { label: 'GPT-4o', value: 'gpt-4o' }
+    ]
+  }
+
+  if (provider === 'openrouter') {
+    return [
+      { label: 'OpenRouter auto', value: 'openrouter/auto' }
+    ]
+  }
+
+  if (provider === 'cloudflare-binding' || provider === 'cloudflare-workers-ai') {
+    return [
+      { label: 'Kimi K2.6', value: '@cf/moonshotai/kimi-k2.6' },
+      { label: 'GPT OSS 20B', value: '@cf/openai/gpt-oss-20b' },
+      { label: 'GLM 4.7 Flash', value: '@cf/zai-org/glm-4.7-flash' },
+      { label: 'Qwen3 30B A3B FP8', value: '@cf/qwen/qwen3-30b-a3b-fp8' },
+      { label: 'DeepSeek R1 Distill Qwen 32B', value: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b' },
+      { label: 'Qwen QwQ 32B', value: '@cf/qwen/qwq-32b' },
+      { label: 'Nemotron 3 120B A12B', value: '@cf/nvidia/nemotron-3-120b-a12b' },
+      { label: 'Gemma 4 26B A4B', value: '@cf/google/gemma-4-26b-a4b-it' }
+    ]
+  }
+
+  return []
+}
+
 function getDefaultModelForProvider(provider: PlannerProviderKind): string {
   if (provider === 'openai') return 'gpt-4.1-mini'
-  if (provider === 'cloudflare-binding') return '@cf/google/gemma-4-26b-a4b-it'
+  if (provider === 'cloudflare-binding') return '@cf/moonshotai/kimi-k2.6'
   if (provider === 'cloudflare-workers-ai') return '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b'
   if (provider === 'openai-compatible') return ''
   return defaultModel
@@ -674,6 +814,7 @@ function getStyles(): string {
   return `
     :host {
       display: block;
+      position: relative;
       color: #101514;
       font: 500 0.95rem/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
@@ -758,11 +899,17 @@ function getStyles(): string {
       outline-offset: 2px;
     }
 
-    .webmcp-settings {
+    .webmcp-settings,
+    .webmcp-diagnostics {
       padding: 0.35rem 0.5rem 0.5rem;
       border-inline: 1px solid #cfd8d2;
       border-bottom: 1px solid #cfd8d2;
       background: #ffffff;
+    }
+
+    .webmcp-diagnostics {
+      padding-bottom: 0;
+      position: relative;
     }
 
     summary {
@@ -787,6 +934,21 @@ function getStyles(): string {
       display: grid;
       min-width: 0;
       gap: 0.25rem;
+    }
+
+    .webmcp-diagnostics-content {
+      position: absolute;
+      z-index: 20;
+      top: 100%;
+      right: -0.5rem;
+      left: -0.5rem;
+      max-height: min(42rem, 70vh);
+      overflow: auto;
+      margin-inline: 0;
+      border: 1px solid rgba(244, 240, 232, 0.16);
+      border-top: 0;
+      background: #08100d;
+      box-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.28);
     }
 
     .webmcp-status {

@@ -3,12 +3,12 @@ import type { DemoSettings, Invoice, InvoiceDraft, PlannerModelOption, Product, 
 export function getCloudflareBindingModels(): PlannerModelOption[] {
   return [
     {
-      id: '@cf/google/gemma-4-26b-a4b-it',
-      label: 'Gemma 4 26B A4B'
-    },
-    {
       id: '@cf/moonshotai/kimi-k2.6',
       label: 'Kimi K2.6'
+    },
+    {
+      id: '@cf/openai/gpt-oss-20b',
+      label: 'GPT OSS 20B'
     },
     {
       id: '@cf/zai-org/glm-4.7-flash',
@@ -19,10 +19,6 @@ export function getCloudflareBindingModels(): PlannerModelOption[] {
       label: 'Qwen3 30B A3B FP8'
     },
     {
-      id: '@cf/openai/gpt-oss-20b',
-      label: 'GPT OSS 20B'
-    },
-    {
       id: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
       label: 'DeepSeek R1 Distill Qwen 32B'
     },
@@ -31,12 +27,12 @@ export function getCloudflareBindingModels(): PlannerModelOption[] {
       label: 'Qwen QwQ 32B'
     },
     {
-      id: '@cf/meta/llama-3.1-8b-instruct',
-      label: 'Llama 3.1 8B Instruct'
+      id: '@cf/nvidia/nemotron-3-120b-a12b',
+      label: 'Nemotron 3 120B A12B'
     },
     {
-      id: '@cf/meta/llama-3.2-3b-instruct',
-      label: 'Llama 3.2 3B Instruct'
+      id: '@cf/google/gemma-4-26b-a4b-it',
+      label: 'Gemma 4 26B A4B'
     }
   ]
 }

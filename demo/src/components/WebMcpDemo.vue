@@ -10,8 +10,18 @@
       placeholder="Try: Select all French items"
       @webmcp-command-error="handleCommandError"
       @webmcp-command-plan="handleCommandPlan"
+      @webmcp-command-planner="handleCommandPlanner"
       @webmcp-command-result="handleCommandResult"
-    />
+    >
+      <DemoRuntimeStatus
+        ref="runtimeStatusPanel"
+        slot="diagnostics"
+        :planner-detail="plannerDetail"
+        :planner-name="plannerName"
+        :registered-tools-count="registeredTools.length"
+        :support-label="supportLabel"
+      />
+    </webmcp-command-input>
 
     <DemoSemanticInventory
       :items="selectableItems"
@@ -80,13 +90,6 @@
       @update-ticket-status="updateTicketStatus"
     />
 
-    <DemoRuntimeStatus
-      ref="runtimeStatusPanel"
-      :planner-detail="plannerDetail"
-      :planner-name="plannerName"
-      :registered-tools-count="registeredTools.length"
-      :support-label="supportLabel"
-    />
   </main>
 </template>
 
@@ -111,6 +114,7 @@ import {
   type WebMCPCommandErrorEventDetail,
   type WebMCPCommandInputElement,
   type WebMCPCommandPlanEventDetail,
+  type WebMCPCommandPlannerEventDetail,
   type WebMCPCommandResultEventDetail
 } from '@webmcp-kit/core'
 import { mountDevtoolsOverlay, type DevtoolsOverlay } from '@webmcp-kit/devtools'
@@ -963,6 +967,13 @@ function handleCommandPlan(event: Event) {
   lastPlannerUsed.value = `${detail.planner.name} (${detail.planner.status})`
   selectedToolName.value = detail.plan.toolName
   commandPhase.value = 'executing'
+}
+
+function handleCommandPlanner(event: Event) {
+  const planner = (event as CustomEvent<WebMCPCommandPlannerEventDetail>).detail.planner
+  plannerName.value = `${planner.name} (${planner.status})`
+  plannerDetail.value = planner.detail
+  window.__webMCPKitDemoPlanner = planner
 }
 
 function handleCommandResult(event: Event) {

@@ -49,6 +49,10 @@ export interface WebMCPCommandPlanEventDetail {
   planner: ToolPlanner
 }
 
+export interface WebMCPCommandPlannerEventDetail {
+  planner: ToolPlanner
+}
+
 export interface WebMCPCommandResultEventDetail {
   message: string
   plan: ToolPlan

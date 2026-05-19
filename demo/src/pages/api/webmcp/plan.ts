@@ -56,9 +56,8 @@ const allowedCloudflareModels = new Set([
   '@cf/zai-org/glm-4.7-flash',
   '@cf/qwen/qwen3-30b-a3b-fp8',
   '@cf/openai/gpt-oss-20b',
-  '@cf/meta/llama-3.2-3b-instruct',
+  '@cf/nvidia/nemotron-3-120b-a12b',
   '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
-  '@cf/meta/llama-3.1-8b-instruct',
   '@cf/qwen/qwq-32b'
 ])
 const maxPlannerRequestBytes = 128 * 1024
@@ -96,17 +95,12 @@ export const OPTIONS: APIRoute = function handleOptions() {
 }
 
 async function planWithCloudflareBinding(body: PlannerRequestBody, env: CloudflareEnv): Promise<ToolPlan> {
-  if (!env.AI) {
+  const ai = env.AI
+  if (!ai) {
     throw new Error('Cloudflare AI binding is unavailable in this runtime. Restart dev with the Astro Cloudflare adapter and remote bindings enabled, or use a Cloudflare preview deployment.')
   }
 
-  const result = await env.AI.run(body.model ?? '', {
-    messages: createPlannerMessages(body),
-    response_format: {
-      type: 'json_object'
-    },
-    temperature: 0
-  } as never) as CloudflareAiResult
+  const result = await runCloudflareBindingPlanner(body, ai)
 
   return parseAndValidatePlan(extractResponseText(result), body.tools)
 }
@@ -124,19 +118,23 @@ async function planWithCloudflareRest(body: PlannerRequestBody, env: CloudflareE
       Authorization: `Bearer ${apiToken}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      messages: createPlannerMessages(body),
-      response_format: {
-        type: 'json_object'
-      },
-      temperature: 0
-    })
+    body: JSON.stringify(createCloudflarePlannerInput(body, true))
   })
 
   if (!response.ok) throw new Error(`Cloudflare Workers AI returned ${response.status}`)
 
   const payload = await response.json() as { result?: { response?: string } }
   return parseAndValidatePlan(payload.result?.response?.trim(), body.tools)
+}
+
+async function runCloudflareBindingPlanner(body: PlannerRequestBody, ai: NonNullable<CloudflareEnv['AI']>): Promise<CloudflareAiResult> {
+  try {
+    return await ai.run(body.model ?? '', createCloudflarePlannerInput(body, true) as never) as CloudflareAiResult
+  } catch (error) {
+    if (!shouldRetryWithoutResponseFormat(error)) throw error
+  }
+
+  return await ai.run(body.model ?? '', createCloudflarePlannerInput(body, false) as never) as CloudflareAiResult
 }
 
 type PlannerRequestReadResult =
@@ -191,10 +189,44 @@ function createPlannerMessages(body: PlannerRequestBody): CloudflareAiInput['mes
   ]
 }
 
+function createCloudflarePlannerInput(body: PlannerRequestBody, useJsonResponseFormat: boolean): CloudflareAiInput {
+  const input: CloudflareAiInput = {
+    messages: createPlannerMessages(body),
+    temperature: 0
+  }
+
+  if (useJsonResponseFormat) {
+    input.response_format = {
+      type: 'json_object'
+    }
+  }
+
+  return input
+}
+
+function shouldRetryWithoutResponseFormat(error: unknown): boolean {
+  const message = getErrorMessage(error).toLowerCase()
+  return message.includes('response_format')
+    || message.includes('response format')
+    || message.includes('json')
+    || message.includes('schema')
+    || message.includes('unsupported')
+    || message.includes('not support')
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
 function parseAndValidatePlan(response: string | undefined, tools: PlannerRequestBody['tools']): ToolPlan {
   if (!response) throw new Error('Cloudflare returned no response')
 
-  const plan = JSON.parse(normalizeJsonText(response)) as ToolPlan
+  let plan: ToolPlan
+  try {
+    plan = JSON.parse(normalizeJsonText(response)) as ToolPlan
+  } catch {
+    throw new Error('Cloudflare returned invalid JSON')
+  }
   validatePlan(plan, tools)
 
   return plan
@@ -308,14 +340,31 @@ function getJsonHeaders(): HeadersInit {
 }
 
 function getPublicErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    if (error.message.includes('Binding AI needs to be run remotely')) {
-      return 'Cloudflare AI binding is not connected to remote Workers AI in this dev session.'
-    }
+  const message = getErrorMessage(error)
 
-    if (error.message.includes('CLOUDFLARE_ACCOUNT_ID') || error.message.includes('CLOUDFLARE_API_TOKEN')) {
-      return 'Cloudflare Workers AI server mode needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN on the server, or a custom planner endpoint.'
-    }
+  if (message.includes('Binding AI needs to be run remotely')) {
+    return 'Cloudflare AI binding is not connected to remote Workers AI in this dev session.'
   }
+
+  if (message.includes('CLOUDFLARE_ACCOUNT_ID') || message.includes('CLOUDFLARE_API_TOKEN')) {
+    return 'Cloudflare Workers AI server mode needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN on the server, or a custom planner endpoint.'
+  }
+
+  if (isSafePlannerFailureMessage(message)) {
+    return message
+  }
+
+  if (import.meta.env.DEV) {
+    return `Server planner failed: ${message}`
+  }
+
   return 'Server planner failed'
+}
+
+function isSafePlannerFailureMessage(message: string): boolean {
+  return message.startsWith('Cloudflare returned')
+    || message.startsWith('Invalid ')
+    || message.startsWith('Unknown tool')
+    || message.startsWith('Selected tool has no input schema')
+    || message.startsWith('Tool sequence is too long')
 }

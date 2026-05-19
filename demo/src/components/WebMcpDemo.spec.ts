@@ -44,6 +44,11 @@ describe('WebMcpDemo', () => {
     expect(providerControl).toBeInstanceOf(HTMLSelectElement)
     expect(providerControl?.value).toBe('auto')
     expect(commandInput.shadowRoot?.querySelector('[data-model]')).toBeNull()
+    const diagnosticsRow = commandInput.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-diagnostics')
+    const diagnosticsSlot = commandInput.shadowRoot?.querySelector<HTMLSlotElement>('slot[name="diagnostics"]')
+    expect(diagnosticsRow).toBeInstanceOf(HTMLDetailsElement)
+    expect(diagnosticsSlot?.assignedElements()[0]?.getAttribute('data-webmcp-diagnostics')).toBe('')
+    expect(wrapper.find('details.diagnostics-panel').exists()).toBe(false)
 
     await commandInput.run('Select all French items')
     await flushPromises()
@@ -62,11 +67,20 @@ describe('WebMcpDemo', () => {
     const providerControl = commandInput.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
     if (!providerControl) throw new Error('Expected provider control.')
 
+    providerControl.value = 'local'
+    providerControl.dispatchEvent(new Event('change', { bubbles: true }))
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Local heuristic planner')
+
     providerControl.value = 'openai'
     providerControl.dispatchEvent(new Event('change', { bubbles: true }))
+    await flushPromises()
 
-    const modelControl = commandInput.shadowRoot?.querySelector<HTMLInputElement>('[data-model]')
-    expect(modelControl).toBeInstanceOf(HTMLInputElement)
+    const settings = commandInput.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-settings')
+    const modelControl = commandInput.shadowRoot?.querySelector<HTMLSelectElement>('[data-model]')
+    expect(settings?.open).toBe(true)
+    expect(modelControl).toBeInstanceOf(HTMLSelectElement)
     expect(modelControl?.value).toBe('gpt-4.1-mini')
   })
 

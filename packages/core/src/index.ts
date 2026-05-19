@@ -20,6 +20,7 @@ export type {
   WebMCPCommandInputElement,
   WebMCPCommandInputPhase,
   WebMCPCommandPlanEventDetail,
+  WebMCPCommandPlannerEventDetail,
   WebMCPCommandResultEventDetail
 } from './interfaces/command-input'
 export type {

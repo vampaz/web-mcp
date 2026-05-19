@@ -117,7 +117,7 @@ Cloudflare binding mode for local development and preview deployments:
 await createWebMCPKit({
   planner: {
     provider: 'cloudflare-binding',
-    model: '@cf/google/gemma-4-26b-a4b-it',
+    model: '@cf/moonshotai/kimi-k2.6',
     auth: {
       mode: 'server',
       endpoint: '/api/webmcp/plan'
@@ -153,7 +153,7 @@ defineWebMCPCommandInput()
 ```html
 <webmcp-command-input
   provider="cloudflare-binding"
-  model="@cf/google/gemma-4-26b-a4b-it"
+  model="@cf/moonshotai/kimi-k2.6"
   endpoint="/api/webmcp/plan"
 ></webmcp-command-input>
 ```
@@ -170,6 +170,8 @@ commandInput.configure({
 ```
 
 For preview or production, pass the selected planner config when the app should own those choices and hide them from users.
+
+The Cloudflare binding default is `@cf/moonshotai/kimi-k2.6` because it gives the demo a faster planning path than the larger exploratory models. The server endpoint first asks for JSON output, then retries without `response_format` when a Workers AI model rejects that option.
 
 ## Tool Sequences
 

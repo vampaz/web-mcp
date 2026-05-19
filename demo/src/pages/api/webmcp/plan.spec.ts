@@ -102,6 +102,54 @@ describe('/api/webmcp/plan', () => {
     })
   })
 
+  it('retries Cloudflare AI binding without response_format when the model rejects it', async () => {
+    const run = vi.fn()
+      .mockRejectedValueOnce(new Error('response_format is not supported by this model'))
+      .mockResolvedValueOnce({
+        response: JSON.stringify({
+          toolName: 'select_items',
+          input: { ids: ['item_1'] },
+          confidence: 0.82,
+          reason: 'Selected fruit.'
+        })
+      })
+    env.AI = {
+      run
+    } as unknown as typeof env.AI
+
+    const response = await POST(createContext({
+      provider: 'cloudflare-binding',
+      model: '@cf/nvidia/nemotron-3-120b-a12b',
+      message: 'Select all fruits',
+      tools: [
+        {
+          name: 'select_items',
+          description: 'Select checklist items.',
+          inputSchema: { type: 'object' }
+        }
+      ],
+      context: {
+        checklistItems: [
+          { id: 'item_1', name: 'Apple' }
+        ]
+      }
+    }))
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      toolName: 'select_items',
+      input: { ids: ['item_1'] }
+    })
+    expect(run).toHaveBeenCalledTimes(2)
+    expect(run).toHaveBeenNthCalledWith(1, '@cf/nvidia/nemotron-3-120b-a12b', expect.objectContaining({
+      response_format: { type: 'json_object' }
+    }))
+    expect(run).toHaveBeenNthCalledWith(2, '@cf/nvidia/nemotron-3-120b-a12b', expect.not.objectContaining({
+      response_format: expect.anything()
+    }))
+    expect(run.mock.calls[1]?.[1]).not.toHaveProperty('response_format')
+  })
+
   it('rejects oversized planner requests before calling Cloudflare', async () => {
     const run = vi.fn()
     env.AI = {
@@ -163,7 +211,7 @@ describe('/api/webmcp/plan', () => {
 
     expect(response.status).toBe(502)
     expect(await response.json()).toEqual({
-      error: 'Server planner failed'
+      error: 'Invalid tool input: input validation failed: /ids is required.'
     })
   })
 
