@@ -11,6 +11,17 @@ export { formatOpenAITool, formatOpenAITools, type OpenAIFunctionTool } from './
 export { emitWebMCPKitEvent, subscribeWebMCPKitEvents } from './events'
 export { assertWebMCPIntegration, getIntegrationHealthReport, type IntegrationHealthOptions } from './diagnostics'
 export { inferFormInputSchema, registerFormTool, type FormInput, type RegisterFormToolOptions } from './forms'
+export {
+  defineWebMCPCommandInput
+} from './command-input'
+export type {
+  WebMCPCommandErrorEventDetail,
+  WebMCPCommandInputConfigureOptions,
+  WebMCPCommandInputElement,
+  WebMCPCommandInputPhase,
+  WebMCPCommandPlanEventDetail,
+  WebMCPCommandResultEventDetail
+} from './interfaces/command-input'
 export type {
   IntegrationDiagnostic,
   IntegrationHealthReport,

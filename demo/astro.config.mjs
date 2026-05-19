@@ -25,7 +25,15 @@ export default defineConfig({
   adapter: cloudflare({
     configPath: cloudflareConfigPath || undefined
   }),
-  integrations: [vue()],
+  integrations: [
+    vue({
+      template: {
+        compilerOptions: {
+          isCustomElement: (tag) => tag === 'webmcp-command-input'
+        }
+      }
+    })
+  ],
   vite: {
     plugins: [
       caddyTls({

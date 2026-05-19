@@ -140,6 +140,37 @@ Pass the selected planner to `getIntegrationHealthReport({ planner })` during de
 
 For the separate `cloudflare-workers-ai` REST mode, use the same `.env` values or another server environment that provides `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`.
 
+## Web Component Input
+
+`@webmcp-kit/core` also exports a ready-made web component for apps that want a command input without building their own planner UI:
+
+```ts
+import { defineWebMCPCommandInput } from '@webmcp-kit/core'
+
+defineWebMCPCommandInput()
+```
+
+```html
+<webmcp-command-input
+  provider="cloudflare-binding"
+  model="@cf/google/gemma-4-26b-a4b-it"
+  endpoint="/api/webmcp/plan"
+></webmcp-command-input>
+```
+
+Provider and model controls are only shown when the app has not fixed those values through attributes, properties, `configure()`, or a supplied `plannerConfig`.
+
+In local development, omit fixed `provider` and `model` values if you want the command input to expose planner controls:
+
+```ts
+commandInput.configure({
+  context: getPlannerContext,
+  endpoint: '/api/webmcp/plan'
+})
+```
+
+For preview or production, pass the selected planner config when the app should own those choices and hide them from users.
+
 ## Tool Sequences
 
 Planner output can be a single invocation:

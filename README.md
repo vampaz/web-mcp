@@ -99,6 +99,7 @@ setConfirmationHandler(async function confirmTool(tool, input, reason) {
 - `assertWebMCPIntegration()` throws when the current integration has blocking errors.
 - `isWebMCPSupported()` checks for native WebMCP registration support.
 - `createBestPlanner()` uses Chrome built-in AI when available, otherwise a deterministic local planner.
+- `defineWebMCPCommandInput()` registers a ready-made `<webmcp-command-input>` web component for planner-driven commands.
 - `installWebMCPKitTestBridge()` exposes a kit-specific test bridge for Playwright and local QA.
 
 ## Planner Output
@@ -222,6 +223,56 @@ await createWebMCPKit({
 See [Planner Providers](./docs/planner-providers.md) for OpenRouter, OpenAI, OpenAI-compatible, Cloudflare Workers AI, Chrome built-in AI, and local fallback examples.
 
 The demo also exposes `cloudflare-binding` in local, preview, and production deployments: a server-endpoint-only mode where the browser selects from approved Cloudflare Workers AI models and the Astro Cloudflare runtime endpoint uses an `AI` binding.
+
+## Ready-Made Command Input
+
+Apps that want a drop-in natural-language command box can register the framework-agnostic web component:
+
+```ts
+import { defineWebMCPCommandInput } from '@webmcp-kit/core'
+
+defineWebMCPCommandInput()
+```
+
+```html
+<webmcp-command-input
+  provider="openai"
+  model="gpt-4.1-mini"
+  endpoint="/api/webmcp/plan"
+></webmcp-command-input>
+```
+
+When `provider` and `model` are initialized by attributes or properties, the component treats them as app-owned configuration and does not show those settings to the user. If they are omitted, the component shows provider/model controls where they apply.
+
+For local development, leave `provider` and `model` unset when configuring the input so developers can switch planners from the command box:
+
+```ts
+input.configure({
+  context: getPlannerContext,
+  endpoint: '/api/webmcp/plan'
+})
+```
+
+The demo follows this pattern in dev mode. Preview and production can pass the app-owned planner/provider/model to keep those choices hidden from end users.
+
+For app context, assign a property before or after mounting:
+
+```ts
+import type { WebMCPCommandInputElement } from '@webmcp-kit/core'
+
+const input = document.querySelector<WebMCPCommandInputElement>('webmcp-command-input')
+
+if (input) {
+  input.context = function getPlannerContext() {
+    return {
+      route: location.pathname,
+      selectedIds: getSelectedIds()
+    }
+  }
+}
+```
+
+The component uses the active WebMCP registry, plans against registered tools, invokes the returned step or bounded `tool_sequence`, and emits `webmcp-command-plan`, `webmcp-command-result`, and `webmcp-command-error` events.
 
 ## Playwright Helpers
 

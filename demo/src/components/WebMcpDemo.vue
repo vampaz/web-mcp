@@ -4,22 +4,13 @@
       <a href="/readme/">README</a>
     </nav>
 
-    <DemoCommandPalette
-      :cloudflare-binding-models="cloudflareBindingModels"
-      :command-button-label="commandButtonLabel"
-      :command-status-label="commandStatusLabel"
-      :is-command-running="isCommandRunning"
-      :planner-model="plannerModel"
-      :planner-model-label="plannerModelLabel"
-      :planner-name="plannerName"
-      :planner-provider="plannerProvider"
-      :prompt="prompt"
-      :show-cloudflare-binding="showCloudflareBinding"
-      :uses-remote-planner="usesRemotePlanner"
-      @run="runPrompt"
-      @update:planner-model="plannerModel = $event"
-      @update:planner-provider="plannerProvider = $event"
-      @update:prompt="prompt = $event"
+    <webmcp-command-input
+      ref="commandInput"
+      class="demo-command-input"
+      placeholder="Try: Select all French items"
+      @webmcp-command-error="handleCommandError"
+      @webmcp-command-plan="handleCommandPlan"
+      @webmcp-command-result="handleCommandResult"
     />
 
     <DemoSemanticInventory
@@ -103,6 +94,7 @@
 import {
   createBestPlanner,
   createConfiguredPlanner,
+  defineWebMCPCommandInput,
   defineTool,
   getSupportLabel,
   installWebMCPKitTestBridge,
@@ -115,14 +107,16 @@ import {
   type PlannerProviderKind,
   type ToolInvocationResult,
   type ToolPlan,
-  type ToolPlanStep,
-  type ToolPlanner
+  type ToolPlanner,
+  type WebMCPCommandErrorEventDetail,
+  type WebMCPCommandInputElement,
+  type WebMCPCommandPlanEventDetail,
+  type WebMCPCommandResultEventDetail
 } from '@webmcp-kit/core'
 import { mountDevtoolsOverlay, type DevtoolsOverlay } from '@webmcp-kit/devtools'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import DemoCartEditor from '@/components/DemoCartEditor.vue'
-import DemoCommandPalette from '@/components/DemoCommandPalette.vue'
 import DemoInvoiceDrawer from '@/components/DemoInvoiceDrawer.vue'
 import DemoInvoiceTable from '@/components/DemoInvoiceTable.vue'
 import DemoRuntimeStatus from '@/components/DemoRuntimeStatus.vue'
@@ -142,10 +136,10 @@ import {
 
 const showCloudflareBinding = true
 const showDevtools = import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIEW === 'true'
+const showPlannerControls = import.meta.env.DEV
 const shouldInstallTestBridge = import.meta.env.DEV || import.meta.env.MODE === 'test'
 const shouldDefaultToCloudflareBinding = showCloudflareBinding && import.meta.env.MODE !== 'test'
 const cloudflareBindingModels = getCloudflareBindingModels()
-const prompt = ref('')
 const plannerName = ref('Loading')
 const plannerDetail = ref(shouldDefaultToCloudflareBinding ? 'Using the Cloudflare AI binding planner endpoint.' : 'Checking Chrome built-in AI availability.')
 const plannerProvider = ref<PlannerProviderKind>(shouldDefaultToCloudflareBinding ? 'cloudflare-binding' : 'auto')
@@ -162,6 +156,7 @@ const lastPlan = ref<ToolPlan | null>(null)
 const lastResult = ref<ToolInvocationResult | null>(null)
 const commandPhase = ref<'idle' | 'preparing' | 'planning' | 'executing' | 'completed' | 'failed'>('idle')
 const unregisterCallbacks: Array<() => void> = []
+const commandInput = ref<WebMCPCommandInputElement | null>(null)
 const supportTicketPanel = ref<{ supportForm: HTMLFormElement | null } | null>(null)
 const runtimeStatusPanel = ref<{ devtoolsHost: HTMLElement | null } | null>(null)
 const supportSubject = ref('Billing access')
@@ -225,25 +220,6 @@ const plannerModelLabel = computed(function getPlannerModelLabel() {
   if (plannerProvider.value === 'auto') return 'Best available'
   return 'Provider managed'
 })
-const isCommandRunning = computed(function getIsCommandRunning() {
-  return commandPhase.value === 'preparing'
-    || commandPhase.value === 'planning'
-    || commandPhase.value === 'executing'
-})
-const commandButtonLabel = computed(function getCommandButtonLabel() {
-  if (commandPhase.value === 'preparing') return 'Preparing...'
-  if (commandPhase.value === 'planning') return 'Planning...'
-  if (commandPhase.value === 'executing') return 'Running...'
-  return 'Run'
-})
-const commandStatusLabel = computed(function getCommandStatusLabel() {
-  if (commandPhase.value === 'idle') return 'No command has run yet.'
-  if (commandPhase.value === 'preparing') return 'Preparing command.'
-  if (commandPhase.value === 'planning') return 'Planning command.'
-  if (commandPhase.value === 'executing') return `Running ${selectedToolName.value}.`
-  if (commandPhase.value === 'completed') return `${lastResult.value?.toolName ?? 'Command'} completed.`
-  return `${lastResult.value?.toolName ?? 'Command'} failed.`
-})
 
 const selectableItems = ref<SelectableItem[]>(getInitialSelectableItems())
 const invoices = ref<Invoice[]>(getInitialInvoices())
@@ -283,10 +259,11 @@ watch(plannerProvider, function handlePlannerProviderChanged(provider) {
     plannerAuthMode.value = 'user-key'
   }
 
-  void refreshPlanner()
+  void refreshPlanner().then(configureCommandInput)
 })
 
 onMounted(async function handleMounted() {
+  defineWebMCPCommandInput()
   setConfirmationHandler(confirmToolInvocation)
   registerDemoTools()
   registerSupportFormTool()
@@ -303,6 +280,7 @@ onMounted(async function handleMounted() {
   }
 
   await refreshPlanner()
+  configureCommandInput()
 })
 
 onUnmounted(function handleUnmounted() {
@@ -960,90 +938,52 @@ function updateTicketPriority(id: string, priority: SupportTicket['priority']) {
   })
 }
 
-async function runPrompt() {
-  if (isCommandRunning.value || !prompt.value.trim()) return
-
-  commandPhase.value = 'preparing'
-  lastPlan.value = null
-  lastResult.value = null
-  selectedToolName.value = 'Planning'
-  const planner = await getCurrentPlanner()
-  if (!planner) {
-    commandPhase.value = 'failed'
-    lastResult.value = {
-      toolName: 'Planner',
-      status: 'error',
-      error: 'No planner is available.',
-      durationMs: 0
-    }
+function configureCommandInput() {
+  if (showPlannerControls) {
+    commandInput.value?.configure({
+      context: getPlannerContext,
+      endpoint: plannerEndpoint.value
+    })
     return
   }
 
-  const tools = listTools().map(function mapRegistration(registration) {
-    return registration.tool
+  commandInput.value?.configure({
+    context: getPlannerContext,
+    endpoint: plannerEndpoint.value,
+    model: plannerModel.value,
+    planner: currentPlanner,
+    provider: plannerProvider.value
   })
-  lastPlannerUsed.value = `${planner.name} (${planner.status})`
-  commandPhase.value = 'planning'
-  let plan: ToolPlan
-  try {
-    plan = await planner.plan(prompt.value, tools, getPlannerContext())
-  } catch (error) {
-    const errorMessage = getErrorMessage(error)
-    lastPlan.value = null
-    selectedToolName.value = planner.name
-    lastResult.value = {
-      toolName: planner.name,
-      status: 'error',
-      error: errorMessage,
-      durationMs: 0
-    }
-    commandPhase.value = 'failed'
-    return
-  }
-  lastPlan.value = plan
-  commandPhase.value = 'executing'
-
-  const result = await invokePlannedSteps(plan)
-  lastResult.value = result
-  commandPhase.value = result.status === 'success' ? 'completed' : 'failed'
-
 }
 
-async function invokePlannedSteps(plan: ToolPlan): Promise<ToolInvocationResult> {
-  const steps = getPlanSteps(plan)
-  let result: ToolInvocationResult | undefined
+function handleCommandPlan(event: Event) {
+  const detail = (event as CustomEvent<WebMCPCommandPlanEventDetail>).detail
+  lastPlan.value = detail.plan
+  lastResult.value = null
+  lastPlannerUsed.value = `${detail.planner.name} (${detail.planner.status})`
+  selectedToolName.value = detail.plan.toolName
+  commandPhase.value = 'executing'
+}
 
-  for (const [index, step] of steps.entries()) {
-    selectedToolName.value = steps.length > 1
-      ? `${step.toolName} (${index + 1}/${steps.length})`
-      : step.toolName
-    result = await invokeTool({
-      toolName: step.toolName,
-      input: step.input,
-      source: 'planner'
-    })
-    if (result.status !== 'success') return result
-  }
+function handleCommandResult(event: Event) {
+  const detail = (event as CustomEvent<WebMCPCommandResultEventDetail>).detail
+  lastPlan.value = detail.plan
+  lastResult.value = detail.result
+  selectedToolName.value = detail.result.toolName
+  commandPhase.value = detail.result.status === 'success' ? 'completed' : 'failed'
+}
 
-  return result ?? {
-    toolName: plan.toolName,
+function handleCommandError(event: Event) {
+  const detail = (event as CustomEvent<WebMCPCommandErrorEventDetail>).detail
+  lastPlan.value = null
+  selectedToolName.value = 'Planner'
+  lastResult.value = {
+    toolName: 'Planner',
     status: 'error',
-    error: 'Planner returned no executable steps.',
+    error: detail.error,
     durationMs: 0
   }
-}
-
-function getPlanSteps(plan: ToolPlan): ToolPlanStep[] {
-  if (Array.isArray(plan.steps)) return plan.steps
-
-  return [
-    {
-      toolName: plan.toolName,
-      input: plan.input,
-      confidence: plan.confidence,
-      reason: plan.reason
-    }
-  ]
+  commandPhase.value = 'failed'
 }
 
 function confirmToolInvocation(tool: { name: string }, input: unknown, reason: string): boolean {
@@ -1068,10 +1008,6 @@ async function submitSupportForm() {
 
 function refreshTools() {
   registeredTools.value = listTools()
-}
-
-async function getCurrentPlanner() {
-  return refreshPlanner()
 }
 
 async function refreshPlanner() {
@@ -1235,6 +1171,15 @@ declare global {
 .demo-nav a:focus-visible {
   border-color: #e8be53;
   color: #e8be53;
+}
+
+.demo-command-input {
+  position: sticky;
+  top: 10px;
+  z-index: 1000;
+  display: block;
+  width: min(920px, 100%);
+  margin: 0 auto 12px;
 }
 
 .app-panels {

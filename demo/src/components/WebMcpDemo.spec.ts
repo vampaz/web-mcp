@@ -1,7 +1,7 @@
 import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { clearToolsForTest, invokeTool } from '@webmcp-kit/core'
+import { clearToolsForTest, invokeTool, type WebMCPCommandInputElement } from '@webmcp-kit/core'
 
 import WebMcpDemo from './WebMcpDemo.vue'
 import { mountWithDeps } from '@/test-utils/mount-with-deps'
@@ -29,28 +29,45 @@ describe('WebMcpDemo', () => {
   })
 
   it('starts with an empty command input and placeholder example', async () => {
-    const wrapper = mountWithDeps(WebMcpDemo)
+    const wrapper = mountWithDeps(WebMcpDemo, { attachTo: document.body })
     await flushPromises()
 
     expect(wrapper.text()).toContain('Inventory')
     expect(wrapper.text()).toContain('Invoices')
     expect(wrapper.find('a[href="/readme/"]').text()).toBe('README')
 
-    const commandInput = wrapper.find('input[aria-label="Natural language command"]')
-    expect(commandInput.element).toHaveProperty('value', '')
-    expect(commandInput.attributes('placeholder')).toBe('Try: Select all French items')
-    expect(wrapper.find('.palette-run').attributes()).toHaveProperty('disabled')
-    expect(wrapper.find('option[value="cloudflare-binding"]').exists()).toBe(true)
+    const commandInput = await getCommandInput(wrapper)
+    const commandTextInput = getCommandTextInput(commandInput)
+    expect(commandTextInput.value).toBe('')
+    expect(commandTextInput.getAttribute('placeholder')).toBe('Try: Select all French items')
+    const providerControl = commandInput.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
+    expect(providerControl).toBeInstanceOf(HTMLSelectElement)
+    expect(providerControl?.value).toBe('auto')
+    expect(commandInput.shadowRoot?.querySelector('[data-model]')).toBeNull()
 
-    await commandInput.setValue('Select all French items')
-    await wrapper.find('.palette-command').trigger('submit')
+    await commandInput.run('Select all French items')
     await flushPromises()
 
     expect(wrapper.text()).toContain('5 selected')
-    expect(wrapper.find('[aria-live="polite"]').text()).toBe('select_items completed.')
     expect(wrapper.text()).toContain('Croissant')
     expect(wrapper.text()).toContain('Pain au chocolat')
     expect(window.confirm).not.toHaveBeenCalled()
+  })
+
+  it('shows model controls after choosing a local development provider', async () => {
+    const wrapper = mountWithDeps(WebMcpDemo, { attachTo: document.body })
+    await flushPromises()
+
+    const commandInput = await getCommandInput(wrapper)
+    const providerControl = commandInput.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
+    if (!providerControl) throw new Error('Expected provider control.')
+
+    providerControl.value = 'openai'
+    providerControl.dispatchEvent(new Event('change', { bubbles: true }))
+
+    const modelControl = commandInput.shadowRoot?.querySelector<HTMLInputElement>('[data-model]')
+    expect(modelControl).toBeInstanceOf(HTMLInputElement)
+    expect(modelControl?.value).toBe('gpt-4.1-mini')
   })
 
   it('operates visible controls from AI-chosen context IDs', async () => {
@@ -81,29 +98,28 @@ describe('WebMcpDemo', () => {
       })
     }
 
-    const wrapper = mountWithDeps(WebMcpDemo)
+    const wrapper = mountWithDeps(WebMcpDemo, { attachTo: document.body })
     await flushPromises()
 
-    await wrapper.find('input[aria-label="Natural language command"]').setValue('Select all French items')
-    await wrapper.find('.palette-command').trigger('submit')
+    const commandInput = await getCommandInput(wrapper)
+    await commandInput.run('Select all French items')
     await flushPromises()
 
     expect(wrapper.text()).toContain('2 selected')
     expect(wrapper.text()).toContain('Croissant')
 
-    await wrapper.find('input[aria-label="Natural language command"]').setValue('Open the Stark invoice')
-    await wrapper.find('.palette-command').trigger('submit')
+    await commandInput.run('Open the Stark invoice')
     await flushPromises()
 
     expect(wrapper.text()).toContain('Stark Industries')
   })
 
   it('executes chained invoice plans in order', async () => {
-    const wrapper = mountWithDeps(WebMcpDemo)
+    const wrapper = mountWithDeps(WebMcpDemo, { attachTo: document.body })
     await flushPromises()
 
-    await wrapper.find('input[aria-label="Natural language command"]').setValue('Mark Stark Industries invoices as paid')
-    await wrapper.find('.palette-command').trigger('submit')
+    const commandInput = await getCommandInput(wrapper)
+    await commandInput.run('Mark Stark Industries invoices as paid')
     await flushPromises()
 
     const starkInvoiceRow = wrapper.findAll('tbody tr').find(function findStarkRow(row) {
@@ -115,7 +131,7 @@ describe('WebMcpDemo', () => {
   })
 
   it('guards and confirms cart checkout', async () => {
-    const wrapper = mountWithDeps(WebMcpDemo)
+    const wrapper = mountWithDeps(WebMcpDemo, { attachTo: document.body })
     await flushPromises()
 
     await expect(invokeTool({
@@ -160,3 +176,16 @@ describe('WebMcpDemo', () => {
     expect(wrapper.text()).toContain('No cart lines yet.')
   })
 })
+
+async function getCommandInput(wrapper: ReturnType<typeof mountWithDeps>): Promise<WebMCPCommandInputElement> {
+  await customElements.whenDefined('webmcp-command-input')
+  const element = wrapper.find('webmcp-command-input').element as WebMCPCommandInputElement
+  if (!element.shadowRoot) throw new Error('Expected WebMCP command input shadow root.')
+  return element
+}
+
+function getCommandTextInput(element: WebMCPCommandInputElement): HTMLInputElement {
+  const input = element.shadowRoot?.querySelector<HTMLInputElement>('[data-command-input]')
+  if (!input) throw new Error('Expected WebMCP command text input.')
+  return input
+}
