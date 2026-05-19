@@ -168,9 +168,11 @@ describe('WebMCP command input', () => {
     await Promise.resolve()
 
     const diagnosticsRow = element.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-diagnostics')
+    const diagnosticsSummary = element.shadowRoot?.querySelector<HTMLElement>('.webmcp-disclosure-summary')
     const diagnosticsSlot = element.shadowRoot?.querySelector<HTMLSlotElement>('slot[name="diagnostics"]')
     const status = element.shadowRoot?.querySelector<HTMLElement>('.webmcp-settings-summary .webmcp-status')
     expect(diagnosticsRow).toBeInstanceOf(HTMLDetailsElement)
+    expect(diagnosticsSummary?.tagName).toBe('SUMMARY')
     expect(diagnosticsRow?.textContent).toContain('Developer diagnostics')
     expect(diagnosticsSlot?.assignedElements()).toEqual([diagnostics])
     expect(status?.textContent?.trim()).toBe('Auto')

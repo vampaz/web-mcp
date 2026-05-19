@@ -587,7 +587,9 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
         `}
         ${showDiagnostics ? `
           <details class="webmcp-diagnostics" ${this.state.diagnosticsOpen ? 'open' : ''}>
-            <summary>Developer diagnostics</summary>
+            <summary class="webmcp-disclosure-summary">
+              <span>Developer diagnostics</span>
+            </summary>
             <div class="webmcp-diagnostics-content">
               <slot name="diagnostics"></slot>
             </div>
@@ -893,8 +895,7 @@ function getStyles(): string {
       box-shadow: 0 0 0 3px rgba(30, 159, 114, 0.12);
     }
 
-    .webmcp-input-shell span,
-    .webmcp-settings label span {
+    .webmcp-input-shell span {
       flex: 0 0 auto;
       color: var(--webmcp-muted);
       font-size: 0.72rem;
@@ -959,7 +960,7 @@ function getStyles(): string {
 
     .webmcp-settings,
     .webmcp-diagnostics {
-      padding: 0.5rem 0.625rem 0.625rem;
+      padding: 0;
       border-inline: 1px solid var(--webmcp-line);
       border-bottom: 1px solid var(--webmcp-line);
       background: rgba(255, 255, 255, 0.96);
@@ -975,52 +976,91 @@ function getStyles(): string {
       position: relative;
     }
 
-    summary,
-    .webmcp-settings-summary {
-      display: inline-flex;
-      min-height: 1.75rem;
+    .webmcp-settings-summary,
+    .webmcp-disclosure-summary {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      min-height: 2.6rem;
       align-items: center;
-      gap: 0.45rem;
+      gap: 0.65rem;
+      width: 100%;
+      padding: 0 0.75rem;
       color: var(--webmcp-muted);
       font-size: 0.72rem;
       font-weight: 800;
       letter-spacing: 0;
       text-transform: uppercase;
+      transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease;
     }
 
-    summary {
+    summary.webmcp-settings-summary,
+    summary.webmcp-disclosure-summary {
       cursor: pointer;
+      list-style: none;
     }
 
-    summary::marker {
-      color: var(--webmcp-accent);
-      font-size: 0.75rem;
+    summary.webmcp-settings-summary::-webkit-details-marker,
+    summary.webmcp-disclosure-summary::-webkit-details-marker {
+      display: none;
     }
 
-    .webmcp-settings-summary {
-      width: 100%;
-      justify-content: space-between;
+    summary.webmcp-settings-summary::before,
+    summary.webmcp-disclosure-summary::before {
+      width: 0.45rem;
+      height: 0.45rem;
+      border-right: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      content: "";
+      transform: rotate(-45deg);
+      transition: transform 140ms ease, color 140ms ease;
+    }
+
+    .webmcp-settings[open] > .webmcp-settings-summary::before,
+    .webmcp-diagnostics[open] > .webmcp-disclosure-summary::before {
+      transform: rotate(45deg);
+    }
+
+    .webmcp-settings > summary.webmcp-settings-summary:hover,
+    .webmcp-diagnostics > summary.webmcp-disclosure-summary:hover {
+      background: #f2f7f4;
+      color: var(--webmcp-ink);
+    }
+
+    .webmcp-settings[open] > .webmcp-settings-summary,
+    .webmcp-diagnostics[open] > .webmcp-disclosure-summary {
+      box-shadow: inset 3px 0 0 var(--webmcp-accent);
+      color: var(--webmcp-ink);
+    }
+
+    .webmcp-settings--status-only .webmcp-settings-summary {
+      grid-template-columns: auto minmax(0, 1fr);
     }
 
     .webmcp-settings-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 0.625rem;
-      padding-block-start: 0.45rem;
+      padding: 0.55rem 0.75rem 0.75rem;
+      border-top: 1px solid var(--webmcp-soft-line);
     }
 
     .webmcp-settings label {
       display: grid;
       min-width: 0;
       gap: 0.3rem;
+      color: var(--webmcp-muted);
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0;
+      text-transform: uppercase;
     }
 
     .webmcp-diagnostics-content {
       position: absolute;
       z-index: 20;
       top: 100%;
-      right: -0.625rem;
-      left: -0.625rem;
+      right: 0;
+      left: 0;
       max-height: min(40rem, 68vh);
       overflow: auto;
       margin-inline: 0;
@@ -1035,6 +1075,7 @@ function getStyles(): string {
       min-width: 0;
       gap: 0.45rem;
       align-items: center;
+      justify-self: end;
       color: var(--webmcp-muted);
       font-size: 0.8rem;
       font-weight: 500;
