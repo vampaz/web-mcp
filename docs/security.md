@@ -39,6 +39,8 @@ WebMCP Kit enforces confirmation before execution in both fallback and native wr
 
 The internal `confirmed: true` invocation flag is only for code paths that already performed approval inside the trusted app boundary. Public bridges and test helpers must not accept caller-provided confirmation bypasses; they should rely on `setConfirmationHandler()` or the browser confirmation fallback.
 
+Chained planner output does not change this rule. A `tool_sequence` executes as individual tool invocations, so each mutating step still runs its own guard and confirmation check before execution. If the user rejects a confirmation or a guard blocks a step, the sequence stops and later steps do not run.
+
 ## Guards And Scope
 
 Use guards for input-specific blocking:

@@ -117,29 +117,26 @@ This should be a single global callback, not per-tool. The registry calls it ins
 
 ### 5. Multi-Tool Planning
 
-**Current state**: The planner picks exactly one tool. Real user requests often imply sequences: "Find a dock, add it to the cart, and check out" triggers three tools in order.
+**Current state**: Basic bounded tool sequencing is implemented. A planner can return `toolName: "tool_sequence"` with ordered `steps`; each step is validated, executed in order, and still uses the normal guard and confirmation path. This covers direct workflows such as "select Stark Industries invoices, then mark them paid."
 
-**Needed**: Extend the planner protocol to return a plan that contains a sequence of tool invocations.
+**Still needed**: Richer agent-loop semantics where later steps can consume earlier tool outputs, plus explicit `needsClarification` and `noToolsMatch` responses for ambiguous or unsupported requests.
 
 ```ts
 interface ToolPlan {
-  steps: Array<{
-    toolName: string
-    input: Record<string, unknown>
-    confidence: number
-    reason: string
-    dependsOn?: number // index of prior step whose output feeds input
-  }>
+  toolName: string
+  input: Record<string, unknown>
+  confidence: number
+  reason: string
+  steps?: ToolPlanStep[]
 }
 
-interface PlannerResponse {
-  plan: ToolPlan
-  needsClarification?: string
-  noToolsMatch?: boolean
+interface ToolPlanStep {
+  toolName: string
+  input: Record<string, unknown>
+  confidence: number
+  reason: string
 }
 ```
-
-The planner can also now say `noToolsMatch: true` when the user request genuinely doesn't map to any tool, or `needsClarification` when the request is ambiguous. The current planner interface forces a best-guess every time; that's wrong for real use.
 
 ### 6. Tool Composition and Recipes
 

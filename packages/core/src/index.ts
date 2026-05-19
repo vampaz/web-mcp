@@ -27,6 +27,7 @@ export type {
   ToolInvocation,
   ToolInvocationResult,
   ToolPlan,
+  ToolPlanStep,
   ToolPlanner,
   ToolScopeResult,
   WebMCPKitEvent,

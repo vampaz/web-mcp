@@ -98,6 +98,22 @@ describe('WebMcpDemo', () => {
     expect(wrapper.text()).toContain('Stark Industries')
   })
 
+  it('executes chained invoice plans in order', async () => {
+    const wrapper = mountWithDeps(WebMcpDemo)
+    await flushPromises()
+
+    await wrapper.find('input[aria-label="Natural language command"]').setValue('Mark Stark Industries invoices as paid')
+    await wrapper.find('.palette-command').trigger('submit')
+    await flushPromises()
+
+    const starkInvoiceRow = wrapper.findAll('tbody tr').find(function findStarkRow(row) {
+      return row.text().includes('Stark Industries')
+    })
+    expect(starkInvoiceRow?.text()).toContain('paid')
+    expect(starkInvoiceRow?.classes()).toContain('selected')
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('"status": "paid"'))
+  })
+
   it('guards and confirms cart checkout', async () => {
     const wrapper = mountWithDeps(WebMcpDemo)
     await flushPromises()

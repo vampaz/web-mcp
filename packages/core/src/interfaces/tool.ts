@@ -95,6 +95,14 @@ export interface ToolPlan {
   input: Record<string, unknown>
   confidence: number
   reason: string
+  steps?: ToolPlanStep[]
+}
+
+export interface ToolPlanStep {
+  toolName: string
+  input: Record<string, unknown>
+  confidence: number
+  reason: string
 }
 
 export interface PlannerContext {

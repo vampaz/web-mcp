@@ -101,6 +101,46 @@ setConfirmationHandler(async function confirmTool(tool, input, reason) {
 - `createBestPlanner()` uses Chrome built-in AI when available, otherwise a deterministic local planner.
 - `installWebMCPKitTestBridge()` exposes a kit-specific test bridge for Playwright and local QA.
 
+## Planner Output
+
+Planners normally return one tool invocation:
+
+```ts
+{
+  toolName: 'select_items',
+  input: { ids: ['item_4'] },
+  confidence: 0.9,
+  reason: 'Selected the matching item from the current app context.'
+}
+```
+
+For requests that require multiple app actions, planners can return a bounded chained plan. The demo executor runs each step in order and stops on the first blocked, failed, or unavailable step:
+
+```ts
+{
+  toolName: 'tool_sequence',
+  input: {},
+  confidence: 0.9,
+  reason: 'Select matching invoices, then update their status.',
+  steps: [
+    {
+      toolName: 'select_invoices',
+      input: { ids: ['inv_104'] },
+      confidence: 0.9,
+      reason: 'Selected the matching Stark Industries invoice.'
+    },
+    {
+      toolName: 'update_selected_invoice_status',
+      input: { status: 'paid' },
+      confidence: 0.9,
+      reason: 'Marked the selected invoice as paid.'
+    }
+  ]
+}
+```
+
+Each step is validated against its tool schema before execution. Confirmation is still enforced per tool invocation, so a chained plan cannot bypass approval for mutating tools.
+
 ## Integration Health
 
 Use the health report while wiring WebMCP into an app:

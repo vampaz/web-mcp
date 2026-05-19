@@ -338,6 +338,87 @@ describe('planner', () => {
     })
   })
 
+  it('plans invoice status changes as a tool sequence when rows must be selected first', async () => {
+    const planner = createHeuristicPlanner()
+    const plan = await planner.plan('Mark Stark Industries invoices as paid', [
+      {
+        name: 'select_invoices',
+        description: 'Select invoice rows by ID.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute: () => []
+      },
+      {
+        name: 'update_selected_invoice_status',
+        description: 'Update selected invoice statuses.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute: () => []
+      }
+    ], {
+      invoices: [
+        { id: 'inv_1', customerName: 'Northwind', amount: 920, status: 'overdue' },
+        { id: 'inv_2', customerName: 'Stark Industries', amount: 2310, status: 'overdue' }
+      ]
+    })
+
+    expect(plan).toMatchObject({
+      toolName: 'tool_sequence',
+      input: {},
+      steps: [
+        {
+          toolName: 'select_invoices',
+          input: {
+            ids: ['inv_2']
+          }
+        },
+        {
+          toolName: 'update_selected_invoice_status',
+          input: {
+            status: 'paid'
+          }
+        }
+      ]
+    })
+  })
+
+  it('does not chain broad invoice status changes without a row target', async () => {
+    const planner = createHeuristicPlanner()
+    const plan = await planner.plan('Mark invoices as paid', [
+      {
+        name: 'select_invoices',
+        description: 'Select invoice rows by ID.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute: () => []
+      },
+      {
+        name: 'update_selected_invoice_status',
+        description: 'Update selected invoice statuses.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute: () => []
+      }
+    ], {
+      invoices: [
+        { id: 'inv_1', customerName: 'Northwind', amount: 920, status: 'overdue' },
+        { id: 'inv_2', customerName: 'Stark Industries', amount: 2310, status: 'overdue' }
+      ]
+    })
+
+    expect(plan).toMatchObject({
+      toolName: 'update_selected_invoice_status',
+      input: {
+        status: 'paid'
+      }
+    })
+    expect(plan.steps).toBeUndefined()
+  })
+
   it('does not route semantic checklist selection to product search in fallback mode', async () => {
     const planner = createHeuristicPlanner()
     const plan = await planner.plan('Select all the items that are French food.', [

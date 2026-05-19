@@ -48,6 +48,25 @@ test('uses the local planner for semantic item selections when AI is unavailable
   await expect(getItemInput(page, 'Apple')).not.toBeChecked()
 })
 
+test('executes chained local invoice commands with confirmation', async function testLocalInvoiceChain({ page }) {
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Invoices' })).toBeVisible()
+  await selectPlannerProvider(page, 'local')
+
+  page.once('dialog', async function acceptStatusConfirmation(dialog) {
+    expect(dialog.message()).toContain('"status": "paid"')
+    await dialog.accept()
+  })
+
+  await page.getByLabel('Natural language command').fill('Mark Stark Industries invoices as paid')
+  await page.getByRole('button', { name: 'Run' }).click()
+
+  const starkInvoiceRow = page.getByRole('row', { name: /Stark Industries/ })
+  await expect(page.getByLabel('Select Stark Industries')).toBeChecked()
+  await expect(starkInvoiceRow).toContainText('paid')
+  await expect(page.getByText('update_selected_invoice_status completed.')).toBeAttached()
+})
+
 test('rechecks Chrome AI before running a command if the page mounted with fallback', async function testPlannerRefresh({ page }) {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Inventory' })).toBeVisible()

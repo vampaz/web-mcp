@@ -3,6 +3,7 @@ import type {
   PlannerContext,
   PlannerProviderConfig,
   ToolPlan,
+  ToolPlanStep,
   ToolPlanner,
   WebMCPTool
 } from './interfaces/tool'
@@ -66,7 +67,22 @@ const toolPlanSchema = {
     toolName: { type: 'string' },
     input: { type: 'object' },
     confidence: { type: 'number' },
-    reason: { type: 'string' }
+    reason: { type: 'string' },
+    steps: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          toolName: { type: 'string' },
+          input: { type: 'object' },
+          confidence: { type: 'number' },
+          reason: { type: 'string' }
+        },
+        required: ['toolName', 'input', 'confidence', 'reason'],
+        additionalProperties: false
+      },
+      maxItems: 5
+    }
   },
   required: ['toolName', 'input', 'confidence', 'reason'],
   additionalProperties: false
@@ -233,7 +249,7 @@ function createChromeAISession(languageModel: LanguageModelApi): Promise<Languag
     initialPrompts: [
       {
         role: 'system',
-        content: 'Choose exactly one app tool for the user request. Return only JSON matching the requested schema.'
+        content: 'Choose one app tool, or a short ordered tool_sequence when the request requires multiple app actions. Return only JSON matching the requested schema.'
       }
     ]
   })
@@ -378,7 +394,7 @@ function createPlannerMessages(message: string, tools: WebMCPTool[], context: Pl
   return [
     {
       role: 'system',
-      content: 'Choose exactly one app tool for the user request. Return only JSON with toolName, input, confidence, and reason.'
+      content: 'Choose one app tool, or a short ordered tool_sequence when the request requires multiple app actions. Return only JSON with toolName, input, confidence, reason, and optional steps.'
     },
     {
       role: 'user',
@@ -393,6 +409,7 @@ function createPlannerPrompt(message: string, tools: WebMCPTool[], context: Plan
     `Current app context:\n${JSON.stringify(context, null, 2)}`,
     `Available tools:\n${JSON.stringify(createToolCatalog(tools), null, 2)}`,
     'Choose the best tool and exact parameters from the current app context. Prefer stable IDs from context over labels.',
+    'If the request requires multiple app actions, return a chained plan with toolName "tool_sequence", input {}, and steps ordered by dependency. Use at most 5 steps. Each step must use one available tool and must be executable after the previous step updates app state.',
     'Return only valid JSON matching this schema:',
     JSON.stringify(toolPlanSchema, null, 2)
   ].join('\n\n')
@@ -456,6 +473,34 @@ function planWithHeuristics(message: string, tools: WebMCPTool[], context: Plann
   }
 
   if (normalizedMessage.includes('invoice') && (normalizedMessage.includes('mark') || normalizedMessage.includes('status')) && hasTool(tools, 'update_selected_invoice_status')) {
+    const matchingInvoiceIds = getMatchingInvoiceIds(normalizedMessage, context, { ignoreRequestedStatus: true })
+    if (matchingInvoiceIds.length > 0 && hasInvoiceSelectionTerms(normalizedMessage) && hasTool(tools, 'select_invoices')) {
+      return {
+        toolName: 'tool_sequence',
+        input: {},
+        confidence: 0.74,
+        reason: 'Matched invoice status mutation for specific invoice rows, so selected matching rows before updating status.',
+        steps: [
+          {
+            toolName: 'select_invoices',
+            input: {
+              ids: matchingInvoiceIds
+            },
+            confidence: 0.74,
+            reason: 'Selected invoice rows matching the user request.'
+          },
+          {
+            toolName: 'update_selected_invoice_status',
+            input: {
+              status: getInvoiceStatusFromMessage(normalizedMessage)
+            },
+            confidence: 0.74,
+            reason: 'Updated the selected invoice rows to the requested status.'
+          }
+        ]
+      }
+    }
+
     return {
       toolName: 'update_selected_invoice_status',
       input: {
@@ -626,7 +671,11 @@ function getSemanticContextItemIds(normalizedMessage: string, context: PlannerCo
     .filter((id): id is string => Boolean(id))
 }
 
-function getMatchingInvoiceIds(normalizedMessage: string, context: PlannerContext): string[] {
+function getMatchingInvoiceIds(
+  normalizedMessage: string,
+  context: PlannerContext,
+  options: { ignoreRequestedStatus?: boolean } = {}
+): string[] {
   const invoices = Array.isArray(context.invoices) ? context.invoices : []
   const status = getInvoiceStatusFromMessage(normalizedMessage)
   const wantsUnpaid = messageRequestsUnpaid(normalizedMessage)
@@ -635,9 +684,7 @@ function getMatchingInvoiceIds(normalizedMessage: string, context: PlannerContex
       if (!invoice || typeof invoice !== 'object') return false
       const record = invoice as Record<string, unknown>
       const searchableText = `${record.customerName ?? ''} ${record.owner ?? ''} ${record.status ?? ''} ${record.id ?? ''}`.toLowerCase()
-      const matchesStatus = wantsUnpaid
-        ? record.status !== 'paid' && record.status !== 'void'
-        : status === 'all' || record.status === status
+      const matchesStatus = getInvoiceStatusMatch(record, status, wantsUnpaid, options)
       const matchesAmount = messageRequestsMinimumAmount(normalizedMessage) && typeof record.amount === 'number'
         ? record.amount >= extractAmount(normalizedMessage)
         : true
@@ -653,6 +700,18 @@ function getMatchingInvoiceIds(normalizedMessage: string, context: PlannerContex
 function getFirstInvoiceId(context: PlannerContext): string {
   const invoices = Array.isArray(context.invoices) ? context.invoices : []
   return getContextItemId(invoices[0]) ?? ''
+}
+
+function getInvoiceStatusMatch(
+  record: Record<string, unknown>,
+  status: string,
+  wantsUnpaid: boolean,
+  options: { ignoreRequestedStatus?: boolean }
+): boolean {
+  if (options.ignoreRequestedStatus) return true
+  if (wantsUnpaid) return record.status !== 'paid' && record.status !== 'void'
+
+  return status === 'all' || record.status === status
 }
 
 function getInvoiceStatusFromMessage(normalizedMessage: string): string {
@@ -677,6 +736,12 @@ function messageRequestsMinimumAmount(normalizedMessage: string): boolean {
     || normalizedMessage.includes('at least')
 }
 
+function hasInvoiceSelectionTerms(normalizedMessage: string): boolean {
+  return normalizedMessage.split(/\W+/).some(function hasSelectionTerm(term) {
+    return term.length > 0 && !isIgnoredInvoiceTerm(term)
+  })
+}
+
 function isIgnoredInvoiceTerm(term: string): boolean {
   return term.length <= 2
     || /^\d+$/.test(term)
@@ -685,21 +750,29 @@ function isIgnoredInvoiceTerm(term: string): boolean {
       'above',
       'amount',
       'are',
+      'as',
       'at',
+      'draft',
       'greater',
       'invoice',
       'invoices',
       'least',
+      'mark',
       'more',
       'not',
       'open',
       'over',
+      'overdue',
+      'paid',
       'select',
       'show',
+      'sent',
+      'status',
       'than',
       'that',
       'the',
       'unpaid',
+      'void',
       'with'
     ].includes(term)
 }
@@ -865,12 +938,37 @@ function validateRemotePlan(plan: ToolPlan, tools: WebMCPTool[]): void {
   if (!plan.input || typeof plan.input !== 'object' || Array.isArray(plan.input)) throw new Error('provider returned a plan with invalid input')
   if (typeof plan.confidence !== 'number') throw new Error('provider returned a plan without numeric confidence')
   if (typeof plan.reason !== 'string') throw new Error('provider returned a plan without reason')
-  const selectedTool = tools.find((tool) => tool.name === plan.toolName)
-  if (!selectedTool) throw new Error(`provider selected unknown tool "${plan.toolName}"`)
+  if (plan.steps !== undefined) {
+    validateRemotePlanSequence(plan, tools)
+    return
+  }
 
-  const inputValidationErrors = validateJsonValue(plan.input, selectedTool.inputSchema)
+  validateRemotePlanStep(plan, tools)
+}
+
+function validateRemotePlanSequence(plan: ToolPlan, tools: WebMCPTool[]): void {
+  if (plan.toolName !== 'tool_sequence') throw new Error('provider returned steps without tool_sequence')
+  if (!Array.isArray(plan.steps) || plan.steps.length === 0) throw new Error('provider returned an empty tool sequence')
+  if (plan.steps.length > 5) throw new Error('provider returned too many tool sequence steps')
+
+  plan.steps.forEach(function validateSequenceStep(step) {
+    validateRemotePlanStep(step, tools)
+  })
+}
+
+function validateRemotePlanStep(step: ToolPlanStep, tools: WebMCPTool[]): void {
+  if (!step || typeof step !== 'object') throw new Error('provider returned an invalid plan step')
+  if (typeof step.toolName !== 'string') throw new Error('provider returned a plan step without toolName')
+  if (!step.input || typeof step.input !== 'object' || Array.isArray(step.input)) throw new Error('provider returned a plan step with invalid input')
+  if (typeof step.confidence !== 'number') throw new Error('provider returned a plan step without numeric confidence')
+  if (typeof step.reason !== 'string') throw new Error('provider returned a plan step without reason')
+
+  const selectedTool = tools.find((tool) => tool.name === step.toolName)
+  if (!selectedTool) throw new Error(`provider selected unknown tool "${step.toolName}"`)
+
+  const inputValidationErrors = validateJsonValue(step.input, selectedTool.inputSchema)
   if (inputValidationErrors.length > 0) {
-    throw new Error(`provider returned invalid input for "${plan.toolName}": ${formatJsonValueValidationError(inputValidationErrors)}`)
+    throw new Error(`provider returned invalid input for "${step.toolName}": ${formatJsonValueValidationError(inputValidationErrors)}`)
   }
 }
 

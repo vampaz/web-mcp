@@ -40,6 +40,14 @@ type ToolPlan = {
   input: Record<string, unknown>
   confidence: number
   reason: string
+  steps?: ToolPlanStep[]
+}
+
+type ToolPlanStep = {
+  toolName: string
+  input: Record<string, unknown>
+  confidence: number
+  reason: string
 }
 
 const allowedCloudflareModels = new Set([
@@ -167,7 +175,7 @@ function createPlannerMessages(body: PlannerRequestBody): CloudflareAiInput['mes
   return [
     {
       role: 'system',
-      content: 'Choose exactly one WebMCP tool. Return only one raw JSON object with toolName, input, confidence, and reason. Do not return Markdown, HTML, prose, or a code fence.'
+      content: 'Choose one WebMCP tool, or a short ordered tool_sequence when the request requires multiple app actions. Return only one raw JSON object with toolName, input, confidence, reason, and optional steps. Do not return Markdown, HTML, prose, or a code fence.'
     },
     {
       role: 'user',
@@ -176,7 +184,8 @@ function createPlannerMessages(body: PlannerRequestBody): CloudflareAiInput['mes
         `Current app context:\n${JSON.stringify(body.context ?? {}, null, 2)}`,
         `Available tools:\n${JSON.stringify(body.tools ?? [], null, 2)}`,
         'Use stable IDs from context when selecting existing items.',
-        'Expected shape: {"toolName":"tool_name","input":{"id":"stable_id_from_context"},"confidence":0.9,"reason":"Brief reason for the selected tool."}'
+        'If the request requires multiple app actions, return {"toolName":"tool_sequence","input":{},"confidence":0.9,"reason":"Brief reason for the chain.","steps":[{"toolName":"tool_name","input":{"id":"stable_id_from_context"},"confidence":0.9,"reason":"Brief reason for this step."}]} with at most 5 steps.',
+        'For one app action, return {"toolName":"tool_name","input":{"id":"stable_id_from_context"},"confidence":0.9,"reason":"Brief reason for the selected tool."}'
       ].join('\n\n')
     }
   ]
@@ -228,8 +237,33 @@ function validatePlan(plan: ToolPlan, tools: PlannerRequestBody['tools']): void 
   if (!plan.input || typeof plan.input !== 'object' || Array.isArray(plan.input)) throw new Error('Invalid input')
   if (typeof plan.confidence !== 'number') throw new Error('Invalid confidence')
   if (typeof plan.reason !== 'string') throw new Error('Invalid reason')
+  if (plan.steps !== undefined) {
+    validatePlanSequence(plan, tools)
+    return
+  }
+
+  validatePlanStep(plan, tools)
+}
+
+function validatePlanSequence(plan: ToolPlan, tools: PlannerRequestBody['tools']): void {
+  if (plan.toolName !== 'tool_sequence') throw new Error('Invalid tool sequence')
+  if (!Array.isArray(plan.steps) || plan.steps.length === 0) throw new Error('Invalid tool sequence steps')
+  if (plan.steps.length > 5) throw new Error('Tool sequence is too long')
+
+  plan.steps.forEach(function validateSequenceStep(step) {
+    validatePlanStep(step, tools)
+  })
+}
+
+function validatePlanStep(step: ToolPlanStep, tools: PlannerRequestBody['tools']): void {
+  if (!step || typeof step !== 'object') throw new Error('Invalid plan step')
+  if (typeof step.toolName !== 'string') throw new Error('Invalid step toolName')
+  if (!step.input || typeof step.input !== 'object' || Array.isArray(step.input)) throw new Error('Invalid step input')
+  if (typeof step.confidence !== 'number') throw new Error('Invalid step confidence')
+  if (typeof step.reason !== 'string') throw new Error('Invalid step reason')
+
   const selectedTool = tools?.find(function hasSelectedTool(tool) {
-    return tool.name === plan.toolName
+    return tool.name === step.toolName
   })
   if (!selectedTool) {
     throw new Error('Unknown tool')
@@ -237,7 +271,7 @@ function validatePlan(plan: ToolPlan, tools: PlannerRequestBody['tools']): void 
 
   if (!selectedTool.inputSchema) throw new Error('Selected tool has no input schema')
 
-  const inputValidationErrors = validateJsonValue(plan.input, selectedTool.inputSchema)
+  const inputValidationErrors = validateJsonValue(step.input, selectedTool.inputSchema)
   if (inputValidationErrors.length > 0) {
     throw new Error(`Invalid tool input: ${formatJsonValueValidationError(inputValidationErrors)}`)
   }

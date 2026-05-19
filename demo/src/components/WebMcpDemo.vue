@@ -115,6 +115,7 @@ import {
   type PlannerProviderKind,
   type ToolInvocationResult,
   type ToolPlan,
+  type ToolPlanStep,
   type ToolPlanner
 } from '@webmcp-kit/core'
 import { mountDevtoolsOverlay, type DevtoolsOverlay } from '@webmcp-kit/devtools'
@@ -1000,17 +1001,49 @@ async function runPrompt() {
     return
   }
   lastPlan.value = plan
-  selectedToolName.value = plan.toolName
   commandPhase.value = 'executing'
 
-  const result = await invokeTool({
-    toolName: plan.toolName,
-    input: plan.input,
-    source: 'planner'
-  })
+  const result = await invokePlannedSteps(plan)
   lastResult.value = result
   commandPhase.value = result.status === 'success' ? 'completed' : 'failed'
 
+}
+
+async function invokePlannedSteps(plan: ToolPlan): Promise<ToolInvocationResult> {
+  const steps = getPlanSteps(plan)
+  let result: ToolInvocationResult | undefined
+
+  for (const [index, step] of steps.entries()) {
+    selectedToolName.value = steps.length > 1
+      ? `${step.toolName} (${index + 1}/${steps.length})`
+      : step.toolName
+    result = await invokeTool({
+      toolName: step.toolName,
+      input: step.input,
+      source: 'planner'
+    })
+    if (result.status !== 'success') return result
+  }
+
+  return result ?? {
+    toolName: plan.toolName,
+    status: 'error',
+    error: 'Planner returned no executable steps.',
+    durationMs: 0
+  }
+}
+
+function getPlanSteps(plan: ToolPlan): ToolPlanStep[] {
+  if (Array.isArray(plan.steps)) return plan.steps
+
+  return [
+    {
+      toolName: plan.toolName,
+      input: plan.input,
+      confidence: plan.confidence,
+      reason: plan.reason
+    }
+  ]
 }
 
 function confirmToolInvocation(tool: { name: string }, input: unknown, reason: string): boolean {

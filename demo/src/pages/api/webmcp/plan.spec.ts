@@ -166,6 +166,78 @@ describe('/api/webmcp/plan', () => {
       error: 'Server planner failed'
     })
   })
+
+  it('accepts validated tool sequence plans', async () => {
+    const sequencePlan = {
+      toolName: 'tool_sequence',
+      input: {},
+      confidence: 0.9,
+      reason: 'Select the matching invoice, then update its status.',
+      steps: [
+        {
+          toolName: 'select_invoices',
+          input: { ids: ['inv_104'] },
+          confidence: 0.9,
+          reason: 'Selected Stark invoices.'
+        },
+        {
+          toolName: 'update_selected_invoice_status',
+          input: { status: 'paid' },
+          confidence: 0.9,
+          reason: 'Marked selected invoices paid.'
+        }
+      ]
+    }
+    env.AI = {
+      run: vi.fn(async () => ({
+        response: JSON.stringify(sequencePlan)
+      }))
+    } as unknown as typeof env.AI
+
+    const response = await POST(createContext({
+      provider: 'cloudflare-binding',
+      model: '@cf/google/gemma-4-26b-a4b-it',
+      message: 'Mark Stark Industries invoices as paid',
+      tools: [
+        {
+          name: 'select_invoices',
+          description: 'Select invoice rows.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              ids: {
+                type: 'array',
+                items: {
+                  type: 'string'
+                }
+              }
+            },
+            required: ['ids'],
+            additionalProperties: false
+          }
+        },
+        {
+          name: 'update_selected_invoice_status',
+          description: 'Update selected invoice statuses.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              status: {
+                type: 'string',
+                enum: ['draft', 'sent', 'overdue', 'paid', 'void']
+              }
+            },
+            required: ['status'],
+            additionalProperties: false
+          }
+        }
+      ],
+      context: {}
+    }))
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual(sequencePlan)
+  })
 })
 
 function createContext(body: unknown) {

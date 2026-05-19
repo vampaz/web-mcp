@@ -1,6 +1,6 @@
 # Planner Providers
 
-WebMCP Kit can plan tool calls with different model providers. The app still owns tools, schemas, guards, confirmations, and execution. Providers only choose which registered tool to call and which JSON input to pass.
+WebMCP Kit can plan tool calls with different model providers. The app still owns tools, schemas, guards, confirmations, and execution. Providers choose which registered tool to call and which JSON input to pass. For requests that need multiple app actions, providers can return a short ordered `tool_sequence`.
 
 ## Production: Server Mode
 
@@ -139,6 +139,54 @@ When a provider is explicitly selected, WebMCP Kit uses that provider. It does n
 Pass the selected planner to `getIntegrationHealthReport({ planner })` during development to expose provider readiness in the same diagnostics used by the devtools overlay.
 
 For the separate `cloudflare-workers-ai` REST mode, use the same `.env` values or another server environment that provides `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`.
+
+## Tool Sequences
+
+Planner output can be a single invocation:
+
+```json
+{
+  "toolName": "select_items",
+  "input": { "ids": ["item_4"] },
+  "confidence": 0.9,
+  "reason": "Selected the matching item from the current app context."
+}
+```
+
+Or a bounded sequence when the user request requires multiple actions:
+
+```json
+{
+  "toolName": "tool_sequence",
+  "input": {},
+  "confidence": 0.9,
+  "reason": "Select matching invoices, then update their status.",
+  "steps": [
+    {
+      "toolName": "select_invoices",
+      "input": { "ids": ["inv_104"] },
+      "confidence": 0.9,
+      "reason": "Selected the matching Stark Industries invoice."
+    },
+    {
+      "toolName": "update_selected_invoice_status",
+      "input": { "status": "paid" },
+      "confidence": 0.9,
+      "reason": "Marked the selected invoice as paid."
+    }
+  ]
+}
+```
+
+Sequence rules:
+
+- Use `toolName: "tool_sequence"` with `input: {}`.
+- Include `steps` in dependency order.
+- Use at most 5 steps.
+- Every step must reference an available registered tool.
+- Every step input is validated against that tool's schema before execution.
+- Execution stops on the first blocked, failed, or unavailable step.
+- Confirmation remains per tool, so mutating steps still require approval.
 
 The handler shape is:
 
