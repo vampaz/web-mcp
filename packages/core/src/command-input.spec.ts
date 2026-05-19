@@ -169,9 +169,11 @@ describe('WebMCP command input', () => {
 
     const diagnosticsRow = element.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-diagnostics')
     const diagnosticsSlot = element.shadowRoot?.querySelector<HTMLSlotElement>('slot[name="diagnostics"]')
+    const status = element.shadowRoot?.querySelector<HTMLElement>('.webmcp-settings-summary .webmcp-status')
     expect(diagnosticsRow).toBeInstanceOf(HTMLDetailsElement)
     expect(diagnosticsRow?.textContent).toContain('Developer diagnostics')
     expect(diagnosticsSlot?.assignedElements()).toEqual([diagnostics])
+    expect(status?.textContent?.trim()).toBe('Auto')
   })
 
   it('emits planner status when the selected provider changes', async () => {

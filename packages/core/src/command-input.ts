@@ -534,11 +534,12 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
     private render() {
       if (!this.shadowRoot) return
 
-      const provider = this.state.fixedProvider ?? this.state.provider
-      const model = this.state.fixedModel ?? this.state.model
+      const provider = this.plannerConfig?.provider ?? this.state.fixedProvider ?? this.state.provider
+      const model = this.plannerConfig?.model ?? this.state.fixedModel ?? this.state.model
       const showProviderControl = !this.planner && !this.plannerConfig && !this.state.fixedProvider
       const showModelControl = !this.planner && !this.plannerConfig && !this.state.fixedModel && usesModelInput(provider)
       const showDiagnostics = this.state.hasDiagnostics
+      const optionsStatus = this.planner ? this.state.plannerName : getOptionsStatusText(provider, model)
       const statusLabel = getStatusLabel(this.state.phase)
       const buttonLabel = this.running ? statusLabel : this.state.buttonLabel
 
@@ -563,13 +564,27 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
         </form>
         ${showProviderControl || showModelControl ? `
           <details class="webmcp-settings" ${this.state.settingsOpen ? 'open' : ''}>
-            <summary>Options</summary>
+            <summary class="webmcp-settings-summary">
+              <span>Options</span>
+              <span class="webmcp-status" aria-live="polite" aria-atomic="true">
+                ${escapeHtml(optionsStatus)}
+              </span>
+            </summary>
             <div class="webmcp-settings-grid">
               ${showProviderControl ? getProviderControlMarkup(provider) : ''}
               ${showModelControl ? getModelControlMarkup(provider, model) : ''}
             </div>
           </details>
-        ` : ''}
+        ` : `
+          <div class="webmcp-settings webmcp-settings--status-only">
+            <div class="webmcp-settings-summary">
+              <span>Options</span>
+              <span class="webmcp-status" aria-live="polite" aria-atomic="true">
+                ${escapeHtml(optionsStatus)}
+              </span>
+            </div>
+          </div>
+        `}
         ${showDiagnostics ? `
           <details class="webmcp-diagnostics" ${this.state.diagnosticsOpen ? 'open' : ''}>
             <summary>Developer diagnostics</summary>
@@ -578,10 +593,6 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
             </div>
           </details>
         ` : ''}
-        <p class="webmcp-status" aria-live="polite" aria-atomic="true">
-          <strong>${escapeHtml(this.state.plannerName)}</strong>
-          <span>${escapeHtml(this.state.plannerDetail)}</span>
-        </p>
       `
 
       const form = this.shadowRoot.querySelector<HTMLFormElement>('form')
@@ -664,7 +675,13 @@ function getProviderControlMarkup(provider: PlannerProviderKind): string {
 }
 
 function getProviderOptionsMarkup(provider: PlannerProviderKind): string {
-  const options: Array<{ label: string, value: PlannerProviderKind }> = [
+  return getProviderOptions().map(function mapOption(option) {
+    return `<option value="${option.value}" ${provider === option.value ? 'selected' : ''}>${escapeHtml(option.label)}</option>`
+  }).join('')
+}
+
+function getProviderOptions(): Array<{ label: string, value: PlannerProviderKind }> {
+  return [
     { label: 'Auto', value: 'auto' },
     { label: 'Chrome built-in AI', value: 'chrome-built-in' },
     { label: 'Local deterministic', value: 'local' },
@@ -674,10 +691,26 @@ function getProviderOptionsMarkup(provider: PlannerProviderKind): string {
     { label: 'Cloudflare binding', value: 'cloudflare-binding' },
     { label: 'Cloudflare Workers AI', value: 'cloudflare-workers-ai' }
   ]
+}
 
-  return options.map(function mapOption(option) {
-    return `<option value="${option.value}" ${provider === option.value ? 'selected' : ''}>${escapeHtml(option.label)}</option>`
-  }).join('')
+function getOptionsStatusText(provider: PlannerProviderKind, model: string): string {
+  const providerLabel = getProviderLabel(provider)
+  if (!usesModelInput(provider) || !model) return providerLabel
+  return `${providerLabel} - ${getModelLabel(provider, model)}`
+}
+
+function getProviderLabel(provider: PlannerProviderKind): string {
+  const option = getProviderOptions().find(function findProviderOption(providerOption) {
+    return providerOption.value === provider
+  })
+  return option?.label ?? provider
+}
+
+function getModelLabel(provider: PlannerProviderKind, model: string): string {
+  const option = getModelOptions(provider).find(function findModelOption(modelOption) {
+    return modelOption.value === model
+  })
+  return option?.label ?? model
 }
 
 function getModelControlMarkup(provider: PlannerProviderKind, model: string): string {
@@ -942,12 +975,12 @@ function getStyles(): string {
       position: relative;
     }
 
-    summary {
+    summary,
+    .webmcp-settings-summary {
       display: inline-flex;
       min-height: 1.75rem;
       align-items: center;
       gap: 0.45rem;
-      cursor: pointer;
       color: var(--webmcp-muted);
       font-size: 0.72rem;
       font-weight: 800;
@@ -955,9 +988,18 @@ function getStyles(): string {
       text-transform: uppercase;
     }
 
+    summary {
+      cursor: pointer;
+    }
+
     summary::marker {
       color: var(--webmcp-accent);
       font-size: 0.75rem;
+    }
+
+    .webmcp-settings-summary {
+      width: 100%;
+      justify-content: space-between;
     }
 
     .webmcp-settings-grid {
@@ -989,16 +1031,29 @@ function getStyles(): string {
     }
 
     .webmcp-status {
-      display: grid;
-      gap: 0.15rem;
-      margin: 0.45rem 0 0;
+      display: inline-flex;
+      min-width: 0;
+      gap: 0.45rem;
+      align-items: center;
       color: var(--webmcp-muted);
       font-size: 0.8rem;
+      font-weight: 500;
+      text-transform: none;
     }
 
     .webmcp-status strong {
       color: var(--webmcp-ink);
       font-size: 0.84rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .webmcp-status span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     @media (max-width: 36rem) {
