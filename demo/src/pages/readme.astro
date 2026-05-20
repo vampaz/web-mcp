@@ -1,7 +1,7 @@
 ---
 import { createMarkdownProcessor } from '@astrojs/markdown-remark'
 
-import '@/styles/global.css'
+import DemoLayout from '@/layouts/DemoLayout.astro'
 import readmeMarkdown from '../../../README.md?raw'
 
 export const prerender = true
@@ -20,25 +20,15 @@ function resolveRepositoryLinks(html: string): string {
 }
 ---
 
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="WebMCP Kit README documentation" />
-    <link rel="icon" href="/webmcp-circuit.svg" type="image/svg+xml" />
-    <title>WebMCP Kit README</title>
-  </head>
-  <body>
-    <main class="readme-shell">
-      <header class="readme-header">
-        <a class="readme-back" href="/">Back to demo</a>
-        <p>Repository README</p>
-      </header>
+<DemoLayout title="WebMCP Kit README" description="WebMCP Kit README documentation">
+  <section class="readme-shell">
+    <header class="readme-header">
+      <p>Repository README</p>
+    </header>
 
-      <article class="readme-document" set:html={readmeHtml} />
-    </main>
-  </body>
-</html>
+    <article class="readme-document" set:html={readmeHtml} />
+  </section>
+</DemoLayout>
 
 <style>
   .readme-shell {
@@ -68,18 +58,11 @@ function resolveRepositoryLinks(html: string): string {
     text-transform: uppercase;
   }
 
-  .readme-back,
   .readme-document a {
     color: #e8be53;
     text-underline-offset: 0.2em;
   }
 
-  .readme-back {
-    font-weight: 800;
-    text-decoration: none;
-  }
-
-  .readme-back:hover,
   .readme-document a:hover {
     text-decoration: underline;
   }

@@ -1,29 +1,25 @@
 <template>
-  <main class="demo-shell">
-    <nav class="demo-nav" aria-label="Demo resources">
-      <a href="/readme/">README</a>
-    </nav>
-
-    <webmcp-command-input
-      ref="commandInput"
-      class="demo-command-input"
-      placeholder="Try: Select all French items"
-      @webmcp-command-error="handleCommandError"
-      @webmcp-command-plan="handleCommandPlan"
-      @webmcp-command-planner="handleCommandPlanner"
-      @webmcp-command-result="handleCommandResult"
-    >
-      <DemoRuntimeStatus
-        ref="runtimeStatusPanel"
-        slot="diagnostics"
-        :planner-detail="plannerDetail"
-        :planner-name="plannerName"
-        :registered-tools-count="registeredTools.length"
-        :support-label="supportLabel"
-      />
-    </webmcp-command-input>
+  <webmcp-command-input
+    ref="commandInput"
+    floating
+    placeholder="Try: Select all French items"
+    @webmcp-command-error="handleCommandError"
+    @webmcp-command-plan="handleCommandPlan"
+    @webmcp-command-planner="handleCommandPlanner"
+    @webmcp-command-result="handleCommandResult"
+  >
+    <DemoRuntimeStatus
+      ref="runtimeStatusPanel"
+      slot="diagnostics"
+      :planner-detail="plannerDetail"
+      :planner-name="plannerName"
+      :registered-tools-count="registeredTools.length"
+      :support-label="supportLabel"
+    />
+  </webmcp-command-input>
 
     <DemoSemanticInventory
+      v-if="page === 'inventory'"
       :items="selectableItems"
       :selected-count="selectedItems.length"
       @clear-selection="clearItemSelection"
@@ -31,28 +27,37 @@
       @toggle-item="setItemSelected"
     />
 
-    <DemoInvoiceTable
-      :active-invoice-id="activeInvoiceId"
-      :density="settings.density"
-      :filtered-count="visibleInvoices.length"
-      :filters="invoiceFilters"
-      :invoices="visibleInvoices"
-      :selected-count="selectedInvoices.length"
-      :sort-direction="invoiceSortDirection"
-      :sort-key="invoiceSortKey"
-      :total-count="invoices.length"
-      @clear-selection="clearInvoiceSelection"
-      @mark-selected="markSelectedInvoices"
-      @open-invoice="openInvoice"
-      @select-visible="selectVisibleInvoices"
-      @toggle-invoice="setInvoiceSelected"
-      @update:query="invoiceFilters.query = $event"
-      @update:sort-direction="invoiceSortDirection = $event"
-      @update:sort-key="invoiceSortKey = $event"
-      @update:status="invoiceFilters.status = $event"
-    />
+    <section v-if="page === 'invoices'" class="demo-page-grid">
+      <DemoInvoiceTable
+        :active-invoice-id="activeInvoiceId"
+        :density="settings.density"
+        :filtered-count="visibleInvoices.length"
+        :filters="invoiceFilters"
+        :invoices="visibleInvoices"
+        :selected-count="selectedInvoices.length"
+        :sort-direction="invoiceSortDirection"
+        :sort-key="invoiceSortKey"
+        :total-count="invoices.length"
+        @clear-selection="clearInvoiceSelection"
+        @mark-selected="markSelectedInvoices"
+        @open-invoice="openInvoice"
+        @select-visible="selectVisibleInvoices"
+        @toggle-invoice="setInvoiceSelected"
+        @update:query="invoiceFilters.query = $event"
+        @update:sort-direction="invoiceSortDirection = $event"
+        @update:sort-key="invoiceSortKey = $event"
+        @update:status="invoiceFilters.status = $event"
+      />
 
-    <section class="app-panels">
+      <DemoInvoiceDrawer
+        :active-invoice="activeInvoice"
+        :draft="invoiceDraft"
+        @create-invoice="createInvoiceFromDraft"
+        @update:draft="updateInvoiceDraft"
+      />
+    </section>
+
+    <section v-if="page === 'support'" class="demo-page-grid">
       <DemoSupportTicketPanel
         ref="supportTicketPanel"
         :body="supportBody"
@@ -62,13 +67,15 @@
         @update:subject="supportSubject = $event"
       />
 
-      <DemoInvoiceDrawer
-        :active-invoice="activeInvoice"
-        :draft="invoiceDraft"
-        @create-invoice="createInvoiceFromDraft"
-        @update:draft="updateInvoiceDraft"
+      <DemoTicketBoard
+        :tickets="tickets"
+        @update-ticket-assignee="updateTicketAssignee"
+        @update-ticket-priority="updateTicketPriority"
+        @update-ticket-status="updateTicketStatus"
       />
+    </section>
 
+    <section v-if="page === 'commerce'" class="demo-page-grid">
       <DemoCartEditor
         v-model:discount-percent="cartDiscountPercent"
         v-model:quantity="cartQuantity"
@@ -82,15 +89,6 @@
         @update-line="updateCartLineQuantity"
       />
     </section>
-
-    <DemoTicketBoard
-      :tickets="tickets"
-      @update-ticket-assignee="updateTicketAssignee"
-      @update-ticket-priority="updateTicketPriority"
-      @update-ticket-status="updateTicketStatus"
-    />
-
-  </main>
 </template>
 
 <script setup lang="ts">
@@ -127,7 +125,7 @@ import DemoRuntimeStatus from '@/components/DemoRuntimeStatus.vue'
 import DemoSemanticInventory from '@/components/DemoSemanticInventory.vue'
 import DemoSupportTicketPanel from '@/components/DemoSupportTicketPanel.vue'
 import DemoTicketBoard from '@/components/DemoTicketBoard.vue'
-import type { CartLine, DemoSettings, Invoice, InvoiceDraft, InvoiceFilters, Product, SelectableItem, SupportTicket } from '@/interfaces/demo'
+import type { CartLine, DemoPage, DemoSettings, Invoice, InvoiceDraft, InvoiceFilters, Product, SelectableItem, SupportTicket } from '@/interfaces/demo'
 import {
   getCloudflareBindingModels,
   getInitialDemoSettings,
@@ -143,6 +141,14 @@ const showDevtools = import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIE
 const showPlannerControls = import.meta.env.DEV
 const shouldInstallTestBridge = import.meta.env.DEV || import.meta.env.MODE === 'test'
 const shouldDefaultToCloudflareBinding = showCloudflareBinding && import.meta.env.MODE !== 'test'
+const props = withDefaults(defineProps<{
+  page?: DemoPage
+}>(), {
+  page: 'inventory'
+})
+const page = computed(function getPage() {
+  return props.page
+})
 const cloudflareBindingModels = getCloudflareBindingModels()
 const plannerName = ref('Loading')
 const plannerDetail = ref(shouldDefaultToCloudflareBinding ? 'Using the Cloudflare AI binding planner endpoint.' : 'Checking Chrome built-in AI availability.')
@@ -297,7 +303,8 @@ onUnmounted(function handleUnmounted() {
 })
 
 function registerDemoTools() {
-  unregisterCallbacks.push(registerTool(defineTool({
+  if (page.value === 'inventory') {
+    unregisterCallbacks.push(registerTool(defineTool({
     name: 'select_items',
     description: 'Select visible inventory items by stable item IDs.',
     inputSchema: {
@@ -326,7 +333,7 @@ function registerDemoTools() {
     }
   })).unregister)
 
-  unregisterCallbacks.push(registerTool(defineTool({
+    unregisterCallbacks.push(registerTool(defineTool({
     name: 'clear_item_selection',
     description: 'Clear the current semantic inventory selection.',
     inputSchema: {
@@ -339,9 +346,11 @@ function registerDemoTools() {
       clearItemSelection()
       return []
     }
-  })).unregister)
+    })).unregister)
+  }
 
-  unregisterCallbacks.push(registerTool(defineTool({
+  if (page.value === 'invoices') {
+    unregisterCallbacks.push(registerTool(defineTool({
     name: 'create_invoice',
     description: 'Create a draft invoice for a customer and add it to the local invoice list.',
     inputSchema: {
@@ -388,7 +397,7 @@ function registerDemoTools() {
     }
   })).unregister)
 
-  unregisterCallbacks.push(registerTool(defineTool({
+    unregisterCallbacks.push(registerTool(defineTool({
     name: 'filter_invoices',
     description: 'Apply visible invoice table filters by status, search query, or minimum amount.',
     inputSchema: {
@@ -433,7 +442,7 @@ function registerDemoTools() {
     }
   })).unregister)
 
-  unregisterCallbacks.push(registerTool(defineTool({
+    unregisterCallbacks.push(registerTool(defineTool({
     name: 'sort_invoices',
     description: 'Sort the visible invoice table by a supported column.',
     inputSchema: {
@@ -458,7 +467,7 @@ function registerDemoTools() {
     }
   })).unregister)
 
-  unregisterCallbacks.push(registerTool(defineTool({
+    unregisterCallbacks.push(registerTool(defineTool({
     name: 'select_invoices',
     description: 'Select invoice rows by stable invoice IDs in the visible invoice table.',
     inputSchema: {
@@ -487,7 +496,7 @@ function registerDemoTools() {
     }
   })).unregister)
 
-  unregisterCallbacks.push(registerTool(defineTool({
+    unregisterCallbacks.push(registerTool(defineTool({
     name: 'open_invoice',
     description: 'Open an invoice row in the visible invoice detail drawer.',
     inputSchema: {
@@ -511,9 +520,9 @@ function registerDemoTools() {
       const invoice = activeInvoice.value
       return invoice
     }
-  })).unregister)
+    })).unregister)
 
-  unregisterCallbacks.push(registerTool(defineTool({
+    unregisterCallbacks.push(registerTool(defineTool({
     name: 'update_selected_invoice_status',
     description: 'Update the status for currently selected invoice rows.',
     inputSchema: {
@@ -546,9 +555,11 @@ function registerDemoTools() {
       })
       return selectedInvoices.value
     }
-  })).unregister)
+    })).unregister)
+  }
 
-  unregisterCallbacks.push(registerTool(defineTool({
+  if (page.value === 'commerce') {
+    unregisterCallbacks.push(registerTool(defineTool({
     name: 'search_products',
     description: 'Search the local product catalog and return matching products for the current shopper.',
     inputSchema: {
@@ -575,7 +586,7 @@ function registerDemoTools() {
     }
   })).unregister)
 
-  unregisterCallbacks.push(registerTool(defineTool({
+    unregisterCallbacks.push(registerTool(defineTool({
     name: 'add_to_cart',
     description: 'Add a known product to the cart for the current shopping session.',
     inputSchema: {
@@ -608,7 +619,7 @@ function registerDemoTools() {
     }
   })).unregister)
 
-  unregisterCallbacks.push(registerTool(defineTool({
+    unregisterCallbacks.push(registerTool(defineTool({
     name: 'update_cart_quantity',
     description: 'Update the quantity for an existing cart line.',
     inputSchema: {
@@ -636,7 +647,7 @@ function registerDemoTools() {
     }
   })).unregister)
 
-  unregisterCallbacks.push(registerTool(defineTool({
+    unregisterCallbacks.push(registerTool(defineTool({
     name: 'remove_from_cart',
     description: 'Remove a product line from the visible cart.',
     inputSchema: {
@@ -657,9 +668,9 @@ function registerDemoTools() {
       removeCartLine(String(input.productId ?? ''))
       return cart.value
     }
-  })).unregister)
+    })).unregister)
 
-  unregisterCallbacks.push(registerTool(defineTool({
+    unregisterCallbacks.push(registerTool(defineTool({
     name: 'apply_cart_discount',
     description: 'Set the cart discount percentage control.',
     inputSchema: {
@@ -681,9 +692,9 @@ function registerDemoTools() {
         total: cartTotal.value
       }
     }
-  })).unregister)
+    })).unregister)
 
-  unregisterCallbacks.push(registerTool(defineTool({
+    unregisterCallbacks.push(registerTool(defineTool({
     name: 'checkout_cart',
     description: 'Checkout the current cart and clear all cart lines after explicit confirmation.',
     inputSchema: {
@@ -708,9 +719,11 @@ function registerDemoTools() {
         total
       }
     }
-  })).unregister)
+    })).unregister)
+  }
 
-  unregisterCallbacks.push(registerTool(defineTool({
+  if (page.value === 'support') {
+    unregisterCallbacks.push(registerTool(defineTool({
     name: 'update_ticket',
     description: 'Update a support ticket status, assignee, or priority from the visible ticket board.',
     inputSchema: {
@@ -753,7 +766,8 @@ function registerDemoTools() {
         return ticket.id === String(input.id)
       })
     }
-  })).unregister)
+    })).unregister)
+  }
 
 }
 
@@ -945,8 +959,7 @@ function updateTicketPriority(id: string, priority: SupportTicket['priority']) {
 function configureCommandInput() {
   if (showPlannerControls) {
     commandInput.value?.configure({
-      context: getPlannerContext,
-      endpoint: plannerEndpoint.value
+      context: getPlannerContext
     })
     return
   }
@@ -1154,63 +1167,3 @@ declare global {
   }
 }
 </script>
-
-<style scoped>
-.demo-shell {
-  width: min(1440px, calc(100% - 32px));
-  margin: 0 auto;
-  padding: 8px 0 80px;
-}
-
-.demo-nav {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 8px;
-}
-
-.demo-nav a {
-  border: 1px solid rgba(244, 240, 232, 0.18);
-  padding: 6px 10px;
-  color: #c9d1cb;
-  font-size: 0.78rem;
-  font-weight: 900;
-  text-decoration: none;
-  text-transform: uppercase;
-}
-
-.demo-nav a:hover,
-.demo-nav a:focus-visible {
-  border-color: #e8be53;
-  color: #e8be53;
-}
-
-.demo-command-input {
-  position: sticky;
-  top: 10px;
-  z-index: 1000;
-  display: block;
-  width: min(920px, 100%);
-  margin: 0 auto 12px;
-}
-
-.app-panels {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: start;
-  margin-top: 16px;
-  margin-bottom: 16px;
-}
-
-.app-panels > * {
-  flex: 1 1 340px;
-}
-
-@media (max-width: 620px) {
-  .demo-shell {
-    width: min(100% - 20px, 1440px);
-    padding-top: 12px;
-    padding-bottom: 36px;
-  }
-}
-</style>

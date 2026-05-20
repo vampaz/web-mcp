@@ -1,0 +1,46 @@
+---
+import '@/styles/global.css'
+
+interface Props {
+  description?: string
+  title?: string
+}
+
+const {
+  description = 'Local WebMCP Kit demo',
+  title = 'WebMCP Kit'
+} = Astro.props
+const currentPath = Astro.url.pathname
+
+function getIsActive(path: string): boolean {
+  return path === '/'
+    ? currentPath === '/'
+    : currentPath.startsWith(path)
+}
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <link rel="icon" href="/webmcp-circuit.svg" type="image/svg+xml" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <header class="demo-topbar">
+      <a class="demo-brand" href="/">WebMCP Kit</a>
+      <nav class="demo-nav" aria-label="Demo sections">
+        <a href="/" aria-current={getIsActive('/') ? 'page' : undefined}>Inventory</a>
+        <a href="/invoices/" aria-current={getIsActive('/invoices/') ? 'page' : undefined}>Invoices</a>
+        <a href="/commerce/" aria-current={getIsActive('/commerce/') ? 'page' : undefined}>Commerce</a>
+        <a href="/support/" aria-current={getIsActive('/support/') ? 'page' : undefined}>Support</a>
+        <a href="/readme/" aria-current={getIsActive('/readme/') ? 'page' : undefined}>README</a>
+      </nav>
+    </header>
+
+    <main class="demo-shell">
+      <slot />
+    </main>
+  </body>
+</html>

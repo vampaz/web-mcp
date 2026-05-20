@@ -178,6 +178,31 @@ describe('WebMCP command input', () => {
     expect(status?.textContent?.trim()).toBe('Auto')
   })
 
+  it('renders floating mode with a stacked trigger and expandable panel', async () => {
+    const element = createCommandInputElement()
+    element.setAttribute('floating', '')
+
+    document.body.append(element)
+    await Promise.resolve()
+
+    const trigger = element.shadowRoot?.querySelector<HTMLButtonElement>('.webmcp-floating-trigger')
+    const triggerWords = Array.from(trigger?.querySelectorAll('span') ?? []).map(function mapWord(word) {
+      return word.textContent
+    })
+    const panel = element.shadowRoot?.querySelector<HTMLElement>('.webmcp-floating-panel')
+    expect(trigger).toBeInstanceOf(HTMLButtonElement)
+    expect(triggerWords).toEqual(['WEB', 'MCP'])
+    expect(trigger?.getAttribute('aria-expanded')).toBe('false')
+    expect(panel?.hidden).toBe(true)
+
+    trigger?.click()
+
+    const expandedTrigger = element.shadowRoot?.querySelector<HTMLButtonElement>('.webmcp-floating-trigger')
+    const expandedPanel = element.shadowRoot?.querySelector<HTMLElement>('.webmcp-floating-panel')
+    expect(expandedTrigger?.getAttribute('aria-expanded')).toBe('true')
+    expect(expandedPanel?.hidden).toBe(false)
+  })
+
   it('emits planner status when the selected provider changes', async () => {
     const element = createCommandInputElement()
     document.body.append(element)

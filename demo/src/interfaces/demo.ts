@@ -59,3 +59,5 @@ export interface DemoSettings {
   confirmationsEnabled: boolean
   density: 'comfortable' | 'compact'
 }
+
+export type DemoPage = 'commerce' | 'inventory' | 'invoices' | 'support'

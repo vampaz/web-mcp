@@ -33,8 +33,7 @@ describe('WebMcpDemo', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Inventory')
-    expect(wrapper.text()).toContain('Invoices')
-    expect(wrapper.find('a[href="/readme/"]').text()).toBe('README')
+    expect(wrapper.text()).not.toContain('Invoices')
 
     const commandInput = await getCommandInput(wrapper)
     const commandTextInput = getCommandTextInput(commandInput)
@@ -89,15 +88,6 @@ describe('WebMcpDemo', () => {
       availability: async () => 'available',
       create: async () => ({
         prompt: async (message: string) => {
-          if (message.includes('Open the Stark')) {
-            return JSON.stringify({
-              toolName: 'open_invoice',
-              input: { id: 'inv_104' },
-              confidence: 0.91,
-              reason: 'Opened the matching invoice row.'
-            })
-          }
-
           if (message.includes('French')) {
             return JSON.stringify({
               toolName: 'select_items',
@@ -121,15 +111,15 @@ describe('WebMcpDemo', () => {
 
     expect(wrapper.text()).toContain('2 selected')
     expect(wrapper.text()).toContain('Croissant')
-
-    await commandInput.run('Open the Stark invoice')
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('Stark Industries')
   })
 
   it('executes chained invoice plans in order', async () => {
-    const wrapper = mountWithDeps(WebMcpDemo, { attachTo: document.body })
+    const wrapper = mountWithDeps(WebMcpDemo, {
+      attachTo: document.body,
+      props: {
+        page: 'invoices'
+      }
+    })
     await flushPromises()
 
     const commandInput = await getCommandInput(wrapper)
@@ -145,7 +135,12 @@ describe('WebMcpDemo', () => {
   })
 
   it('guards and confirms cart checkout', async () => {
-    const wrapper = mountWithDeps(WebMcpDemo, { attachTo: document.body })
+    const wrapper = mountWithDeps(WebMcpDemo, {
+      attachTo: document.body,
+      props: {
+        page: 'commerce'
+      }
+    })
     await flushPromises()
 
     await expect(invokeTool({

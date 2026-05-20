@@ -18,6 +18,7 @@ export interface WebMCPCommandInputConfigureOptions {
   context?: PlannerContext | (() => PlannerContext)
   disabled?: boolean
   endpoint?: string
+  floating?: boolean
   model?: string
   placeholder?: string
   planner?: ToolPlanner
@@ -34,6 +35,7 @@ export interface WebMCPCommandInputElement extends HTMLElement {
   context?: PlannerContext | (() => PlannerContext)
   disabled: boolean
   endpoint?: string
+  floating: boolean
   model?: string
   placeholder: string
   planner?: ToolPlanner
