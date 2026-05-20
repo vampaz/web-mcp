@@ -61,7 +61,7 @@ Assumptions:
     - Files: [`demo/src/components/DemoCommandPalette.vue`]
     - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/WebMcpDemo.spec.ts`
 
-- [ ] Phase 4: Update Tests For Page Boundaries
+- [x] Phase 4: Update Tests For Page Boundaries
   - [x] Step 4.1: Replace the old monolithic component test
     - Objective: Move expectations from `WebMcpDemo.spec.ts` into page-specific tests, keeping coverage for default command placeholder, planner controls, inventory selection, invoice chains, cart checkout guards, and support form tool registration.
     - Files: [`demo/src/components/WebMcpDemo.spec.ts`]
@@ -71,7 +71,7 @@ Assumptions:
     - Files: [`demo/tests/e2e/webmcp-demo.spec.ts`]
     - Test: `npm --workspace @webmcp-kit/demo run test:e2e`
 
-- [ ] Phase 5: Final Verification
+- [x] Phase 5: Final Verification
   - [x] Step 5.1: Run focused unit coverage
     - Objective: Confirm the page split and floating input behavior are fully green after implementation.
     - Files: [`demo/src/components/*.spec.ts`]
@@ -80,7 +80,7 @@ Assumptions:
     - Objective: Catch integration errors across Astro, Vue, and TypeScript after moving state and routes.
     - Files: [`demo/src/**/*.ts`], [`demo/src/**/*.vue`], [`demo/src/**/*.astro`]
     - Test: `npm exec tsc -- --noEmit`
-  - [ ] Step 5.3: Manually verify in the in-app browser
+  - [x] Step 5.3: Manually verify in the in-app browser
     - Objective: Open the Vite/Astro dev server, check desktop and mobile viewport behavior, confirm the nav is usable, and confirm the floating WebMCP panel does not cover core workflows.
     - Files: [`demo/src/pages/*.astro`], [`demo/src/components/*.vue`]
     - Test: `npm run dev`

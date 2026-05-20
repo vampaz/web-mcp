@@ -95,7 +95,11 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
     context?: PlannerContext | (() => PlannerContext)
     endpoint?: string
     private floatingDragState?: FloatingDragState
+    private floatingPanelLeft = '8px'
     private floatingPanelMaxHeight = 'calc(100vh - 16px)'
+    private floatingPanelTop = '8px'
+    private floatingPinnedBottom = true
+    private floatingPinnedRight = true
     private floatingPlacement: FloatingPlacement = {
       horizontal: 'right',
       vertical: 'down'
@@ -103,6 +107,10 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
     private floatingPosition = {
       x: 24,
       y: 96
+    }
+    private floatingViewport = {
+      height: 0,
+      width: 0
     }
     private floatingWasPositioned = false
     private currentPlanner?: ToolPlanner
@@ -142,6 +150,7 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       this.syncAttributes()
       this.syncDiagnosticsContent()
       this.observeLightDom()
+      this.floatingViewport = this.getViewportSize()
       this.render()
       window.addEventListener('resize', this.handleViewportChanged)
       void this.refreshPlannerStatus()
@@ -260,6 +269,12 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       this.context = options.context ?? this.context
       this.endpoint = options.endpoint ?? this.endpoint
       if (options.floating !== undefined) this.floating = options.floating
+      if (options.initialProvider !== undefined && !this.state.fixedProvider) {
+        this.state.provider = options.initialProvider
+      }
+      if (options.initialModel !== undefined && !this.state.fixedModel) {
+        this.state.model = options.initialModel
+      }
       this.planner = options.planner ?? this.planner
       this.plannerConfig = options.plannerConfig ?? this.plannerConfig
 
@@ -662,7 +677,7 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
         </button>
         <section
           class="webmcp-floating-panel webmcp-floating-panel--${this.floatingPlacement.vertical} webmcp-floating-panel--${this.floatingPlacement.horizontal}"
-          style="--webmcp-floating-panel-max-height: ${escapeAttribute(this.floatingPanelMaxHeight)}"
+          style="left: ${escapeAttribute(this.floatingPanelLeft)}; top: ${escapeAttribute(this.floatingPanelTop)}; --webmcp-floating-panel-max-height: ${escapeAttribute(this.floatingPanelMaxHeight)}"
           ${this.state.floatingExpanded ? '' : 'hidden'}
         >
           ${commandMarkup}
@@ -722,9 +737,13 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       const nextY = event.clientY - this.floatingDragState.offsetY
       const deltaX = Math.abs(nextX - this.floatingPosition.x)
       const deltaY = Math.abs(nextY - this.floatingPosition.y)
+      const nextPosition = this.clampFloatingPosition(nextX, nextY)
+      const bounds = this.getFloatingBounds()
 
       if (deltaX > 3 || deltaY > 3) this.floatingDragState.hasMoved = true
-      this.floatingPosition = this.clampFloatingPosition(nextX, nextY)
+      this.floatingPosition = nextPosition
+      this.floatingPinnedRight = Math.abs(nextPosition.x - bounds.maxX) <= 2
+      this.floatingPinnedBottom = Math.abs(nextPosition.y - bounds.maxY) <= 2
       this.syncFloatingHost()
       this.updateFloatingPlacement()
     }
@@ -741,7 +760,21 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
 
     private readonly handleViewportChanged = () => {
       if (!this.state.floating) return
-      this.floatingPosition = this.clampFloatingPosition(this.floatingPosition.x, this.floatingPosition.y)
+      const triggerWidth = this.getFloatingTriggerWidth()
+      const triggerHeight = this.getFloatingTriggerHeight()
+      const previousMaxX = Math.max(8, this.floatingViewport.width - triggerWidth - 8)
+      const previousMaxY = Math.max(8, this.floatingViewport.height - triggerHeight - 8)
+      const wasPinnedRight = this.floatingPinnedRight || Math.abs(this.floatingPosition.x - previousMaxX) <= 2
+      const wasPinnedBottom = this.floatingPinnedBottom || Math.abs(this.floatingPosition.y - previousMaxY) <= 2
+      this.floatingViewport = this.getViewportSize()
+      const nextMaxX = Math.max(8, this.floatingViewport.width - triggerWidth - 8)
+      const nextMaxY = Math.max(8, this.floatingViewport.height - triggerHeight - 8)
+      const nextX = wasPinnedRight ? nextMaxX : this.floatingPosition.x
+      const nextY = wasPinnedBottom ? nextMaxY : this.floatingPosition.y
+
+      this.floatingPinnedRight = wasPinnedRight
+      this.floatingPinnedBottom = wasPinnedBottom
+      this.floatingPosition = this.clampFloatingPosition(nextX, nextY)
       this.syncFloatingHost()
       this.updateFloatingPlacement()
     }
@@ -752,24 +785,43 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       if (!this.state.floating) {
         this.style.removeProperty('left')
         this.style.removeProperty('top')
+        this.style.removeProperty('right')
+        this.style.removeProperty('bottom')
         return
       }
 
       if (!this.floatingWasPositioned) this.setInitialFloatingPosition()
-      this.style.left = `${this.floatingPosition.x}px`
-      this.style.top = `${this.floatingPosition.y}px`
+      if (this.floatingPinnedRight) {
+        this.style.removeProperty('left')
+        this.style.right = '8px'
+      } else {
+        this.style.left = `${this.floatingPosition.x}px`
+        this.style.removeProperty('right')
+      }
+
+      if (this.floatingPinnedBottom) {
+        this.style.removeProperty('top')
+        this.style.bottom = '8px'
+      } else {
+        this.style.top = `${this.floatingPosition.y}px`
+        this.style.removeProperty('bottom')
+      }
     }
 
     private setInitialFloatingPosition() {
-      this.floatingPosition = this.clampFloatingPosition(window.innerWidth, window.innerHeight)
+      const bounds = this.getFloatingBounds()
+      this.floatingPosition = {
+        x: bounds.maxX,
+        y: bounds.maxY
+      }
+      this.floatingPinnedRight = true
+      this.floatingPinnedBottom = true
+      this.floatingViewport = this.getViewportSize()
       this.floatingWasPositioned = true
     }
 
     private clampFloatingPosition(x: number, y: number): { x: number, y: number } {
-      const width = this.getFloatingTriggerWidth()
-      const height = this.getFloatingTriggerHeight()
-      const maxX = Math.max(8, window.innerWidth - width - 8)
-      const maxY = Math.max(8, window.innerHeight - height - 8)
+      const { maxX, maxY } = this.getFloatingBounds()
 
       return {
         x: Math.min(Math.max(8, x), maxX),
@@ -783,6 +835,24 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
 
     private getFloatingTriggerHeight(): number {
       return this.shadowRoot?.querySelector<HTMLElement>('.webmcp-floating-trigger')?.offsetHeight || 0
+    }
+
+    private getFloatingBounds(): { maxX: number, maxY: number } {
+      const viewport = this.getViewportSize()
+      const width = this.getFloatingTriggerWidth()
+      const height = this.getFloatingTriggerHeight()
+
+      return {
+        maxX: Math.max(8, viewport.width - width - 8),
+        maxY: Math.max(8, viewport.height - height - 8)
+      }
+    }
+
+    private getViewportSize(): { height: number, width: number } {
+      return {
+        height: window.innerHeight,
+        width: window.innerWidth
+      }
     }
 
     private updateFloatingPlacement() {
@@ -800,18 +870,28 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       const spaceRight = window.innerWidth - triggerRect.left - 8
       const vertical = spaceBelow >= panelHeight || spaceBelow >= spaceAbove ? 'down' : 'up'
       const horizontal = spaceRight >= panelWidth || spaceRight >= spaceLeft ? 'right' : 'left'
-      const maxHeight = Math.max(180, vertical === 'down' ? spaceBelow - 8 : spaceAbove - 8)
+      const maxHeight = Math.max(0, vertical === 'down' ? spaceBelow - 8 : spaceAbove - 8)
+      const panelLeft = horizontal === 'right'
+        ? Math.min(triggerRect.left, window.innerWidth - panelWidth - 8)
+        : Math.max(8, triggerRect.right - panelWidth)
+      const panelTop = vertical === 'down'
+        ? Math.min(triggerRect.bottom + 8, window.innerHeight - panelHeight - 8)
+        : Math.max(8, triggerRect.top - panelHeight - 8)
 
       if (
         this.floatingPlacement.vertical === vertical
         && this.floatingPlacement.horizontal === horizontal
         && this.floatingPanelMaxHeight === `${maxHeight}px`
+        && this.floatingPanelLeft === `${panelLeft}px`
+        && this.floatingPanelTop === `${panelTop}px`
       ) {
         return
       }
 
       this.floatingPlacement = { horizontal, vertical }
+      this.floatingPanelLeft = `${panelLeft}px`
       this.floatingPanelMaxHeight = `${maxHeight}px`
+      this.floatingPanelTop = `${panelTop}px`
       this.renderIfConnected()
     }
   }
@@ -1182,27 +1262,11 @@ function getStyles(): string {
     }
 
     .webmcp-floating-panel {
-      position: absolute;
+      position: fixed;
       width: min(920px, calc(100vw - 16px));
       max-height: var(--webmcp-floating-panel-max-height, calc(100vh - 16px));
       overflow: auto;
       box-shadow: 0 24px 80px rgba(0, 0, 0, 0.48);
-    }
-
-    .webmcp-floating-panel--down {
-      top: calc(100% + 0.5rem);
-    }
-
-    .webmcp-floating-panel--up {
-      bottom: calc(100% + 0.5rem);
-    }
-
-    .webmcp-floating-panel--right {
-      left: 0;
-    }
-
-    .webmcp-floating-panel--left {
-      right: 0;
     }
 
     button:disabled {

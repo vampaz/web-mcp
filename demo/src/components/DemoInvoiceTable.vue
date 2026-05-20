@@ -2,7 +2,7 @@
   <section class="invoice-workspace" :class="density">
     <div class="workspace-header">
       <div>
-        <h2>Invoices</h2>
+        <h2>Invoice list</h2>
       </div>
       <div class="workspace-summary">
         <strong>{{ selectedCount }} selected</strong>
@@ -170,14 +170,14 @@ function getInputValue(event: Event): string {
 <style scoped>
 .invoice-workspace {
   display: grid;
-  gap: 12px;
+  align-content: start;
+  gap: clamp(0.75rem, 1.5vw, 1rem);
+  height: 100%;
   min-width: 0;
   overflow: hidden;
-  margin-top: 10px;
-  padding: 14px;
-  border: 1px solid rgba(48, 167, 121, 0.34);
-  background: rgba(9, 18, 15, 0.82);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.26);
+  padding: clamp(0.9rem, 1.8vw, 1.25rem);
+  border: 1px solid rgba(244, 240, 232, 0.12);
+  background: rgba(12, 17, 16, 0.82);
   backdrop-filter: blur(18px);
 }
 
@@ -188,6 +188,10 @@ function getInputValue(event: Event): string {
   gap: 10px 18px;
   align-items: baseline;
   justify-content: space-between;
+}
+
+.workspace-header {
+  min-block-size: 2.35rem;
 }
 
 .bulk-bar {
@@ -213,7 +217,7 @@ h2 {
 
 .table-controls {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(160px, 0.42fr) minmax(240px, 0.58fr);
+  grid-template-columns: minmax(min(100%, 18rem), 1fr) minmax(9rem, 0.42fr) minmax(13rem, 0.58fr);
   gap: 8px;
   align-items: end;
 }
@@ -280,6 +284,7 @@ button:disabled {
   max-width: 100%;
   overflow: auto;
   border: 1px solid rgba(244, 240, 232, 0.12);
+  background: rgba(244, 240, 232, 0.025);
 }
 
 table {

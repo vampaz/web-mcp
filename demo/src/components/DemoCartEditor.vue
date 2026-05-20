@@ -1,7 +1,7 @@
 <template>
   <section class="cart-editor">
     <div class="panel-heading">
-      <h2>Cart</h2>
+      <h2>Cart workspace</h2>
     </div>
 
     <div class="product-picker">
@@ -35,7 +35,7 @@
         Discount %
         <input :value="discountPercent" type="number" min="0" max="100" @input="updateDiscount" />
       </label>
-      <div>
+      <div class="cart-total">
         <span>Total</span>
         <strong>€{{ total }}</strong>
       </div>
@@ -105,17 +105,18 @@ function getInputValue(event: Event): string {
 <style scoped>
 .cart-editor {
   display: grid;
-  gap: 14px;
-  padding: clamp(18px, 3vw, 28px);
-  border: 1px solid rgba(244, 240, 232, 0.14);
-  background: rgba(12, 17, 16, 0.72);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.26);
+  gap: clamp(0.75rem, 1.5vw, 1rem);
+  padding: clamp(0.9rem, 1.8vw, 1.25rem);
+  border: 1px solid rgba(244, 240, 232, 0.12);
+  background: rgba(12, 17, 16, 0.82);
   backdrop-filter: blur(18px);
 }
 
 .panel-heading {
   display: grid;
   gap: 8px;
+  min-block-size: 2.35rem;
+  align-items: center;
 }
 
 h2 {
@@ -132,8 +133,7 @@ h2 {
 }
 
 .product-picker {
-  display: flex;
-  flex-wrap: wrap;
+  grid-template-columns: minmax(min(100%, 24rem), 1fr) minmax(6rem, 0.18fr) auto;
 }
 
 .cart-line {
@@ -179,21 +179,25 @@ button:disabled {
 }
 
 .cart-footer {
-  grid-template-columns: 120px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(7rem, 9rem) minmax(0, 1fr) auto;
   align-items: end;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(244, 240, 232, 0.1);
 }
 
 .product-picker label:first-child {
-  flex: 1 1 100%;
+  min-width: 0;
 }
 
-.product-picker label:not(:first-child) {
-  flex: 0 0 92px;
+.cart-total {
+  display: grid;
+  gap: 0.15rem;
+  justify-self: start;
 }
 
-.product-picker button {
-  flex: 0 0 auto;
-  min-width: 88px;
+.cart-total strong {
+  color: #f4f0e8;
+  font-size: 1.18rem;
 }
 
 .cart-footer span,

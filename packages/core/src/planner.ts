@@ -579,14 +579,7 @@ function planWithHeuristics(message: string, tools: WebMCPTool[], context: Plann
   }
 
   if (normalizedMessage.includes('select') && hasTool(tools, 'select_items')) {
-    return {
-      toolName: 'select_items',
-      input: {
-        ids: []
-      },
-      confidence: 0.2,
-      reason: 'Fallback planner cannot infer semantic checklist selection. Chrome built-in AI needs to choose IDs from the current app context.'
-    }
+    throw new Error('Semantic checklist selection needs an AI planner to choose IDs from the current app context.')
   }
 
   if (normalizedMessage.includes('support') || normalizedMessage.includes('ticket') || normalizedMessage.includes('help')) {

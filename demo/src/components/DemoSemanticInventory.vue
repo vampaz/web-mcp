@@ -2,7 +2,7 @@
   <section class="semantic-inventory" aria-labelledby="inventory-title">
     <div class="inventory-header">
       <div>
-        <h2 id="inventory-title">Inventory</h2>
+        <h2 id="inventory-title">Inventory list</h2>
       </div>
       <div class="inventory-summary">
         <strong>{{ selectedCount }} selected</strong>
@@ -58,13 +58,12 @@ function toggleItem(id: string, event: Event) {
 <style scoped>
 .semantic-inventory {
   display: grid;
-  gap: 12px;
+  gap: clamp(0.75rem, 1.5vw, 1rem);
   min-width: 0;
-  margin-top: 10px;
-  padding: 14px;
-  border: 1px solid rgba(48, 167, 121, 0.4);
-  background: rgba(9, 18, 15, 0.86);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.26);
+  padding: clamp(0.9rem, 1.8vw, 1.25rem);
+  border: 1px solid rgba(244, 240, 232, 0.12);
+  background: rgba(12, 17, 16, 0.82);
+  backdrop-filter: blur(18px);
 }
 
 .inventory-header,
@@ -109,8 +108,7 @@ button {
 
 .inventory-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  grid-auto-rows: 58px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10.5rem), 1fr));
   gap: 8px;
   min-width: 0;
   margin: 0;
@@ -135,7 +133,6 @@ label {
   grid-template-columns: auto auto minmax(0, 1fr);
   gap: 8px;
   align-items: center;
-  min-height: 100%;
   padding: 8px 10px;
 }
 
@@ -154,15 +151,12 @@ label strong {
   overflow-wrap: anywhere;
   color: #f4f0e8;
   font-size: 0.98rem;
+  font-weight: 500;
 }
 
 @media (max-width: 620px) {
   .semantic-inventory {
     padding: 12px;
-  }
-
-  .inventory-grid {
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   }
 }
 </style>

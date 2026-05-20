@@ -7,11 +7,16 @@ import type { ToolPlanner } from './interfaces/tool'
 import { clearToolsForTest, registerTool } from './registry'
 
 let tagCounter = 0
+const defaultViewport = {
+  height: window.innerHeight,
+  width: window.innerWidth
+}
 
 describe('WebMCP command input', () => {
   afterEach(() => {
     clearToolsForTest()
     document.body.innerHTML = ''
+    setViewportSize(defaultViewport.width, defaultViewport.height)
   })
 
   it('plans a command and invokes the selected registered tool', async () => {
@@ -203,6 +208,59 @@ describe('WebMCP command input', () => {
     expect(expandedPanel?.hidden).toBe(false)
   })
 
+  it('keeps the floating trigger pinned to the viewport edge when resizing back up', async () => {
+    setViewportSize(1200, 900)
+    const element = createCommandInputElement()
+    element.setAttribute('floating', '')
+
+    document.body.append(element)
+    await Promise.resolve()
+
+    expect(element.style.left).toBe('')
+    expect(element.style.top).toBe('')
+    expect(element.style.right).toBe('8px')
+    expect(element.style.bottom).toBe('8px')
+
+    setViewportSize(640, 500)
+    window.dispatchEvent(new Event('resize'))
+
+    expect(element.style.left).toBe('')
+    expect(element.style.top).toBe('')
+    expect(element.style.right).toBe('8px')
+    expect(element.style.bottom).toBe('8px')
+
+    setViewportSize(1200, 900)
+    window.dispatchEvent(new Event('resize'))
+
+    expect(element.style.left).toBe('')
+    expect(element.style.top).toBe('')
+    expect(element.style.right).toBe('8px')
+    expect(element.style.bottom).toBe('8px')
+  })
+
+  it('uses initial planner choices without locking the controls', async () => {
+    const element = createCommandInputElement()
+    document.body.append(element)
+
+    element.configure({
+      initialModel: '@cf/moonshotai/kimi-k2.6',
+      initialProvider: 'cloudflare-binding'
+    })
+    await Promise.resolve()
+
+    const providerControl = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
+    const modelControl = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-model]')
+    expect(providerControl?.value).toBe('cloudflare-binding')
+    expect(modelControl?.value).toBe('@cf/moonshotai/kimi-k2.6')
+
+    providerControl!.value = 'local'
+    providerControl!.dispatchEvent(new Event('change', { bubbles: true }))
+    await Promise.resolve()
+
+    expect(providerControl?.value).toBe('local')
+    expect(element.shadowRoot?.querySelector('[data-model]')).toBeNull()
+  })
+
   it('emits planner status when the selected provider changes', async () => {
     const element = createCommandInputElement()
     document.body.append(element)
@@ -333,5 +391,16 @@ function waitForCommandPlanner(element: WebMCPCommandInputElement): Promise<Cust
     element.addEventListener('webmcp-command-planner', function handlePlanner(event) {
       resolve(event as CustomEvent<WebMCPCommandPlannerEventDetail>)
     }, { once: true })
+  })
+}
+
+function setViewportSize(width: number, height: number) {
+  Object.defineProperty(window, 'innerWidth', {
+    configurable: true,
+    value: width
+  })
+  Object.defineProperty(window, 'innerHeight', {
+    configurable: true,
+    value: height
   })
 }

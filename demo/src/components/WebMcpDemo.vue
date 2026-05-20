@@ -18,6 +18,14 @@
     />
   </webmcp-command-input>
 
+  <section class="demo-app-page" :data-page="page">
+    <header class="demo-page-header">
+      <div>
+        <p>{{ pageEyebrow }}</p>
+        <h1>{{ pageTitle }}</h1>
+      </div>
+    </header>
+
     <DemoSemanticInventory
       v-if="page === 'inventory'"
       :items="selectableItems"
@@ -27,7 +35,7 @@
       @toggle-item="setItemSelected"
     />
 
-    <section v-if="page === 'invoices'" class="demo-page-grid">
+    <section v-if="page === 'invoices'" class="demo-page-content demo-page-content--invoices">
       <DemoInvoiceTable
         :active-invoice-id="activeInvoiceId"
         :density="settings.density"
@@ -57,7 +65,7 @@
       />
     </section>
 
-    <section v-if="page === 'support'" class="demo-page-grid">
+    <section v-if="page === 'support'" class="demo-page-content demo-page-content--support">
       <DemoSupportTicketPanel
         ref="supportTicketPanel"
         :body="supportBody"
@@ -75,7 +83,7 @@
       />
     </section>
 
-    <section v-if="page === 'commerce'" class="demo-page-grid">
+    <section v-if="page === 'commerce'" class="demo-page-content demo-page-content--commerce">
       <DemoCartEditor
         v-model:discount-percent="cartDiscountPercent"
         v-model:quantity="cartQuantity"
@@ -89,6 +97,7 @@
         @update-line="updateCartLineQuantity"
       />
     </section>
+  </section>
 </template>
 
 <script setup lang="ts">
@@ -160,7 +169,7 @@ const plannerApiKey = ref('')
 const plannerAccountId = ref('')
 const plannerAuthMode = ref<'server' | 'user-key'>(shouldDefaultToCloudflareBinding ? 'server' : 'user-key')
 const lastPlannerUsed = ref('No command has run yet')
-const selectedToolName = ref('select_items')
+const selectedToolName = ref(getDefaultToolNameForPage(page.value))
 const registeredTools = ref<ReturnType<typeof listTools>>([])
 const lastPlan = ref<ToolPlan | null>(null)
 const lastResult = ref<ToolInvocationResult | null>(null)
@@ -212,23 +221,17 @@ const cartTotal = computed(function getCartTotal() {
   }, 0)
   return Math.round(subtotal * (1 - cartDiscountPercent.value / 100))
 })
-const usesRemotePlanner = computed(function getUsesRemotePlanner() {
-  return plannerProvider.value === 'openrouter'
-    || plannerProvider.value === 'openai'
-    || plannerProvider.value === 'openai-compatible'
-    || plannerProvider.value === 'cloudflare-binding'
-    || plannerProvider.value === 'cloudflare-workers-ai'
+const pageTitle = computed(function getPageTitle() {
+  if (page.value === 'invoices') return 'Invoices'
+  if (page.value === 'commerce') return 'Commerce'
+  if (page.value === 'support') return 'Support'
+  return 'Inventory'
 })
-const plannerModelLabel = computed(function getPlannerModelLabel() {
-  if (plannerProvider.value === 'cloudflare-binding') {
-    return cloudflareBindingModels.find(function findModel(model) {
-      return model.id === plannerModel.value
-    })?.label ?? plannerModel.value
-  }
-
-  if (usesRemotePlanner.value) return plannerModel.value || 'Default model'
-  if (plannerProvider.value === 'auto') return 'Best available'
-  return 'Provider managed'
+const pageEyebrow = computed(function getPageEyebrow() {
+  if (page.value === 'invoices') return `${visibleInvoices.value.length} visible records`
+  if (page.value === 'commerce') return `${cart.value.length} cart lines`
+  if (page.value === 'support') return `${tickets.value.length} tickets`
+  return `${selectableItems.value.length} selectable items`
 })
 
 const selectableItems = ref<SelectableItem[]>(getInitialSelectableItems())
@@ -959,7 +962,9 @@ function updateTicketPriority(id: string, priority: SupportTicket['priority']) {
 function configureCommandInput() {
   if (showPlannerControls) {
     commandInput.value?.configure({
-      context: getPlannerContext
+      context: getPlannerContext,
+      initialModel: shouldDefaultToCloudflareBinding ? plannerModel.value : undefined,
+      initialProvider: shouldDefaultToCloudflareBinding ? plannerProvider.value : undefined
     })
     return
   }
@@ -1087,23 +1092,41 @@ function getSelectedPlannerConfig(): PlannerProviderConfig | undefined {
 }
 
 function getPlannerContext() {
+  if (page.value === 'inventory') {
+    return {
+      checklistItems: selectableItems.value.map(function mapChecklistItem(item, index) {
+        return {
+          id: item.id,
+          name: item.name,
+          position: index + 1,
+          selected: item.selected
+        }
+      }),
+      settings: settings.value
+    }
+  }
+
+  if (page.value === 'invoices') {
+    return {
+      invoiceFilters: invoiceFilters.value,
+      invoices: invoices.value,
+      selectedInvoices: selectedInvoices.value,
+      settings: settings.value,
+      visibleInvoices: visibleInvoices.value
+    }
+  }
+
+  if (page.value === 'commerce') {
+    return {
+      cart: cart.value,
+      products: products.value,
+      settings: settings.value
+    }
+  }
+
   return {
-    checklistItems: selectableItems.value.map(function mapChecklistItem(item, index) {
-      return {
-        id: item.id,
-        name: item.name,
-        position: index + 1,
-        selected: item.selected
-      }
-    }),
-    products: products.value,
-    invoices: invoices.value,
-    invoiceFilters: invoiceFilters.value,
-    visibleInvoices: visibleInvoices.value,
-    selectedInvoices: selectedInvoices.value,
-    cart: cart.value,
-    tickets: tickets.value,
-    settings: settings.value
+    settings: settings.value,
+    tickets: tickets.value
   }
 }
 
@@ -1133,6 +1156,13 @@ function getSearchTokens(query: string): string[] {
     })
 
   return tokens.length > 0 ? tokens : [query]
+}
+
+function getDefaultToolNameForPage(demoPage: DemoPage): string {
+  if (demoPage === 'invoices') return 'open_invoice'
+  if (demoPage === 'commerce') return 'search_products'
+  if (demoPage === 'support') return 'create_support_ticket'
+  return 'select_items'
 }
 
 function isInvoiceStatus(value: unknown): value is Invoice['status'] {
@@ -1167,3 +1197,86 @@ declare global {
   }
 }
 </script>
+
+<style scoped>
+.demo-app-page {
+  display: grid;
+  gap: clamp(0.9rem, 1.8vw, 1.25rem);
+}
+
+webmcp-command-input[floating] {
+  position: fixed;
+  z-index: 1000;
+  width: auto;
+}
+
+.demo-page-header {
+  display: grid;
+  align-items: end;
+  padding-block: clamp(0.25rem, 1vw, 0.7rem) clamp(0.65rem, 1.4vw, 1rem);
+  border-bottom: 1px solid rgba(244, 240, 232, 0.12);
+}
+
+.demo-page-header p,
+.demo-page-header h1 {
+  margin: 0;
+}
+
+.demo-page-header p {
+  color: #8fa098;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.demo-page-header h1 {
+  margin-top: 0.2rem;
+  color: #f4f0e8;
+  font-size: clamp(1.55rem, 3.6vw, 2.55rem);
+  line-height: 1;
+}
+
+.demo-page-content {
+  display: grid;
+  min-width: 0;
+  gap: clamp(0.9rem, 1.6vw, 1.25rem);
+}
+
+.demo-page-content--invoices {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+.demo-page-content--support {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+.demo-page-content--commerce {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 76rem) {
+  .demo-page-content--support {
+    grid-template-columns: minmax(20rem, 24rem) minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 78rem) {
+  .demo-page-content--invoices {
+    grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem);
+    align-items: stretch;
+  }
+
+  .demo-page-content--invoices > * {
+    min-height: 100%;
+  }
+}
+
+@media (max-width: 62rem) {
+  .demo-page-header {
+    align-items: start;
+  }
+}
+</style>

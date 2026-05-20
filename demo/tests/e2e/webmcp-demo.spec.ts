@@ -6,7 +6,7 @@ type LanguageModelAvailability = 'available' | 'downloadable' | 'downloading' | 
 test('uses Chrome AI context to select semantic inventory items and open records', async function testSemanticInventorySelection({ page }) {
   await installLanguageModelMock(page, 'downloadable')
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Inventory' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible()
   await selectPlannerProvider(page, 'chrome-built-in')
 
   await getCommandTextbox(page).fill('Select all French items')
@@ -18,27 +18,34 @@ test('uses Chrome AI context to select semantic inventory items and open records
   await expect(getItemInput(page, 'Pain au chocolat')).toBeChecked()
   await expect(getItemInput(page, 'Apple')).not.toBeChecked()
 
+  const inventoryPromptMessages = await page.evaluate(function getPromptMessages() {
+    return (window as Window & { __webMCPPromptMessages?: string[] }).__webMCPPromptMessages ?? []
+  })
+  expect(inventoryPromptMessages[0]).toContain('Current app context')
+  expect(inventoryPromptMessages[0]).toContain('Croissant')
+  expect(inventoryPromptMessages[0]).toContain('Pain au chocolat')
+  expect(inventoryPromptMessages[0]).not.toContain('Stark Industries')
+
   await page.goto('/invoices/')
-  await expect(page.getByRole('heading', { name: 'Invoices' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Invoices', exact: true })).toBeVisible()
   await selectPlannerProvider(page, 'chrome-built-in', 'open_invoice')
   await getCommandTextbox(page).fill('Open the Stark invoice')
   await page.getByRole('button', { name: 'Run' }).click()
 
   await expect(page.locator('.active-record strong').filter({ hasText: 'Stark Industries' })).toBeVisible()
 
-  const promptMessages = await page.evaluate(function getPromptMessages() {
+  const invoicePromptMessages = await page.evaluate(function getPromptMessages() {
     return (window as Window & { __webMCPPromptMessages?: string[] }).__webMCPPromptMessages ?? []
   })
-
-  expect(promptMessages[0]).toContain('Current app context')
-  expect(promptMessages[0]).toContain('Croissant')
-  expect(promptMessages[0]).toContain('Pain au chocolat')
+  expect(invoicePromptMessages[0]).toContain('Current app context')
+  expect(invoicePromptMessages[0]).toContain('Stark Industries')
+  expect(invoicePromptMessages[0]).not.toContain('Pain au chocolat')
 })
 
 test('uses the local planner for semantic item selections when AI is unavailable', async function testFallbackItemSelection({ page }) {
   await installUnavailableLanguageModelMock(page)
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Inventory' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible()
   await selectPlannerProvider(page, 'local')
 
   await getCommandTextbox(page).fill('Select all liquids')
@@ -53,7 +60,7 @@ test('uses the local planner for semantic item selections when AI is unavailable
 
 test('executes chained local invoice commands with confirmation', async function testLocalInvoiceChain({ page }) {
   await page.goto('/invoices/')
-  await expect(page.getByRole('heading', { name: 'Invoices' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Invoices', exact: true })).toBeVisible()
   await selectPlannerProvider(page, 'local', 'update_selected_invoice_status')
 
   page.once('dialog', async function acceptStatusConfirmation(dialog) {
@@ -71,7 +78,7 @@ test('executes chained local invoice commands with confirmation', async function
 
 test('rechecks Chrome AI before running a command if the page mounted with fallback', async function testPlannerRefresh({ page }) {
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Inventory' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible()
   await selectPlannerProvider(page, 'auto')
 
   await installLanguageModelInPage(page, 'available')
@@ -132,7 +139,7 @@ test('plans through a selected user-key provider', async function testUserKeyPro
   })
 
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Inventory' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible()
   await selectPlannerProvider(page, 'openrouter')
 
   await getCommandTextbox(page).fill('Select all French items')
@@ -162,7 +169,7 @@ test('plans through the dev Cloudflare binding provider', async function testClo
   })
 
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Inventory' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible()
   await selectPlannerProvider(page, 'cloudflare-binding')
   await page.getByLabel('Model').selectOption('@cf/qwen/qwq-32b')
   await getCommandTextbox(page).fill('Select all French items')
@@ -170,6 +177,63 @@ test('plans through the dev Cloudflare binding provider', async function testClo
 
   await expect(getItemInput(page, 'Croissant')).toBeChecked()
   await expect(getItemInput(page, 'Quiche')).toBeChecked()
+})
+
+test('keeps demo pages responsive without forcing cramped columns', async function testResponsiveDemoLayouts({ page }) {
+  const viewports = [
+    { width: 390, height: 840 },
+    { width: 768, height: 900 },
+    { width: 1154, height: 900 },
+    { width: 1440, height: 1000 }
+  ]
+  const paths = ['/', '/invoices/', '/commerce/', '/support/']
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport)
+
+    for (const path of paths) {
+      await page.goto(path)
+      await expect(page.locator('.demo-page-header')).toBeVisible()
+
+      const hasHorizontalOverflow = await page.evaluate(function hasHorizontalPageOverflow() {
+        return document.documentElement.scrollWidth > document.documentElement.clientWidth
+      })
+      expect(hasHorizontalOverflow).toBe(false)
+    }
+
+    await page.goto('/invoices/')
+    await expect(page.getByRole('heading', { name: 'Invoices', exact: true })).toBeVisible()
+    const invoiceLayout = await page.evaluate(function getInvoiceLayout() {
+      const table = document.querySelector('.invoice-workspace')?.getBoundingClientRect()
+      const detail = document.querySelector('.invoice-drawer')?.getBoundingClientRect()
+      return table && detail
+        ? {
+            detailY: Math.round(detail.y),
+            tableY: Math.round(table.y)
+          }
+        : undefined
+    })
+
+    expect(invoiceLayout).toBeDefined()
+    if (viewport.width < 1248) {
+      expect(invoiceLayout!.detailY).toBeGreaterThan(invoiceLayout!.tableY)
+    } else {
+      expect(invoiceLayout!.detailY).toBe(invoiceLayout!.tableY)
+    }
+  }
+
+  await page.setViewportSize({ width: 1154, height: 900 })
+  await page.goto('/')
+  const wideTriggerBox = await getWebMCPTriggerBox(page)
+
+  await page.setViewportSize({ width: 640, height: 900 })
+  const narrowTriggerBox = await getWebMCPTriggerBox(page)
+
+  await page.setViewportSize({ width: 1154, height: 900 })
+  const regrownTriggerBox = await getWebMCPTriggerBox(page)
+
+  expect(narrowTriggerBox.x).toBeLessThan(wideTriggerBox.x)
+  expect(Math.abs(regrownTriggerBox.x - wideTriggerBox.x)).toBeLessThanOrEqual(2)
 })
 
 async function installLanguageModelMock(page: Page, availability: LanguageModelAvailability) {
@@ -227,6 +291,14 @@ function getItemInput(page: Page, itemName: string) {
 
 function getCommandTextbox(page: Page) {
   return page.getByRole('textbox', { name: 'WebMCP' })
+}
+
+async function getWebMCPTriggerBox(page: Page) {
+  const launcher = page.getByRole('button', { name: 'Open WebMCP command input' })
+  await expect(launcher).toBeVisible()
+  const box = await launcher.boundingBox()
+  if (!box) throw new Error('Expected WebMCP launcher bounds.')
+  return box
 }
 
 function installLanguageModel(targetWindow: Window, mockAvailability: LanguageModelAvailability) {

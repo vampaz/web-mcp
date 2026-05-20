@@ -1,7 +1,7 @@
 <template>
   <aside class="tools-panel support-panel">
     <div class="panel-heading">
-      <h2>Support</h2>
+      <h2>Support request</h2>
     </div>
 
     <form ref="supportForm" class="support-form" @submit.prevent="submitForm">
@@ -59,17 +59,18 @@ function getInputValue(event: Event): string {
 
 <style scoped>
 .tools-panel {
-  padding: clamp(18px, 3vw, 28px);
-  border: 1px solid rgba(244, 240, 232, 0.14);
-  background: rgba(12, 17, 16, 0.72);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.26);
+  padding: clamp(0.9rem, 1.8vw, 1.25rem);
+  border: 1px solid rgba(244, 240, 232, 0.12);
+  background: rgba(12, 17, 16, 0.82);
   backdrop-filter: blur(18px);
 }
 
 .panel-heading {
   display: grid;
   gap: 8px;
-  margin-bottom: 18px;
+  min-block-size: 2.35rem;
+  align-items: center;
+  margin-bottom: clamp(0.75rem, 1.5vw, 1rem);
 }
 
 h2 {

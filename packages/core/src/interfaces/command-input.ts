@@ -19,6 +19,8 @@ export interface WebMCPCommandInputConfigureOptions {
   disabled?: boolean
   endpoint?: string
   floating?: boolean
+  initialModel?: string
+  initialProvider?: PlannerProviderKind
   model?: string
   placeholder?: string
   planner?: ToolPlanner

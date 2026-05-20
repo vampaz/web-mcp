@@ -419,9 +419,9 @@ describe('planner', () => {
     expect(plan.steps).toBeUndefined()
   })
 
-  it('does not route semantic checklist selection to product search in fallback mode', async () => {
+  it('does not pretend to understand unmatched semantic checklist selection in fallback mode', async () => {
     const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Select all the items that are French food.', [
+    await expect(planner.plan('Select all the items that are French food.', [
       {
         name: 'select_items',
         description: 'Select checklist items by ID.',
@@ -438,13 +438,7 @@ describe('planner', () => {
         },
         execute: () => []
       }
-    ])
-
-    expect(plan.toolName).toBe('select_items')
-    expect(plan.input).toEqual({
-      ids: []
-    })
-    expect(plan.reason).toContain('cannot infer semantic checklist selection')
+    ])).rejects.toThrow('Semantic checklist selection needs an AI planner')
   })
 
   it('passes app context to Chrome AI for semantic selection', async () => {

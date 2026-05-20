@@ -1,7 +1,7 @@
 <template>
   <section class="ticket-board">
     <div class="panel-heading">
-      <h2>Tickets</h2>
+      <h2>Ticket board</h2>
     </div>
 
     <div class="board-columns">
@@ -88,17 +88,18 @@ function getInputValue(event: Event): string {
 <style scoped>
 .ticket-board {
   display: grid;
-  gap: 14px;
-  padding: clamp(18px, 3vw, 28px);
-  border: 1px solid rgba(244, 240, 232, 0.14);
-  background: rgba(12, 17, 16, 0.72);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.26);
+  gap: clamp(0.75rem, 1.5vw, 1rem);
+  padding: clamp(0.9rem, 1.8vw, 1.25rem);
+  border: 1px solid rgba(244, 240, 232, 0.12);
+  background: rgba(12, 17, 16, 0.82);
   backdrop-filter: blur(18px);
 }
 
 .panel-heading {
   display: grid;
   gap: 8px;
+  min-block-size: 2.35rem;
+  align-items: center;
 }
 
 h2,
@@ -118,16 +119,15 @@ h3 {
 
 .board-columns {
   display: grid;
-  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
   gap: 10px;
-  overflow: auto;
+  min-width: 0;
 }
 
 .board-column {
   display: grid;
   align-content: start;
   gap: 10px;
-  min-height: 260px;
   padding: 10px;
   border: 1px solid rgba(244, 240, 232, 0.12);
   background: rgba(244, 240, 232, 0.04);
