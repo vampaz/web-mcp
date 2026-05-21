@@ -95,6 +95,7 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
     context?: PlannerContext | (() => PlannerContext)
     endpoint?: string
     private floatingDragState?: FloatingDragState
+    private floatingPanelBottom = 'auto'
     private floatingPanelLeft = '8px'
     private floatingPanelMaxHeight = 'calc(100vh - 16px)'
     private floatingPanelTop = '8px'
@@ -582,12 +583,14 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       const target = event.target
       if (!(target instanceof HTMLDetailsElement)) return
       this.state.settingsOpen = target.open
+      this.updateFloatingPlacement()
     }
 
     private handleDiagnosticsToggled(event: Event) {
       const target = event.target
       if (!(target instanceof HTMLDetailsElement)) return
       this.state.diagnosticsOpen = target.open
+      this.updateFloatingPlacement()
     }
 
     private handlePromptChanged(event: Event) {
@@ -677,7 +680,7 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
         </button>
         <section
           class="webmcp-floating-panel webmcp-floating-panel--${this.floatingPlacement.vertical} webmcp-floating-panel--${this.floatingPlacement.horizontal}"
-          style="left: ${escapeAttribute(this.floatingPanelLeft)}; top: ${escapeAttribute(this.floatingPanelTop)}; --webmcp-floating-panel-max-height: ${escapeAttribute(this.floatingPanelMaxHeight)}"
+          style="left: ${escapeAttribute(this.floatingPanelLeft)}; top: ${escapeAttribute(this.floatingPanelTop)}; bottom: ${escapeAttribute(this.floatingPanelBottom)}; --webmcp-floating-panel-max-height: ${escapeAttribute(this.floatingPanelMaxHeight)}"
           ${this.state.floatingExpanded ? '' : 'hidden'}
         >
           ${commandMarkup}
@@ -875,15 +878,19 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
         ? Math.min(triggerRect.left, window.innerWidth - panelWidth - 8)
         : Math.max(8, triggerRect.right - panelWidth)
       const panelTop = vertical === 'down'
-        ? Math.min(triggerRect.bottom + 8, window.innerHeight - panelHeight - 8)
-        : Math.max(8, triggerRect.top - panelHeight - 8)
+        ? `${Math.min(triggerRect.bottom + 8, window.innerHeight - panelHeight - 8)}px`
+        : 'auto'
+      const panelBottom = vertical === 'up'
+        ? `${Math.max(8, window.innerHeight - triggerRect.top + 8)}px`
+        : 'auto'
 
       if (
         this.floatingPlacement.vertical === vertical
         && this.floatingPlacement.horizontal === horizontal
         && this.floatingPanelMaxHeight === `${maxHeight}px`
         && this.floatingPanelLeft === `${panelLeft}px`
-        && this.floatingPanelTop === `${panelTop}px`
+        && this.floatingPanelTop === panelTop
+        && this.floatingPanelBottom === panelBottom
       ) {
         return
       }
@@ -891,7 +898,8 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       this.floatingPlacement = { horizontal, vertical }
       this.floatingPanelLeft = `${panelLeft}px`
       this.floatingPanelMaxHeight = `${maxHeight}px`
-      this.floatingPanelTop = `${panelTop}px`
+      this.floatingPanelTop = panelTop
+      this.floatingPanelBottom = panelBottom
       this.renderIfConnected()
     }
   }
@@ -1263,10 +1271,16 @@ function getStyles(): string {
 
     .webmcp-floating-panel {
       position: fixed;
+      display: flex;
+      flex-direction: column;
       width: min(920px, calc(100vw - 16px));
       max-height: var(--webmcp-floating-panel-max-height, calc(100vh - 16px));
-      overflow: auto;
+      overflow: hidden;
       box-shadow: 0 24px 80px rgba(0, 0, 0, 0.48);
+    }
+
+    .webmcp-floating-panel[hidden] {
+      display: none;
     }
 
     button:disabled {
@@ -1392,6 +1406,38 @@ function getStyles(): string {
       border-top: 0;
       background: var(--webmcp-dark);
       box-shadow: 0 1.2rem 2.5rem rgba(0, 0, 0, 0.32);
+    }
+
+    .webmcp-floating-panel .webmcp-command,
+    .webmcp-floating-panel .webmcp-settings {
+      flex: 0 0 auto;
+    }
+
+    .webmcp-floating-panel .webmcp-diagnostics[open] {
+      display: flex;
+      flex: 1 1 auto;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .webmcp-floating-panel .webmcp-disclosure-summary {
+      flex: 0 0 auto;
+    }
+
+    .webmcp-floating-panel .webmcp-diagnostics-content {
+      position: static;
+      flex: 0 1 auto;
+      height: auto;
+      min-height: 0;
+      max-height: calc(var(--webmcp-floating-panel-max-height, calc(100vh - 16px)) - 9.25rem);
+      border-inline: 0;
+      box-shadow: none;
+      overscroll-behavior: contain;
+    }
+
+    .webmcp-floating-panel .webmcp-settings[open] ~ .webmcp-diagnostics .webmcp-diagnostics-content {
+      max-height: calc(var(--webmcp-floating-panel-max-height, calc(100vh - 16px)) - 14.5rem);
     }
 
     .webmcp-status {

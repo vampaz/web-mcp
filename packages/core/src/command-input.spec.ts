@@ -199,6 +199,7 @@ describe('WebMCP command input', () => {
     expect(triggerWords).toEqual(['WEB', 'MCP'])
     expect(trigger?.getAttribute('aria-expanded')).toBe('false')
     expect(panel?.hidden).toBe(true)
+    expect(window.getComputedStyle(panel as Element).display).toBe('none')
 
     trigger?.click()
 
@@ -206,6 +207,40 @@ describe('WebMCP command input', () => {
     const expandedPanel = element.shadowRoot?.querySelector<HTMLElement>('.webmcp-floating-panel')
     expect(expandedTrigger?.getAttribute('aria-expanded')).toBe('true')
     expect(expandedPanel?.hidden).toBe(false)
+    expect(window.getComputedStyle(expandedPanel as Element).display).not.toBe('none')
+
+    expandedTrigger?.click()
+
+    const collapsedTrigger = element.shadowRoot?.querySelector<HTMLButtonElement>('.webmcp-floating-trigger')
+    const collapsedPanel = element.shadowRoot?.querySelector<HTMLElement>('.webmcp-floating-panel')
+    expect(collapsedTrigger?.getAttribute('aria-expanded')).toBe('false')
+    expect(collapsedPanel?.hidden).toBe(true)
+    expect(window.getComputedStyle(collapsedPanel as Element).display).toBe('none')
+  })
+
+  it('updates floating placement after expanding panel disclosures', async () => {
+    const element = createCommandInputElement()
+    const diagnostics = document.createElement('section')
+    diagnostics.slot = 'diagnostics'
+    diagnostics.textContent = 'Runtime diagnostics'
+    element.append(diagnostics)
+    element.setAttribute('floating', '')
+
+    document.body.append(element)
+    await Promise.resolve()
+
+    const trigger = element.shadowRoot?.querySelector<HTMLButtonElement>('.webmcp-floating-trigger')
+    trigger?.click()
+
+    const placementController = element as unknown as { updateFloatingPlacement: () => void }
+    const updateFloatingPlacement = vi.spyOn(placementController, 'updateFloatingPlacement')
+    const settings = element.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-settings')
+    const diagnosticsRow = element.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-diagnostics')
+
+    settings?.dispatchEvent(new Event('toggle'))
+    diagnosticsRow?.dispatchEvent(new Event('toggle'))
+
+    expect(updateFloatingPlacement).toHaveBeenCalledTimes(2)
   })
 
   it('keeps the floating trigger pinned to the viewport edge when resizing back up', async () => {
