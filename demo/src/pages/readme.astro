@@ -1,23 +1,8 @@
 ---
-import { createMarkdownProcessor } from '@astrojs/markdown-remark'
-
 import DemoLayout from '@/layouts/DemoLayout.astro'
-import readmeMarkdown from '../../../README.md?raw'
+import { Content as ReadmeContent } from '../../../README.md'
 
 export const prerender = true
-
-const readmeUrl = new URL('../../../README.md', import.meta.url)
-const markdown = await createMarkdownProcessor({
-  syntaxHighlight: 'prism'
-})
-const renderedReadme = await markdown.render(readmeMarkdown, {
-  fileURL: readmeUrl.pathname
-})
-const readmeHtml = resolveRepositoryLinks(renderedReadme.code)
-
-function resolveRepositoryLinks(html: string): string {
-  return html.replaceAll('href="./', 'href="https://github.com/vampaz/web-mcp/blob/master/')
-}
 ---
 
 <DemoLayout title="WebMCP Kit README" description="WebMCP Kit README documentation">
@@ -26,7 +11,9 @@ function resolveRepositoryLinks(html: string): string {
       <p>Repository README</p>
     </header>
 
-    <article class="readme-document" set:html={readmeHtml} />
+    <article class="readme-document">
+      <ReadmeContent />
+    </article>
   </section>
 </DemoLayout>
 

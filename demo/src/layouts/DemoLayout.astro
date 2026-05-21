@@ -24,8 +24,15 @@ function getIsActive(path: string): boolean {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
+    <meta name="theme-color" content="#090b0b" />
     <link rel="icon" href="/webmcp-circuit.svg" type="image/svg+xml" />
     <title>{title}</title>
+    <style is:inline>
+      html,
+      body {
+        background: #090b0b;
+      }
+    </style>
   </head>
   <body>
     <header class="demo-topbar">
