@@ -58,6 +58,17 @@ type ToolPlanStep = {
   reason: string
 }
 
+class AiEndpointError extends Error {
+  constructor(
+    providerLabel: string,
+    public readonly status: number,
+    public readonly responseText: string
+  ) {
+    super(`${providerLabel} returned ${status}`)
+    this.name = 'AiEndpointError'
+  }
+}
+
 const allowedCloudflareModels = new Set([
   '@cf/zai-org/glm-4.7-flash',
   '@cf/google/gemma-4-26b-a4b-it',
@@ -98,7 +109,9 @@ export const POST: APIRoute = async function planWithServerProvider({ request, l
       return json(await planWithOpenAI(body, env, model))
     }
   } catch (error) {
-    return json({ error: getPublicErrorMessage(error) }, 502)
+    const publicError = getPublicErrorMessage(error)
+    logServerPlannerFailure(error, body, publicError)
+    return json({ error: publicError }, 502)
   }
 
   return json({ error: 'Unsupported server planner provider' }, 400)
@@ -137,7 +150,7 @@ async function planWithCloudflareRest(body: PlannerRequestBody, env: CloudflareE
     body: JSON.stringify(createCloudflarePlannerInput(body, true))
   })
 
-  if (!response.ok) throw new Error(`Cloudflare Workers AI returned ${response.status}`)
+  if (!response.ok) throw await createAiEndpointError('Cloudflare Workers AI', response)
 
   const payload = await response.json() as { result?: { response?: string } }
   return parseAndValidatePlan(payload.result?.response?.trim(), body.tools)
@@ -164,7 +177,7 @@ async function planWithOpenAI(body: PlannerRequestBody, env: CloudflareEnv, mode
     })
   })
 
-  if (!response.ok) throw new Error(`OpenAI returned ${response.status}`)
+  if (!response.ok) throw await createAiEndpointError('OpenAI', response)
 
   const payload = await response.json() as OpenAIChatResult
   return parseAndValidatePlan(payload.choices?.[0]?.message?.content?.trim(), body.tools, 'OpenAI')
@@ -259,6 +272,18 @@ function shouldRetryWithoutResponseFormat(error: unknown): boolean {
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+async function createAiEndpointError(providerLabel: string, response: Response): Promise<AiEndpointError> {
+  return new AiEndpointError(providerLabel, response.status, await readAiEndpointErrorBody(response))
+}
+
+async function readAiEndpointErrorBody(response: Response): Promise<string> {
+  try {
+    return await response.text()
+  } catch {
+    return ''
+  }
 }
 
 function parseAndValidatePlan(response: string | undefined, tools: PlannerRequestBody['tools'], providerLabel = 'Cloudflare'): ToolPlan {
@@ -385,6 +410,55 @@ function getJsonHeaders(): HeadersInit {
   return {
     'Content-Type': 'application/json'
   }
+}
+
+function logServerPlannerFailure(error: unknown, body: PlannerRequestBody, publicError: string): void {
+  console.error('Server planner returned 502', {
+    event: 'webmcp.serverPlanner.502',
+    provider: body.provider,
+    model: body.model,
+    status: error instanceof AiEndpointError ? error.status : undefined,
+    toolCount: Array.isArray(body.tools) ? body.tools.length : 0,
+    toolNames: getPlannerToolNames(body.tools),
+    messageLength: typeof body.message === 'string' ? body.message.length : 0,
+    publicError,
+    error: serializePlannerError(error)
+  })
+}
+
+function getPlannerToolNames(tools: PlannerRequestBody['tools']): string[] {
+  if (!Array.isArray(tools)) return []
+
+  return tools
+    .map(function getToolName(tool) {
+      return tool.name
+    })
+    .filter(function hasToolName(name): name is string {
+      return typeof name === 'string'
+    })
+    .slice(0, 20)
+}
+
+function serializePlannerError(error: unknown): Record<string, unknown> {
+  if (!(error instanceof Error)) {
+    return {
+      message: sanitizeLogText(String(error))
+    }
+  }
+
+  return {
+    name: error.name,
+    message: sanitizeLogText(error.message),
+    upstreamResponse: error instanceof AiEndpointError ? sanitizeLogText(error.responseText) : undefined,
+    stack: sanitizeLogText(error.stack ?? '')
+  }
+}
+
+function sanitizeLogText(value: string): string {
+  return value
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [redacted]')
+    .replace(/sk-[A-Za-z0-9_-]+/g, 'sk-[redacted]')
+    .slice(0, 2000)
 }
 
 function getPublicErrorMessage(error: unknown): string {

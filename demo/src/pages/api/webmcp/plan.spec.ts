@@ -10,6 +10,7 @@ describe('/api/webmcp/plan', () => {
     delete env.CLOUDFLARE_ACCOUNT_ID
     delete env.CLOUDFLARE_API_TOKEN
     delete env.OPENAI_API_KEY
+    vi.restoreAllMocks()
     vi.unstubAllGlobals()
   })
 
@@ -57,6 +58,8 @@ describe('/api/webmcp/plan', () => {
   })
 
   it('returns a clear error when Cloudflare Workers AI server env is missing', async () => {
+    vi.spyOn(console, 'error').mockImplementation(function ignoreErrorLog() {})
+
     const response = await POST(createContext({
       provider: 'cloudflare-workers-ai',
       model: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
@@ -144,6 +147,7 @@ describe('/api/webmcp/plan', () => {
   })
 
   it('returns a clear error when OpenAI server env is missing', async () => {
+    vi.spyOn(console, 'error').mockImplementation(function ignoreErrorLog() {})
     env.OPENAI_API_KEY = ''
 
     const response = await POST(createContext({
@@ -166,7 +170,52 @@ describe('/api/webmcp/plan', () => {
     })
   })
 
+  it('logs upstream OpenAI errors before returning 502', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(function ignoreErrorLog() {})
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      error: {
+        message: 'upstream failed for sk-test-secret'
+      }
+    }, {
+      status: 502
+    })))
+    env.OPENAI_API_KEY = 'test-openai-key'
+
+    const response = await POST(createContext({
+      provider: 'openai',
+      model: 'gpt-5.4-mini',
+      message: 'Select water',
+      tools: [
+        {
+          name: 'select_items',
+          description: 'Select checklist items.',
+          inputSchema: { type: 'object' }
+        }
+      ],
+      context: {}
+    }))
+
+    expect(response.status).toBe(502)
+    expect(await response.json()).toEqual({
+      error: 'OpenAI returned 502'
+    })
+    expect(consoleError).toHaveBeenCalledWith('Server planner returned 502', expect.objectContaining({
+      event: 'webmcp.serverPlanner.502',
+      provider: 'openai',
+      model: 'gpt-5.4-mini',
+      status: 502,
+      toolCount: 1,
+      toolNames: ['select_items'],
+      publicError: 'OpenAI returned 502',
+      error: expect.objectContaining({
+        message: 'OpenAI returned 502',
+        upstreamResponse: expect.stringContaining('sk-[redacted]')
+      })
+    }))
+  })
+
   it('returns a clear error when the Cloudflare AI binding is local-only', async () => {
+    vi.spyOn(console, 'error').mockImplementation(function ignoreErrorLog() {})
     env.AI = {
       run: async () => {
         throw new Error('Binding AI needs to be run remotely')
@@ -263,6 +312,7 @@ describe('/api/webmcp/plan', () => {
   })
 
   it('rejects plans whose input does not match the selected tool schema', async () => {
+    vi.spyOn(console, 'error').mockImplementation(function ignoreErrorLog() {})
     env.AI = {
       run: vi.fn(async () => ({
         response: JSON.stringify({
