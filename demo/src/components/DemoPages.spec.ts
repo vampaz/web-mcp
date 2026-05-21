@@ -82,7 +82,7 @@ describe('demo pages', () => {
     const modelControl = commandInput.shadowRoot?.querySelector<HTMLSelectElement>('[data-model]')
     expect(settings?.open).toBe(true)
     expect(modelControl).toBeInstanceOf(HTMLSelectElement)
-    expect(modelControl?.value).toBe('gpt-4.1-mini')
+    expect(modelControl?.value).toBe('gpt-5.4-mini')
   })
 
   it('operates visible controls from AI-chosen context IDs', async () => {

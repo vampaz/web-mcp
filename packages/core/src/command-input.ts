@@ -458,7 +458,8 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
 
     private getAuthMode(provider: PlannerProviderKind): 'none' | 'server' | 'user-key' {
       if (this.authMode) return this.authMode
-      if (this.endpoint || provider === 'cloudflare-binding') return 'server'
+      if (provider === 'cloudflare-binding') return 'server'
+      if (this.endpoint && provider !== 'openrouter' && provider !== 'openai-compatible') return 'server'
       return 'user-key'
     }
 
@@ -1035,7 +1036,7 @@ function getModelOptionsMarkup(options: ModelOption[], model: string): string {
 function getModelOptions(provider: PlannerProviderKind): ModelOption[] {
   if (provider === 'openai') {
     return [
-      { label: 'GPT-4.1 mini', value: 'gpt-4.1-mini' },
+      { label: 'GPT-5.4 mini', value: 'gpt-5.4-mini' },
       { label: 'GPT-4.1', value: 'gpt-4.1' },
       { label: 'GPT-4o mini', value: 'gpt-4o-mini' },
       { label: 'GPT-4o', value: 'gpt-4o' }
@@ -1065,7 +1066,7 @@ function getModelOptions(provider: PlannerProviderKind): ModelOption[] {
 }
 
 function getDefaultModelForProvider(provider: PlannerProviderKind): string {
-  if (provider === 'openai') return 'gpt-4.1-mini'
+  if (provider === 'openai') return 'gpt-5.4-mini'
   if (provider === 'cloudflare-binding') return '@cf/moonshotai/kimi-k2.6'
   if (provider === 'cloudflare-workers-ai') return '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b'
   if (provider === 'openai-compatible') return ''

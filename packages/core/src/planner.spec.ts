@@ -602,7 +602,7 @@ describe('planner', () => {
 
     const planner = await createConfiguredPlanner({
       provider: 'openai',
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       auth: {
         mode: 'server',
         endpoint: '/api/webmcp/plan'

@@ -9,6 +9,8 @@ describe('/api/webmcp/plan', () => {
     delete env.AI
     delete env.CLOUDFLARE_ACCOUNT_ID
     delete env.CLOUDFLARE_API_TOKEN
+    delete env.OPENAI_API_KEY
+    vi.unstubAllGlobals()
   })
 
   it('plans through a Cloudflare AI binding when the runtime provides one', async () => {
@@ -72,6 +74,95 @@ describe('/api/webmcp/plan', () => {
     expect(response.status).toBe(502)
     expect(await response.json()).toEqual({
       error: 'Cloudflare Workers AI server mode needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN on the server, or a custom planner endpoint.'
+    })
+  })
+
+  it('plans through OpenAI using GPT-5.4 mini', async () => {
+    const fetch = vi.fn(async () => Response.json({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              toolName: 'select_items',
+              input: { ids: ['item_8'] },
+              confidence: 0.91,
+              reason: 'Selected water.'
+            })
+          }
+        }
+      ]
+    }))
+    vi.stubGlobal('fetch', fetch)
+    env.OPENAI_API_KEY = 'test-openai-key'
+
+    const response = await POST(createContext({
+      provider: 'openai',
+      model: 'gpt-5.4-mini',
+      message: 'Select water',
+      tools: [
+        {
+          name: 'select_items',
+          description: 'Select checklist items.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              ids: {
+                type: 'array',
+                items: {
+                  type: 'string'
+                }
+              }
+            },
+            required: ['ids'],
+            additionalProperties: false
+          }
+        }
+      ],
+      context: {
+        checklistItems: [
+          { id: 'item_8', name: 'Water' }
+        ]
+      }
+    }))
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      toolName: 'select_items',
+      input: { ids: ['item_8'] },
+      confidence: 0.91,
+      reason: 'Selected water.'
+    })
+    expect(fetch).toHaveBeenCalledWith('https://api.openai.com/v1/chat/completions', expect.objectContaining({
+      headers: expect.objectContaining({
+        Authorization: 'Bearer test-openai-key'
+      }),
+      method: 'POST'
+    }))
+    const fetchOptions = (fetch.mock.calls as unknown as Array<[string, RequestInit]>)[0]?.[1]
+    const request = JSON.parse(String(fetchOptions?.body)) as { model?: string }
+    expect(request.model).toBe('gpt-5.4-mini')
+  })
+
+  it('returns a clear error when OpenAI server env is missing', async () => {
+    env.OPENAI_API_KEY = ''
+
+    const response = await POST(createContext({
+      provider: 'openai',
+      model: 'gpt-5.4-mini',
+      message: 'Select water',
+      tools: [
+        {
+          name: 'select_items',
+          description: 'Select checklist items.',
+          inputSchema: { type: 'object' }
+        }
+      ],
+      context: {}
+    }))
+
+    expect(response.status).toBe(502)
+    expect(await response.json()).toEqual({
+      error: 'OpenAI server mode needs OPENAI_API_KEY on the server.'
     })
   })
 

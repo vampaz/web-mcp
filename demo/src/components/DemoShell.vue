@@ -64,6 +64,7 @@ const showDevtools = import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIE
 const showPlannerControls = import.meta.env.DEV
 const shouldInstallTestBridge = import.meta.env.DEV || import.meta.env.MODE === 'test'
 const shouldDefaultToCloudflareBinding = import.meta.env.MODE !== 'test'
+const openAIPlannerModel = 'gpt-5.4-mini'
 const cloudflareBindingModels = getCloudflareBindingModels()
 const plannerName = ref('Loading')
 const plannerDetail = ref(shouldDefaultToCloudflareBinding ? 'Using the Cloudflare AI binding planner endpoint.' : 'Checking Chrome built-in AI availability.')
@@ -88,8 +89,9 @@ watch(plannerProvider, function handlePlannerProviderChanged(provider) {
     plannerModel.value = 'openrouter/auto'
     plannerAuthMode.value = 'user-key'
   } else if (provider === 'openai') {
-    plannerModel.value = 'gpt-4.1-mini'
-    plannerAuthMode.value = 'user-key'
+    plannerModel.value = openAIPlannerModel
+    plannerAuthMode.value = 'server'
+    plannerEndpoint.value = '/api/webmcp/plan'
   } else if (provider === 'cloudflare-workers-ai') {
     plannerModel.value = '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b'
     plannerAuthMode.value = 'server'
@@ -136,6 +138,7 @@ function configureCommandInput() {
   if (showPlannerControls) {
     commandInput.value?.configure({
       context: props.getContext,
+      endpoint: plannerEndpoint.value,
       initialModel: shouldDefaultToCloudflareBinding ? plannerModel.value : undefined,
       initialProvider: shouldDefaultToCloudflareBinding ? plannerProvider.value : undefined
     })

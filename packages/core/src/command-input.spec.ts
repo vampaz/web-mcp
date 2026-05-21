@@ -95,7 +95,7 @@ describe('WebMCP command input', () => {
   it('hides provider and model controls when both are initialized by attributes', async () => {
     const element = createCommandInputElement()
     element.setAttribute('provider', 'openai')
-    element.setAttribute('model', 'gpt-4.1-mini')
+    element.setAttribute('model', 'gpt-5.4-mini')
     element.setAttribute('endpoint', '/api/webmcp/plan')
 
     document.body.append(element)
@@ -108,7 +108,7 @@ describe('WebMCP command input', () => {
   it('restores provider controls when a fixed provider attribute is removed', async () => {
     const element = createCommandInputElement()
     element.setAttribute('provider', 'openai')
-    element.setAttribute('model', 'gpt-4.1-mini')
+    element.setAttribute('model', 'gpt-5.4-mini')
 
     document.body.append(element)
     await Promise.resolve()
@@ -139,7 +139,7 @@ describe('WebMCP command input', () => {
     const model = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-model]')
     expect(settings?.open).toBe(true)
     expect(model).toBeInstanceOf(HTMLSelectElement)
-    expect(model?.value).toBe('gpt-4.1-mini')
+    expect(model?.value).toBe('gpt-5.4-mini')
   })
 
   it('shows Cloudflare models as a dropdown after choosing Cloudflare binding', async () => {
@@ -356,7 +356,7 @@ describe('WebMCP command input', () => {
     const element = createCommandInputElement()
     element.configure({
       endpoint: '/api/webmcp/plan',
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       provider: 'openai'
     })
 

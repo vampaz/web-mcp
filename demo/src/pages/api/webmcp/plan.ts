@@ -23,6 +23,14 @@ type CloudflareAiResult = {
   }>
 }
 
+type OpenAIChatResult = {
+  choices?: Array<{
+    message?: {
+      content?: string
+    }
+  }>
+}
+
 type PlannerRequestBody = {
   provider?: string
   model?: string
@@ -60,6 +68,7 @@ const allowedCloudflareModels = new Set([
   '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
   '@cf/qwen/qwq-32b'
 ])
+const openAIApiModel = 'gpt-5.4-mini'
 const maxPlannerRequestBytes = 128 * 1024
 
 export const prerender = false
@@ -69,17 +78,24 @@ export const POST: APIRoute = async function planWithServerProvider({ request, l
   if ('error' in requestBody) return json({ error: requestBody.error }, requestBody.status)
 
   const body = requestBody.body
-  if (!body.model || !allowedCloudflareModels.has(body.model)) return json({ error: 'Unsupported Cloudflare model' }, 400)
   if (!body.message || !Array.isArray(body.tools)) return json({ error: 'Invalid planner request' }, 400)
   const env = await getCloudflareEnv(locals)
 
   try {
     if (body.provider === 'cloudflare-binding') {
+      if (!body.model || !allowedCloudflareModels.has(body.model)) return json({ error: 'Unsupported Cloudflare model' }, 400)
       return json(await planWithCloudflareBinding(body, env))
     }
 
     if (body.provider === 'cloudflare-workers-ai') {
+      if (!body.model || !allowedCloudflareModels.has(body.model)) return json({ error: 'Unsupported Cloudflare model' }, 400)
       return json(await planWithCloudflareRest(body, env))
+    }
+
+    if (body.provider === 'openai') {
+      const model = getOpenAIModel(body.model)
+      if (!model) return json({ error: 'Unsupported OpenAI model' }, 400)
+      return json(await planWithOpenAI(body, env, model))
     }
   } catch (error) {
     return json({ error: getPublicErrorMessage(error) }, 502)
@@ -125,6 +141,33 @@ async function planWithCloudflareRest(body: PlannerRequestBody, env: CloudflareE
 
   const payload = await response.json() as { result?: { response?: string } }
   return parseAndValidatePlan(payload.result?.response?.trim(), body.tools)
+}
+
+async function planWithOpenAI(body: PlannerRequestBody, env: CloudflareEnv, model: string): Promise<ToolPlan> {
+  const apiKey = env.OPENAI_API_KEY ?? import.meta.env.OPENAI_API_KEY
+  if (!apiKey) {
+    throw new Error('OpenAI server mode needs OPENAI_API_KEY on the server.')
+  }
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model,
+      messages: createPlannerMessages(body),
+      response_format: {
+        type: 'json_object'
+      }
+    })
+  })
+
+  if (!response.ok) throw new Error(`OpenAI returned ${response.status}`)
+
+  const payload = await response.json() as OpenAIChatResult
+  return parseAndValidatePlan(payload.choices?.[0]?.message?.content?.trim(), body.tools, 'OpenAI')
 }
 
 async function runCloudflareBindingPlanner(body: PlannerRequestBody, ai: NonNullable<CloudflareEnv['AI']>): Promise<CloudflareAiResult> {
@@ -218,14 +261,14 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-function parseAndValidatePlan(response: string | undefined, tools: PlannerRequestBody['tools']): ToolPlan {
-  if (!response) throw new Error('Cloudflare returned no response')
+function parseAndValidatePlan(response: string | undefined, tools: PlannerRequestBody['tools'], providerLabel = 'Cloudflare'): ToolPlan {
+  if (!response) throw new Error(`${providerLabel} returned no response`)
 
   let plan: ToolPlan
   try {
-    plan = JSON.parse(normalizeJsonText(response)) as ToolPlan
+    plan = JSON.parse(normalizeJsonText(response, providerLabel)) as ToolPlan
   } catch {
-    throw new Error('Cloudflare returned invalid JSON')
+    throw new Error(`${providerLabel} returned invalid JSON`)
   }
   validatePlan(plan, tools)
 
@@ -247,9 +290,9 @@ function extractResponseText(value: unknown): string | undefined {
   return undefined
 }
 
-function normalizeJsonText(value: string): string {
+function normalizeJsonText(value: string, providerLabel: string): string {
   const trimmedValue = value.trim()
-  if (!trimmedValue) throw new Error('Cloudflare returned empty text')
+  if (!trimmedValue) throw new Error(`${providerLabel} returned empty text`)
 
   const fencedMatch = trimmedValue.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
   if (fencedMatch?.[1]) return fencedMatch[1].trim()
@@ -260,7 +303,12 @@ function normalizeJsonText(value: string): string {
     return trimmedValue.slice(firstBraceIndex, lastBraceIndex + 1)
   }
 
-  throw new Error(`Cloudflare returned non-JSON text: ${trimmedValue.slice(0, 120)}`)
+  throw new Error(`${providerLabel} returned non-JSON text: ${trimmedValue.slice(0, 120)}`)
+}
+
+function getOpenAIModel(model: string | undefined): string | undefined {
+  if (!model || model === openAIApiModel) return openAIApiModel
+  return undefined
 }
 
 function validatePlan(plan: ToolPlan, tools: PlannerRequestBody['tools']): void {
@@ -350,6 +398,10 @@ function getPublicErrorMessage(error: unknown): string {
     return 'Cloudflare Workers AI server mode needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN on the server, or a custom planner endpoint.'
   }
 
+  if (message.includes('OPENAI_API_KEY')) {
+    return 'OpenAI server mode needs OPENAI_API_KEY on the server.'
+  }
+
   if (isSafePlannerFailureMessage(message)) {
     return message
   }
@@ -363,6 +415,7 @@ function getPublicErrorMessage(error: unknown): string {
 
 function isSafePlannerFailureMessage(message: string): boolean {
   return message.startsWith('Cloudflare returned')
+    || message.startsWith('OpenAI returned')
     || message.startsWith('Invalid ')
     || message.startsWith('Unknown tool')
     || message.startsWith('Selected tool has no input schema')
