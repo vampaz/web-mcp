@@ -27,11 +27,14 @@ export function registerNativeTool<TInput = Record<string, unknown>, TOutput = u
   const registerTool = (navigator as NavigatorWithModelContext).modelContext?.registerTool
   if (!registerTool) return undefined
 
+  const abortController = typeof AbortController === 'function' ? new AbortController() : undefined
+
   try {
     const handle = registerTool.call((navigator as NavigatorWithModelContext).modelContext, {
       name: tool.name,
       description: tool.description,
       inputSchema: tool.inputSchema,
+      annotations: tool.annotations,
       async execute(input: TInput) {
         const inputValidationErrors = validateJsonValue(input, tool.inputSchema)
         if (inputValidationErrors.length > 0) {
@@ -47,11 +50,11 @@ export function registerNativeTool<TInput = Record<string, unknown>, TOutput = u
 
         return tool.execute(input, { source: 'native' })
       }
-    }) as NativeHandle | undefined
+    }, abortController ? { signal: abortController.signal } : undefined) as NativeHandle | undefined
 
     return {
-      unregister: getNativeUnregister(handle),
-      warnings: getNativeHandleWarnings(handle)
+      unregister: getNativeUnregister(handle, abortController),
+      warnings: getNativeHandleWarnings(handle, abortController)
     }
   } catch (error) {
     console.warn('[WebMCP Kit] Native registration failed; using fallback registry.', error)
@@ -59,23 +62,32 @@ export function registerNativeTool<TInput = Record<string, unknown>, TOutput = u
   }
 }
 
-function getNativeUnregister(handle: NativeHandle | undefined): (() => void) | undefined {
+function getNativeUnregister(handle: NativeHandle | undefined, abortController: AbortController | undefined): (() => void) | undefined {
   if (typeof handle?.unregister === 'function') {
     return function unregisterNativeTool() {
       handle.unregister?.()
+      abortController?.abort()
     }
   }
 
   if (typeof handle?.dispose === 'function') {
     return function disposeNativeTool() {
       handle.dispose?.()
+      abortController?.abort()
+    }
+  }
+
+  if (abortController) {
+    return function abortNativeToolRegistration() {
+      abortController.abort()
     }
   }
 
   return undefined
 }
 
-function getNativeHandleWarnings(handle: NativeHandle | undefined): string[] {
+function getNativeHandleWarnings(handle: NativeHandle | undefined, abortController: AbortController | undefined): string[] {
+  if (abortController) return []
   if (!handle || typeof handle !== 'object') return []
 
   if (typeof handle.unregister === 'function' || typeof handle.dispose === 'function') return []

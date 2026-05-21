@@ -16,6 +16,12 @@ if (isWebMCPSupported()) {
 
 When `navigator.modelContext.registerTool` exists, WebMCP Kit registers tools with the browser native API and also keeps a fallback copy for local inspection and tests.
 
+Native registration follows the current Chrome WebMCP shape:
+
+- Tool `annotations`, including `readOnlyHint` and `untrustedContentHint`, are passed to `navigator.modelContext.registerTool`.
+- Native cleanup uses `AbortSignal` when available, matching Chrome's documented unregister path.
+- Returned native `unregister()` or `dispose()` handles are still honored for compatibility.
+
 ## Fallback Mode
 
 Fallback mode keeps tools in an in-memory registry. It is useful for:
@@ -41,3 +47,11 @@ During development or preview deployments, mount `@webmcp-kit/devtools` to inspe
 ## Chrome And Lighthouse Inspection
 
 Use browser feature detection as the source of truth before documenting support for a specific environment. In supported Chrome or Lighthouse environments, inspect the native browser surface first, then compare it with the WebMCP Kit devtools overlay. In unsupported environments, the overlay and test bridge should still show fallback-registered tools so demos and QA remain usable.
+
+Useful references:
+
+- [Chrome WebMCP Imperative API](https://developer.chrome.com/docs/ai/webmcp/imperative-api)
+- [Chrome WebMCP Declarative API](https://developer.chrome.com/docs/ai/webmcp/declarative-api)
+- [Chrome WebMCP best practices](https://developer.chrome.com/docs/ai/webmcp/best-practices)
+- [Chrome WebMCP evals](https://developer.chrome.com/docs/ai/webmcp/evals)
+- [When to use WebMCP and MCP](https://developer.chrome.com/docs/ai/webmcp/compare-mcp)

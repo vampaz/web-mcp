@@ -61,7 +61,7 @@ OpenAI:
 await createWebMCPKit({
   planner: {
     provider: 'openai',
-    model: 'gpt-4.1-mini',
+    model: 'gpt-5.4-mini',
     auth: {
       mode: 'user-key',
       apiKey: userProvidedOpenAIKey

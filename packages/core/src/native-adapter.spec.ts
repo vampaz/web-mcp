@@ -54,14 +54,84 @@ describe('native WebMCP adapter', () => {
 
     expect(isWebMCPSupported()).toBe(true)
     expect(registration.mode).toBe('native-and-fallback')
-    expect(registerNativeTool).toHaveBeenCalledWith(expect.objectContaining({
-      name: 'search_products',
-      description: expect.stringContaining('Search the local product catalog')
-    }))
+    expect(registerNativeTool).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'search_products',
+        description: expect.stringContaining('Search the local product catalog')
+      }),
+      expect.objectContaining({
+        signal: expect.any(AbortSignal)
+      })
+    )
 
     registration.unregister()
 
     expect(unregister).toHaveBeenCalledOnce()
+  })
+
+  it('passes annotations to native WebMCP registration', () => {
+    const registerNativeTool = vi.fn()
+    ;(navigator as NavigatorWithModelContext).modelContext = {
+      registerTool: registerNativeTool
+    }
+
+    registerTool(defineTool({
+      name: 'get_order_status',
+      description: 'Search visible order status information for a selected timeframe.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          timeframe: { type: 'string' }
+        },
+        required: ['timeframe']
+      },
+      annotations: {
+        readOnlyHint: true,
+        untrustedContentHint: true
+      },
+      execute(input) {
+        return input
+      }
+    }))
+
+    expect(registerNativeTool).toHaveBeenCalledWith(
+      expect.objectContaining({
+        annotations: {
+          readOnlyHint: true,
+          untrustedContentHint: true
+        }
+      }),
+      expect.any(Object)
+    )
+  })
+
+  it('unregisters native tools with AbortSignal when no native handle is returned', () => {
+    let signal: AbortSignal | undefined
+    ;(navigator as NavigatorWithModelContext).modelContext = {
+      registerTool: vi.fn(function registerNativeToolMock(_nativeTool, options) {
+        signal = options.signal
+        return undefined
+      })
+    }
+
+    const registration = registerTool(defineTool({
+      name: 'clear_selection',
+      description: 'Clear the current selection from the visible workspace list.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        required: []
+      },
+      execute() {
+        return []
+      }
+    }))
+
+    expect(signal?.aborted).toBe(false)
+
+    registration.unregister()
+
+    expect(signal?.aborted).toBe(true)
   })
 
   it('unregisters a previous native handle when a tool is replaced', () => {
@@ -129,7 +199,7 @@ describe('native WebMCP adapter', () => {
     expect(dispose).toHaveBeenCalledOnce()
   })
 
-  it('surfaces a compatibility warning for unexpected native handles', () => {
+  it('does not warn for unexpected native handles when AbortSignal cleanup is available', () => {
     ;(navigator as NavigatorWithModelContext).modelContext = {
       registerTool: vi.fn(function registerNativeToolMock() {
         return { close: vi.fn() }
@@ -155,7 +225,7 @@ describe('native WebMCP adapter', () => {
     }))
 
     expect(registration.mode).toBe('native-and-fallback')
-    expect(registration.warnings).toContain('Native WebMCP registration returned a handle without unregister or dispose; local unregister cannot remove the native tool.')
+    expect(registration.warnings).not.toContain('Native WebMCP registration returned a handle without unregister or dispose; local unregister cannot remove the native tool.')
   })
 
   it('executes native calls with native source context', async () => {

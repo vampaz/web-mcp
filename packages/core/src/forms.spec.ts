@@ -105,10 +105,10 @@ describe('form helpers', () => {
     expect(registration.warnings).toContain('Sensitive form field "password" should require explicit confirmation or be excluded.')
   })
 
-  it('infers checkbox fields and data-tool-description overrides', () => {
+  it('infers checkbox fields and official tool parameter description overrides', () => {
     document.body.innerHTML = `
       <form>
-        <input name="acceptedTerms" type="checkbox" data-tool-description="Whether the user accepted the terms." />
+        <input name="acceptedTerms" type="checkbox" toolparamdescription="Whether the user accepted the terms." />
       </form>
     `
 
@@ -118,6 +118,103 @@ describe('form helpers', () => {
     expect(inferFormInputSchema(form).properties?.acceptedTerms).toEqual({
       type: 'boolean',
       description: 'Whether the user accepted the terms.'
+    })
+  })
+
+  it('keeps data-tool-description as a compatibility fallback', () => {
+    document.body.innerHTML = `
+      <form>
+        <textarea name="body" data-tool-description="Support request details"></textarea>
+      </form>
+    `
+
+    const form = document.querySelector('form')
+    if (!form) throw new Error('Expected test form.')
+
+    expect(inferFormInputSchema(form).properties?.body).toEqual({
+      type: 'string',
+      description: 'Support request details'
+    })
+  })
+
+  it('applies explicit field metadata as official declarative attributes', () => {
+    document.body.innerHTML = `
+      <form>
+        <input name="email" type="email" />
+      </form>
+    `
+
+    const form = document.querySelector('form')
+    const email = document.querySelector('input[name="email"]')
+    if (!form || !email) throw new Error('Expected test form.')
+
+    registerFormTool({
+      form,
+      name: 'send_support_reply',
+      description: 'Send a support reply to the visible customer email address.',
+      fields: {
+        email: {
+          title: 'Customer email',
+          description: 'Email address that receives the support reply.'
+        }
+      }
+    })
+
+    expect(email.getAttribute('toolparamtitle')).toBe('Customer email')
+    expect(email.getAttribute('toolparamdescription')).toBe('Email address that receives the support reply.')
+    expect(inferFormInputSchema(form).properties?.email).toEqual({
+      type: 'string',
+      format: 'email',
+      description: 'Email address that receives the support reply.'
+    })
+  })
+
+  it('infers richer schemas from email, date, time, and select fields', () => {
+    document.body.innerHTML = `
+      <form>
+        <label>Email <input name="email" type="email" required /></label>
+        <label>Date <input name="date" type="date" /></label>
+        <label>Time <input name="time" type="time" /></label>
+        <label>Status
+          <select name="status">
+            <option value="">Choose</option>
+            <option value="new">New</option>
+            <option value="resolved">Resolved</option>
+          </select>
+        </label>
+      </form>
+    `
+
+    const form = document.querySelector('form')
+    if (!form) throw new Error('Expected test form.')
+
+    expect(inferFormInputSchema(form)).toEqual({
+      type: 'object',
+      properties: {
+        email: {
+          type: 'string',
+          format: 'email',
+          description: 'Email'
+        },
+        date: {
+          type: 'string',
+          format: 'date',
+          description: 'Date'
+        },
+        time: {
+          type: 'string',
+          pattern: '^\\d{2}:\\d{2}$',
+          description: 'Time'
+        },
+        status: {
+          type: 'string',
+          description: 'Status',
+          enum: ['new', 'resolved']
+        }
+      },
+      required: ['email'],
+      additionalProperties: false,
+      'x-webmcp-source': 'form'
     })
   })
 

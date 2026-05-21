@@ -10,7 +10,7 @@ export {
 export { formatOpenAITool, formatOpenAITools, type OpenAIFunctionTool } from './adapters/openai'
 export { emitWebMCPKitEvent, subscribeWebMCPKitEvents } from './events'
 export { assertWebMCPIntegration, getIntegrationHealthReport, type IntegrationHealthOptions } from './diagnostics'
-export { inferFormInputSchema, registerFormTool, type FormInput, type RegisterFormToolOptions } from './forms'
+export { inferFormInputSchema, registerFormTool, type FormInput, type RegisterFormToolFieldOptions, type RegisterFormToolOptions } from './forms'
 export {
   defineWebMCPCommandInput
 } from './command-input'
@@ -35,6 +35,7 @@ export type {
   RegisteredTool,
   RegistrySnapshot,
   ToolConfirmation,
+  ToolAnnotations,
   ToolContext,
   ToolInvocation,
   ToolInvocationResult,

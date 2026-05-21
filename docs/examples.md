@@ -18,6 +18,9 @@ registerTool(defineTool({
     required: ['query'],
     additionalProperties: false
   },
+  annotations: {
+    readOnlyHint: true
+  },
   execute(input) {
     return searchProducts(String(input.query))
   }
@@ -46,6 +49,9 @@ useWebMCPTool(defineTool({
     },
     required: ['query'],
     additionalProperties: false
+  },
+  annotations: {
+    readOnlyHint: true
   },
   execute(input) {
     return searchProducts(String(input.query))
@@ -117,3 +123,33 @@ test('selects items through the WebMCP test bridge', async function testSelectIt
 ```
 
 The test bridge does not let tests bypass confirmation by passing `confirmed: true`. Confirmed tools still use the app confirmation handler or the browser confirmation fallback.
+
+## Form Tool
+
+```ts
+import { registerFormTool } from '@webmcp-kit/core'
+
+const form = document.querySelector<HTMLFormElement>('form')
+
+if (form) {
+  registerFormTool({
+    form,
+    name: 'create_support_ticket',
+    description: 'Create a support ticket from the visible support request form.',
+    fields: {
+      subject: {
+        description: 'Short issue summary.'
+      },
+      body: {
+        description: 'Detailed issue description.'
+      }
+    }
+  })
+}
+```
+
+The helper applies `toolname`, `tooldescription`, and official field metadata attributes such as `toolparamdescription`.
+
+## Eval Fixtures
+
+See [WebMCP Evals](./evals.md) for starter cases that check tool selection, parameter extraction, call order, and end-to-end user journey success.

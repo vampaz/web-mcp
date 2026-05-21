@@ -8,6 +8,7 @@
       <div>
         <span>WebMCP</span>
         <strong>{{ supportLabel }}</strong>
+        <small>{{ nativeSupportDetail }}</small>
       </div>
       <div>
         <span>Planner</span>
@@ -25,7 +26,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 interface Props {
   plannerDetail: string
@@ -34,8 +35,15 @@ interface Props {
   supportLabel: string
 }
 
-withDefaults(defineProps<Props>(), {})
+const props = withDefaults(defineProps<Props>(), {})
 const devtoolsHost = ref<HTMLElement | null>(null)
+const nativeSupportDetail = computed(function getNativeSupportDetail() {
+  if (props.supportLabel.toLowerCase().includes('native')) {
+    return 'Native browser tools are live. Cross-check in Chrome DevTools or the WebMCP extension.'
+  }
+
+  return 'Fallback simulation. Enable chrome://flags/#enable-webmcp-testing, then verify with Chrome DevTools or the WebMCP extension.'
+})
 
 defineExpose({
   devtoolsHost

@@ -1036,10 +1036,7 @@ function getModelOptionsMarkup(options: ModelOption[], model: string): string {
 function getModelOptions(provider: PlannerProviderKind): ModelOption[] {
   if (provider === 'openai') {
     return [
-      { label: 'GPT-5.4 mini', value: 'gpt-5.4-mini' },
-      { label: 'GPT-4.1', value: 'gpt-4.1' },
-      { label: 'GPT-4o mini', value: 'gpt-4o-mini' },
-      { label: 'GPT-4o', value: 'gpt-4o' }
+      { label: 'GPT-5.4 mini', value: 'gpt-5.4-mini' }
     ]
   }
 

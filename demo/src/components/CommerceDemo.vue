@@ -73,6 +73,9 @@ function registerCommerceTools() {
       required: ['query'],
       additionalProperties: false
     },
+    annotations: {
+      readOnlyHint: true
+    },
     execute(input) {
       const query = String(input.query ?? '').toLowerCase()
       const tokens = getSearchTokens(query)

@@ -7,6 +7,10 @@
 
 ---
 
+## Status Note
+
+This review captured the `feature/mvp-hardening` branch as of 2026-05-13. Since then, the native adapter and form helper have been tightened: native registration now passes `annotations`, unregisters with `AbortSignal` when available, keeps returned-handle cleanup for compatibility, and `registerFormTool()` now prefers official `toolparamdescription` / `toolparamtitle` metadata with richer schema inference for email, date, time, and select fields.
+
 ## Summary
 
 This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging Chrome WebMCP browser APIs (`navigator.modelContext`) with typed tool definitions, a fallback registry, devtools overlay, planner providers (Chrome built-in AI, OpenRouter, OpenAI, Cloudflare), adapters (OpenAI tools, MCP bridge, catalog export), form helpers, Playwright test utilities, and an Astro/Vue demo. The code is clean, well-structured, and thoroughly tested.
@@ -42,13 +46,13 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 
 - **`registry.ts`**: Clean. Properly replaces duplicate tool names, runs guards/confirmations before execution, emits events at every lifecycle point, uses `performance.now()` for timing. The `invokeTool` function is a well-structured pipeline: find → scope check → confirm → guard → execute.
 
-- **`native-adapter.ts`**: Handles edge cases well — `unregister`, `dispose`, and unrecognized native handle shapes all produce appropriate warnings. The `source: 'native'` context is correctly threaded through to the handler.
+- **`native-adapter.ts`**: Handles edge cases well — `AbortSignal` cleanup, returned `unregister` / `dispose` handles, annotations passthrough, and native `source: 'native'` context are covered.
 
 - **`schema.ts`**: Recursive JSON Schema validator with specific, path-prefixed error messages. Validates types, properties, required fields, items, enums, and numeric constraints. Solid.
 
 - **`quality.ts`**: Practical heuristic quality checks — snake_case naming, minimum description length, vague words, sensitive action detection, form field validation. Good signal-to-noise ratio on warnings.
 
-- **`forms.ts`**: Clean attribute-based form metadata. Infers schemas from inputs (text/number/checkbox), supports `data-tool-description` overrides, fills forms before execution. The `fillForm` function correctly handles `RadioNodeList`, checkboxes, and standard inputs.
+- **`forms.ts`**: Clean attribute-based form metadata. Infers schemas from inputs including text, number, checkbox, email, date, time, and select; prefers official `toolparamdescription` / `toolparamtitle` metadata while keeping `data-tool-description` as a compatibility fallback; fills forms before execution. The `fillForm` function correctly handles `RadioNodeList`, checkboxes, and standard inputs.
 
 - **`devtools.ts`**: A self-contained vanilla-TS overlay with its own CSS. Subscribes to kit events, renders tool cards with prompt previews, sample generation, invocation history with replay. The `invocationId` tracking correctly correlates concurrent calls. Clean use of event delegation.
 
@@ -85,9 +89,9 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 | Area | Location | Tests | Status |
 |---|---|---|---|
 | Schema validation | `schema.spec.ts` | 5 | ✅ Edge cases for types, required, nested, output schemas |
-| Native adapter | `native-adapter.spec.ts` | 6 | ✅ Registration, unregistration, dispose-only, warnings, source context |
+| Native adapter | `native-adapter.spec.ts` | 8+ | ✅ Registration, annotations passthrough, AbortSignal cleanup, returned handles, source context |
 | Planner | `planner.spec.ts` | 13 | ✅ Heuristics, Chrome AI (available/downloadable/session-failure), word/numeric quantity, positional/context-based selection, OpenRouter user-key, server endpoint, Cloudflare binding, needs-key/unavailable states |
-| Forms | `forms.spec.ts` | 3 | ✅ Schema inference, invocation, risky field warnings |
+| Forms | `forms.spec.ts` | 9+ | ✅ Schema inference, invocation, official form metadata, richer field schemas, risky field warnings |
 | Devtools | `devtools.spec.ts` | 3 | ✅ Render, invoke, error handling, concurrent calls |
 | MCP bridge | `mcp-bridge/index.spec.ts` | 2 | ✅ List/call with and without confirmation |
 | Test bridge | `test-bridge.spec.ts` | 1 | ✅ Install, invoke, uninstall |
@@ -100,12 +104,9 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 
 ### Coverage gaps to consider
 
-1. **No test for `forms.ts` checkbox field inference**: Checkbox → `boolean` is in the code but not explicitly tested.
-2. **No test for `forms.ts` `RadioNodeList` fill-form path**: The `field instanceof RadioNodeList` branch has no test.
-3. **No test for `forms.ts` `data-tool-description` override**: Only the label-fallback path is tested.
-4. **No test for `events.ts`**: The pub/sub system is exercised indirectly through registry tests but has no direct tests.
-5. **No test for `support.ts`**: `isWebMCPSupported()` and `getSupportLabel()` are tested only indirectly through native-adapter specs.
-6. **No test for `planner.ts` Cloudflare REST direct mode**: Only the server-endpoint path for `cloudflare-workers-ai` is tested; the browser-direct REST path is not.
+1. **No direct test for `events.ts`**: The pub/sub system is exercised indirectly through registry tests but has no direct tests.
+2. **No direct test for `support.ts`**: `isWebMCPSupported()` and `getSupportLabel()` are tested only indirectly through native-adapter specs.
+3. **No test for `planner.ts` Cloudflare REST direct mode**: Only the server-endpoint path for `cloudflare-workers-ai` is tested; the browser-direct REST path is not.
 
 ---
 
@@ -115,7 +116,7 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 |---|---|
 | **User-key visibility** | ✅ Clearly documented. The demo sidebar warns: "the key is visible to this browser page." The PRD and planner docs repeat this. |
 | **Server mode for secrets** | ✅ App-owned keys use server endpoints. The `plan.ts` endpoint never exposes secrets to the browser. |
-| **Input validation** | ✅ `defineTool` validates schemas at registration. `invokeTool` passes raw input to handlers; handlers are responsible for their own validation. This is documented in the security guide. |
+| **Input validation** | ✅ `defineTool` validates schemas at registration. `invokeTool` and the native wrapper validate tool input against schema before execution. Handlers should still treat inputs as untrusted and normalize domain values. |
 | **Confirmation enforcement** | ✅ `invokeTool` blocks actions without confirmation. The devtools overlay uses `window.confirm()`. MCP/test bridge callers cannot bypass confirmation with request params. |
 | **Guard execution** | ✅ Guards run after scope/confirmation checks and before execution. Both `false` and string (reason) returns are handled. |
 | **Event data** | ✅ Events include tool name and timestamp but no input/output by default. `detail` contains invocation data but is only visible through the subscription API, not transmitted. |
@@ -136,8 +137,9 @@ All 10 planned docs exist and are well-written:
 - `README.md` — Clean, clear positioning ("not a new protocol"), quick start, good examples.
 - `Dev-Docs/PLAN.md` — Exhaustive implementation plan with all phases checked off.
 - `Dev-Docs/PRD.md` — Production-quality PRD with personas, functional/non-functional requirements, open questions.
-- `docs/getting-started.md` — First-tool example in plain JS.
-- `docs/browser-support.md` — Native WebMCP, Early Preview status, feature detection, fallback behavior.
+- `docs/getting-started.md` — First-tool example in plain JS, annotations, and form upgrade path.
+- `docs/browser-support.md` — Native WebMCP, Early Preview status, feature detection, fallback behavior, annotations, and AbortSignal cleanup.
+- `docs/evals.md` — Starter WebMCP eval cases for tool selection, parameter extraction, call order, and user journey success.
 - `docs/security.md` — Untrusted inputs, permissions, confirmations, redaction, audit hooks.
 - `docs/planner-providers.md` — Server mode, user-key mode, Chrome built-in AI, Cloudflare binding, model selection.
 - `docs/vue.md`, `docs/react.md`, `docs/svelte.md`, `docs/astro.md` — Consistent lifecycle-safe registration recipes.
@@ -165,7 +167,6 @@ All 10 planned docs exist and are well-written:
 | Should fix | `planWithOpenAICompatible` accesses `location` without guard | `planner.ts:269` |
 | Nice to have | Chrome AI session lifecycle cleanup (`dispose`) | `planner.ts`, `interfaces/tool.ts` |
 | Nice to have | Targeted DOM updates instead of full innerHTML re-render | `devtools.ts` |
-| Nice to have | Flesh out form helper tests (checkbox, radio, `data-tool-description`) | `forms.spec.ts` |
 | Nice to have | Direct tests for `events.ts` and `support.ts` | New test files |
 | Not blocking | Split `planner.ts` into multiple modules | `planner.ts` |
 | Not blocking | Split `WebMcpDemo.vue` into subcomponents | `WebMcpDemo.vue` |

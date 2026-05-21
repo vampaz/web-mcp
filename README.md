@@ -38,6 +38,9 @@ registerTool(defineTool({
     required: ['query'],
     additionalProperties: false
   },
+  annotations: {
+    readOnlyHint: true
+  },
   execute(input) {
     return searchProducts(String(input.query))
   }
@@ -90,7 +93,7 @@ setConfirmationHandler(async function confirmTool(tool, input, reason) {
 
 - `createWebMCPKit(options)` initializes the kit and optional planner provider.
 - `defineTool(tool)` validates and preserves a typed tool definition.
-- `registerTool(tool)` registers with native WebMCP when available and always stores the tool in the fallback registry.
+- `registerTool(tool)` registers with native WebMCP when available and always stores the tool in the fallback registry. Native registration passes through WebMCP `annotations` such as `readOnlyHint` and unregisters with `AbortSignal` when supported by the browser.
 - `invokeTool({ toolName, input, confirmed })` invokes fallback-registered tools for devtools, tests, and demos.
 - `setConfirmationHandler(handler)` configures one global async confirmation provider for tools with `confirmation.required`.
 - `listTools()` returns active registrations.
@@ -186,6 +189,16 @@ See [Vue](./docs/vue.md), [React](./docs/react.md), [Svelte](./docs/svelte.md), 
 
 For copy-paste snippets, see [Examples](./docs/examples.md).
 
+## Browser WebMCP References
+
+WebMCP Kit tracks the browser proposal while keeping a local fallback for unsupported environments:
+
+- [Chrome WebMCP Imperative API](https://developer.chrome.com/docs/ai/webmcp/imperative-api)
+- [Chrome WebMCP Declarative API](https://developer.chrome.com/docs/ai/webmcp/declarative-api)
+- [Chrome WebMCP best practices](https://developer.chrome.com/docs/ai/webmcp/best-practices)
+- [Chrome WebMCP evals](https://developer.chrome.com/docs/ai/webmcp/evals)
+- [When to use WebMCP and MCP](https://developer.chrome.com/docs/ai/webmcp/compare-mcp)
+
 ## Planner Providers
 
 Developers can pass a planner provider when initializing the kit:
@@ -211,7 +224,7 @@ User-key mode is intentionally simple and does not need a server, but the key is
 await createWebMCPKit({
   planner: {
     provider: 'openai',
-    model: 'gpt-4.1-mini',
+    model: 'gpt-5.4-mini',
     auth: {
       mode: 'server',
       endpoint: '/api/webmcp/plan'
@@ -239,7 +252,7 @@ defineWebMCPCommandInput()
 ```html
 <webmcp-command-input
   provider="openai"
-  model="gpt-4.1-mini"
+  model="gpt-5.4-mini"
   endpoint="/api/webmcp/plan"
 ></webmcp-command-input>
 ```

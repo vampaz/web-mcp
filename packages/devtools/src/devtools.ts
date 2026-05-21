@@ -8,7 +8,8 @@ import {
   type JsonSchema,
   type ToolInvocation,
   type ToolInvocationResult,
-  type WebMCPKitEvent
+  type WebMCPKitEvent,
+  type WebMCPTool
 } from '@webmcp-kit/core'
 
 export interface DevtoolsOverlay {
@@ -167,6 +168,30 @@ const overlayStyles = `
   background: rgba(243, 154, 141, 0.12);
   color: #f6aca2;
 }
+.wmk-devtools__tool-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.wmk-devtools__tool-badge {
+  width: max-content;
+  border: 1px solid rgba(224, 234, 229, 0.18);
+  padding: 3px 7px;
+  color: #c4d0c9;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.wmk-devtools__tool-badge--readonly {
+  border-color: rgba(80, 215, 161, 0.42);
+  background: rgba(80, 215, 161, 0.1);
+  color: #50d7a1;
+}
+.wmk-devtools__tool-badge--mutating {
+  border-color: rgba(232, 190, 83, 0.42);
+  background: rgba(232, 190, 83, 0.1);
+  color: #f2cc6b;
+}
 .wmk-devtools__diagnostics {
   display: grid;
   gap: 8px;
@@ -265,7 +290,8 @@ const overlayStyles = `
   color: #9aa8a1;
 }
 .wmk-devtools__preview pre,
-.wmk-devtools__history pre {
+.wmk-devtools__history pre,
+.wmk-devtools__last-call pre {
   overflow: auto;
   margin: 6px 0 0;
   padding: 10px;
@@ -278,6 +304,15 @@ const overlayStyles = `
   gap: 10px;
   border-top: 1px solid rgba(224, 234, 229, 0.12);
   padding-top: 12px;
+}
+.wmk-devtools__last-call {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(224, 234, 229, 0.12);
+  background: rgba(255, 255, 255, 0.035);
+  color: #c4d0c9;
+  font-size: 12px;
 }
 .wmk-devtools__history-item {
   display: grid;
@@ -399,9 +434,17 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
             </div>
           `}
         </section>
+        <section class="wmk-devtools__last-call" aria-label="Last tool call">
+          <strong>Last tool call</strong>
+          ${history[0] ? `
+            <span>${escapeHtml(history[0].toolName)} - ${escapeHtml(history[0].status)} - ${escapeHtml(history[0].detail)}</span>
+            <pre>${escapeHtml(JSON.stringify({ input: history[0].input, output: history[0].output }, null, 2))}</pre>
+          ` : '<span>No tool calls yet.</span>'}
+        </section>
         ${registrations.map((registration) => `
           <article class="wmk-devtools__tool">
             <div class="wmk-devtools__meta">${escapeHtml(registration.mode)}</div>
+            <div class="wmk-devtools__tool-badges">${formatToolBadges(registration.tool)}</div>
             <strong>${escapeHtml(registration.tool.name)}</strong>
             <p>${escapeHtml(registration.tool.description)}</p>
             <div class="wmk-devtools__quality">Quality ${getQualityScore(registration.warnings)}% · ${registration.warnings.length} warnings</div>
@@ -506,6 +549,16 @@ function createPromptPreview(name: string, description: string, inputSchema: Jso
     `When to use: ${description}`,
     `Input JSON Schema: ${JSON.stringify(inputSchema, null, 2)}`
   ].join('\n\n')
+}
+
+function formatToolBadges(tool: WebMCPTool): string {
+  const readOnly = tool.annotations?.readOnlyHint === true
+
+  return `
+    <span class="wmk-devtools__tool-badge wmk-devtools__tool-badge--${readOnly ? 'readonly' : 'mutating'}">
+      ${readOnly ? 'Read-only' : 'Mutating'}
+    </span>
+  `
 }
 
 function createSampleInput(schema: JsonSchema): Record<string, unknown> {

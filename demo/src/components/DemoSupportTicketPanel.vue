@@ -7,11 +7,11 @@
     <form ref="supportForm" class="support-form" @submit.prevent="submitForm">
       <label>
         Subject
-        <input :value="subject" name="subject" required data-tool-description="Short issue summary." @input="updateSubject" />
+        <input :value="subject" name="subject" required toolparamdescription="Short issue summary." @input="updateSubject" />
       </label>
       <label>
         Details
-        <textarea :value="body" name="body" required rows="5" data-tool-description="Detailed issue description." @input="updateBody" />
+        <textarea :value="body" name="body" required rows="5" toolparamdescription="Detailed issue description." @input="updateBody" />
       </label>
       <button class="primary-action" type="submit">Create ticket</button>
     </form>

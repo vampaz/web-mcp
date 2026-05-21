@@ -140,6 +140,9 @@ describe('WebMCP command input', () => {
     expect(settings?.open).toBe(true)
     expect(model).toBeInstanceOf(HTMLSelectElement)
     expect(model?.value).toBe('gpt-5.4-mini')
+    expect(Array.from(model?.options ?? []).map(function mapOption(option) {
+      return option.value
+    })).toEqual(['gpt-5.4-mini'])
   })
 
   it('shows Cloudflare models as a dropdown after choosing Cloudflare binding', async () => {

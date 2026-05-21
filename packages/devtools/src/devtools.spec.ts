@@ -43,14 +43,19 @@ describe('devtools overlay', () => {
     expect(document.body.textContent).toContain('Integration health')
     expect(document.body.textContent).toContain('1 tool registered and ready.')
     expect(document.body.textContent).toContain('create_invoice')
+    expect(document.body.textContent).toContain('Mutating')
     expect(document.body.textContent).toContain('Quality 100%')
     expect(document.body.textContent).toContain('Prompt preview')
+    expect(document.body.textContent).toContain('Last tool call')
+    expect(document.body.textContent).toContain('No tool calls yet.')
 
     const invokeButton = document.querySelector<HTMLButtonElement>('button[data-action="invoke"]')
     invokeButton?.click()
     await flushPromises()
 
     expect(execute).toHaveBeenCalledWith({ customerName: 'Acme Corp', amount: 1 }, { source: 'devtools' })
+    expect(document.body.textContent).toContain('Last tool call')
+    expect(document.body.textContent).toContain('create_invoice - success')
     expect(document.body.textContent).toContain('Invocation history')
     expect(document.body.textContent).toContain('"input"')
     expect(document.body.textContent).toContain('"output"')
@@ -93,6 +98,33 @@ describe('devtools overlay', () => {
 
     expect(execute).not.toHaveBeenCalled()
     expect(document.body.textContent).toContain('Input must be valid JSON.')
+
+    overlay.destroy()
+  })
+
+  it('shows read-only hints for annotated tools', () => {
+    registerTool(defineTool({
+      name: 'get_invoice_status',
+      description: 'Read visible invoice status information without changing invoice data.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          invoiceId: { type: 'string' }
+        },
+        required: ['invoiceId'],
+        additionalProperties: false
+      },
+      annotations: {
+        readOnlyHint: true
+      },
+      execute(input) {
+        return input
+      }
+    }))
+
+    const overlay = mountDevtoolsOverlay()
+
+    expect(document.body.textContent).toContain('Read-only')
 
     overlay.destroy()
   })

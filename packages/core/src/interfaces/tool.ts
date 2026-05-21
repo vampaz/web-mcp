@@ -25,6 +25,12 @@ export interface ToolConfirmation {
   reason: string
 }
 
+export interface ToolAnnotations {
+  readOnlyHint?: boolean
+  untrustedContentHint?: boolean
+  [key: string]: unknown
+}
+
 export interface ToolContext {
   source: 'native' | 'fallback' | 'devtools' | 'planner'
 }
@@ -34,6 +40,7 @@ export interface WebMCPTool<TInput = Record<string, unknown>, TOutput = unknown>
   description: string
   inputSchema: JsonSchema
   outputSchema?: JsonSchema
+  annotations?: ToolAnnotations
   confirmation?: ToolConfirmation
   examples?: TInput[]
   scope?: () => ToolScopeResult
