@@ -61,9 +61,9 @@ const props = withDefaults(defineProps<Props>(), {
   confirmationsEnabled: true
 })
 const showDevtools = import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIEW === 'true'
-const showPlannerControls = import.meta.env.DEV
 const shouldInstallTestBridge = import.meta.env.DEV || import.meta.env.MODE === 'test'
 const shouldDefaultToCloudflareBinding = import.meta.env.MODE !== 'test'
+const plannerControlsStorageKey = 'webmcp:admin'
 const openAIPlannerModel = 'gpt-5.4-mini'
 const cloudflareBindingModels = getCloudflareBindingModels()
 const plannerName = ref('Loading')
@@ -75,6 +75,7 @@ const plannerEndpoint = ref('/api/webmcp/plan')
 const plannerApiKey = ref('')
 const plannerAccountId = ref('')
 const plannerAuthMode = ref<'server' | 'user-key'>(shouldDefaultToCloudflareBinding ? 'server' : 'user-key')
+const plannerControlsEnabled = ref(import.meta.env.DEV)
 const unregisterCallbacks: Array<() => void> = []
 const commandInput = ref<WebMCPCommandInputElement | null>(null)
 const runtimeStatusPanel = ref<{ devtoolsHost: HTMLElement | null } | null>(null)
@@ -108,6 +109,7 @@ watch(plannerProvider, function handlePlannerProviderChanged(provider) {
 })
 
 onMounted(async function handleMounted() {
+  plannerControlsEnabled.value = shouldShowPlannerControls()
   defineWebMCPCommandInput()
   setConfirmationHandler(confirmToolInvocation)
   if (shouldInstallTestBridge) {
@@ -135,7 +137,7 @@ onUnmounted(function handleUnmounted() {
 })
 
 function configureCommandInput() {
-  if (showPlannerControls) {
+  if (plannerControlsEnabled.value) {
     commandInput.value?.configure({
       context: props.getContext,
       endpoint: plannerEndpoint.value,
@@ -152,6 +154,15 @@ function configureCommandInput() {
     planner: currentPlanner,
     provider: plannerProvider.value
   })
+}
+
+function shouldShowPlannerControls(): boolean {
+  if (import.meta.env.DEV) return true
+  try {
+    return localStorage.getItem(plannerControlsStorageKey) === 'true'
+  } catch {
+    return false
+  }
 }
 
 function handleCommandPlanner(event: Event) {

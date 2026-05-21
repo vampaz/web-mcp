@@ -224,6 +224,8 @@ See [Planner Providers](./docs/planner-providers.md) for OpenRouter, OpenAI, Ope
 
 The demo also exposes `cloudflare-binding` in local, preview, and production deployments: a server-endpoint-only mode where the browser selects from approved Cloudflare Workers AI models and the Astro Cloudflare runtime endpoint uses an `AI` binding.
 
+In production, the demo keeps planner controls hidden by default. To temporarily expose the provider/model controls in a browser, set `localStorage.setItem('webmcp:admin', 'true')` and reload the page.
+
 ## Ready-Made Command Input
 
 Apps that want a drop-in natural-language command box can register the framework-agnostic web component:
