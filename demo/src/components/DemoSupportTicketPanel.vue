@@ -1,5 +1,5 @@
 <template>
-  <aside class="tools-panel support-panel">
+  <aside class="tools-panel">
     <div class="panel-heading">
       <h2>Support request</h2>
     </div>

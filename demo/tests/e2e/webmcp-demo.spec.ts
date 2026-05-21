@@ -61,6 +61,10 @@ test('uses the local planner for semantic item selections when AI is unavailable
 test('executes chained local invoice commands with confirmation', async function testLocalInvoiceChain({ page }) {
   await page.goto('/invoices/')
   await expect(page.getByRole('heading', { name: 'Invoices', exact: true })).toBeVisible()
+
+  await page.getByRole('row', { name: /Northwind/ }).click()
+  await expect(page.locator('.active-record strong').filter({ hasText: 'Northwind' })).toBeVisible()
+
   await selectPlannerProvider(page, 'local', 'update_selected_invoice_status')
 
   page.once('dialog', async function acceptStatusConfirmation(dialog) {
@@ -111,6 +115,41 @@ test('exposes registered tools through Playwright helpers', async function testP
   expect(result.status).toBe('success')
   await expect(getItemInput(page, 'Croissant')).toBeChecked()
   await expect(getItemInput(page, 'Baguette')).toBeChecked()
+})
+
+test('exposes only page-specific tools on each demo route', async function testRouteSpecificTools({ page }) {
+  const routeTools = [
+    {
+      path: '/',
+      readyTool: 'select_items',
+      tools: ['clear_item_selection', 'select_items']
+    },
+    {
+      path: '/invoices/',
+      readyTool: 'open_invoice',
+      tools: ['create_invoice', 'filter_invoices', 'open_invoice', 'select_invoices', 'sort_invoices', 'update_selected_invoice_status']
+    },
+    {
+      path: '/commerce/',
+      readyTool: 'search_products',
+      tools: ['add_to_cart', 'apply_cart_discount', 'checkout_cart', 'remove_from_cart', 'search_products', 'update_cart_quantity']
+    },
+    {
+      path: '/support/',
+      readyTool: 'create_support_ticket',
+      tools: ['create_support_ticket', 'update_ticket']
+    }
+  ]
+
+  for (const route of routeTools) {
+    await page.goto(route.path)
+    await waitForWebMCPTool(page, route.readyTool)
+
+    const tools = await listWebMCPTools(page)
+    expect(tools.map(function getToolName(tool) {
+      return tool.name
+    }).sort()).toEqual(route.tools)
+  }
 })
 
 test('plans through a selected user-key provider', async function testUserKeyProviderSelection({ page }) {

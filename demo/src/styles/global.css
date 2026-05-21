@@ -81,22 +81,6 @@ button {
   padding: 18px 0 80px;
 }
 
-.demo-page-stack {
-  display: grid;
-  gap: 16px;
-}
-
-.demo-page-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: start;
-}
-
-.demo-page-grid > * {
-  flex: 1 1 340px;
-}
-
 @media (max-width: 620px) {
   .demo-topbar {
     align-items: stretch;

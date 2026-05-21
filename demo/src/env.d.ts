@@ -4,7 +4,6 @@ declare namespace App {
   interface Locals {
     runtime?: {
       env?: import('@/interfaces/cloudflare').CloudflareEnv
-      ctx?: import('@/interfaces/cloudflare').CloudflareExecutionContext
     }
   }
 }

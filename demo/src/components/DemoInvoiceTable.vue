@@ -11,7 +11,7 @@
     </div>
 
     <div class="table-controls">
-      <label class="search-control">
+      <label>
         Search
         <input :value="filters.query" type="search" placeholder="Customer, owner, status..." @input="updateQuery" />
       </label>
@@ -72,8 +72,17 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="invoice in invoices" :key="invoice.id" :class="{ selected: invoice.selected, active: invoice.id === activeInvoiceId }">
-            <td class="col-select">
+          <tr
+            v-for="invoice in invoices"
+            :key="invoice.id"
+            :aria-current="invoice.id === activeInvoiceId ? 'true' : undefined"
+            :class="{ selected: invoice.selected, active: invoice.id === activeInvoiceId }"
+            tabindex="0"
+            @click="openInvoice(invoice.id)"
+            @keydown.enter.prevent="openInvoice(invoice.id)"
+            @keydown.space.prevent="openInvoice(invoice.id)"
+          >
+            <td class="col-select" @click.stop>
               <input :checked="invoice.selected" type="checkbox" :aria-label="`Select ${invoice.customerName}`" @change="toggleInvoice(invoice.id, $event)" />
             </td>
             <td>
@@ -87,7 +96,7 @@
             <td class="col-due">{{ invoice.dueDate }}</td>
             <td class="col-owner">{{ invoice.owner }}</td>
             <td class="col-open">
-              <button type="button" @click="openInvoice(invoice.id)">Open</button>
+              <button type="button" @click.stop="openInvoice(invoice.id)">{{ invoice.id === activeInvoiceId ? 'Viewing' : 'View' }}</button>
             </td>
           </tr>
         </tbody>
@@ -310,6 +319,29 @@ th {
 tr.selected,
 tr.active {
   background: rgba(48, 167, 121, 0.13);
+}
+
+tbody tr {
+  cursor: pointer;
+  transition: background 120ms ease, box-shadow 120ms ease;
+}
+
+tbody tr:hover {
+  background: rgba(244, 240, 232, 0.055);
+}
+
+tbody tr.active,
+tbody tr.active:hover {
+  background: rgba(48, 167, 121, 0.13);
+}
+
+tbody tr:focus-visible {
+  outline: 2px solid #e8be53;
+  outline-offset: -2px;
+}
+
+tbody tr.active {
+  box-shadow: inset 3px 0 0 #30a779;
 }
 
 td strong,

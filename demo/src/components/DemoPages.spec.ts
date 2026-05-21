@@ -1,9 +1,11 @@
 import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { clearToolsForTest, invokeTool, type WebMCPCommandInputElement } from '@webmcp-kit/core'
+import { clearToolsForTest, invokeTool, listTools, type WebMCPCommandInputElement } from '@webmcp-kit/core'
 
-import WebMcpDemo from './WebMcpDemo.vue'
+import CommerceDemo from './CommerceDemo.vue'
+import InventoryDemo from './InventoryDemo.vue'
+import InvoicesDemo from './InvoicesDemo.vue'
 import { mountWithDeps } from '@/test-utils/mount-with-deps'
 
 interface WindowWithLanguageModel extends Window {
@@ -15,7 +17,7 @@ interface WindowWithLanguageModel extends Window {
   }
 }
 
-describe('WebMcpDemo', () => {
+describe('demo pages', () => {
   beforeEach(() => {
     clearToolsForTest()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
@@ -29,7 +31,7 @@ describe('WebMcpDemo', () => {
   })
 
   it('starts with an empty command input and placeholder example', async () => {
-    const wrapper = mountWithDeps(WebMcpDemo, { attachTo: document.body })
+    const wrapper = mountWithDeps(InventoryDemo, { attachTo: document.body })
     await flushPromises()
 
     expect(wrapper.text()).toContain('Inventory')
@@ -59,7 +61,7 @@ describe('WebMcpDemo', () => {
   })
 
   it('shows model controls after choosing a local development provider', async () => {
-    const wrapper = mountWithDeps(WebMcpDemo, { attachTo: document.body })
+    const wrapper = mountWithDeps(InventoryDemo, { attachTo: document.body })
     await flushPromises()
 
     const commandInput = await getCommandInput(wrapper)
@@ -102,7 +104,7 @@ describe('WebMcpDemo', () => {
       })
     }
 
-    const wrapper = mountWithDeps(WebMcpDemo, { attachTo: document.body })
+    const wrapper = mountWithDeps(InventoryDemo, { attachTo: document.body })
     await flushPromises()
 
     const commandInput = await getCommandInput(wrapper)
@@ -114,12 +116,7 @@ describe('WebMcpDemo', () => {
   })
 
   it('executes chained invoice plans in order', async () => {
-    const wrapper = mountWithDeps(WebMcpDemo, {
-      attachTo: document.body,
-      props: {
-        page: 'invoices'
-      }
-    })
+    const wrapper = mountWithDeps(InvoicesDemo, { attachTo: document.body })
     await flushPromises()
 
     const commandInput = await getCommandInput(wrapper)
@@ -135,12 +132,7 @@ describe('WebMcpDemo', () => {
   })
 
   it('guards and confirms cart checkout', async () => {
-    const wrapper = mountWithDeps(WebMcpDemo, {
-      attachTo: document.body,
-      props: {
-        page: 'commerce'
-      }
-    })
+    const wrapper = mountWithDeps(CommerceDemo, { attachTo: document.body })
     await flushPromises()
 
     await expect(invokeTool({
@@ -184,6 +176,27 @@ describe('WebMcpDemo', () => {
 
     expect(wrapper.text()).toContain('No cart lines yet.')
   })
+
+  it('registers only inventory tools on the inventory page', async () => {
+    mountWithDeps(InventoryDemo, { attachTo: document.body })
+    await flushPromises()
+
+    expect(getRegisteredToolNames()).toEqual(['clear_item_selection', 'select_items'])
+  })
+
+  it('registers only invoice tools on the invoices page', async () => {
+    mountWithDeps(InvoicesDemo, { attachTo: document.body })
+    await flushPromises()
+
+    expect(getRegisteredToolNames()).toEqual([
+      'create_invoice',
+      'filter_invoices',
+      'open_invoice',
+      'select_invoices',
+      'sort_invoices',
+      'update_selected_invoice_status'
+    ])
+  })
 })
 
 async function getCommandInput(wrapper: ReturnType<typeof mountWithDeps>): Promise<WebMCPCommandInputElement> {
@@ -197,4 +210,10 @@ function getCommandTextInput(element: WebMCPCommandInputElement): HTMLInputEleme
   const input = element.shadowRoot?.querySelector<HTMLInputElement>('[data-command-input]')
   if (!input) throw new Error('Expected WebMCP command text input.')
   return input
+}
+
+function getRegisteredToolNames(): string[] {
+  return listTools().map(function getToolName(entry) {
+    return entry.tool.name
+  }).sort()
 }
