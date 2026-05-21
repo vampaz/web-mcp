@@ -3,6 +3,7 @@
     :confirmations-enabled="settings.confirmationsEnabled"
     :eyebrow="`${visibleInvoices.length} visible records`"
     :get-context="getPlannerContext"
+    placeholder="Try: Mark Stark Industries invoices as paid"
     :registered-tools-count="registeredToolsCount"
     title="Invoices"
   >

@@ -16,7 +16,21 @@ import type {
   WebMCPCommandPlannerEventDetail,
   WebMCPCommandResultEventDetail
 } from './interfaces/command-input'
-import { createBestPlanner, createChromeAIPlanner, createConfiguredPlanner, createHeuristicPlanner } from './planner'
+import { escapeAttribute, escapeHtml } from './command-input-html'
+import {
+  createCommandInputPlanner,
+  defaultEndpoint,
+  defaultModel,
+  getDefaultModelForProvider,
+  getModelControlMarkup,
+  getOptionsStatusText,
+  getProviderControlMarkup,
+  isAuthMode,
+  isPlannerAttribute,
+  isPlannerProviderKind,
+  usesModelInput
+} from './command-input-options'
+import { getStyles } from './command-input-styles'
 import { invokeTool, listTools } from './registry'
 
 type CommandInputConstructor = CustomElementConstructor & {
@@ -42,11 +56,6 @@ type CommandInputRuntimeState = {
   settingsOpen: boolean
 }
 
-type ModelOption = {
-  label: string
-  value: string
-}
-
 type FloatingDragState = {
   hasMoved: boolean
   offsetX: number
@@ -61,8 +70,6 @@ type FloatingPlacement = {
 
 const defaultPlaceholder = 'Tell this app what to do'
 const defaultButtonLabel = 'Run'
-const defaultModel = 'openrouter/auto'
-const defaultEndpoint = '/api/webmcp/plan'
 const supersededPlannerRefreshMessage = 'Planner refresh was superseded.'
 const webMCPCommandInputTagName = 'webmcp-command-input'
 const observedAttributes = [
@@ -624,7 +631,7 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
               type="text"
               autocomplete="off"
               spellcheck="false"
-              placeholder="${escapeHtml(this.state.placeholder)}"
+              placeholder="${escapeAttribute(this.state.placeholder)}"
               value="${escapeAttribute(this.state.prompt)}"
               ${this.state.disabled ? 'disabled' : ''}
             />
@@ -948,179 +955,11 @@ function getPlanSteps(plan: ToolPlan): ToolPlanStep[] {
   ]
 }
 
-async function createCommandInputPlanner(config: PlannerProviderConfig | undefined): Promise<ToolPlanner> {
-  if (!config) return createBestPlanner()
-  if (config.provider === 'chrome-built-in') return createChromeAIPlanner(false)
-  if (config.provider === 'local') return createHeuristicPlanner()
-
-  return createConfiguredPlanner(config)
-}
-
-function getProviderControlMarkup(provider: PlannerProviderKind): string {
-  return `
-    <label>
-      <span>Provider</span>
-      <select data-provider>
-        ${getProviderOptionsMarkup(provider)}
-      </select>
-    </label>
-  `
-}
-
-function getProviderOptionsMarkup(provider: PlannerProviderKind): string {
-  return getProviderOptions().map(function mapOption(option) {
-    return `<option value="${option.value}" ${provider === option.value ? 'selected' : ''}>${escapeHtml(option.label)}</option>`
-  }).join('')
-}
-
-function getProviderOptions(): Array<{ label: string, value: PlannerProviderKind }> {
-  return [
-    { label: 'Auto', value: 'auto' },
-    { label: 'Chrome built-in AI', value: 'chrome-built-in' },
-    { label: 'Local deterministic', value: 'local' },
-    { label: 'OpenRouter', value: 'openrouter' },
-    { label: 'OpenAI', value: 'openai' },
-    { label: 'OpenAI-compatible', value: 'openai-compatible' },
-    { label: 'Cloudflare binding', value: 'cloudflare-binding' },
-    { label: 'Cloudflare Workers AI', value: 'cloudflare-workers-ai' }
-  ]
-}
-
-function getOptionsStatusText(provider: PlannerProviderKind, model: string): string {
-  const providerLabel = getProviderLabel(provider)
-  if (!usesModelInput(provider) || !model) return providerLabel
-  return `${providerLabel} - ${getModelLabel(provider, model)}`
-}
-
-function getProviderLabel(provider: PlannerProviderKind): string {
-  const option = getProviderOptions().find(function findProviderOption(providerOption) {
-    return providerOption.value === provider
-  })
-  return option?.label ?? provider
-}
-
-function getModelLabel(provider: PlannerProviderKind, model: string): string {
-  const option = getModelOptions(provider).find(function findModelOption(modelOption) {
-    return modelOption.value === model
-  })
-  return option?.label ?? model
-}
-
-function getModelControlMarkup(provider: PlannerProviderKind, model: string): string {
-  const modelOptions = getModelOptions(provider)
-  if (modelOptions.length > 0) {
-    return `
-      <label>
-        <span>Model</span>
-        <select data-model>
-          ${getModelOptionsMarkup(modelOptions, model)}
-        </select>
-      </label>
-    `
-  }
-
-  return `
-    <label>
-      <span>Model</span>
-      <input data-model type="text" value="${escapeAttribute(model)}" />
-    </label>
-  `
-}
-
-function getModelOptionsMarkup(options: ModelOption[], model: string): string {
-  return options.map(function mapOption(option) {
-    return `<option value="${escapeAttribute(option.value)}" ${model === option.value ? 'selected' : ''}>${escapeHtml(option.label)}</option>`
-  }).join('')
-}
-
-function getModelOptions(provider: PlannerProviderKind): ModelOption[] {
-  if (provider === 'openai') {
-    return [
-      { label: 'GPT-5.4 mini', value: 'gpt-5.4-mini' }
-    ]
-  }
-
-  if (provider === 'openrouter') {
-    return [
-      { label: 'OpenRouter auto', value: 'openrouter/auto' }
-    ]
-  }
-
-  if (provider === 'cloudflare-binding' || provider === 'cloudflare-workers-ai') {
-    return [
-      { label: 'Kimi K2.6', value: '@cf/moonshotai/kimi-k2.6' },
-      { label: 'GPT OSS 20B', value: '@cf/openai/gpt-oss-20b' },
-      { label: 'GLM 4.7 Flash', value: '@cf/zai-org/glm-4.7-flash' },
-      { label: 'Qwen3 30B A3B FP8', value: '@cf/qwen/qwen3-30b-a3b-fp8' },
-      { label: 'DeepSeek R1 Distill Qwen 32B', value: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b' },
-      { label: 'Qwen QwQ 32B', value: '@cf/qwen/qwq-32b' },
-      { label: 'Nemotron 3 120B A12B', value: '@cf/nvidia/nemotron-3-120b-a12b' },
-      { label: 'Gemma 4 26B A4B', value: '@cf/google/gemma-4-26b-a4b-it' }
-    ]
-  }
-
-  return []
-}
-
-function getDefaultModelForProvider(provider: PlannerProviderKind): string {
-  if (provider === 'openai') return 'gpt-5.4-mini'
-  if (provider === 'cloudflare-binding') return '@cf/moonshotai/kimi-k2.6'
-  if (provider === 'cloudflare-workers-ai') return '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b'
-  if (provider === 'openai-compatible') return ''
-  return defaultModel
-}
-
 function getStatusLabel(phase: WebMCPCommandInputPhase): string {
   if (phase === 'preparing') return 'Preparing...'
   if (phase === 'planning') return 'Planning...'
   if (phase === 'executing') return 'Running...'
   return defaultButtonLabel
-}
-
-function usesModelInput(provider: PlannerProviderKind): boolean {
-  return provider === 'openai'
-    || provider === 'openrouter'
-    || provider === 'openai-compatible'
-    || provider === 'cloudflare-binding'
-    || provider === 'cloudflare-workers-ai'
-}
-
-function isPlannerAttribute(name: string): boolean {
-  return name === 'account-id'
-    || name === 'api-key'
-    || name === 'auth-mode'
-    || name === 'base-url'
-    || name === 'endpoint'
-    || name === 'model'
-    || name === 'provider'
-}
-
-function isAuthMode(value: unknown): value is 'none' | 'server' | 'user-key' {
-  return value === 'none' || value === 'server' || value === 'user-key'
-}
-
-function isPlannerProviderKind(value: unknown): value is PlannerProviderKind {
-  return value === 'auto'
-    || value === 'chrome-built-in'
-    || value === 'local'
-    || value === 'openai'
-    || value === 'openrouter'
-    || value === 'openai-compatible'
-    || value === 'cloudflare-binding'
-    || value === 'cloudflare-workers-ai'
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;')
-}
-
-function escapeAttribute(value: string): string {
-  return escapeHtml(value).replaceAll('`', '&#96;')
 }
 
 function getErrorMessage(error: unknown): string {
@@ -1131,349 +970,4 @@ function assertCustomElementsAvailable() {
   if (typeof customElements === 'undefined' || typeof HTMLElement === 'undefined') {
     throw new Error('WebMCP command input can only be defined in a browser custom elements environment.')
   }
-}
-
-function getStyles(): string {
-  return `
-    :host {
-      --webmcp-ink: #121815;
-      --webmcp-muted: #66746d;
-      --webmcp-line: #dbe5df;
-      --webmcp-soft-line: rgba(18, 24, 21, 0.09);
-      --webmcp-paper: #fbfcfa;
-      --webmcp-panel: #ffffff;
-      --webmcp-field: #f4f8f5;
-      --webmcp-accent: #1e9f72;
-      --webmcp-accent-dark: #0f6f51;
-      --webmcp-dark: #09110e;
-      display: block;
-      position: relative;
-      color: var(--webmcp-ink);
-      font: 500 0.95rem/1.4 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
-
-    :host([data-floating]) {
-      position: fixed;
-      z-index: 1000;
-      width: auto;
-      max-width: min(920px, calc(100vw - 16px));
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    .webmcp-command {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 0.625rem;
-      padding: 0.625rem;
-      border: 1px solid var(--webmcp-line);
-      background: linear-gradient(180deg, #ffffff 0%, var(--webmcp-paper) 100%);
-      box-shadow: 0 16px 36px rgba(4, 10, 8, 0.12);
-    }
-
-    .webmcp-input-shell {
-      display: flex;
-      align-items: center;
-      min-width: 0;
-      gap: 0.625rem;
-      padding: 0 0.875rem;
-      border: 1px solid var(--webmcp-line);
-      background: var(--webmcp-field);
-      transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
-    }
-
-    .webmcp-input-shell:focus-within {
-      border-color: rgba(30, 159, 114, 0.58);
-      background: #ffffff;
-      box-shadow: 0 0 0 3px rgba(30, 159, 114, 0.12);
-    }
-
-    .webmcp-input-shell span {
-      flex: 0 0 auto;
-      color: var(--webmcp-muted);
-      font-size: 0.72rem;
-      font-weight: 800;
-      letter-spacing: 0;
-      text-transform: uppercase;
-    }
-
-    input,
-    select,
-    button {
-      min-width: 0;
-      min-height: 2.5rem;
-      font: inherit;
-    }
-
-    input,
-    select {
-      width: 100%;
-      border: 0;
-      outline: 0;
-      background: transparent;
-      color: var(--webmcp-ink);
-    }
-
-    select,
-    .webmcp-settings input {
-      padding: 0 0.75rem;
-      border: 1px solid var(--webmcp-line);
-      background: #ffffff;
-    }
-
-    button {
-      padding: 0 1.125rem;
-      border: 1px solid var(--webmcp-ink);
-      background: var(--webmcp-ink);
-      color: #ffffff;
-      font-weight: 800;
-      white-space: nowrap;
-      cursor: pointer;
-      transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
-    }
-
-    button:hover:not(:disabled) {
-      border-color: var(--webmcp-accent-dark);
-      background: var(--webmcp-accent-dark);
-      transform: translateY(-1px);
-    }
-
-    .webmcp-floating-trigger {
-      display: grid;
-      place-items: center;
-      min-width: auto;
-      min-height: auto;
-      padding: 0.18em 0.36em;
-      border: 2px solid #0f1512;
-      background: #e8be53;
-      color: #0c1110;
-      font-size: 0.88em;
-      font-weight: 950;
-      line-height: 0.9;
-      text-align: center;
-      touch-action: none;
-      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.34);
-    }
-
-    .webmcp-floating-trigger span {
-      display: block;
-    }
-
-    .webmcp-floating-trigger:hover:not(:disabled) {
-      border-color: #0f1512;
-      background: #f1cd70;
-      transform: translateY(-1px);
-    }
-
-    .webmcp-floating-panel {
-      position: fixed;
-      display: flex;
-      flex-direction: column;
-      width: min(920px, calc(100vw - 16px));
-      max-height: var(--webmcp-floating-panel-max-height, calc(100vh - 16px));
-      overflow: hidden;
-      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.48);
-    }
-
-    .webmcp-floating-panel[hidden] {
-      display: none;
-    }
-
-    button:disabled {
-      cursor: progress;
-      opacity: 0.7;
-    }
-
-    button:focus-visible,
-    summary:focus-visible,
-    select:focus-visible,
-    .webmcp-settings input:focus-visible {
-      outline: 2px solid var(--webmcp-accent);
-      outline-offset: 2px;
-    }
-
-    .webmcp-settings,
-    .webmcp-diagnostics {
-      padding: 0;
-      border-inline: 1px solid var(--webmcp-line);
-      border-bottom: 1px solid var(--webmcp-line);
-      background: rgba(255, 255, 255, 0.96);
-    }
-
-    .webmcp-settings[open],
-    .webmcp-diagnostics[open] {
-      background: #ffffff;
-    }
-
-    .webmcp-diagnostics {
-      padding-bottom: 0;
-      position: relative;
-    }
-
-    .webmcp-settings-summary,
-    .webmcp-disclosure-summary {
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr) auto;
-      min-height: 2.6rem;
-      align-items: center;
-      gap: 0.65rem;
-      width: 100%;
-      padding: 0 0.75rem;
-      color: var(--webmcp-muted);
-      font-size: 0.72rem;
-      font-weight: 800;
-      letter-spacing: 0;
-      text-transform: uppercase;
-      transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease;
-    }
-
-    summary.webmcp-settings-summary,
-    summary.webmcp-disclosure-summary {
-      cursor: pointer;
-      list-style: none;
-    }
-
-    summary.webmcp-settings-summary::-webkit-details-marker,
-    summary.webmcp-disclosure-summary::-webkit-details-marker {
-      display: none;
-    }
-
-    summary.webmcp-settings-summary::before,
-    summary.webmcp-disclosure-summary::before {
-      width: 0.45rem;
-      height: 0.45rem;
-      border-right: 2px solid currentColor;
-      border-bottom: 2px solid currentColor;
-      content: "";
-      transform: rotate(-45deg);
-      transition: transform 140ms ease, color 140ms ease;
-    }
-
-    .webmcp-settings[open] > .webmcp-settings-summary::before,
-    .webmcp-diagnostics[open] > .webmcp-disclosure-summary::before {
-      transform: rotate(45deg);
-    }
-
-    .webmcp-settings > summary.webmcp-settings-summary:hover,
-    .webmcp-diagnostics > summary.webmcp-disclosure-summary:hover {
-      background: #f2f7f4;
-      color: var(--webmcp-ink);
-    }
-
-    .webmcp-settings[open] > .webmcp-settings-summary,
-    .webmcp-diagnostics[open] > .webmcp-disclosure-summary {
-      box-shadow: inset 3px 0 0 var(--webmcp-accent);
-      color: var(--webmcp-ink);
-    }
-
-    .webmcp-settings--status-only .webmcp-settings-summary {
-      grid-template-columns: auto minmax(0, 1fr);
-    }
-
-    .webmcp-settings-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.625rem;
-      padding: 0.55rem 0.75rem 0.75rem;
-      border-top: 1px solid var(--webmcp-soft-line);
-    }
-
-    .webmcp-settings label {
-      display: grid;
-      min-width: 0;
-      gap: 0.3rem;
-      color: var(--webmcp-muted);
-      font-size: 0.7rem;
-      font-weight: 800;
-      letter-spacing: 0;
-      text-transform: uppercase;
-    }
-
-    .webmcp-diagnostics-content {
-      position: absolute;
-      z-index: 20;
-      top: 100%;
-      right: 0;
-      left: 0;
-      max-height: min(40rem, 68vh);
-      overflow: auto;
-      margin-inline: 0;
-      border: 1px solid rgba(224, 234, 229, 0.18);
-      border-top: 0;
-      background: var(--webmcp-dark);
-      box-shadow: 0 1.2rem 2.5rem rgba(0, 0, 0, 0.32);
-    }
-
-    .webmcp-floating-panel .webmcp-command,
-    .webmcp-floating-panel .webmcp-settings {
-      flex: 0 0 auto;
-    }
-
-    .webmcp-floating-panel .webmcp-diagnostics[open] {
-      display: flex;
-      flex: 1 1 auto;
-      flex-direction: column;
-      min-height: 0;
-      overflow: hidden;
-    }
-
-    .webmcp-floating-panel .webmcp-disclosure-summary {
-      flex: 0 0 auto;
-    }
-
-    .webmcp-floating-panel .webmcp-diagnostics-content {
-      position: static;
-      flex: 0 1 auto;
-      height: auto;
-      min-height: 0;
-      max-height: calc(var(--webmcp-floating-panel-max-height, calc(100vh - 16px)) - 9.25rem);
-      border-inline: 0;
-      box-shadow: none;
-      overscroll-behavior: contain;
-    }
-
-    .webmcp-floating-panel .webmcp-settings[open] ~ .webmcp-diagnostics .webmcp-diagnostics-content {
-      max-height: calc(var(--webmcp-floating-panel-max-height, calc(100vh - 16px)) - 14.5rem);
-    }
-
-    .webmcp-status {
-      display: inline-flex;
-      min-width: 0;
-      gap: 0.45rem;
-      align-items: center;
-      justify-self: end;
-      color: var(--webmcp-muted);
-      font-size: 0.8rem;
-      font-weight: 500;
-      text-transform: none;
-    }
-
-    .webmcp-status strong {
-      color: var(--webmcp-ink);
-      font-size: 0.84rem;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .webmcp-status span {
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    @media (max-width: 36rem) {
-      .webmcp-command,
-      .webmcp-settings-grid {
-        grid-template-columns: 1fr;
-      }
-
-      button {
-        width: 100%;
-      }
-    }
-  `
 }

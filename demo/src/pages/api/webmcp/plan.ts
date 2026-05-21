@@ -59,9 +59,9 @@ type ToolPlanStep = {
 }
 
 const allowedCloudflareModels = new Set([
+  '@cf/zai-org/glm-4.7-flash',
   '@cf/google/gemma-4-26b-a4b-it',
   '@cf/moonshotai/kimi-k2.6',
-  '@cf/zai-org/glm-4.7-flash',
   '@cf/qwen/qwen3-30b-a3b-fp8',
   '@cf/openai/gpt-oss-20b',
   '@cf/nvidia/nemotron-3-120b-a12b',

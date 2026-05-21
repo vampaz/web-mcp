@@ -3,6 +3,7 @@
     :confirmations-enabled="settings.confirmationsEnabled"
     :eyebrow="`${tickets.length} tickets`"
     :get-context="getPlannerContext"
+    placeholder="Try: Mark billing access as resolved"
     :registered-tools-count="registeredToolsCount"
     title="Support"
   >

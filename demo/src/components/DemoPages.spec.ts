@@ -6,6 +6,7 @@ import { clearToolsForTest, invokeTool, listTools, type WebMCPCommandInputElemen
 import CommerceDemo from './CommerceDemo.vue'
 import InventoryDemo from './InventoryDemo.vue'
 import InvoicesDemo from './InvoicesDemo.vue'
+import SupportDemo from './SupportDemo.vue'
 import { mountWithDeps } from '@/test-utils/mount-with-deps'
 
 interface WindowWithLanguageModel extends Window {
@@ -83,6 +84,13 @@ describe('demo pages', () => {
     expect(settings?.open).toBe(true)
     expect(modelControl).toBeInstanceOf(HTMLSelectElement)
     expect(modelControl?.value).toBe('gpt-5.4-mini')
+  })
+
+  it('uses page-specific command examples', async () => {
+    await expectCommandPlaceholder(InventoryDemo, 'Try: Select all French items')
+    await expectCommandPlaceholder(InvoicesDemo, 'Try: Mark Stark Industries invoices as paid')
+    await expectCommandPlaceholder(CommerceDemo, 'Try: Add two keyboard kits to the cart')
+    await expectCommandPlaceholder(SupportDemo, 'Try: Mark billing access as resolved')
   })
 
   it('operates visible controls from AI-chosen context IDs', async () => {
@@ -210,6 +218,18 @@ function getCommandTextInput(element: WebMCPCommandInputElement): HTMLInputEleme
   const input = element.shadowRoot?.querySelector<HTMLInputElement>('[data-command-input]')
   if (!input) throw new Error('Expected WebMCP command text input.')
   return input
+}
+
+async function expectCommandPlaceholder(component: object, placeholder: string) {
+  const wrapper = mountWithDeps(component, { attachTo: document.body })
+  await flushPromises()
+
+  const commandInput = await getCommandInput(wrapper)
+  expect(getCommandTextInput(commandInput).getAttribute('placeholder')).toBe(placeholder)
+
+  wrapper.unmount()
+  clearToolsForTest()
+  document.body.innerHTML = ''
 }
 
 function getRegisteredToolNames(): string[] {

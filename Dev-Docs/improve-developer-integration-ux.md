@@ -20,5 +20,5 @@
 
 - [x] Phase 4: Add README Access To The Demo
   - [x] Step 4.1: Render the repository README as a demo Astro page
-    - Files: `demo/src/pages/readme.astro`, `demo/src/components/WebMcpDemo.vue`, `demo/src/components/WebMcpDemo.spec.ts`, `demo/package.json`, `package-lock.json`
-    - Test: `npm run test:demo -- src/components/WebMcpDemo.spec.ts`
+    - Files: `demo/src/pages/readme.astro`, `demo/src/components/DemoShell.vue`, `demo/src/components/DemoPages.spec.ts`, `demo/package.json`, `package-lock.json`
+    - Test: `npm run test:demo -- src/components/DemoPages.spec.ts`

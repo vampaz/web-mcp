@@ -3,16 +3,16 @@ import type { DemoSettings, Invoice, InvoiceDraft, PlannerModelOption, Product, 
 export function getCloudflareBindingModels(): PlannerModelOption[] {
   return [
     {
-      id: '@cf/moonshotai/kimi-k2.6',
-      label: 'Kimi K2.6'
+      id: '@cf/zai-org/glm-4.7-flash',
+      label: 'GLM 4.7 Flash'
     },
     {
       id: '@cf/openai/gpt-oss-20b',
       label: 'GPT OSS 20B'
     },
     {
-      id: '@cf/zai-org/glm-4.7-flash',
-      label: 'GLM 4.7 Flash'
+      id: '@cf/moonshotai/kimi-k2.6',
+      label: 'Kimi K2.6'
     },
     {
       id: '@cf/qwen/qwen3-30b-a3b-fp8',

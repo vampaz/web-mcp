@@ -196,7 +196,7 @@ export function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner 
       name: providerLabel,
       available: false,
       status: 'unavailable',
-      detail: `${providerLabel} needs server endpoint mode so the browser talks to a local or preview Worker with an AI binding.`,
+      detail: `${providerLabel} needs server endpoint mode so the browser talks to a Worker with an AI binding.`,
       async plan() {
         throw new Error(`${providerLabel} needs server endpoint mode.`)
       }
@@ -987,7 +987,7 @@ function requiresServerBinding(config: PlannerProviderConfig, auth: PlannerAuth)
 
 function getRemotePlannerDetail(config: PlannerProviderConfig, auth: PlannerAuth): string {
   const provider = getProviderLabel(config)
-  if (config.provider === 'cloudflare-binding') return `${provider} will plan through ${auth.mode === 'server' ? auth.endpoint : 'a server endpoint'} using a local or preview Cloudflare AI binding.`
+  if (config.provider === 'cloudflare-binding') return `${provider} will plan through ${auth.mode === 'server' ? auth.endpoint : 'a server endpoint'} using a Cloudflare AI binding.`
   if (auth.mode === 'server') return `${provider} will plan through ${auth.endpoint}; provider secrets stay server-side.`
   if (auth.mode === 'user-key') return `${provider} will plan directly from the browser with a user-provided key. This is convenient but the key is visible to this page.`
   return `${provider} will plan without an API key.`
@@ -1004,7 +1004,7 @@ function getOpenAICompatibleBaseUrl(config: PlannerProviderConfig): string {
 function getDefaultModel(config: PlannerProviderConfig): string {
   if (config.provider === 'openrouter') return 'openrouter/auto'
   if (config.provider === 'openai') return 'gpt-5.4-mini'
-  if (config.provider === 'cloudflare-binding') return '@cf/moonshotai/kimi-k2.6'
+  if (config.provider === 'cloudflare-binding') return '@cf/zai-org/glm-4.7-flash'
   if (config.provider === 'cloudflare-workers-ai') return '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b'
 
   return 'default'

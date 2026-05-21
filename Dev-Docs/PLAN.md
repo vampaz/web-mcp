@@ -10,7 +10,7 @@ This is not a new protocol. It is an adoption layer for WebMCP.
 
 - `packages/core`, `packages/testing`, `packages/devtools`, and `packages/mcp-bridge` are implemented as local npm workspace packages and covered by tests.
 - The devtools overlay lives in `packages/devtools`; core remains framework-agnostic.
-- The active demo is the Astro app in `demo/src/pages/index.astro` and `demo/src/components/WebMcpDemo.vue`.
+- The active demo is the Astro app in `demo/src/pages/index.astro` and `demo/src/components/DemoShell.vue`.
 - Planner providers now support Chrome built-in AI, deterministic fallback, server endpoints, user-provided OpenAI-compatible keys, Cloudflare REST, and Cloudflare binding mode.
 - Cloudflare binding mode is wired through the Astro Cloudflare adapter, `demo/wrangler.toml`, and `demo/src/pages/api/webmcp/plan.ts`.
 - `demo/wrangler.toml` is already configured for the existing Cloudflare project/Worker named `web-mcp`.
@@ -129,10 +129,10 @@ This is not a new protocol. It is an adoption layer for WebMCP.
     - Files: `packages/core/src/planner.ts`
     - Verify: server endpoint and user-key modes are covered by tests
   - [x] Step 8.5.3: Add development provider selector
-    - Files: `demo/src/components/WebMcpDemo.vue`
+    - Files: `demo/src/components/DemoShell.vue`
     - Verify: Chrome Beta E2E can select OpenRouter with a user key
   - [x] Step 8.5.4: Add Cloudflare binding planner mode
-    - Files: `packages/core/src/planner.ts`, `demo/src/components/WebMcpDemo.vue`, `docs/planner-providers.md`
+    - Files: `packages/core/src/planner.ts`, `demo/src/components/DemoShell.vue`, `docs/planner-providers.md`
     - Verify: unit and E2E tests cover model selection through the mocked binding endpoint
   - [x] Step 8.5.5: Wire Astro Cloudflare adapter for AI bindings
     - Files: `demo/astro.config.mjs`, `demo/wrangler.toml`, `demo/src/pages/api/webmcp/plan.ts`
@@ -140,19 +140,19 @@ This is not a new protocol. It is an adoption layer for WebMCP.
 
 - [x] Phase 9: Demo Application
   - [x] Step 9.1: Build Astro demo
-    - Files: `demo/astro.config.mjs`, `demo/src/pages/index.astro`, `demo/src/components/WebMcpDemo.vue`
+    - Files: `demo/astro.config.mjs`, `demo/src/pages/index.astro`, `demo/src/components/DemoShell.vue`
     - Verify: dev overlay appears in dev mode
   - [x] Step 9.2: Build Vue invoice workflow
-    - Files: `demo/src/components/WebMcpDemo.vue`
+    - Files: `demo/src/components/DemoShell.vue`
     - Verify: create-invoice tool is registered with confirmation metadata and updates demo state
   - [x] Step 9.3: Build product/cart workflow in the active demo
-    - Files: `demo/src/components/WebMcpDemo.vue`
+    - Files: `demo/src/components/DemoShell.vue`
     - Verify: search, add-to-cart, and checkout tools use guards and confirmations
   - [x] Step 9.4: Build support workflow
-    - Files: `demo/src/components/WebMcpDemo.vue`
+    - Files: `demo/src/components/DemoShell.vue`
     - Verify: create-ticket tool demonstrates form helpers and schema inference
   - [x] Step 9.5: Add browser support indicator
-    - Files: `demo/src/components/WebMcpDemo.vue`
+    - Files: `demo/src/components/DemoShell.vue`
     - Verify: page clearly distinguishes native WebMCP from fallback mode
 
 - [x] Phase 10: Documentation

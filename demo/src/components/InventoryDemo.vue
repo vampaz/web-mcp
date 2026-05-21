@@ -3,6 +3,7 @@
     :confirmations-enabled="settings.confirmationsEnabled"
     :eyebrow="`${selectableItems.length} selectable items`"
     :get-context="getPlannerContext"
+    placeholder="Try: Select all French items"
     :registered-tools-count="registeredToolsCount"
     title="Inventory"
   >

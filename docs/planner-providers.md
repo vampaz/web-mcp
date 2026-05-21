@@ -111,13 +111,15 @@ cp demo/.env.example demo/.env
 
 Then fill in `CLOUDFLARE_API_TOKEN`. `CLOUDFLARE_ACCOUNT_ID` is already present in `demo/.env.example` for this project. This keeps `npm run dev` and remote AI bindings on stable project-local credentials while avoiding committed secrets.
 
+Keep `.dev.vars` for Worker runtime values only. Do not put `CLOUDFLARE_API_TOKEN` there; Wrangler reads system authentication from the process environment / `.env`, while `.dev.vars` is loaded into the local Worker runtime.
+
 Cloudflare binding mode for local development and preview deployments:
 
 ```ts
 await createWebMCPKit({
   planner: {
     provider: 'cloudflare-binding',
-    model: '@cf/moonshotai/kimi-k2.6',
+    model: '@cf/zai-org/glm-4.7-flash',
     auth: {
       mode: 'server',
       endpoint: '/api/webmcp/plan'
@@ -153,7 +155,7 @@ defineWebMCPCommandInput()
 ```html
 <webmcp-command-input
   provider="cloudflare-binding"
-  model="@cf/moonshotai/kimi-k2.6"
+  model="@cf/zai-org/glm-4.7-flash"
   endpoint="/api/webmcp/plan"
 ></webmcp-command-input>
 ```
@@ -171,7 +173,7 @@ commandInput.configure({
 
 For preview or production, pass the selected planner config when the app should own those choices and hide them from users.
 
-The Cloudflare binding default is `@cf/moonshotai/kimi-k2.6` because it gives the demo a faster planning path than the larger exploratory models. The server endpoint first asks for JSON output, then retries without `response_format` when a Workers AI model rejects that option.
+The Cloudflare binding default is `@cf/zai-org/glm-4.7-flash` because it returned reliable JSON plans in the demo acceptance checks while keeping the local binding flow fast. The server endpoint first asks for JSON output, then retries without `response_format` when a Workers AI model rejects that option.
 
 ## Tool Sequences
 

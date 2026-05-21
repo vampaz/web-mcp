@@ -32,9 +32,9 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 
 **Points to address:**
 
-1. **`planner.ts` is 592 lines** — the largest module. It handles Chrome AI sessions, OpenAI-compatible chat, Cloudflare REST, server endpoints, heuristic keyword matching, and plan validation all in one file. Consider splitting into `planner/heuristic.ts`, `planner/chrome-ai.ts`, `planner/remote.ts`, `planner/validate.ts` when it grows further. Not a blocker for this MVP.
+1. **`planner.ts` is the largest core module** — it handles Chrome AI sessions, OpenAI-compatible chat, Cloudflare REST, server endpoints, heuristic keyword matching, and plan validation. Consider splitting into `planner/heuristic.ts`, `planner/chrome-ai.ts`, `planner/remote.ts`, and `planner/validate.ts` when it grows further. Not a blocker for this MVP.
 
-2. **`WebMcpDemo.vue` is 647 lines** — the demo component mixes UI, tool registration, planner config, form handling, and activity logging. This is acceptable for a demo but worth noting for future refactoring.
+2. **Demo pages are split by workflow** — Inventory, Invoices, Commerce, and Support now own their page-specific tools while sharing `DemoShell.vue`. Keep future changes in those page components instead of rebuilding a single large demo component.
 
 ---
 
@@ -46,13 +46,13 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 
 - **`registry.ts`**: Clean. Properly replaces duplicate tool names, runs guards/confirmations before execution, emits events at every lifecycle point, uses `performance.now()` for timing. The `invokeTool` function is a well-structured pipeline: find → scope check → confirm → guard → execute.
 
-- **`native-adapter.ts`**: Handles edge cases well — `AbortSignal` cleanup, returned `unregister` / `dispose` handles, annotations passthrough, and native `source: 'native'` context are covered.
+- **`native-adapter.ts`**: Uses `AbortSignal` cleanup, supports returned `unregister` / `dispose` handles, passes annotations through, and preserves native `source: 'native'` context.
 
 - **`schema.ts`**: Recursive JSON Schema validator with specific, path-prefixed error messages. Validates types, properties, required fields, items, enums, and numeric constraints. Solid.
 
 - **`quality.ts`**: Practical heuristic quality checks — snake_case naming, minimum description length, vague words, sensitive action detection, form field validation. Good signal-to-noise ratio on warnings.
 
-- **`forms.ts`**: Clean attribute-based form metadata. Infers schemas from inputs including text, number, checkbox, email, date, time, and select; prefers official `toolparamdescription` / `toolparamtitle` metadata while keeping `data-tool-description` as a compatibility fallback; fills forms before execution. The `fillForm` function correctly handles `RadioNodeList`, checkboxes, and standard inputs.
+- **`forms.ts`**: Clean attribute-based form metadata. Infers schemas from inputs including text, number, checkbox, email, date, time, and select; prefers official `toolparamdescription` / `toolparamtitle` metadata while preserving `data-tool-description` compatibility; fills forms before execution. The `fillForm` function correctly handles `RadioNodeList`, checkboxes, and standard inputs.
 
 - **`devtools.ts`**: A self-contained vanilla-TS overlay with its own CSS. Subscribes to kit events, renders tool cards with prompt previews, sample generation, invocation history with replay. The `invocationId` tracking correctly correlates concurrent calls. Clean use of event delegation.
 
@@ -66,41 +66,35 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 
 ### Issues & Recommendations
 
-1. **Chrome AI session leak** (`planner.ts:446`): Sessions are created lazily (`session ??= await createChromeAISession(languageModel)`) and never cleaned up. There's no `destroy()` or `dispose()` on the `ToolPlanner` interface. If Chrome's LanguageModel session holds resources, this leaks. **Recommendation**: Add an optional `dispose?: () => void` to `ToolPlanner` and destroy sessions when the planner is replaced (e.g., when the user switches providers in the demo). Not urgent for MVP but worth tracking.
+1. **`devtools.ts` — `innerHTML`-based rendering**: The entire overlay DOM is rebuilt via `root.innerHTML = ...` on every render. This means textarea content is lost on external render triggers (e.g., events from other tools being invoked). You already handle this for concurrent invocations (the `pendingInvocations` map), but if someone types in a textarea and another tool fires in the background, their input is lost. **Recommendation**: Use targeted DOM updates or a diff-based approach in a follow-up. Low priority for a devtool.
 
-2. **`planWithChromeAI` doesn't handle malformed JSON** (`planner.ts:210`): If Chrome AI returns non-JSON text (which can happen), `JSON.parse()` throws and falls through to the catch in `createActiveChromePlanner`. That fallback is good, but the error message ("Chrome built-in AI could not plan this command...") doesn't distinguish between a session failure and a bad response. **Recommendation**: Add a try/catch around `JSON.parse()` with a more specific fallback reason like "Chrome AI returned unparseable text."
+2. **`devtools.ts` — `escapeHtml` uses `replaceAll`**: This requires ES2021+. The codebase targets modern Chrome (WebMCP is Chrome-only), so this is fine, but worth noting.
 
-3. **`devtools.ts` — `innerHTML`-based rendering**: The entire overlay DOM is rebuilt via `root.innerHTML = ...` on every render. This means textarea content is lost on external render triggers (e.g., events from other tools being invoked). You already handle this for concurrent invocations (the `pendingInvocations` map), but if someone types in a textarea and another tool fires in the background, their input is lost. **Recommendation**: Use targeted DOM updates or a diff-based approach in a follow-up. Low priority for a devtool.
+3. **Heuristic planner has hardcoded product IDs** (`planner.ts`): demo product IDs are hardcoded in `planWithHeuristics`. These match the demo but not real apps. The heuristic planner is explicitly a fallback, and its `reason` field explains what it did, so this is acceptable for MVP.
 
-4. **`devtools.ts` — `escapeHtml` uses `replaceAll`**: This requires ES2021+. The codebase targets modern Chrome (WebMCP is Chrome-only), so this is fine, but worth noting.
+4. **`native-adapter.spec.ts` — test pollution risk**: `clearToolsForTest()` is called in `beforeEach`/`afterEach`, but `navigator.modelContext` is directly mutated without restoration of the original value. Since the tests delete `modelContext` in teardown, this works, but if another test file runs in the same vm context, it could leak. Acceptable.
 
-5. **`planWithOpenAICompatible` references `location.origin`** (`planner.ts:269`): This will throw in non-browser environments (Node tests). The current tests mock `fetch` globally so it's not hit, but if someone writes a test that invokes OpenRouter planning without mocking `location`, it will fail. **Recommendation**: Guard with `typeof location !== 'undefined'`.
-
-6. **Heuristic planner has hardcoded product IDs** (`planner.ts:351`): `'kbd-01'` and `'dock-02'` are hardcoded in `planWithHeuristics`. These match the demo but not real apps. The heuristic planner is explicitly a fallback, and its `reason` field explains what it did, so this is acceptable for MVP.
-
-7. **`native-adapter.spec.ts` — test pollution risk**: `clearToolsForTest()` is called in `beforeEach`/`afterEach`, but `navigator.modelContext` is directly mutated without restoration of the original value. Since the tests delete `modelContext` in teardown, this works, but if another test file runs in the same vm context, it could leak. Acceptable.
-
-8. **`plan.ts` — `getLegacyRuntimeEnv` try/catch is broad** (`plan.ts:185`): `catch { return {} }` in `getLegacyRuntimeEnv` silently swallows syntax errors in the `locals.runtime.env` getter. Not a realistic scenario, but worth being aware of.
+5. **`plan.ts` — `getLegacyRuntimeEnv` try/catch is broad**: `catch { return {} }` in `getLegacyRuntimeEnv` silently swallows syntax errors in the `locals.runtime.env` getter. Not a realistic scenario, but worth being aware of.
 
 ---
 
 ## 3. Test Coverage
 
-| Area | Location | Tests | Status |
-|---|---|---|---|
-| Schema validation | `schema.spec.ts` | 5 | ✅ Edge cases for types, required, nested, output schemas |
-| Native adapter | `native-adapter.spec.ts` | 8+ | ✅ Registration, annotations passthrough, AbortSignal cleanup, returned handles, source context |
-| Planner | `planner.spec.ts` | 13 | ✅ Heuristics, Chrome AI (available/downloadable/session-failure), word/numeric quantity, positional/context-based selection, OpenRouter user-key, server endpoint, Cloudflare binding, needs-key/unavailable states |
-| Forms | `forms.spec.ts` | 9+ | ✅ Schema inference, invocation, official form metadata, richer field schemas, risky field warnings |
-| Devtools | `devtools.spec.ts` | 3 | ✅ Render, invoke, error handling, concurrent calls |
-| MCP bridge | `mcp-bridge/index.spec.ts` | 2 | ✅ List/call with and without confirmation |
-| Test bridge | `test-bridge.spec.ts` | 1 | ✅ Install, invoke, uninstall |
-| Kit | `kit.spec.ts` | 1 | ✅ Basic initialization |
-| OpenAI adapter | `openai.spec.ts` | 2 | ✅ Single tool, multiple tools |
-| Catalog adapter | `catalog.spec.ts` | 2 | ✅ JSON catalog, Markdown format |
-| Server endpoint | `plan.spec.ts` | 2 | ✅ Binding mode, missing env error |
-| Integration | `tests/integration/fallback.spec.ts` | — | ✅ |
-| Demo component | `WebMcpDemo.spec.ts` | — | ✅ |
+| Area | Location | Coverage |
+|---|---|---|
+| Schema validation | `schema.spec.ts` | ✅ Edge cases for types, required, nested, output schemas |
+| Native adapter | `native-adapter.spec.ts` | ✅ Registration, annotations passthrough, AbortSignal cleanup, returned handles, source context |
+| Planner | `planner.spec.ts` | ✅ Heuristics, Chrome AI (available/downloadable/session-failure), word/numeric quantity, positional/context-based selection, OpenRouter user-key, server endpoint, Cloudflare binding, needs-key/unavailable states |
+| Forms | `forms.spec.ts` | ✅ Schema inference, invocation, official and compatibility form metadata, richer field schemas, risky field warnings |
+| Devtools | `devtools.spec.ts` | ✅ Render, invoke, error handling, concurrent calls |
+| MCP bridge | `mcp-bridge/index.spec.ts` | ✅ List/call with and without confirmation |
+| Test bridge | `test-bridge.spec.ts` | ✅ Install, invoke, uninstall |
+| Kit | `kit.spec.ts` | ✅ Basic initialization |
+| OpenAI adapter | `adapters/openai.spec.ts` | ✅ Single tool, multiple tools |
+| Catalog adapter | `adapters/catalog.spec.ts` | ✅ JSON catalog, Markdown format |
+| Server endpoint | `plan.spec.ts` | ✅ Binding mode, missing env error |
+| Integration | `tests/integration/fallback.spec.ts` | ✅ Fallback registry behavior |
+| Demo components | `DemoPages.spec.ts` | ✅ Page registration, planner controls, command placeholders, confirmations, and interaction behavior |
 
 ### Coverage gaps to consider
 
@@ -163,13 +157,10 @@ All 10 planned docs exist and are well-written:
 
 | Priority | Issue | File |
 |---|---|---|
-| Should fix | `planWithChromeAI` doesn't distinguish JSON parse failure from session failure | `planner.ts:210` |
-| Should fix | `planWithOpenAICompatible` accesses `location` without guard | `planner.ts:269` |
-| Nice to have | Chrome AI session lifecycle cleanup (`dispose`) | `planner.ts`, `interfaces/tool.ts` |
 | Nice to have | Targeted DOM updates instead of full innerHTML re-render | `devtools.ts` |
 | Nice to have | Direct tests for `events.ts` and `support.ts` | New test files |
 | Not blocking | Split `planner.ts` into multiple modules | `planner.ts` |
-| Not blocking | Split `WebMcpDemo.vue` into subcomponents | `WebMcpDemo.vue` |
+| Not blocking | Keep splitting shared demo behavior only when repeated page code proves it is actually duplicated | `demo/src/components` |
 
 ---
 

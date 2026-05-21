@@ -14,33 +14,33 @@ Assumptions:
   - [x] Step 1.1: Add a shared Astro layout with top navigation
     - Objective: Create one layout for demo pages with the global CSS import, document metadata, favicon, and a top navigation menu linking Inventory, Invoices, Commerce, Support, and README.
     - Files: [`demo/src/layouts/DemoLayout.astro`], [`demo/src/pages/index.astro`], [`demo/src/pages/readme.astro`]
-    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/WebMcpDemo.spec.ts`
+    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/DemoPages.spec.ts`
   - [x] Step 1.2: Move current single-page shell styling into page/layout components
     - Objective: Keep the constrained page width, responsive padding, and nav states in reusable layout CSS while avoiding unrelated visual changes.
-    - Files: [`demo/src/layouts/DemoLayout.astro`], [`demo/src/styles/global.css`], [`demo/src/components/WebMcpDemo.vue`]
-    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/WebMcpDemo.spec.ts`
+    - Files: [`demo/src/layouts/DemoLayout.astro`], [`demo/src/styles/global.css`], [`demo/src/components/DemoShell.vue`]
+    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/DemoPages.spec.ts`
 
 - [x] Phase 2: Split Current Demo Into Logical Pages
   - [x] Step 2.1: Make the demo component page-aware
-    - Objective: Add a typed `page` prop to `WebMcpDemo.vue` so each Astro route renders one logical demo group and registers the relevant tools without a large extraction.
-    - Files: [`demo/src/interfaces/demo.ts`], [`demo/src/components/WebMcpDemo.vue`]
-    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/WebMcpDemo.spec.ts`
+    - Objective: Add a typed `page` prop to `DemoShell.vue` so each Astro route renders one logical demo group and registers the relevant tools without a large extraction.
+    - Files: [`demo/src/interfaces/demo.ts`], [`demo/src/components/DemoShell.vue`]
+    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/DemoPages.spec.ts`
   - [x] Step 2.2: Create the Inventory page
     - Objective: Make `/` render the inventory/list demo with `DemoSemanticInventory` and the relevant `select_items` and `clear_item_selection` tools.
-    - Files: [`demo/src/pages/index.astro`], [`demo/src/components/WebMcpDemo.vue`]
-    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/WebMcpDemo.spec.ts`
+    - Files: [`demo/src/pages/index.astro`], [`demo/src/components/DemoShell.vue`]
+    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/DemoPages.spec.ts`
   - [x] Step 2.3: Create the Invoices page
     - Objective: Make `/invoices/` render invoice table and invoice drawer together, preserving filtering, sorting, opening, creation, selection, and invoice-status tools.
-    - Files: [`demo/src/pages/invoices.astro`], [`demo/src/components/WebMcpDemo.vue`], [`demo/src/components/DemoInvoiceTable.vue`], [`demo/src/components/DemoInvoiceDrawer.vue`]
-    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/WebMcpDemo.spec.ts`
+    - Files: [`demo/src/pages/invoices.astro`], [`demo/src/components/DemoShell.vue`], [`demo/src/components/DemoInvoiceTable.vue`], [`demo/src/components/DemoInvoiceDrawer.vue`]
+    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/DemoPages.spec.ts`
   - [x] Step 2.4: Create the Commerce page
     - Objective: Make `/commerce/` render cart editing with the existing cart tools: `search_products`, `add_to_cart`, `update_cart_quantity`, `remove_from_cart`, `apply_cart_discount`, and `checkout_cart`.
-    - Files: [`demo/src/pages/commerce.astro`], [`demo/src/components/WebMcpDemo.vue`], [`demo/src/components/DemoCartEditor.vue`]
-    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/WebMcpDemo.spec.ts`
+    - Files: [`demo/src/pages/commerce.astro`], [`demo/src/components/DemoShell.vue`], [`demo/src/components/DemoCartEditor.vue`]
+    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/DemoPages.spec.ts`
   - [x] Step 2.5: Create the Support page
     - Objective: Make `/support/` render the support ticket form and ticket board together, preserving `create_support_ticket` form registration and `update_ticket`.
-    - Files: [`demo/src/pages/support.astro`], [`demo/src/components/WebMcpDemo.vue`], [`demo/src/components/DemoSupportTicketPanel.vue`], [`demo/src/components/DemoTicketBoard.vue`]
-    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/WebMcpDemo.spec.ts`
+    - Files: [`demo/src/pages/support.astro`], [`demo/src/components/DemoShell.vue`], [`demo/src/components/DemoSupportTicketPanel.vue`], [`demo/src/components/DemoTicketBoard.vue`]
+    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/DemoPages.spec.ts`
 
 - [x] Phase 3: Add Floating Draggable WebMCP Input
   - [x] Step 3.1: Build the floating launcher component
@@ -49,23 +49,23 @@ Assumptions:
     - Test: `npm run test -- packages/core/src/command-input.spec.ts`
   - [x] Step 3.2: Wire the floating input into every demo page
     - Objective: Render `<webmcp-command-input floating>` from the demo component and keep planner configuration, diagnostics slot, and command result state wired through the library element.
-    - Files: [`demo/src/components/WebMcpDemo.vue`], [`demo/src/components/DemoRuntimeStatus.vue`]
-    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/WebMcpDemo.spec.ts`
+    - Files: [`demo/src/components/DemoShell.vue`], [`demo/src/components/DemoRuntimeStatus.vue`]
+    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/DemoPages.spec.ts`
   - [x] Step 3.3: Make floating behavior accessible and responsive
     - Objective: Ensure the launcher has an accessible name, keyboard focus styles, drag does not break click/tap, and the expanded library command input opens toward available viewport space.
     - Files: [`packages/core/src/command-input.ts`], [`packages/core/src/command-input.spec.ts`]
     - Test: `npm run test -- packages/core/src/command-input.spec.ts`
 
   - [x] Step 3.4: Remove stale custom command-palette code if still unused
-    - Objective: Delete `DemoCommandPalette.vue` if it remains unused after the split, so the demo has one command-input path and that path uses the library element.
-    - Files: [`demo/src/components/DemoCommandPalette.vue`]
-    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/WebMcpDemo.spec.ts`
+    - Objective: Delete `DemoShell.vue` if it remains unused after the split, so the demo has one command-input path and that path uses the library element.
+    - Files: [`demo/src/components/DemoShell.vue`]
+    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/DemoPages.spec.ts`
 
 - [x] Phase 4: Update Tests For Page Boundaries
   - [x] Step 4.1: Replace the old monolithic component test
-    - Objective: Move expectations from `WebMcpDemo.spec.ts` into page-specific tests, keeping coverage for default command placeholder, planner controls, inventory selection, invoice chains, cart checkout guards, and support form tool registration.
-    - Files: [`demo/src/components/WebMcpDemo.spec.ts`]
-    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/WebMcpDemo.spec.ts`
+    - Objective: Move expectations from `DemoPages.spec.ts` into page-specific tests, keeping coverage for default command placeholder, planner controls, inventory selection, invoice chains, cart checkout guards, and support form tool registration.
+    - Files: [`demo/src/components/DemoPages.spec.ts`]
+    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/DemoPages.spec.ts`
   - [x] Step 4.2: Update Playwright coverage for navigation and floating input
     - Objective: Verify top navigation routes, launcher expansion, drag/reposition behavior, page-specific tools, and the existing planner/provider flows on the relevant pages.
     - Files: [`demo/tests/e2e/webmcp-demo.spec.ts`]
@@ -75,7 +75,7 @@ Assumptions:
   - [x] Step 5.1: Run focused unit coverage
     - Objective: Confirm the page split and floating input behavior are fully green after implementation.
     - Files: [`demo/src/components/*.spec.ts`]
-    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/WebMcpDemo.spec.ts src/pages/api/webmcp/plan.spec.ts`
+    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/DemoPages.spec.ts src/pages/api/webmcp/plan.spec.ts`
   - [x] Step 5.2: Run typecheck
     - Objective: Catch integration errors across Astro, Vue, and TypeScript after moving state and routes.
     - Files: [`demo/src/**/*.ts`], [`demo/src/**/*.vue`], [`demo/src/**/*.astro`]

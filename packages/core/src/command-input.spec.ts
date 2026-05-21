@@ -159,7 +159,7 @@ describe('WebMCP command input', () => {
     const model = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-model]')
     expect(settings?.open).toBe(true)
     expect(model).toBeInstanceOf(HTMLSelectElement)
-    expect(model?.value).toBe('@cf/moonshotai/kimi-k2.6')
+    expect(model?.value).toBe('@cf/zai-org/glm-4.7-flash')
     expect(Array.from(model?.options ?? []).map(function mapOption(option) {
       return option.value
     })).toContain('@cf/openai/gpt-oss-20b')

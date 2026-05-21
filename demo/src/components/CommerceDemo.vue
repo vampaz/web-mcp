@@ -3,6 +3,7 @@
     :confirmations-enabled="settings.confirmationsEnabled"
     :eyebrow="`${cart.length} cart lines`"
     :get-context="getPlannerContext"
+    placeholder="Try: Add two keyboard kits to the cart"
     :registered-tools-count="registeredToolsCount"
     title="Commerce"
   >

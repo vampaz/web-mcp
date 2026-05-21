@@ -23,6 +23,8 @@ Cloudflare documents `.env` as the recommended persistent way to set Wrangler sy
 
 Keep `wrangler login` as a manual fallback, not as the main development credential path.
 
+Do not put `CLOUDFLARE_API_TOKEN` in `.dev.vars`. That file is for values read by the Worker runtime during local development. If the app config loads `.dev.vars` into `process.env`, an empty or stale token can override valid Wrangler authentication and break remote bindings.
+
 ## Standard Project Setup
 
 1. Ignore local credential files:
@@ -44,13 +46,15 @@ CLOUDFLARE_API_TOKEN=
 
 3. Fill `.env` locally, never in git.
 
-4. Verify auth with:
+4. Keep `.dev.vars` for Worker runtime secrets only. Do not duplicate Wrangler auth variables there.
+
+5. Verify auth with:
 
 ```sh
 npm exec wrangler -- whoami
 ```
 
-5. Start development normally:
+6. Start development normally:
 
 ```sh
 npm run dev
@@ -84,7 +88,7 @@ When creating or touching any Cloudflare project, check this before calling the 
 
 - `.env` and local variants are ignored.
 - `demo/.env.example` exists and names required Cloudflare variables without secrets.
-- Docs say local dev uses `.env`, not repeated interactive OAuth.
+- Docs say Wrangler auth uses `.env`, while `.dev.vars` stays limited to Worker runtime values.
 - `npm exec wrangler -- whoami` works from the project root after the local `.env` is present.
 
 If this is missing, fix it as project setup. Do not add fallbacks, alternate providers, or hidden auth flows to work around a missing credential contract.
