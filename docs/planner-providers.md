@@ -216,6 +216,19 @@ For preview or production, pass the selected planner config when the app should 
 
 The Cloudflare binding default is `@cf/zai-org/glm-4.7-flash` because it returned reliable JSON plans in the demo acceptance checks while keeping the local binding flow fast. The server endpoint first asks for JSON output, then retries without `response_format` when a Workers AI model rejects that option.
 
+## Custom App Planners
+
+Apps can bypass provider configuration and pass a complete planner object to the command input:
+
+```ts
+commandInput.configure({
+  context: getPlannerContext,
+  planner: createBrowserLocalAIPlanner()
+})
+```
+
+This is the right shape for app-owned experiments such as the demo's browser-local WebLLM planner. The kit receives a `ToolPlanner`; the app owns the model dependency, loading policy, browser requirements, and prompt strategy.
+
 ## Tool Sequences
 
 Planner output can be a single invocation:

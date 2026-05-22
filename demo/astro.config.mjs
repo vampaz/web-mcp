@@ -11,6 +11,8 @@ if (fs.existsSync('./.env')) {
 }
 
 const cloudflareConfigPath = process.env.CLOUDFLARE_CONFIG_PATH?.trim()
+const disableCloudflareRemoteBindings =
+  process.env.CLOUDFLARE_REMOTE_BINDINGS?.trim() === 'false'
 const caddyTlsDomain = process.env.CADDY_TLS_DOMAIN?.trim() || 'web-mcp.localtest.me'
 const repositoryRoot = 'https://github.com/vampaz/web-mcp/blob/master/'
 
@@ -24,7 +26,8 @@ export default defineConfig({
     allowedHosts: true
   },
   adapter: cloudflare({
-    configPath: cloudflareConfigPath || undefined
+    configPath: cloudflareConfigPath || undefined,
+    remoteBindings: disableCloudflareRemoteBindings ? false : undefined
   }),
   markdown: {
     remarkPlugins: [rewriteRepositoryMarkdownLinks],

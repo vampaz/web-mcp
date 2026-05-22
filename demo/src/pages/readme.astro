@@ -17,8 +17,8 @@ export const prerender = true
   </section>
 </DemoLayout>
 
-<script>
-  import mermaid from 'mermaid'
+<script is:inline type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs'
 
   mermaid.initialize({
     flowchart: {

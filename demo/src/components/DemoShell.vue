@@ -34,11 +34,9 @@ import {
   installWebMCPKitTestBridge,
   listTools,
   setConfirmationHandler,
-  type PlannerProviderKind,
   type ToolPlan,
   type ToolPlanner,
   type WebMCPCommandInputElement,
-  type WebMCPCommandInputEndpointOption,
   type WebMCPCommandPlannerEventDetail
 } from '@webmcp-kit/core'
 import { mountDevtoolsOverlay, type DevtoolsOverlay } from '@webmcp-kit/devtools'
@@ -46,10 +44,9 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 import DemoRuntimeStatus from '@/components/DemoRuntimeStatus.vue'
 import {
-  getCloudflareBindingModels,
-  getOpenAIPlannerEndpoints,
-  getOpenRouterPlannerEndpoints
-} from '@/utils/demo-data'
+  createBrowserLocalAIPlanner,
+  defaultBrowserLocalAIModel
+} from '@/utils/browser-local-ai-planner'
 
 interface Props {
   confirmationsEnabled?: boolean
@@ -65,62 +62,8 @@ const props = withDefaults(defineProps<Props>(), {
 })
 const showDevtools = import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIEW === 'true'
 const shouldInstallTestBridge = import.meta.env.DEV || import.meta.env.MODE === 'test'
-const shouldDefaultToCloudflareBinding = import.meta.env.MODE !== 'test'
-const plannerControlsStorageKey = 'webmcp:admin'
-const cloudflareBindingModels = getCloudflareBindingModels()
-const openAIPlannerEndpoints = getOpenAIPlannerEndpoints()
-const openRouterPlannerEndpoints = getOpenRouterPlannerEndpoints()
-const plannerEndpointOptions: WebMCPCommandInputEndpointOption[] = [
-  ...cloudflareBindingModels.flatMap(function mapCloudflareEndpoint(model) {
-    return [
-      {
-        label: model.label,
-        model: model.id,
-        provider: 'cloudflare-binding' as const
-      },
-      {
-        label: model.label,
-        model: model.id,
-        provider: 'cloudflare-workers-ai' as const
-      }
-    ]
-  }),
-  ...openRouterPlannerEndpoints.map(function mapOpenRouterEndpoint(model) {
-    return {
-      label: model.label,
-      model: model.id,
-      provider: 'openrouter' as const
-    }
-  }),
-  ...openAIPlannerEndpoints.map(function mapOpenAIEndpoint(model) {
-    return {
-      label: model.label,
-      model: model.id,
-      provider: 'openai' as const
-    }
-  }),
-  {
-    label: 'Auto',
-    provider: 'auto'
-  },
-  {
-    label: 'Local deterministic',
-    provider: 'local'
-  }
-]
 const plannerName = ref('Loading')
-const plannerDetail = ref(
-  shouldDefaultToCloudflareBinding
-    ? 'Using the Cloudflare AI binding planner endpoint.'
-    : 'Checking Chrome built-in AI availability.'
-)
-const defaultPlannerProvider: PlannerProviderKind = shouldDefaultToCloudflareBinding
-  ? 'cloudflare-binding'
-  : 'auto'
-const defaultPlannerModel = shouldDefaultToCloudflareBinding
-  ? cloudflareBindingModels[0].id
-  : openRouterPlannerEndpoints[0].id
-const plannerEndpoint = '/api/webmcp/plan'
+const plannerDetail = ref('Browser local AI will load on the first command.')
 const unregisterCallbacks: Array<() => void> = []
 const commandInput = ref<WebMCPCommandInputElement | null>(null)
 const runtimeStatusPanel = ref<{ devtoolsHost: HTMLElement | null } | null>(null)
@@ -165,34 +108,12 @@ function configureCommandInput() {
     return
   }
 
-  if (shouldShowPlannerControls()) {
-    commandInput.value?.configure({
-      context: props.getContext,
-      endpoint: plannerEndpoint,
-      endpointOptions: plannerEndpointOptions,
-      initialModel: shouldDefaultToCloudflareBinding ? defaultPlannerModel : undefined,
-      initialProvider: shouldDefaultToCloudflareBinding ? defaultPlannerProvider : undefined
-    })
-    return
-  }
-
   commandInput.value?.configure({
     context: props.getContext,
-    endpoint: plannerEndpoint,
-    endpointOptions: plannerEndpointOptions,
-    model: defaultPlannerModel,
-    provider: defaultPlannerProvider
+    planner: createBrowserLocalAIPlanner({
+      model: defaultBrowserLocalAIModel
+    })
   })
-}
-
-function shouldShowPlannerControls(): boolean {
-  if (import.meta.env.MODE === 'test') return false
-  if (import.meta.env.DEV) return true
-  try {
-    return localStorage.getItem(plannerControlsStorageKey) === 'true'
-  } catch {
-    return false
-  }
 }
 
 function handleCommandPlanner(event: Event) {

@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@astrojs/vue": "latest",
+    "@mlc-ai/web-llm": "^0.2.83",
     "@webmcp-kit/core": "0.0.0",
     "@webmcp-kit/devtools": "0.0.0",
     "astro": "latest",

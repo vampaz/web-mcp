@@ -42,6 +42,10 @@ The command input adds Chrome built-in AI to the provider selector when the brow
 
 If Chrome built-in AI is unavailable, downloadable, or still initializing, the planner can fall back to local heuristics or a configured provider.
 
+## Browser-Local Demo Models
+
+The demo can configure the command input with an app-owned WebLLM planner that downloads and runs a small model in the browser. This path requires WebGPU. It is separate from the kit's built-in provider configuration: the demo owns the WebLLM dependency and passes a `ToolPlanner` directly to the command input.
+
 ## Inspecting Tools
 
 During development or preview deployments, mount `@webmcp-kit/devtools` to inspect registered tools, warnings, prompt previews, sample inputs, and invocation history. The demo gates the overlay behind `import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIEW === 'true'`.

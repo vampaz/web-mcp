@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import type { WebMCPCommandInputElement } from '@webmcp-kit/core'
 import {
   invokeWebMCPTool,
   listWebMCPTools,
@@ -277,8 +278,7 @@ test('plans through the dev Cloudflare binding provider', async function testClo
 
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible()
-  await selectPlannerProvider(page, 'cloudflare-binding')
-  await page.getByLabel('Model').selectOption('@cf/qwen/qwq-32b')
+  await selectPlannerProvider(page, 'cloudflare-binding', 'select_items', '@cf/qwen/qwq-32b')
   await getCommandTextbox(page).fill('Select all French items')
   await page.getByRole('button', { name: 'Run' }).click()
 
@@ -393,17 +393,52 @@ async function installUnavailableLanguageModelMock(page: Page) {
   })
 }
 
-async function selectPlannerProvider(page: Page, provider: string, toolName = 'select_items') {
+async function selectPlannerProvider(
+  page: Page,
+  provider: string,
+  toolName = 'select_items',
+  model?: string
+) {
   await waitForWebMCPTool(page, toolName)
   await openWebMCPInput(page)
 
   const providerSelect = page.getByLabel('Provider')
   if (!(await providerSelect.isVisible())) {
-    await page.getByText('Options').click()
+    await page.evaluate(
+      function configurePlanner(options) {
+        const commandInput = document.querySelector('webmcp-command-input') as
+          | WebMCPCommandInputElement
+          | undefined
+        if (!commandInput) throw new Error('Expected WebMCP command input.')
+
+        commandInput.planner = undefined
+        commandInput.configure({
+          endpoint: options.endpoint,
+          model: options.model,
+          provider: options.provider
+        })
+      },
+      {
+        endpoint: isServerProvider(provider) ? '/api/webmcp/plan' : undefined,
+        model: model ?? getE2EPlannerModel(provider),
+        provider
+      }
+    )
+    return
   }
 
   await providerSelect.selectOption(provider)
   await expect(providerSelect).toHaveValue(provider)
+}
+
+function isServerProvider(provider: string): boolean {
+  return provider === 'openrouter' || provider === 'openai' || provider === 'cloudflare-binding'
+}
+
+function getE2EPlannerModel(provider: string): string | undefined {
+  if (provider === 'openrouter') return 'nvidia/nemotron-3-super-120b-a12b:free'
+  if (provider === 'openai') return 'gpt-5.4-mini'
+  return undefined
 }
 
 async function openWebMCPInput(page: Page) {
