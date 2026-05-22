@@ -636,7 +636,13 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
               ${this.state.disabled ? 'disabled' : ''}
             />
           </label>
-          <button type="submit" ${this.running || this.state.disabled ? 'disabled' : ''} aria-busy="${String(this.running)}">
+          <button
+            class="webmcp-run-button"
+            type="submit"
+            data-phase="${escapeAttribute(this.state.phase)}"
+            ${this.running || this.state.disabled ? 'disabled' : ''}
+            aria-busy="${String(this.running)}"
+          >
             ${escapeHtml(buttonLabel)}
           </button>
         </form>

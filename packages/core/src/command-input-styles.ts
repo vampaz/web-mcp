@@ -100,9 +100,18 @@ export function getStyles(): string {
       background: var(--webmcp-accent-dark);
     }
 
+    .webmcp-run-button[data-phase="planning"] {
+      opacity: 1;
+      animation: webmcp-planning-pulse 1.1s ease-in-out infinite;
+    }
+
     button:disabled {
       cursor: progress;
       opacity: 0.7;
+    }
+
+    .webmcp-run-button[data-phase="planning"]:disabled {
+      opacity: 1;
     }
 
     :is(button, summary, select, .webmcp-settings input):focus-visible {
@@ -296,6 +305,23 @@ export function getStyles(): string {
     .webmcp-status strong {
       color: var(--webmcp-ink);
       font-size: 0.84rem;
+    }
+
+    @keyframes webmcp-planning-pulse {
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.62;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .webmcp-run-button[data-phase="planning"] {
+        animation: none;
+      }
     }
 
     @media (max-width: 36rem) {

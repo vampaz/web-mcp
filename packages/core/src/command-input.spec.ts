@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineWebMCPCommandInput } from './command-input'
 import { defineTool } from './define-tool'
 import type { WebMCPCommandInputElement, WebMCPCommandPlannerEventDetail, WebMCPCommandResultEventDetail } from './interfaces/command-input'
-import type { ToolPlanner } from './interfaces/tool'
+import type { ToolPlan, ToolPlanner } from './interfaces/tool'
 import { clearToolsForTest, registerTool } from './registry'
 
 let tagCounter = 0
@@ -90,6 +90,57 @@ describe('WebMCP command input', () => {
     }, {
       source: 'planner'
     })
+  })
+
+  it('marks the run button as planning while the planner is working', async () => {
+    const planRequest = createDeferred<ToolPlan>()
+    registerTool(defineTool({
+      name: 'search_products',
+      description: 'Search visible products.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' }
+        },
+        required: ['query'],
+        additionalProperties: false
+      },
+      execute(input) {
+        return input
+      }
+    }))
+
+    const planner: ToolPlanner = {
+      name: 'Slow planner',
+      available: true,
+      status: 'ready',
+      detail: 'Planning in progress.',
+      async plan() {
+        return await planRequest.promise
+      }
+    }
+    const element = createCommandInputElement()
+    element.planner = planner
+    document.body.append(element)
+    await Promise.resolve()
+
+    const result = element.run('Find docks')
+    await Promise.resolve()
+    await Promise.resolve()
+
+    const button = element.shadowRoot?.querySelector<HTMLButtonElement>('.webmcp-run-button')
+    expect(button?.dataset.phase).toBe('planning')
+    expect(button?.getAttribute('aria-busy')).toBe('true')
+
+    planRequest.resolve({
+      toolName: 'search_products',
+      input: {
+        query: 'dock'
+      },
+      confidence: 0.9,
+      reason: 'Matched product search.'
+    })
+    await result
   })
 
   it('hides provider and model controls when both are initialized by attributes', async () => {
@@ -441,4 +492,18 @@ function setViewportSize(width: number, height: number) {
     configurable: true,
     value: height
   })
+}
+
+function createDeferred<T>(): { promise: Promise<T>, resolve: (value: T) => void } {
+  let resolve: (value: T) => void
+  const promise = new Promise<T>(function captureResolve(resolvePromise) {
+    resolve = resolvePromise
+  })
+
+  return {
+    promise,
+    resolve: function resolveDeferred(value: T) {
+      resolve(value)
+    }
+  }
 }
