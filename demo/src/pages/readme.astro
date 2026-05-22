@@ -17,8 +17,8 @@ export const prerender = true
   </section>
 </DemoLayout>
 
-<script is:inline type="module">
-  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs'
+<script>
+  import mermaid from 'mermaid'
 
   mermaid.initialize({
     flowchart: {
@@ -29,21 +29,65 @@ export const prerender = true
     theme: 'dark'
   })
 
-  document.querySelectorAll('pre[data-language="mermaid"]').forEach(function replaceMermaidPre(pre) {
-    const diagram = document.createElement('div')
-    diagram.className = 'mermaid readme-mermaid'
-    diagram.textContent = pre.textContent ?? ''
-    pre.replaceWith(diagram)
-  })
+  void renderReadmeMermaid()
 
-  const diagrams = document.querySelectorAll('.readme-mermaid')
-  if (diagrams.length > 0) {
-    await mermaid.run({
-      nodes: diagrams
+  async function renderReadmeMermaid() {
+    const diagrams = Array.from(
+      document.querySelectorAll<HTMLElement>('pre[data-language="mermaid"], .readme-mermaid')
+    ).map(function prepareMermaidBlock(block, index) {
+      const source = block.textContent?.trim() ?? ''
+      const diagram =
+        block instanceof HTMLPreElement ? document.createElement('div') : block
+
+      diagram.className = 'readme-mermaid'
+      diagram.dataset.rendered = 'false'
+      diagram.removeAttribute('data-processed')
+      diagram.textContent = ''
+      if (block instanceof HTMLPreElement) {
+        block.replaceWith(diagram)
+      }
+
+      return {
+        diagram,
+        id: `readme-mermaid-${Date.now()}-${index}`,
+        source
+      }
     })
-    diagrams.forEach(function markRenderedDiagram(diagram) {
-      diagram.setAttribute('data-rendered', 'true')
-    })
+
+    for (const item of diagrams) {
+      if (!item.source) continue
+
+      try {
+        const rendered = await mermaid.render(item.id, item.source)
+        item.diagram.innerHTML = rendered.svg
+        normalizeMermaidSvg(item.diagram)
+        item.diagram.dataset.rendered = 'true'
+      } catch (error) {
+        item.diagram.dataset.error = 'true'
+        item.diagram.dataset.rendered = 'true'
+        item.diagram.textContent = item.source
+        console.error('Mermaid render failed', error)
+      }
+    }
+  }
+
+  function normalizeMermaidSvg(diagram: HTMLElement) {
+    const svg = diagram.querySelector('svg')
+    if (!svg) return
+
+    svg.removeAttribute('height')
+    svg.setAttribute('width', '100%')
+    svg.style.width = '100%'
+    svg.style.maxWidth = '100%'
+    svg.style.height = 'auto'
+
+    const viewBox = svg.getAttribute('viewBox')?.split(/\s+/).map(Number)
+    if (!viewBox || viewBox.length !== 4) return
+
+    const [, , width, height] = viewBox
+    if (width > 0 && height > 0) {
+      svg.style.aspectRatio = `${width} / ${height}`
+    }
   }
 </script>
 
@@ -148,22 +192,32 @@ export const prerender = true
     color: #f4f0e8;
   }
 
+  .readme-document :global(pre[data-language='mermaid']) {
+    visibility: hidden;
+  }
+
   .readme-document :global(.readme-mermaid) {
     overflow-x: auto;
     margin: 18px 0 26px;
     border: 1px solid rgba(244, 240, 232, 0.14);
     background: #101514;
-    color: transparent;
+    color: #d7ddd8;
+    opacity: 0;
     padding: 18px;
   }
 
   .readme-document :global(.readme-mermaid[data-rendered='true']) {
-    color: #d7ddd8;
+    opacity: 1;
+  }
+
+  .readme-document :global(.readme-mermaid[data-error='true']) {
+    color: #f4f0e8;
+    white-space: pre;
   }
 
   .readme-document :global(.readme-mermaid svg) {
     display: block;
-    min-width: min(760px, 100%);
+    width: 100%;
     max-width: 100%;
     height: auto;
     margin: 0 auto;

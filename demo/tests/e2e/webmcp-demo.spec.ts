@@ -600,15 +600,18 @@ test('keeps demo pages responsive without forcing cramped columns', async functi
 test('renders README Mermaid diagrams', async function testReadmeMermaidDiagrams({ page }) {
   const htmlResponse = await page.request.get('/readme/')
   const html = await htmlResponse.text()
-  expect(html.indexOf('color:transparent')).toBeGreaterThan(-1)
-  expect(html.indexOf('color:transparent')).toBeLessThan(html.indexOf('flowchart TB'))
-  expect(html).toContain("diagram.setAttribute('data-rendered', 'true')")
+  expect(html.indexOf('visibility:hidden')).toBeGreaterThan(-1)
+  expect(html.indexOf('visibility:hidden')).toBeLessThan(html.indexOf('flowchart TB'))
 
   await page.goto('/readme/')
 
   const mermaidDiagram = page.locator('.readme-mermaid').first()
   await expect(mermaidDiagram.locator('svg')).toBeVisible()
   await expect(mermaidDiagram).toHaveAttribute('data-rendered', 'true')
+  const diagramBox = await mermaidDiagram.boundingBox()
+  const svgBox = await mermaidDiagram.locator('svg').boundingBox()
+  expect(diagramBox?.height ?? 0).toBeGreaterThan(400)
+  expect(svgBox?.height ?? 0).toBeGreaterThan(360)
   await expect(mermaidDiagram.locator('svg')).toContainText('User command')
   await expect(mermaidDiagram.locator('svg')).toContainText('WebMCP tool registry')
   await expect(page.locator('pre[data-language="mermaid"]')).toHaveCount(0)
