@@ -101,8 +101,8 @@ await createWebMCPKit({
 })
 ```
 
-The demo includes `/api/webmcp/plan` for server planning. For `provider: 'cloudflare-workers-ai'`, that route uses `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` from the server environment. For `provider: 'cloudflare-binding'`, it uses the Astro Cloudflare adapter and expects a Cloudflare runtime with `env.AI`. For `provider: 'openrouter'`, it uses `OPENROUTER_API_KEY` from the server environment.
-For `provider: 'openai'`, it uses `OPENAI_API_KEY` from the server environment.
+The demo includes `/api/webmcp/plan` for server planning. For `provider: 'cloudflare-workers-ai'`, that route uses `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` from the server environment. For `provider: 'cloudflare-binding'`, it uses the Astro Cloudflare adapter and expects a Cloudflare runtime with `env.AI`. For `provider: 'openrouter'`, it uses `OPENROUTER_API_KEY` from the server environment when OpenRouter is selected.
+For `provider: 'openai'`, it uses `OPENAI_API_KEY` from the server environment when OpenAI is selected.
 
 For local development, keep Wrangler authentication in an ignored project `.env` file instead of relying on the global interactive OAuth refresh token:
 
@@ -110,7 +110,7 @@ For local development, keep Wrangler authentication in an ignored project `.env`
 cp demo/.env.example demo/.env
 ```
 
-Then fill in `CLOUDFLARE_API_TOKEN`, `OPENAI_API_KEY`, and `OPENROUTER_API_KEY`. `CLOUDFLARE_ACCOUNT_ID` is already present in `demo/.env.example` for this project. This keeps `npm run dev` and remote AI bindings on stable project-local credentials while avoiding committed secrets.
+Then fill in `CLOUDFLARE_API_TOKEN`. `CLOUDFLARE_ACCOUNT_ID` is already present in `demo/.env.example` for this project. Add `OPENAI_API_KEY` or `OPENROUTER_API_KEY` only if you want to use those provider modes. This keeps `npm run dev` and remote AI bindings on stable project-local credentials while avoiding committed secrets.
 
 Keep `.dev.vars` for Worker runtime values only. Do not put `CLOUDFLARE_API_TOKEN` there; Wrangler reads system authentication from the process environment / `.env`, while `.dev.vars` is loaded into the local Worker runtime.
 
