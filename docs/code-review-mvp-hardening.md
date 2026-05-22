@@ -21,14 +21,14 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 
 ## 1. Architecture & Design
 
-| Aspect | Assessment |
-|---|---|
-| **Monorepo structure** | Clean npm workspaces (`packages/core`, `devtools`, `mcp-bridge`, `testing`). Each has proper `package.json`, `tsconfig`, and `exports`. |
-| **Framework agnosticism** | Core package has zero framework dependencies. The Vue demo and Astro integration are layered on top without contaminating core. Framework recipes in `docs/` are documentation only, no separate wrapper packages — per the deferred decision in the plan. |
-| **Separation of concerns** | `define-tool.ts` (validation), `registry.ts` (fallback store), `native-adapter.ts` (browser API), `planner.ts` (AI routing), `quality.ts` (warnings), `events.ts` (pub/sub), `test-bridge.ts` (test exposure) are all single-responsibility modules. |
-| **Adapter pattern** | Clean adapters for OpenAI tools, MCP bridge (JSON-RPC), and Markdown/JSON catalog export. Each is independent and optional. |
-| **Progressive enhancement** | Native WebMCP is used when available; fallback registry always runs in parallel. This is the right strategy for an emerging browser API. |
-| **Planner abstraction** | `ToolPlanner` interface is well-designed — status, availability, and fallback are first-class. The heuristic planner provides sensible defaults for basic commands while AI planners handle semantic queries. |
+| Aspect                      | Assessment                                                                                                                                                                                                                                                 |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Monorepo structure**      | Clean npm workspaces (`packages/core`, `devtools`, `mcp-bridge`, `testing`). Each has proper `package.json`, `tsconfig`, and `exports`.                                                                                                                    |
+| **Framework agnosticism**   | Core package has zero framework dependencies. The Vue demo and Astro integration are layered on top without contaminating core. Framework recipes in `docs/` are documentation only, no separate wrapper packages — per the deferred decision in the plan. |
+| **Separation of concerns**  | `define-tool.ts` (validation), `registry.ts` (fallback store), `native-adapter.ts` (browser API), `planner.ts` (AI routing), `quality.ts` (warnings), `events.ts` (pub/sub), `test-bridge.ts` (test exposure) are all single-responsibility modules.       |
+| **Adapter pattern**         | Clean adapters for OpenAI tools, MCP bridge (JSON-RPC), and Markdown/JSON catalog export. Each is independent and optional.                                                                                                                                |
+| **Progressive enhancement** | Native WebMCP is used when available; fallback registry always runs in parallel. This is the right strategy for an emerging browser API.                                                                                                                   |
+| **Planner abstraction**     | `ToolPlanner` interface is well-designed — status, availability, and fallback are first-class. The heuristic planner provides sensible defaults for basic commands while AI planners handle semantic queries.                                              |
 
 **Points to address:**
 
@@ -80,21 +80,21 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 
 ## 3. Test Coverage
 
-| Area | Location | Coverage |
-|---|---|---|
-| Schema validation | `schema.spec.ts` | ✅ Edge cases for types, required, nested, output schemas |
-| Native adapter | `native-adapter.spec.ts` | ✅ Registration, annotations passthrough, AbortSignal cleanup, returned handles, source context |
-| Planner | `planner.spec.ts` | ✅ Heuristics, Chrome AI (available/downloadable/session-failure), word/numeric quantity, positional/context-based selection, OpenRouter user-key, server endpoint, Cloudflare binding, needs-key/unavailable states |
-| Forms | `forms.spec.ts` | ✅ Schema inference, invocation, official and compatibility form metadata, richer field schemas, risky field warnings |
-| Devtools | `devtools.spec.ts` | ✅ Render, invoke, error handling, concurrent calls |
-| MCP bridge | `mcp-bridge/index.spec.ts` | ✅ List/call with and without confirmation |
-| Test bridge | `test-bridge.spec.ts` | ✅ Install, invoke, uninstall |
-| Kit | `kit.spec.ts` | ✅ Basic initialization |
-| OpenAI adapter | `adapters/openai.spec.ts` | ✅ Single tool, multiple tools |
-| Catalog adapter | `adapters/catalog.spec.ts` | ✅ JSON catalog, Markdown format |
-| Server endpoint | `plan.spec.ts` | ✅ Binding mode, missing env error |
-| Integration | `tests/integration/fallback.spec.ts` | ✅ Fallback registry behavior |
-| Demo components | `DemoPages.spec.ts` | ✅ Page registration, planner controls, command placeholders, confirmations, and interaction behavior |
+| Area              | Location                             | Coverage                                                                                                                                                                                                             |
+| ----------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Schema validation | `schema.spec.ts`                     | ✅ Edge cases for types, required, nested, output schemas                                                                                                                                                            |
+| Native adapter    | `native-adapter.spec.ts`             | ✅ Registration, annotations passthrough, AbortSignal cleanup, returned handles, source context                                                                                                                      |
+| Planner           | `planner.spec.ts`                    | ✅ Heuristics, Chrome AI (available/downloadable/session-failure), word/numeric quantity, positional/context-based selection, OpenRouter user-key, server endpoint, Cloudflare binding, needs-key/unavailable states |
+| Forms             | `forms.spec.ts`                      | ✅ Schema inference, invocation, official and compatibility form metadata, richer field schemas, risky field warnings                                                                                                |
+| Devtools          | `devtools.spec.ts`                   | ✅ Render, invoke, error handling, concurrent calls                                                                                                                                                                  |
+| MCP bridge        | `mcp-bridge/index.spec.ts`           | ✅ List/call with and without confirmation                                                                                                                                                                           |
+| Test bridge       | `test-bridge.spec.ts`                | ✅ Install, invoke, uninstall                                                                                                                                                                                        |
+| Kit               | `kit.spec.ts`                        | ✅ Basic initialization                                                                                                                                                                                              |
+| OpenAI adapter    | `adapters/openai.spec.ts`            | ✅ Single tool, multiple tools                                                                                                                                                                                       |
+| Catalog adapter   | `adapters/catalog.spec.ts`           | ✅ JSON catalog, Markdown format                                                                                                                                                                                     |
+| Server endpoint   | `plan.spec.ts`                       | ✅ Binding mode, missing env error                                                                                                                                                                                   |
+| Integration       | `tests/integration/fallback.spec.ts` | ✅ Fallback registry behavior                                                                                                                                                                                        |
+| Demo components   | `DemoPages.spec.ts`                  | ✅ Page registration, planner controls, command placeholders, confirmations, and interaction behavior                                                                                                                |
 
 ### Coverage gaps to consider
 
@@ -106,16 +106,16 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 
 ## 4. Security
 
-| Concern | Status |
-|---|---|
-| **User-key visibility** | ✅ Clearly documented. The demo sidebar warns: "the key is visible to this browser page." The PRD and planner docs repeat this. |
-| **Server mode for secrets** | ✅ App-owned keys use server endpoints. The `plan.ts` endpoint never exposes secrets to the browser. |
-| **Input validation** | ✅ `defineTool` validates schemas at registration. `invokeTool` and the native wrapper validate tool input against schema before execution. Handlers should still treat inputs as untrusted and normalize domain values. |
-| **Confirmation enforcement** | ✅ `invokeTool` blocks actions without confirmation. The devtools overlay uses `window.confirm()`. MCP/test bridge callers cannot bypass confirmation with request params. |
-| **Guard execution** | ✅ Guards run after scope/confirmation checks and before execution. Both `false` and string (reason) returns are handled. |
-| **Event data** | ✅ Events include tool name and timestamp but no input/output by default. `detail` contains invocation data but is only visible through the subscription API, not transmitted. |
-| **Devtools secrets** | ✅ Invocation history shows input/output in the DOM, which is appropriate for a dev tool. Not exposed in production builds. |
-| **Cloudflare binding mode** | ✅ Available in local, preview, and production deployments through the server endpoint and Cloudflare `AI` binding. |
+| Concern                      | Status                                                                                                                                                                                                                   |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **User-key visibility**      | ✅ Clearly documented. The demo sidebar warns: "the key is visible to this browser page." The PRD and planner docs repeat this.                                                                                          |
+| **Server mode for secrets**  | ✅ App-owned keys use server endpoints. The `plan.ts` endpoint never exposes secrets to the browser.                                                                                                                     |
+| **Input validation**         | ✅ `defineTool` validates schemas at registration. `invokeTool` and the native wrapper validate tool input against schema before execution. Handlers should still treat inputs as untrusted and normalize domain values. |
+| **Confirmation enforcement** | ✅ `invokeTool` blocks actions without confirmation. The devtools overlay uses `window.confirm()`. MCP/test bridge callers cannot bypass confirmation with request params.                                               |
+| **Guard execution**          | ✅ Guards run after scope/confirmation checks and before execution. Both `false` and string (reason) returns are handled.                                                                                                |
+| **Event data**               | ✅ Events include tool name and timestamp but no input/output by default. `detail` contains invocation data but is only visible through the subscription API, not transmitted.                                           |
+| **Devtools secrets**         | ✅ Invocation history shows input/output in the DOM, which is appropriate for a dev tool. Not exposed in production builds.                                                                                              |
+| **Cloudflare binding mode**  | ✅ Available in local, preview, and production deployments through the server endpoint and Cloudflare `AI` binding.                                                                                                      |
 
 ### Minor concerns
 
@@ -155,11 +155,11 @@ All 10 planned docs exist and are well-written:
 
 ## 7. Recommendations Summary
 
-| Priority | Issue | File |
-|---|---|---|
-| Nice to have | Targeted DOM updates instead of full innerHTML re-render | `devtools.ts` |
-| Nice to have | Direct tests for `events.ts` and `support.ts` | New test files |
-| Not blocking | Split `planner.ts` into multiple modules | `planner.ts` |
+| Priority     | Issue                                                                                             | File                  |
+| ------------ | ------------------------------------------------------------------------------------------------- | --------------------- |
+| Nice to have | Targeted DOM updates instead of full innerHTML re-render                                          | `devtools.ts`         |
+| Nice to have | Direct tests for `events.ts` and `support.ts`                                                     | New test files        |
+| Not blocking | Split `planner.ts` into multiple modules                                                          | `planner.ts`          |
 | Not blocking | Keep splitting shared demo behavior only when repeated page code proves it is actually duplicated | `demo/src/components` |
 
 ---

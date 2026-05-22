@@ -30,27 +30,31 @@ export function registerNativeTool<TInput = Record<string, unknown>, TOutput = u
   const abortController = new AbortController()
 
   try {
-    const handle = registerTool.call((navigator as NavigatorWithModelContext).modelContext, {
-      name: tool.name,
-      description: tool.description,
-      inputSchema: tool.inputSchema,
-      annotations: tool.annotations,
-      async execute(input: TInput) {
-        const inputValidationErrors = validateJsonValue(input, tool.inputSchema)
-        if (inputValidationErrors.length > 0) {
-          throw new Error(formatJsonValueValidationError(inputValidationErrors))
-        }
-
-        if (tool.confirmation?.required) {
-          const confirmed = await requestToolConfirmation(tool, input)
-          if (!confirmed) {
-            throw new Error(tool.confirmation.reason)
+    const handle = registerTool.call(
+      (navigator as NavigatorWithModelContext).modelContext,
+      {
+        name: tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+        annotations: tool.annotations,
+        async execute(input: TInput) {
+          const inputValidationErrors = validateJsonValue(input, tool.inputSchema)
+          if (inputValidationErrors.length > 0) {
+            throw new Error(formatJsonValueValidationError(inputValidationErrors))
           }
-        }
 
-        return tool.execute(input, { source: 'native' })
-      }
-    }, { signal: abortController.signal }) as NativeRegistrationHandle | undefined
+          if (tool.confirmation?.required) {
+            const confirmed = await requestToolConfirmation(tool, input)
+            if (!confirmed) {
+              throw new Error(tool.confirmation.reason)
+            }
+          }
+
+          return tool.execute(input, { source: 'native' })
+        }
+      },
+      { signal: abortController.signal }
+    ) as NativeRegistrationHandle | undefined
 
     return {
       unregister() {

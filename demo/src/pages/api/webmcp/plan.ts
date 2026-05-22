@@ -1,5 +1,11 @@
 import type { APIRoute } from 'astro'
-import { formatJsonValueValidationError, type JsonSchema, validateJsonValue } from '@webmcp-kit/core'
+import {
+  formatJsonValueValidationError,
+  getErrorMessage,
+  normalizeJsonText,
+  type JsonSchema,
+  validateJsonValue
+} from '@webmcp-kit/core'
 
 import type { CloudflareEnv } from '@/interfaces/cloudflare'
 
@@ -80,6 +86,10 @@ const allowedCloudflareModels = new Set([
   '@cf/qwen/qwq-32b'
 ])
 const openAIApiModel = 'gpt-5.4-mini'
+const allowedOpenRouterModels = new Set([
+  'nvidia/nemotron-3-super-120b-a12b:free',
+  'nvidia/nemotron-nano-9b-v2:free'
+])
 const maxPlannerRequestBytes = 128 * 1024
 
 export const prerender = false
@@ -89,17 +99,20 @@ export const POST: APIRoute = async function planWithServerProvider({ request, l
   if ('error' in requestBody) return json({ error: requestBody.error }, requestBody.status)
 
   const body = requestBody.body
-  if (!body.message || !Array.isArray(body.tools)) return json({ error: 'Invalid planner request' }, 400)
+  if (!body.message || !Array.isArray(body.tools))
+    return json({ error: 'Invalid planner request' }, 400)
   const env = await getCloudflareEnv(locals)
 
   try {
     if (body.provider === 'cloudflare-binding') {
-      if (!body.model || !allowedCloudflareModels.has(body.model)) return json({ error: 'Unsupported Cloudflare model' }, 400)
+      if (!body.model || !allowedCloudflareModels.has(body.model))
+        return json({ error: 'Unsupported Cloudflare model' }, 400)
       return json(await planWithCloudflareBinding(body, env))
     }
 
     if (body.provider === 'cloudflare-workers-ai') {
-      if (!body.model || !allowedCloudflareModels.has(body.model)) return json({ error: 'Unsupported Cloudflare model' }, 400)
+      if (!body.model || !allowedCloudflareModels.has(body.model))
+        return json({ error: 'Unsupported Cloudflare model' }, 400)
       return json(await planWithCloudflareRest(body, env))
     }
 
@@ -108,10 +121,16 @@ export const POST: APIRoute = async function planWithServerProvider({ request, l
       if (!model) return json({ error: 'Unsupported OpenAI model' }, 400)
       return json(await planWithOpenAI(body, env, model))
     }
+
+    if (body.provider === 'openrouter') {
+      if (!body.model || !allowedOpenRouterModels.has(body.model))
+        return json({ error: 'Unsupported OpenRouter model' }, 400)
+      return json(await planWithOpenRouter(body, env, body.model))
+    }
   } catch (error) {
     const publicError = getPublicErrorMessage(error)
     logServerPlannerFailure(error, body, publicError)
-    return json({ error: publicError }, 502)
+    return json(createPlannerErrorResponse(error, publicError), 502)
   }
 
   return json({ error: 'Unsupported server planner provider' }, 400)
@@ -123,10 +142,15 @@ export const OPTIONS: APIRoute = function handleOptions() {
   })
 }
 
-async function planWithCloudflareBinding(body: PlannerRequestBody, env: CloudflareEnv): Promise<ToolPlan> {
+async function planWithCloudflareBinding(
+  body: PlannerRequestBody,
+  env: CloudflareEnv
+): Promise<ToolPlan> {
   const ai = env.AI
   if (!ai) {
-    throw new Error('Cloudflare AI binding is unavailable in this runtime. Restart dev with the Astro Cloudflare adapter and remote bindings enabled, or use a Cloudflare preview deployment.')
+    throw new Error(
+      'Cloudflare AI binding is unavailable in this runtime. Restart dev with the Astro Cloudflare adapter and remote bindings enabled, or use a Cloudflare preview deployment.'
+    )
   }
 
   const result = await runCloudflareBindingPlanner(body, ai)
@@ -134,29 +158,41 @@ async function planWithCloudflareBinding(body: PlannerRequestBody, env: Cloudfla
   return parseAndValidatePlan(extractResponseText(result), body.tools)
 }
 
-async function planWithCloudflareRest(body: PlannerRequestBody, env: CloudflareEnv): Promise<ToolPlan> {
+async function planWithCloudflareRest(
+  body: PlannerRequestBody,
+  env: CloudflareEnv
+): Promise<ToolPlan> {
   const accountId = env.CLOUDFLARE_ACCOUNT_ID ?? import.meta.env.CLOUDFLARE_ACCOUNT_ID
   const apiToken = env.CLOUDFLARE_API_TOKEN ?? import.meta.env.CLOUDFLARE_API_TOKEN
   if (!accountId || !apiToken) {
-    throw new Error('Cloudflare Workers AI server mode needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN on the server, or a custom planner endpoint.')
+    throw new Error(
+      'Cloudflare Workers AI server mode needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN on the server, or a custom planner endpoint.'
+    )
   }
 
-  const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${body.model}`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiToken}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(createCloudflarePlannerInput(body, true))
-  })
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${body.model}`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(createCloudflarePlannerInput(body, true))
+    }
+  )
 
   if (!response.ok) throw await createAiEndpointError('Cloudflare Workers AI', response)
 
-  const payload = await response.json() as { result?: { response?: string } }
+  const payload = (await response.json()) as { result?: { response?: string } }
   return parseAndValidatePlan(payload.result?.response?.trim(), body.tools)
 }
 
-async function planWithOpenAI(body: PlannerRequestBody, env: CloudflareEnv, model: string): Promise<ToolPlan> {
+async function planWithOpenAI(
+  body: PlannerRequestBody,
+  env: CloudflareEnv,
+  model: string
+): Promise<ToolPlan> {
   const apiKey = env.OPENAI_API_KEY ?? import.meta.env.OPENAI_API_KEY
   if (!apiKey) {
     throw new Error('OpenAI server mode needs OPENAI_API_KEY on the server.')
@@ -179,23 +215,67 @@ async function planWithOpenAI(body: PlannerRequestBody, env: CloudflareEnv, mode
 
   if (!response.ok) throw await createAiEndpointError('OpenAI', response)
 
-  const payload = await response.json() as OpenAIChatResult
+  const payload = (await response.json()) as OpenAIChatResult
   return parseAndValidatePlan(payload.choices?.[0]?.message?.content?.trim(), body.tools, 'OpenAI')
 }
 
-async function runCloudflareBindingPlanner(body: PlannerRequestBody, ai: NonNullable<CloudflareEnv['AI']>): Promise<CloudflareAiResult> {
+async function planWithOpenRouter(
+  body: PlannerRequestBody,
+  env: CloudflareEnv,
+  model: string
+): Promise<ToolPlan> {
+  const apiKey = env.OPENROUTER_API_KEY ?? import.meta.env.OPENROUTER_API_KEY
+  if (!apiKey) {
+    throw new Error('OpenRouter server mode needs OPENROUTER_API_KEY on the server.')
+  }
+
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model,
+      messages: createPlannerMessages(body),
+      response_format: {
+        type: 'json_object'
+      }
+    })
+  })
+
+  if (!response.ok) throw await createAiEndpointError('OpenRouter', response)
+
+  const payload = (await response.json()) as OpenAIChatResult
+  return parseAndValidatePlan(
+    payload.choices?.[0]?.message?.content?.trim(),
+    body.tools,
+    'OpenRouter'
+  )
+}
+
+async function runCloudflareBindingPlanner(
+  body: PlannerRequestBody,
+  ai: NonNullable<CloudflareEnv['AI']>
+): Promise<CloudflareAiResult> {
   try {
-    return await ai.run(body.model ?? '', createCloudflarePlannerInput(body, true) as never) as CloudflareAiResult
+    return (await ai.run(
+      body.model ?? '',
+      createCloudflarePlannerInput(body, true) as never
+    )) as CloudflareAiResult
   } catch (error) {
     if (!shouldRetryWithoutResponseFormat(error)) throw error
   }
 
-  return await ai.run(body.model ?? '', createCloudflarePlannerInput(body, false) as never) as CloudflareAiResult
+  return (await ai.run(
+    body.model ?? '',
+    createCloudflarePlannerInput(body, false) as never
+  )) as CloudflareAiResult
 }
 
 type PlannerRequestReadResult =
-  | { body: PlannerRequestBody, error?: never, status?: never }
-  | { body?: never, error: string, status: number }
+  | { body: PlannerRequestBody; error?: never; status?: never }
+  | { body?: never; error: string; status: number }
 
 async function readPlannerRequest(request: Request): Promise<PlannerRequestReadResult> {
   const contentLength = Number(request.headers.get('content-length') ?? 0)
@@ -229,7 +309,8 @@ function createPlannerMessages(body: PlannerRequestBody): CloudflareAiInput['mes
   return [
     {
       role: 'system',
-      content: 'Choose one WebMCP tool, or a short ordered tool_sequence when the request requires multiple app actions. Return only one raw JSON object with toolName, input, confidence, reason, and optional steps. Do not return Markdown, HTML, prose, or a code fence.'
+      content:
+        'Choose one WebMCP tool, or a short ordered tool_sequence when the request requires multiple app actions. Return only one raw JSON object with toolName, input, confidence, reason, and optional steps. Do not return Markdown, HTML, prose, or a code fence.'
     },
     {
       role: 'user',
@@ -245,7 +326,10 @@ function createPlannerMessages(body: PlannerRequestBody): CloudflareAiInput['mes
   ]
 }
 
-function createCloudflarePlannerInput(body: PlannerRequestBody, useJsonResponseFormat: boolean): CloudflareAiInput {
+function createCloudflarePlannerInput(
+  body: PlannerRequestBody,
+  useJsonResponseFormat: boolean
+): CloudflareAiInput {
   const input: CloudflareAiInput = {
     messages: createPlannerMessages(body),
     temperature: 0
@@ -262,20 +346,25 @@ function createCloudflarePlannerInput(body: PlannerRequestBody, useJsonResponseF
 
 function shouldRetryWithoutResponseFormat(error: unknown): boolean {
   const message = getErrorMessage(error).toLowerCase()
-  return message.includes('response_format')
-    || message.includes('response format')
-    || message.includes('json')
-    || message.includes('schema')
-    || message.includes('unsupported')
-    || message.includes('not support')
+  return (
+    message.includes('response_format') ||
+    message.includes('response format') ||
+    message.includes('json') ||
+    message.includes('schema') ||
+    message.includes('unsupported') ||
+    message.includes('not support')
+  )
 }
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
-
-async function createAiEndpointError(providerLabel: string, response: Response): Promise<AiEndpointError> {
-  return new AiEndpointError(providerLabel, response.status, await readAiEndpointErrorBody(response))
+async function createAiEndpointError(
+  providerLabel: string,
+  response: Response
+): Promise<AiEndpointError> {
+  return new AiEndpointError(
+    providerLabel,
+    response.status,
+    await readAiEndpointErrorBody(response)
+  )
 }
 
 async function readAiEndpointErrorBody(response: Response): Promise<string> {
@@ -286,7 +375,11 @@ async function readAiEndpointErrorBody(response: Response): Promise<string> {
   }
 }
 
-function parseAndValidatePlan(response: string | undefined, tools: PlannerRequestBody['tools'], providerLabel = 'Cloudflare'): ToolPlan {
+function parseAndValidatePlan(
+  response: string | undefined,
+  tools: PlannerRequestBody['tools'],
+  providerLabel = 'Cloudflare'
+): ToolPlan {
   if (!response) throw new Error(`${providerLabel} returned no response`)
 
   let plan: ToolPlan
@@ -303,7 +396,12 @@ function parseAndValidatePlan(response: string | undefined, tools: PlannerReques
 function extractResponseText(value: unknown): string | undefined {
   if (typeof value === 'string') return value.trim()
 
-  if (value && typeof value === 'object' && 'response' in value && typeof value.response === 'string') {
+  if (
+    value &&
+    typeof value === 'object' &&
+    'response' in value &&
+    typeof value.response === 'string'
+  ) {
     return value.response.trim()
   }
 
@@ -315,22 +413,6 @@ function extractResponseText(value: unknown): string | undefined {
   return undefined
 }
 
-function normalizeJsonText(value: string, providerLabel: string): string {
-  const trimmedValue = value.trim()
-  if (!trimmedValue) throw new Error(`${providerLabel} returned empty text`)
-
-  const fencedMatch = trimmedValue.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
-  if (fencedMatch?.[1]) return fencedMatch[1].trim()
-
-  const firstBraceIndex = trimmedValue.indexOf('{')
-  const lastBraceIndex = trimmedValue.lastIndexOf('}')
-  if (firstBraceIndex !== -1 && lastBraceIndex > firstBraceIndex) {
-    return trimmedValue.slice(firstBraceIndex, lastBraceIndex + 1)
-  }
-
-  throw new Error(`${providerLabel} returned non-JSON text: ${trimmedValue.slice(0, 120)}`)
-}
-
 function getOpenAIModel(model: string | undefined): string | undefined {
   if (!model || model === openAIApiModel) return openAIApiModel
   return undefined
@@ -339,7 +421,8 @@ function getOpenAIModel(model: string | undefined): string | undefined {
 function validatePlan(plan: ToolPlan, tools: PlannerRequestBody['tools']): void {
   if (!plan || typeof plan !== 'object') throw new Error('Invalid plan')
   if (typeof plan.toolName !== 'string') throw new Error('Invalid toolName')
-  if (!plan.input || typeof plan.input !== 'object' || Array.isArray(plan.input)) throw new Error('Invalid input')
+  if (!plan.input || typeof plan.input !== 'object' || Array.isArray(plan.input))
+    throw new Error('Invalid input')
   if (typeof plan.confidence !== 'number') throw new Error('Invalid confidence')
   if (typeof plan.reason !== 'string') throw new Error('Invalid reason')
   if (plan.steps !== undefined) {
@@ -352,7 +435,8 @@ function validatePlan(plan: ToolPlan, tools: PlannerRequestBody['tools']): void 
 
 function validatePlanSequence(plan: ToolPlan, tools: PlannerRequestBody['tools']): void {
   if (plan.toolName !== 'tool_sequence') throw new Error('Invalid tool sequence')
-  if (!Array.isArray(plan.steps) || plan.steps.length === 0) throw new Error('Invalid tool sequence steps')
+  if (!Array.isArray(plan.steps) || plan.steps.length === 0)
+    throw new Error('Invalid tool sequence steps')
   if (plan.steps.length > 5) throw new Error('Tool sequence is too long')
 
   plan.steps.forEach(function validateSequenceStep(step) {
@@ -363,7 +447,8 @@ function validatePlanSequence(plan: ToolPlan, tools: PlannerRequestBody['tools']
 function validatePlanStep(step: ToolPlanStep, tools: PlannerRequestBody['tools']): void {
   if (!step || typeof step !== 'object') throw new Error('Invalid plan step')
   if (typeof step.toolName !== 'string') throw new Error('Invalid step toolName')
-  if (!step.input || typeof step.input !== 'object' || Array.isArray(step.input)) throw new Error('Invalid step input')
+  if (!step.input || typeof step.input !== 'object' || Array.isArray(step.input))
+    throw new Error('Invalid step input')
   if (typeof step.confidence !== 'number') throw new Error('Invalid step confidence')
   if (typeof step.reason !== 'string') throw new Error('Invalid step reason')
 
@@ -412,7 +497,11 @@ function getJsonHeaders(): HeadersInit {
   }
 }
 
-function logServerPlannerFailure(error: unknown, body: PlannerRequestBody, publicError: string): void {
+function logServerPlannerFailure(
+  error: unknown,
+  body: PlannerRequestBody,
+  publicError: string
+): void {
   console.error('Server planner returned 502', {
     event: 'webmcp.serverPlanner.502',
     provider: body.provider,
@@ -449,7 +538,8 @@ function serializePlannerError(error: unknown): Record<string, unknown> {
   return {
     name: error.name,
     message: sanitizeLogText(error.message),
-    upstreamResponse: error instanceof AiEndpointError ? sanitizeLogText(error.responseText) : undefined,
+    upstreamResponse:
+      error instanceof AiEndpointError ? sanitizeLogText(error.responseText) : undefined,
     stack: sanitizeLogText(error.stack ?? '')
   }
 }
@@ -459,6 +549,22 @@ function sanitizeLogText(value: string): string {
     .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [redacted]')
     .replace(/sk-[A-Za-z0-9_-]+/g, 'sk-[redacted]')
     .slice(0, 2000)
+}
+
+function createPlannerErrorResponse(
+  error: unknown,
+  publicError: string
+): { error: string; upstreamError?: string } {
+  if (!import.meta.env.DEV || !(error instanceof AiEndpointError) || !error.responseText) {
+    return {
+      error: publicError
+    }
+  }
+
+  return {
+    error: publicError,
+    upstreamError: sanitizeLogText(error.responseText)
+  }
 }
 
 function getPublicErrorMessage(error: unknown): string {
@@ -476,6 +582,10 @@ function getPublicErrorMessage(error: unknown): string {
     return 'OpenAI server mode needs OPENAI_API_KEY on the server.'
   }
 
+  if (message.includes('OPENROUTER_API_KEY')) {
+    return 'OpenRouter server mode needs OPENROUTER_API_KEY on the server.'
+  }
+
   if (isSafePlannerFailureMessage(message)) {
     return message
   }
@@ -488,10 +598,13 @@ function getPublicErrorMessage(error: unknown): string {
 }
 
 function isSafePlannerFailureMessage(message: string): boolean {
-  return message.startsWith('Cloudflare returned')
-    || message.startsWith('OpenAI returned')
-    || message.startsWith('Invalid ')
-    || message.startsWith('Unknown tool')
-    || message.startsWith('Selected tool has no input schema')
-    || message.startsWith('Tool sequence is too long')
+  return (
+    message.startsWith('Cloudflare returned') ||
+    message.startsWith('OpenAI returned') ||
+    message.startsWith('OpenRouter returned') ||
+    message.startsWith('Invalid ') ||
+    message.startsWith('Unknown tool') ||
+    message.startsWith('Selected tool has no input schema') ||
+    message.startsWith('Tool sequence is too long')
+  )
 }

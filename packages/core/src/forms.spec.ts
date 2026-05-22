@@ -101,8 +101,12 @@ describe('form helpers', () => {
     })
 
     expect(registration.warnings).toContain('Form field "email" needs a specific tool description.')
-    expect(registration.warnings).toContain('Form field "email" is exposed without validation constraints.')
-    expect(registration.warnings).toContain('Sensitive form field "password" should require explicit confirmation or be excluded.')
+    expect(registration.warnings).toContain(
+      'Form field "email" is exposed without validation constraints.'
+    )
+    expect(registration.warnings).toContain(
+      'Sensitive form field "password" should require explicit confirmation or be excluded.'
+    )
   })
 
   it('infers checkbox fields and official tool parameter description overrides', () => {
@@ -161,7 +165,9 @@ describe('form helpers', () => {
     })
 
     expect(email.getAttribute('toolparamtitle')).toBe('Customer email')
-    expect(email.getAttribute('toolparamdescription')).toBe('Email address that receives the support reply.')
+    expect(email.getAttribute('toolparamdescription')).toBe(
+      'Email address that receives the support reply.'
+    )
     expect(inferFormInputSchema(form).properties?.email).toEqual({
       type: 'string',
       format: 'email',

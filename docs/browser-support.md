@@ -38,6 +38,8 @@ Fallback mode is not the same as native browser-agent access. It does not give t
 
 The demo can use Chrome built-in AI through `window.LanguageModel` when available. Requests should specify an output language. WebMCP Kit uses English output for planner calls so Chrome can optimize quality and safety checks.
 
+The command input adds Chrome built-in AI to the provider selector when the browser exposes an available `LanguageModel` API. Consumers can hide that option with `showChromeAI: false`.
+
 If Chrome built-in AI is unavailable, downloadable, or still initializing, the planner can fall back to local heuristics or a configured provider.
 
 ## Inspecting Tools

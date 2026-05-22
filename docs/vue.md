@@ -12,24 +12,27 @@ const isSupportRoute = computed(function getIsSupportRoute() {
   return window.location.pathname.startsWith('/support')
 })
 
-useWebMCPTool(defineTool({
-  name: 'create_ticket',
-  description: 'Create a support ticket from the current Vue screen.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      subject: { type: 'string' }
+useWebMCPTool(
+  defineTool({
+    name: 'create_ticket',
+    description: 'Create a support ticket from the current Vue screen.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        subject: { type: 'string' }
+      },
+      required: ['subject'],
+      additionalProperties: false
     },
-    required: ['subject'],
-    additionalProperties: false
-  },
-  execute(input) {
-    return {
-      subject: input.subject
+    execute(input) {
+      return {
+        subject: input.subject
+      }
     }
+  }),
+  {
+    when: isSupportRoute
   }
-}), {
-  when: isSupportRoute
-})
+)
 </script>
 ```

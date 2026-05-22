@@ -7,24 +7,26 @@ These examples show the current WebMCP Kit adoption path: expose narrow app acti
 ```ts
 import { defineTool, registerTool } from '@webmcp-kit/core'
 
-registerTool(defineTool({
-  name: 'search_products',
-  description: 'Search the local product catalog.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      query: { type: 'string' }
+registerTool(
+  defineTool({
+    name: 'search_products',
+    description: 'Search the local product catalog.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string' }
+      },
+      required: ['query'],
+      additionalProperties: false
     },
-    required: ['query'],
-    additionalProperties: false
-  },
-  annotations: {
-    readOnlyHint: true
-  },
-  execute(input) {
-    return searchProducts(String(input.query))
-  }
-}))
+    annotations: {
+      readOnlyHint: true
+    },
+    execute(input) {
+      return searchProducts(String(input.query))
+    }
+  })
+)
 ```
 
 ## Vue Lifecycle
@@ -39,26 +41,29 @@ const isCatalogRoute = computed(function getIsCatalogRoute() {
   return window.location.pathname.startsWith('/catalog')
 })
 
-useWebMCPTool(defineTool({
-  name: 'search_products',
-  description: 'Search the visible product catalog.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      query: { type: 'string' }
+useWebMCPTool(
+  defineTool({
+    name: 'search_products',
+    description: 'Search the visible product catalog.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string' }
+      },
+      required: ['query'],
+      additionalProperties: false
     },
-    required: ['query'],
-    additionalProperties: false
-  },
-  annotations: {
-    readOnlyHint: true
-  },
-  execute(input) {
-    return searchProducts(String(input.query))
+    annotations: {
+      readOnlyHint: true
+    },
+    execute(input) {
+      return searchProducts(String(input.query))
+    }
+  }),
+  {
+    when: isCatalogRoute
   }
-}), {
-  when: isCatalogRoute
-})
+)
 </script>
 ```
 
@@ -67,29 +72,31 @@ useWebMCPTool(defineTool({
 ```ts
 import { defineTool, registerTool, setConfirmationHandler } from '@webmcp-kit/core'
 
-registerTool(defineTool({
-  name: 'checkout_cart',
-  description: 'Checkout the current cart after explicit user approval.',
-  inputSchema: {
-    type: 'object',
-    properties: {},
-    required: [],
-    additionalProperties: false
-  },
-  confirmation: {
-    required: true,
-    reason: 'Checkout clears the cart and represents a purchase action.'
-  },
-  scope() {
-    return {
-      available: cartHasItems(),
-      reason: 'Cart is empty.'
+registerTool(
+  defineTool({
+    name: 'checkout_cart',
+    description: 'Checkout the current cart after explicit user approval.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: [],
+      additionalProperties: false
+    },
+    confirmation: {
+      required: true,
+      reason: 'Checkout clears the cart and represents a purchase action.'
+    },
+    scope() {
+      return {
+        available: cartHasItems(),
+        reason: 'Cart is empty.'
+      }
+    },
+    execute() {
+      return checkoutCart()
     }
-  },
-  execute() {
-    return checkoutCart()
-  }
-}))
+  })
+)
 
 setConfirmationHandler(async function confirmTool(tool, input, reason) {
   return showConfirmationModal({

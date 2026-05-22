@@ -24,7 +24,13 @@
       <div v-if="cart.length === 0" class="empty-state">No cart lines yet.</div>
       <div v-for="line in cart" :key="line.productId" class="cart-line">
         <span>{{ line.name }}</span>
-        <input :value="line.quantity" type="number" min="1" :aria-label="`Quantity for ${line.name}`" @input="updateLine(line.productId, $event)" />
+        <input
+          :value="line.quantity"
+          type="number"
+          min="1"
+          :aria-label="`Quantity for ${line.name}`"
+          @input="updateLine(line.productId, $event)"
+        />
         <strong>€{{ line.price * line.quantity }}</strong>
         <button type="button" @click="removeLine(line.productId)">Remove</button>
       </div>

@@ -58,64 +58,77 @@ onUnmounted(function handleUnmounted() {
 })
 
 function registerSupportTools() {
-  unregisterCallbacks.push(registerTool(defineTool({
-    name: 'update_ticket',
-    description: 'Update a support ticket status, assignee, or priority from the visible ticket board.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        id: {
-          type: 'string'
+  unregisterCallbacks.push(
+    registerTool(
+      defineTool({
+        name: 'update_ticket',
+        description:
+          'Update a support ticket status, assignee, or priority from the visible ticket board.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string'
+            },
+            status: {
+              type: 'string',
+              enum: ['new', 'triaged', 'in_progress', 'resolved']
+            },
+            assignee: {
+              type: 'string'
+            },
+            priority: {
+              type: 'string',
+              enum: ['low', 'medium', 'high', 'urgent']
+            }
+          },
+          required: ['id'],
+          additionalProperties: false
         },
-        status: {
-          type: 'string',
-          enum: ['new', 'triaged', 'in_progress', 'resolved']
+        guard(input) {
+          return (
+            tickets.value.some(function hasTicket(ticket) {
+              return ticket.id === String(input.id ?? '')
+            }) || 'Ticket is not visible in the current board.'
+          )
         },
-        assignee: {
-          type: 'string'
-        },
-        priority: {
-          type: 'string',
-          enum: ['low', 'medium', 'high', 'urgent']
-        }
-      },
-      required: ['id'],
-      additionalProperties: false
-    },
-    guard(input) {
-      return tickets.value.some(function hasTicket(ticket) {
-        return ticket.id === String(input.id ?? '')
-      }) || 'Ticket is not visible in the current board.'
-    },
-    execute(input) {
-      tickets.value = tickets.value.map(function mapTicket(ticket) {
-        if (ticket.id !== String(input.id)) return ticket
-        return {
-          ...ticket,
-          assignee: typeof input.assignee === 'string' ? input.assignee : ticket.assignee,
-          priority: isTicketPriority(input.priority) ? input.priority : ticket.priority,
-          status: isTicketStatus(input.status) ? input.status : ticket.status
+        execute(input) {
+          tickets.value = tickets.value.map(function mapTicket(ticket) {
+            if (ticket.id !== String(input.id)) return ticket
+            return {
+              ...ticket,
+              assignee: typeof input.assignee === 'string' ? input.assignee : ticket.assignee,
+              priority: isTicketPriority(input.priority) ? input.priority : ticket.priority,
+              status: isTicketStatus(input.status) ? input.status : ticket.status
+            }
+          })
+          return tickets.value.find(function findTicket(ticket) {
+            return ticket.id === String(input.id)
+          })
         }
       })
-      return tickets.value.find(function findTicket(ticket) {
-        return ticket.id === String(input.id)
-      })
-    }
-  })).unregister)
+    ).unregister
+  )
 }
 
 function registerSupportFormTool() {
   const form = supportTicketPanel.value?.supportForm
   if (!form) return
 
-  unregisterCallbacks.push(registerFormTool({
-    form,
-    name: 'create_support_ticket',
-    description: 'Create a support ticket from the visible support form and mark it as open for triage.',
-    execute(input) {
-      return createSupportTicket(String(input.subject ?? 'Support request'), String(input.body ?? ''))
-    }
-  }).unregister)
+  unregisterCallbacks.push(
+    registerFormTool({
+      form,
+      name: 'create_support_ticket',
+      description:
+        'Create a support ticket from the visible support form and mark it as open for triage.',
+      execute(input) {
+        return createSupportTicket(
+          String(input.subject ?? 'Support request'),
+          String(input.body ?? '')
+        )
+      }
+    }).unregister
+  )
 }
 
 function updateTicketStatus(id: string, status: SupportTicket['status']) {

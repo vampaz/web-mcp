@@ -18,7 +18,12 @@
     <ul class="inventory-grid" aria-label="Selectable inventory items">
       <li v-for="(item, index) in items" :key="item.id" :class="{ selected: item.selected }">
         <label>
-          <input :checked="item.selected" type="checkbox" :aria-label="`Select ${item.name}`" @change="toggleItem(item.id, $event)" />
+          <input
+            :checked="item.selected"
+            type="checkbox"
+            :aria-label="`Select ${item.name}`"
+            @change="toggleItem(item.id, $event)"
+          />
           <span>{{ index + 1 }}.</span>
           <strong>{{ item.name }}</strong>
         </label>

@@ -1,7 +1,12 @@
 import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { clearToolsForTest, invokeTool, listTools, type WebMCPCommandInputElement } from '@webmcp-kit/core'
+import {
+  clearToolsForTest,
+  invokeTool,
+  listTools,
+  type WebMCPCommandInputElement
+} from '@webmcp-kit/core'
 
 import CommerceDemo from './CommerceDemo.vue'
 import InventoryDemo from './InventoryDemo.vue'
@@ -42,12 +47,14 @@ describe('demo pages', () => {
     const commandTextInput = getCommandTextInput(commandInput)
     expect(commandTextInput.value).toBe('')
     expect(commandTextInput.getAttribute('placeholder')).toBe('Try: Select all French items')
-    const providerControl = commandInput.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
-    expect(providerControl).toBeInstanceOf(HTMLSelectElement)
-    expect(providerControl?.value).toBe('auto')
+    expect(commandInput.shadowRoot?.querySelector('[data-provider]')).toBeNull()
     expect(commandInput.shadowRoot?.querySelector('[data-model]')).toBeNull()
-    const diagnosticsRow = commandInput.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-diagnostics')
-    const diagnosticsSlot = commandInput.shadowRoot?.querySelector<HTMLSlotElement>('slot[name="diagnostics"]')
+    expect(commandInput.shadowRoot?.querySelector('.webmcp-settings')).toBeNull()
+    const diagnosticsRow =
+      commandInput.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-diagnostics')
+    const diagnosticsSlot = commandInput.shadowRoot?.querySelector<HTMLSlotElement>(
+      'slot[name="diagnostics"]'
+    )
     expect(diagnosticsRow).toBeInstanceOf(HTMLDetailsElement)
     expect(diagnosticsSlot?.assignedElements()[0]?.getAttribute('data-webmcp-diagnostics')).toBe('')
     expect(wrapper.find('details.diagnostics-panel').exists()).toBe(false)
@@ -61,29 +68,17 @@ describe('demo pages', () => {
     expect(window.confirm).not.toHaveBeenCalled()
   })
 
-  it('shows model controls after choosing a local development provider', async () => {
+  it('uses local deterministic planning when demo tests do not configure endpoints', async () => {
     const wrapper = mountWithDeps(InventoryDemo, { attachTo: document.body })
     await flushPromises()
 
     const commandInput = await getCommandInput(wrapper)
-    const providerControl = commandInput.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
-    if (!providerControl) throw new Error('Expected provider control.')
-
-    providerControl.value = 'local'
-    providerControl.dispatchEvent(new Event('change', { bubbles: true }))
+    await commandInput.run('Select all French items')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Local heuristic planner')
-
-    providerControl.value = 'openai'
-    providerControl.dispatchEvent(new Event('change', { bubbles: true }))
-    await flushPromises()
-
-    const settings = commandInput.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-settings')
-    const modelControl = commandInput.shadowRoot?.querySelector<HTMLSelectElement>('[data-model]')
-    expect(settings?.open).toBe(true)
-    expect(modelControl).toBeInstanceOf(HTMLSelectElement)
-    expect(modelControl?.value).toBe('gpt-5.4-mini')
+    expect(wrapper.text()).toContain('5 selected')
+    expect(commandInput.shadowRoot?.querySelector('[data-provider]')).toBeNull()
+    expect(commandInput.shadowRoot?.querySelector('[data-model]')).toBeNull()
   })
 
   it('uses page-specific command examples', async () => {
@@ -143,11 +138,13 @@ describe('demo pages', () => {
     const wrapper = mountWithDeps(CommerceDemo, { attachTo: document.body })
     await flushPromises()
 
-    await expect(invokeTool({
-      toolName: 'checkout_cart',
-      input: {},
-      confirmed: true
-    })).resolves.toMatchObject({
+    await expect(
+      invokeTool({
+        toolName: 'checkout_cart',
+        input: {},
+        confirmed: true
+      })
+    ).resolves.toMatchObject({
       status: 'blocked',
       error: 'Cart is empty.'
     })
@@ -162,19 +159,23 @@ describe('demo pages', () => {
     await flushPromises()
 
     vi.mocked(window.confirm).mockReturnValueOnce(false)
-    await expect(invokeTool({
-      toolName: 'checkout_cart',
-      input: {}
-    })).resolves.toMatchObject({
+    await expect(
+      invokeTool({
+        toolName: 'checkout_cart',
+        input: {}
+      })
+    ).resolves.toMatchObject({
       status: 'blocked',
       error: 'Checkout clears the cart and represents a purchase action.'
     })
 
-    await expect(invokeTool({
-      toolName: 'checkout_cart',
-      input: {},
-      confirmed: true
-    })).resolves.toMatchObject({
+    await expect(
+      invokeTool({
+        toolName: 'checkout_cart',
+        input: {},
+        confirmed: true
+      })
+    ).resolves.toMatchObject({
       status: 'success',
       output: {
         total: 258
@@ -207,7 +208,9 @@ describe('demo pages', () => {
   })
 })
 
-async function getCommandInput(wrapper: ReturnType<typeof mountWithDeps>): Promise<WebMCPCommandInputElement> {
+async function getCommandInput(
+  wrapper: ReturnType<typeof mountWithDeps>
+): Promise<WebMCPCommandInputElement> {
   await customElements.whenDefined('webmcp-command-input')
   const element = wrapper.find('webmcp-command-input').element as WebMCPCommandInputElement
   if (!element.shadowRoot) throw new Error('Expected WebMCP command input shadow root.')
@@ -233,7 +236,9 @@ async function expectCommandPlaceholder(component: object, placeholder: string) 
 }
 
 function getRegisteredToolNames(): string[] {
-  return listTools().map(function getToolName(entry) {
-    return entry.tool.name
-  }).sort()
+  return listTools()
+    .map(function getToolName(entry) {
+      return entry.tool.name
+    })
+    .sort()
 }

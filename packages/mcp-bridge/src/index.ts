@@ -47,7 +47,10 @@ function listToolsForBridge(): MCPBridgeTool[] {
   return listTools().map(toBridgeTool)
 }
 
-async function callTool(name: string, input: Record<string, unknown>): Promise<ToolInvocationResult> {
+async function callTool(
+  name: string,
+  input: Record<string, unknown>
+): Promise<ToolInvocationResult> {
   return invokeTool({
     toolName: name,
     input,
@@ -102,7 +105,11 @@ function toBridgeTool(registration: RegisteredTool): MCPBridgeTool {
   }
 }
 
-function createErrorResponse(request: MCPBridgeRequest, code: number, message: string): MCPBridgeResponse {
+function createErrorResponse(
+  request: MCPBridgeRequest,
+  code: number,
+  message: string
+): MCPBridgeResponse {
   return {
     jsonrpc: '2.0',
     id: request.id,

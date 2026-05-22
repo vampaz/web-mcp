@@ -25,13 +25,17 @@ export function assertValidTool<TInput = Record<string, unknown>, TOutput = unkn
 
   const inputSchemaErrors = validateJsonSchema(tool.inputSchema, 'inputSchema')
   if (inputSchemaErrors.length > 0) {
-    throw new Error(`Tool "${tool.name}" has an invalid input schema: ${inputSchemaErrors.join(' ')}`)
+    throw new Error(
+      `Tool "${tool.name}" has an invalid input schema: ${inputSchemaErrors.join(' ')}`
+    )
   }
 
   if (tool.outputSchema) {
     const outputSchemaErrors = validateJsonSchema(tool.outputSchema, 'outputSchema')
     if (outputSchemaErrors.length > 0) {
-      throw new Error(`Tool "${tool.name}" has an invalid output schema: ${outputSchemaErrors.join(' ')}`)
+      throw new Error(
+        `Tool "${tool.name}" has an invalid output schema: ${outputSchemaErrors.join(' ')}`
+      )
     }
   }
 

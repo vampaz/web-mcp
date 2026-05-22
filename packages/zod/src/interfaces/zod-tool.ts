@@ -19,4 +19,7 @@ export interface DefineZodToolOptions<TSchema extends z.ZodType, TOutput = unkno
   execute: (input: z.infer<TSchema>, context: ToolContext) => Promise<TOutput> | TOutput
 }
 
-export type ZodWebMCPTool<TSchema extends z.ZodType, TOutput = unknown> = WebMCPTool<z.infer<TSchema>, TOutput>
+export type ZodWebMCPTool<TSchema extends z.ZodType, TOutput = unknown> = WebMCPTool<
+  z.infer<TSchema>,
+  TOutput
+>

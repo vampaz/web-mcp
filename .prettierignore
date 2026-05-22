@@ -1,0 +1,6 @@
+node_modules
+demo/dist
+demo/.astro
+.wrangler
+test-results
+package-lock.json

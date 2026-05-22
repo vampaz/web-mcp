@@ -6,4 +6,7 @@ export interface UseWebMCPToolOptions {
   when?: boolean | (() => boolean) | Readable<boolean>
 }
 
-export type SvelteWebMCPTool<TInput = Record<string, unknown>, TOutput = unknown> = WebMCPTool<TInput, TOutput>
+export type SvelteWebMCPTool<TInput = Record<string, unknown>, TOutput = unknown> = WebMCPTool<
+  TInput,
+  TOutput
+>

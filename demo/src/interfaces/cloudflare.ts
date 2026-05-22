@@ -5,4 +5,5 @@ export interface CloudflareEnv {
   CLOUDFLARE_ACCOUNT_ID?: string
   CLOUDFLARE_API_TOKEN?: string
   OPENAI_API_KEY?: string
+  OPENROUTER_API_KEY?: string
 }

@@ -48,49 +48,57 @@ onUnmounted(function handleUnmounted() {
 })
 
 function registerInventoryTools() {
-  unregisterCallbacks.push(registerTool(defineTool({
-    name: 'select_items',
-    description: 'Select visible inventory items by stable item IDs.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        ids: {
-          type: 'array',
-          items: {
-            type: 'string'
+  unregisterCallbacks.push(
+    registerTool(
+      defineTool({
+        name: 'select_items',
+        description: 'Select visible inventory items by stable item IDs.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            ids: {
+              type: 'array',
+              items: {
+                type: 'string'
+              },
+              description: 'Stable item IDs to select from the visible inventory.'
+            }
           },
-          description: 'Stable item IDs to select from the visible inventory.'
-        }
-      },
-      required: ['ids'],
-      additionalProperties: false
-    },
-    execute(input) {
-      const ids = Array.isArray(input.ids) ? input.ids.map(String) : []
-      selectableItems.value = selectableItems.value.map(function mapItem(item) {
-        return {
-          ...item,
-          selected: ids.includes(item.id)
+          required: ['ids'],
+          additionalProperties: false
+        },
+        execute(input) {
+          const ids = Array.isArray(input.ids) ? input.ids.map(String) : []
+          selectableItems.value = selectableItems.value.map(function mapItem(item) {
+            return {
+              ...item,
+              selected: ids.includes(item.id)
+            }
+          })
+          return selectedItems.value
         }
       })
-      return selectedItems.value
-    }
-  })).unregister)
+    ).unregister
+  )
 
-  unregisterCallbacks.push(registerTool(defineTool({
-    name: 'clear_item_selection',
-    description: 'Clear the current semantic inventory selection.',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      required: [],
-      additionalProperties: false
-    },
-    execute() {
-      clearItemSelection()
-      return []
-    }
-  })).unregister)
+  unregisterCallbacks.push(
+    registerTool(
+      defineTool({
+        name: 'clear_item_selection',
+        description: 'Clear the current semantic inventory selection.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          required: [],
+          additionalProperties: false
+        },
+        execute() {
+          clearItemSelection()
+          return []
+        }
+      })
+    ).unregister
+  )
 }
 
 function setItemSelected(id: string, selected: boolean) {

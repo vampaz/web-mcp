@@ -2,9 +2,24 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { defineWebMCPCommandInput } from './command-input'
 import { defineTool } from './define-tool'
-import type { WebMCPCommandInputElement, WebMCPCommandPlannerEventDetail, WebMCPCommandResultEventDetail } from './interfaces/command-input'
+import type {
+  WebMCPCommandInputElement,
+  WebMCPCommandPlannerEventDetail,
+  WebMCPCommandResultEventDetail
+} from './interfaces/command-input'
 import type { ToolPlan, ToolPlanner } from './interfaces/tool'
 import { clearToolsForTest, registerTool } from './registry'
+
+interface WindowWithLanguageModel extends Window {
+  LanguageModel?: {
+    availability: (
+      options?: unknown
+    ) => Promise<'available' | 'downloadable' | 'downloading' | 'unavailable'>
+    create: (options?: unknown) => Promise<{
+      prompt: (message: string) => Promise<string>
+    }>
+  }
+}
 
 let tagCounter = 0
 const defaultViewport = {
@@ -15,6 +30,7 @@ const defaultViewport = {
 describe('WebMCP command input', () => {
   afterEach(() => {
     clearToolsForTest()
+    delete (window as WindowWithLanguageModel).LanguageModel
     document.body.innerHTML = ''
     setViewportSize(defaultViewport.width, defaultViewport.height)
   })
@@ -25,19 +41,21 @@ describe('WebMCP command input', () => {
         query: input.query
       }
     })
-    registerTool(defineTool({
-      name: 'search_products',
-      description: 'Search visible products.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          query: { type: 'string' }
+    registerTool(
+      defineTool({
+        name: 'search_products',
+        description: 'Search visible products.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string' }
+          },
+          required: ['query'],
+          additionalProperties: false
         },
-        required: ['query'],
-        additionalProperties: false
-      },
-      execute
-    }))
+        execute
+      })
+    )
 
     const planner: ToolPlanner = {
       name: 'Test planner',
@@ -46,9 +64,11 @@ describe('WebMCP command input', () => {
       detail: 'Ready for tests.',
       async plan(message, tools, context) {
         expect(message).toBe('Find docks')
-        expect(tools.map(function mapTool(tool) {
-          return tool.name
-        })).toEqual(['search_products'])
+        expect(
+          tools.map(function mapTool(tool) {
+            return tool.name
+          })
+        ).toEqual(['search_products'])
         expect(context).toEqual({
           route: 'catalog'
         })
@@ -85,30 +105,35 @@ describe('WebMCP command input', () => {
     expect(event.detail.result.output).toEqual({
       query: 'dock'
     })
-    expect(execute).toHaveBeenCalledWith({
-      query: 'dock'
-    }, {
-      source: 'planner'
-    })
+    expect(execute).toHaveBeenCalledWith(
+      {
+        query: 'dock'
+      },
+      {
+        source: 'planner'
+      }
+    )
   })
 
   it('marks the run button as planning while the planner is working', async () => {
     const planRequest = createDeferred<ToolPlan>()
-    registerTool(defineTool({
-      name: 'search_products',
-      description: 'Search visible products.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          query: { type: 'string' }
+    registerTool(
+      defineTool({
+        name: 'search_products',
+        description: 'Search visible products.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string' }
+          },
+          required: ['query'],
+          additionalProperties: false
         },
-        required: ['query'],
-        additionalProperties: false
-      },
-      execute(input) {
-        return input
-      }
-    }))
+        execute(input) {
+          return input
+        }
+      })
+    )
 
     const planner: ToolPlanner = {
       name: 'Slow planner',
@@ -156,48 +181,107 @@ describe('WebMCP command input', () => {
     expect(element.shadowRoot?.querySelector('[data-model]')).toBeNull()
   })
 
-  it('restores provider controls when a fixed provider attribute is removed', async () => {
+  it('does not render planner controls without consumer endpoint options', async () => {
     const element = createCommandInputElement()
-    element.setAttribute('provider', 'openai')
-    element.setAttribute('model', 'gpt-5.4-mini')
 
     document.body.append(element)
     await Promise.resolve()
 
-    element.removeAttribute('provider')
-    await Promise.resolve()
-
-    const provider = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
-    expect(provider).toBeInstanceOf(HTMLSelectElement)
-    expect(provider?.value).toBe('auto')
     expect(element.shadowRoot?.querySelector('[data-model]')).toBeNull()
+    expect(element.shadowRoot?.querySelector('[data-provider]')).toBeNull()
+    expect(element.shadowRoot?.querySelector('.webmcp-settings')).toBeNull()
   })
 
-  it('shows configurable provider and model controls when they are not fixed', async () => {
+  it('renders no planner controls for one consumer endpoint option', async () => {
     const element = createCommandInputElement()
+    element.configure({
+      endpointOptions: [
+        {
+          label: 'GPT-5.4 mini',
+          model: 'gpt-5.4-mini',
+          provider: 'openai'
+        }
+      ]
+    })
+    document.body.append(element)
+    await Promise.resolve()
+
+    expect(element.shadowRoot?.querySelector('[data-model]')).toBeNull()
+    expect(element.shadowRoot?.querySelector('[data-provider]')).toBeNull()
+    expect(element.shadowRoot?.querySelector('.webmcp-settings')).toBeNull()
+  })
+
+  it('shows provider and model controls from consumer endpoint options', async () => {
+    const element = createCommandInputElement()
+    element.configure({
+      endpointOptions: [
+        {
+          label: 'OpenRouter Nemotron',
+          model: 'nvidia/nemotron-3-super-120b-a12b:free',
+          provider: 'openrouter'
+        },
+        {
+          label: 'OpenRouter Nano',
+          model: 'nvidia/nemotron-nano-9b-v2:free',
+          provider: 'openrouter'
+        },
+        {
+          label: 'Cloudflare GLM',
+          model: '@cf/zai-org/glm-4.7-flash',
+          provider: 'cloudflare-binding'
+        },
+        {
+          label: 'GPT-5.4 mini',
+          model: 'gpt-5.4-mini',
+          provider: 'openai'
+        }
+      ]
+    })
     document.body.append(element)
     await Promise.resolve()
 
     const provider = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
     expect(provider).toBeInstanceOf(HTMLSelectElement)
-    expect(element.shadowRoot?.querySelector('[data-model]')).toBeNull()
-
     if (!provider) throw new Error('Expected provider control.')
-    provider.value = 'openai'
-    provider.dispatchEvent(new Event('change', { bubbles: true }))
-
     const settings = element.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-settings')
     const model = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-model]')
-    expect(settings?.open).toBe(true)
+    expect(settings).toBeInstanceOf(HTMLDetailsElement)
     expect(model).toBeInstanceOf(HTMLSelectElement)
-    expect(model?.value).toBe('gpt-5.4-mini')
-    expect(Array.from(model?.options ?? []).map(function mapOption(option) {
-      return option.value
-    })).toEqual(['gpt-5.4-mini'])
+    expect(provider.value).toBe('openrouter')
+    expect(model?.value).toBe('nvidia/nemotron-3-super-120b-a12b:free')
+    expect(
+      Array.from(provider.options).map(function mapOption(option) {
+        return option.textContent
+      })
+    ).toEqual(['OpenRouter', 'Cloudflare binding', 'OpenAI'])
+    expect(
+      Array.from(model?.options ?? []).map(function mapOption(option) {
+        return option.textContent
+      })
+    ).toEqual(['OpenRouter Nemotron', 'OpenRouter Nano'])
   })
 
-  it('shows Cloudflare models as a dropdown after choosing Cloudflare binding', async () => {
+  it('updates the model control when the selected configured provider changes', async () => {
     const element = createCommandInputElement()
+    element.configure({
+      endpointOptions: [
+        {
+          label: 'Nemotron 3 Super 120B A12B',
+          model: 'nvidia/nemotron-3-super-120b-a12b:free',
+          provider: 'openrouter'
+        },
+        {
+          label: 'Nemotron Nano 9B V2',
+          model: 'nvidia/nemotron-nano-9b-v2:free',
+          provider: 'openrouter'
+        },
+        {
+          label: 'GLM 4.7 Flash',
+          model: '@cf/zai-org/glm-4.7-flash',
+          provider: 'cloudflare-binding'
+        }
+      ]
+    })
     document.body.append(element)
     await Promise.resolve()
 
@@ -207,13 +291,190 @@ describe('WebMCP command input', () => {
     provider.dispatchEvent(new Event('change', { bubbles: true }))
 
     const settings = element.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-settings')
-    const model = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-model]')
+    const model = element.shadowRoot?.querySelector('[data-model]')
     expect(settings?.open).toBe(true)
-    expect(model).toBeInstanceOf(HTMLSelectElement)
-    expect(model?.value).toBe('@cf/zai-org/glm-4.7-flash')
-    expect(Array.from(model?.options ?? []).map(function mapOption(option) {
-      return option.value
-    })).toContain('@cf/openai/gpt-oss-20b')
+    expect(provider.value).toBe('cloudflare-binding')
+    expect(model).toBeNull()
+    expect(element.shadowRoot?.textContent).toContain('Cloudflare binding · GLM 4.7 Flash')
+  })
+
+  it('adds Chrome built-in AI when the browser exposes the local LanguageModel API', async () => {
+    ;(window as WindowWithLanguageModel).LanguageModel = {
+      availability: async () => 'available',
+      create: async () => ({
+        prompt: async () =>
+          JSON.stringify({
+            toolName: 'select_items',
+            input: { ids: ['item_8'] },
+            confidence: 0.9,
+            reason: 'Chrome selected water.'
+          })
+      })
+    }
+    const element = createCommandInputElement()
+    element.configure({
+      endpointOptions: [
+        {
+          label: 'GLM 4.7 Flash',
+          model: '@cf/zai-org/glm-4.7-flash',
+          provider: 'cloudflare-binding'
+        },
+        {
+          label: 'Nemotron 3 Super 120B A12B',
+          model: 'nvidia/nemotron-3-super-120b-a12b:free',
+          provider: 'openrouter'
+        }
+      ]
+    })
+    document.body.append(element)
+    await Promise.resolve()
+    await Promise.resolve()
+
+    const provider = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
+    expect(
+      Array.from(provider?.options ?? []).map(function mapOption(option) {
+        return option.textContent
+      })
+    ).toEqual(['Chrome built-in AI', 'Cloudflare binding', 'OpenRouter'])
+    expect(provider?.value).toBe('chrome-built-in')
+
+    if (!provider) throw new Error('Expected provider control.')
+    provider.value = 'chrome-built-in'
+    provider.dispatchEvent(new Event('change', { bubbles: true }))
+    await Promise.resolve()
+
+    expect(element.shadowRoot?.querySelector('[data-model]')).toBeNull()
+    expect(element.shadowRoot?.textContent).toContain('Chrome built-in AI')
+  })
+
+  it('does not override a consumer-selected initial provider when Chrome built-in AI is detected', async () => {
+    ;(window as WindowWithLanguageModel).LanguageModel = {
+      availability: async () => 'available',
+      create: async () => ({
+        prompt: async () => '{}'
+      })
+    }
+    const element = createCommandInputElement()
+    element.configure({
+      initialProvider: 'cloudflare-binding',
+      initialModel: '@cf/zai-org/glm-4.7-flash',
+      endpointOptions: [
+        {
+          label: 'GLM 4.7 Flash',
+          model: '@cf/zai-org/glm-4.7-flash',
+          provider: 'cloudflare-binding'
+        },
+        {
+          label: 'Nemotron 3 Super 120B A12B',
+          model: 'nvidia/nemotron-3-super-120b-a12b:free',
+          provider: 'openrouter'
+        }
+      ]
+    })
+    document.body.append(element)
+    await Promise.resolve()
+    await Promise.resolve()
+
+    const provider = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
+    expect(
+      Array.from(provider?.options ?? []).map(function mapOption(option) {
+        return option.textContent
+      })
+    ).toEqual(['Chrome built-in AI', 'Cloudflare binding', 'OpenRouter'])
+    expect(provider?.value).toBe('cloudflare-binding')
+  })
+
+  it('lets consumers hide detected Chrome built-in AI', async () => {
+    ;(window as WindowWithLanguageModel).LanguageModel = {
+      availability: async () => 'available',
+      create: async () => ({
+        prompt: async () => '{}'
+      })
+    }
+    const element = createCommandInputElement()
+    element.configure({
+      showChromeAI: false,
+      endpointOptions: [
+        {
+          label: 'GLM 4.7 Flash',
+          model: '@cf/zai-org/glm-4.7-flash',
+          provider: 'cloudflare-binding'
+        },
+        {
+          label: 'Nemotron 3 Super 120B A12B',
+          model: 'nvidia/nemotron-3-super-120b-a12b:free',
+          provider: 'openrouter'
+        }
+      ]
+    })
+    document.body.append(element)
+    await Promise.resolve()
+    await Promise.resolve()
+
+    const provider = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
+    expect(
+      Array.from(provider?.options ?? []).map(function mapOption(option) {
+        return option.textContent
+      })
+    ).toEqual(['Cloudflare binding', 'OpenRouter'])
+  })
+
+  it('routes OpenRouter planning through the configured server endpoint', async () => {
+    const fetch = vi.fn(async () =>
+      Response.json({
+        toolName: 'select_items',
+        input: { ids: ['item_8'] },
+        confidence: 0.91,
+        reason: 'Server selected water.'
+      })
+    )
+    vi.stubGlobal('fetch', fetch)
+    registerTool(
+      defineTool({
+        name: 'select_items',
+        description: 'Select checklist items.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute(input) {
+          return input
+        }
+      })
+    )
+
+    const element = createCommandInputElement()
+    element.configure({
+      endpoint: '/api/webmcp/plan',
+      endpointOptions: [
+        {
+          label: 'Nemotron 3 Super 120B A12B',
+          model: 'nvidia/nemotron-3-super-120b-a12b:free',
+          provider: 'openrouter'
+        },
+        {
+          label: 'Nemotron Nano 9B V2',
+          model: 'nvidia/nemotron-nano-9b-v2:free',
+          provider: 'openrouter'
+        }
+      ]
+    })
+    document.body.append(element)
+    await Promise.resolve()
+
+    expect(element.shadowRoot?.querySelector('[data-provider]')).toBeNull()
+
+    const result = await element.run('Select water')
+
+    expect(result?.status).toBe('success')
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/webmcp/plan',
+      expect.objectContaining({
+        body: expect.stringContaining('"provider":"openrouter"')
+      })
+    )
+    const fetchOptions = (fetch.mock.calls as unknown as Array<[string, RequestInit]>)[0]?.[1]
+    expect(String(fetchOptions?.body)).toContain('"model":"nvidia/nemotron-3-super-120b-a12b:free"')
+    expect(fetchOptions?.headers).not.toHaveProperty('Authorization')
   })
 
   it('renders slotted diagnostics inside an expandable row', async () => {
@@ -226,15 +487,22 @@ describe('WebMCP command input', () => {
     document.body.append(element)
     await Promise.resolve()
 
-    const diagnosticsRow = element.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-diagnostics')
-    const diagnosticsSummary = element.shadowRoot?.querySelector<HTMLElement>('.webmcp-disclosure-summary')
-    const diagnosticsSlot = element.shadowRoot?.querySelector<HTMLSlotElement>('slot[name="diagnostics"]')
-    const status = element.shadowRoot?.querySelector<HTMLElement>('.webmcp-settings-summary .webmcp-status')
+    const diagnosticsRow =
+      element.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-diagnostics')
+    const diagnosticsSummary = element.shadowRoot?.querySelector<HTMLElement>(
+      '.webmcp-disclosure-summary'
+    )
+    const diagnosticsSlot = element.shadowRoot?.querySelector<HTMLSlotElement>(
+      'slot[name="diagnostics"]'
+    )
+    const status = element.shadowRoot?.querySelector<HTMLElement>(
+      '.webmcp-settings-summary .webmcp-status'
+    )
     expect(diagnosticsRow).toBeInstanceOf(HTMLDetailsElement)
     expect(diagnosticsSummary?.tagName).toBe('SUMMARY')
     expect(diagnosticsRow?.textContent).toContain('Developer diagnostics')
     expect(diagnosticsSlot?.assignedElements()).toEqual([diagnostics])
-    expect(status?.textContent?.trim()).toBe('Auto')
+    expect(status).toBeNull()
   })
 
   it('renders floating mode with a stacked trigger and expandable panel', async () => {
@@ -245,9 +513,11 @@ describe('WebMCP command input', () => {
     await Promise.resolve()
 
     const trigger = element.shadowRoot?.querySelector<HTMLButtonElement>('.webmcp-floating-trigger')
-    const triggerWords = Array.from(trigger?.querySelectorAll('span') ?? []).map(function mapWord(word) {
-      return word.textContent
-    })
+    const triggerWords = Array.from(trigger?.querySelectorAll('span') ?? []).map(
+      function mapWord(word) {
+        return word.textContent
+      }
+    )
     const panel = element.shadowRoot?.querySelector<HTMLElement>('.webmcp-floating-panel')
     expect(trigger).toBeInstanceOf(HTMLButtonElement)
     expect(triggerWords).toEqual(['WEB', 'MCP'])
@@ -257,7 +527,9 @@ describe('WebMCP command input', () => {
 
     trigger?.click()
 
-    const expandedTrigger = element.shadowRoot?.querySelector<HTMLButtonElement>('.webmcp-floating-trigger')
+    const expandedTrigger = element.shadowRoot?.querySelector<HTMLButtonElement>(
+      '.webmcp-floating-trigger'
+    )
     const expandedPanel = element.shadowRoot?.querySelector<HTMLElement>('.webmcp-floating-panel')
     expect(expandedTrigger?.getAttribute('aria-expanded')).toBe('true')
     expect(expandedPanel?.hidden).toBe(false)
@@ -265,7 +537,9 @@ describe('WebMCP command input', () => {
 
     expandedTrigger?.click()
 
-    const collapsedTrigger = element.shadowRoot?.querySelector<HTMLButtonElement>('.webmcp-floating-trigger')
+    const collapsedTrigger = element.shadowRoot?.querySelector<HTMLButtonElement>(
+      '.webmcp-floating-trigger'
+    )
     const collapsedPanel = element.shadowRoot?.querySelector<HTMLElement>('.webmcp-floating-panel')
     expect(collapsedTrigger?.getAttribute('aria-expanded')).toBe('false')
     expect(collapsedPanel?.hidden).toBe(true)
@@ -274,6 +548,20 @@ describe('WebMCP command input', () => {
 
   it('updates floating placement after expanding panel disclosures', async () => {
     const element = createCommandInputElement()
+    element.configure({
+      endpointOptions: [
+        {
+          label: 'Nemotron 3 Super 120B A12B',
+          model: 'nvidia/nemotron-3-super-120b-a12b:free',
+          provider: 'openrouter'
+        },
+        {
+          label: 'GLM 4.7 Flash',
+          model: '@cf/zai-org/glm-4.7-flash',
+          provider: 'cloudflare-binding'
+        }
+      ]
+    })
     const diagnostics = document.createElement('section')
     diagnostics.slot = 'diagnostics'
     diagnostics.textContent = 'Runtime diagnostics'
@@ -289,7 +577,8 @@ describe('WebMCP command input', () => {
     const placementController = element as unknown as { updateFloatingPlacement: () => void }
     const updateFloatingPlacement = vi.spyOn(placementController, 'updateFloatingPlacement')
     const settings = element.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-settings')
-    const diagnosticsRow = element.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-diagnostics')
+    const diagnosticsRow =
+      element.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-diagnostics')
 
     settings?.dispatchEvent(new Event('toggle'))
     diagnosticsRow?.dispatchEvent(new Event('toggle'))
@@ -332,6 +621,23 @@ describe('WebMCP command input', () => {
     document.body.append(element)
 
     element.configure({
+      endpointOptions: [
+        {
+          label: 'Kimi K2.6',
+          model: '@cf/moonshotai/kimi-k2.6',
+          provider: 'cloudflare-binding'
+        },
+        {
+          label: 'GLM 4.7 Flash',
+          model: '@cf/zai-org/glm-4.7-flash',
+          provider: 'cloudflare-binding'
+        },
+        {
+          label: 'Nemotron 3 Super 120B A12B',
+          model: 'nvidia/nemotron-3-super-120b-a12b:free',
+          provider: 'openrouter'
+        }
+      ],
       initialModel: '@cf/moonshotai/kimi-k2.6',
       initialProvider: 'cloudflare-binding'
     })
@@ -342,52 +648,68 @@ describe('WebMCP command input', () => {
     expect(providerControl?.value).toBe('cloudflare-binding')
     expect(modelControl?.value).toBe('@cf/moonshotai/kimi-k2.6')
 
-    providerControl!.value = 'local'
+    providerControl!.value = 'openrouter'
     providerControl!.dispatchEvent(new Event('change', { bubbles: true }))
     await Promise.resolve()
 
-    expect(providerControl?.value).toBe('local')
+    expect(providerControl?.value).toBe('openrouter')
     expect(element.shadowRoot?.querySelector('[data-model]')).toBeNull()
   })
 
   it('emits planner status when the selected provider changes', async () => {
     const element = createCommandInputElement()
+    element.configure({
+      endpointOptions: [
+        {
+          label: 'GLM 4.7 Flash',
+          model: '@cf/zai-org/glm-4.7-flash',
+          provider: 'cloudflare-binding'
+        },
+        {
+          label: 'Nemotron 3 Super 120B A12B',
+          model: 'nvidia/nemotron-3-super-120b-a12b:free',
+          provider: 'openrouter'
+        }
+      ]
+    })
     document.body.append(element)
     await Promise.resolve()
 
     const event = waitForCommandPlanner(element)
     const provider = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
     if (!provider) throw new Error('Expected provider control.')
-    provider.value = 'local'
+    provider.value = 'openrouter'
     provider.dispatchEvent(new Event('change', { bubbles: true }))
 
     await expect(event).resolves.toMatchObject({
       detail: {
         planner: expect.objectContaining({
-          name: 'Local heuristic planner',
-          status: 'fallback'
+          name: 'OpenRouter',
+          status: 'needs-key'
         })
       }
     })
   })
 
   it('keeps commands usable when selected Chrome built-in AI is unavailable', async () => {
-    registerTool(defineTool({
-      name: 'add_to_cart',
-      description: 'Add a product to the cart.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          productId: { type: 'string' },
-          quantity: { type: 'number' }
+    registerTool(
+      defineTool({
+        name: 'add_to_cart',
+        description: 'Add a product to the cart.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            productId: { type: 'string' },
+            quantity: { type: 'number' }
+          },
+          required: ['productId', 'quantity'],
+          additionalProperties: false
         },
-        required: ['productId', 'quantity'],
-        additionalProperties: false
-      },
-      execute(input) {
-        return input
-      }
-    }))
+        execute(input) {
+          return input
+        }
+      })
+    )
 
     const element = createCommandInputElement()
     element.setAttribute('provider', 'chrome-built-in')
@@ -424,7 +746,9 @@ describe('WebMCP command input', () => {
   it('does not show superseded planner refreshes after late configuration', async () => {
     const element = createCommandInputElement()
     document.body.append(element)
+    await Promise.resolve()
 
+    const event = waitForCommandPlanner(element)
     element.configure({
       planner: {
         name: 'Configured planner',
@@ -444,7 +768,13 @@ describe('WebMCP command input', () => {
     await Promise.resolve()
     await Promise.resolve()
 
-    expect(element.shadowRoot?.textContent).toContain('Configured planner')
+    await expect(event).resolves.toMatchObject({
+      detail: {
+        planner: expect.objectContaining({
+          name: 'Configured planner'
+        })
+      }
+    })
     expect(element.shadowRoot?.textContent).not.toContain('superseded')
   })
 })
@@ -467,19 +797,31 @@ function getPromptForm(element: WebMCPCommandInputElement): HTMLFormElement {
   return form
 }
 
-function waitForCommandResult(element: WebMCPCommandInputElement): Promise<CustomEvent<WebMCPCommandResultEventDetail>> {
+function waitForCommandResult(
+  element: WebMCPCommandInputElement
+): Promise<CustomEvent<WebMCPCommandResultEventDetail>> {
   return new Promise(function resolveCommandResult(resolve) {
-    element.addEventListener('webmcp-command-result', function handleResult(event) {
-      resolve(event as CustomEvent<WebMCPCommandResultEventDetail>)
-    }, { once: true })
+    element.addEventListener(
+      'webmcp-command-result',
+      function handleResult(event) {
+        resolve(event as CustomEvent<WebMCPCommandResultEventDetail>)
+      },
+      { once: true }
+    )
   })
 }
 
-function waitForCommandPlanner(element: WebMCPCommandInputElement): Promise<CustomEvent<WebMCPCommandPlannerEventDetail>> {
+function waitForCommandPlanner(
+  element: WebMCPCommandInputElement
+): Promise<CustomEvent<WebMCPCommandPlannerEventDetail>> {
   return new Promise(function resolveCommandPlanner(resolve) {
-    element.addEventListener('webmcp-command-planner', function handlePlanner(event) {
-      resolve(event as CustomEvent<WebMCPCommandPlannerEventDetail>)
-    }, { once: true })
+    element.addEventListener(
+      'webmcp-command-planner',
+      function handlePlanner(event) {
+        resolve(event as CustomEvent<WebMCPCommandPlannerEventDetail>)
+      },
+      { once: true }
+    )
   })
 }
 
@@ -494,7 +836,7 @@ function setViewportSize(width: number, height: number) {
   })
 }
 
-function createDeferred<T>(): { promise: Promise<T>, resolve: (value: T) => void } {
+function createDeferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   let resolve: (value: T) => void
   const promise = new Promise<T>(function captureResolve(resolvePromise) {
     resolve = resolvePromise

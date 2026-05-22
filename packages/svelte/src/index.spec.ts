@@ -26,27 +26,31 @@ describe('Svelte useWebMCPTool', () => {
     const { useWebMCPTool } = await import('./index')
     const { defineTool, listTools } = await import('@webmcp-kit/core')
 
-    useWebMCPTool(defineTool({
-      name: 'search_products',
-      description: 'Search the local product catalog from a Svelte component.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          query: { type: 'string' }
+    useWebMCPTool(
+      defineTool({
+        name: 'search_products',
+        description: 'Search the local product catalog from a Svelte component.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string' }
+          },
+          required: ['query'],
+          additionalProperties: false
         },
-        required: ['query'],
-        additionalProperties: false
-      },
-      execute(input) {
-        return input
-      }
-    }))
+        execute(input) {
+          return input
+        }
+      })
+    )
 
     const destroy = mountCallbacks[0]?.()
 
-    expect(listTools().map(function getToolName(registration) {
-      return registration.tool.name
-    })).toEqual(['search_products'])
+    expect(
+      listTools().map(function getToolName(registration) {
+        return registration.tool.name
+      })
+    ).toEqual(['search_products'])
 
     if (typeof destroy === 'function') destroy()
 
@@ -67,21 +71,24 @@ describe('Svelte useWebMCPTool', () => {
     const { useWebMCPTool } = await import('./index')
     const { defineTool, listTools } = await import('@webmcp-kit/core')
 
-    useWebMCPTool(defineTool({
-      name: 'search_products',
-      description: 'Search the local product catalog from a Svelte component.',
-      inputSchema: {
-        type: 'object',
-        properties: {},
-        required: [],
-        additionalProperties: false
-      },
-      execute() {
-        return {}
+    useWebMCPTool(
+      defineTool({
+        name: 'search_products',
+        description: 'Search the local product catalog from a Svelte component.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          required: [],
+          additionalProperties: false
+        },
+        execute() {
+          return {}
+        }
+      }),
+      {
+        when: available
       }
-    }), {
-      when: available
-    })
+    )
 
     const destroy = mountCallbacks[0]?.()
     expect(listTools()).toEqual([])

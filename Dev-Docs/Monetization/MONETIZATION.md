@@ -22,12 +22,12 @@ The simplest path to revenue: sell planner tokens. Teams buy tokens, each token 
 
 ### Token Pricing Tiers (initial)
 
-| Tokens | Price | Effective per-plan cost |
-|---|---|---|
-| 1,000 | Free (on signup) | $0 |
-| 10,000 | $9 | $0.0009 |
-| 100,000 | $49 | $0.00049 |
-| 1,000,000 | $199 | $0.000199 |
+| Tokens    | Price            | Effective per-plan cost |
+| --------- | ---------------- | ----------------------- |
+| 1,000     | Free (on signup) | $0                      |
+| 10,000    | $9               | $0.0009                 |
+| 100,000   | $49              | $0.00049                |
+| 1,000,000 | $199             | $0.000199               |
 
 Exact pricing TBD. The point is a generous free tier for evaluation and graduated volume pricing.
 
@@ -108,13 +108,13 @@ Each recipe package includes the tool definition, schema, guard logic, confirmat
 
 ## Recommended Sequence
 
-| Phase | Action | Product |
-|---|---|---|
-| Now | Publish free SDK packages, build community | `@webmcp-kit/core` + framework helpers |
-| V1 | Launch token-billed hosted planner API | `webmcp-cloud` provider + dashboard |
-| Post-revenue | Launch Devtools Pro | Paid devtools tier (flat sub or bundled with tokens) |
-| Post-adoption | Enterprise analytics dashboard | Hosted observability |
-| Ongoing | Consulting and integration services | Services revenue |
-| When ecosystem matures | Recipe marketplace | Verified recipe packs |
+| Phase                  | Action                                     | Product                                              |
+| ---------------------- | ------------------------------------------ | ---------------------------------------------------- |
+| Now                    | Publish free SDK packages, build community | `@webmcp-kit/core` + framework helpers               |
+| V1                     | Launch token-billed hosted planner API     | `webmcp-cloud` provider + dashboard                  |
+| Post-revenue           | Launch Devtools Pro                        | Paid devtools tier (flat sub or bundled with tokens) |
+| Post-adoption          | Enterprise analytics dashboard             | Hosted observability                                 |
+| Ongoing                | Consulting and integration services        | Services revenue                                     |
+| When ecosystem matures | Recipe marketplace                         | Verified recipe packs                                |
 
 The core principle: free SDK drives adoption, tokens monetize the planner immediately, Devtools Pro monetizes the developer experience next.

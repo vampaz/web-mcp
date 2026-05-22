@@ -1,5 +1,10 @@
 export { defineTool } from './define-tool'
-export { setConfirmationHandler, type ConfirmationHandler, type ConfirmationTool } from './confirmation'
+export {
+  getErrorMessage,
+  setConfirmationHandler,
+  type ConfirmationHandler,
+  type ConfirmationTool
+} from './confirmation'
 export {
   createToolCatalog,
   formatToolCatalogMarkdown,
@@ -9,15 +14,24 @@ export {
 } from './adapters/catalog'
 export { formatOpenAITool, formatOpenAITools, type OpenAIFunctionTool } from './adapters/openai'
 export { emitWebMCPKitEvent, subscribeWebMCPKitEvents } from './events'
-export { assertWebMCPIntegration, getIntegrationHealthReport, type IntegrationHealthOptions } from './diagnostics'
-export { inferFormInputSchema, registerFormTool, type FormInput, type RegisterFormToolFieldOptions, type RegisterFormToolOptions } from './forms'
 export {
-  defineWebMCPCommandInput
-} from './command-input'
+  assertWebMCPIntegration,
+  getIntegrationHealthReport,
+  type IntegrationHealthOptions
+} from './diagnostics'
+export {
+  inferFormInputSchema,
+  registerFormTool,
+  type FormInput,
+  type RegisterFormToolFieldOptions,
+  type RegisterFormToolOptions
+} from './forms'
+export { defineWebMCPCommandInput } from './command-input'
 export type {
   WebMCPCommandErrorEventDetail,
   WebMCPCommandInputConfigureOptions,
   WebMCPCommandInputElement,
+  WebMCPCommandInputEndpointOption,
   WebMCPCommandInputPhase,
   WebMCPCommandPlanEventDetail,
   WebMCPCommandPlannerEventDetail,
@@ -52,11 +66,20 @@ export {
   createChromeAIPlanner,
   createConfiguredPlanner,
   createHeuristicPlanner,
-  createRemotePlanner
+  createRemotePlanner,
+  normalizeJsonText
 } from './planner'
-export { clearToolsForTest, getRegistrySnapshot, getTool, invokeTool, listTools, registerTool } from './registry'
+export {
+  clearToolsForTest,
+  getRegistrySnapshot,
+  getTool,
+  invokeTool,
+  listTools,
+  registerTool
+} from './registry'
 export { formatJsonValueValidationError, validateJsonSchema, validateJsonValue } from './schema'
 export { getSupportLabel, isWebMCPSupported } from './support'
+export { escapeHtml, escapeAttribute } from './command-input-html'
 export {
   installWebMCPKitTestBridge,
   type TestBridgeSnapshot,

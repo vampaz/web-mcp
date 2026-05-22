@@ -11,4 +11,7 @@ export interface UseWebMCPToolResult<TInput = Record<string, unknown>, TOutput =
   getRegistration: () => RegisteredTool<TInput, TOutput> | undefined
 }
 
-export type VueWebMCPTool<TInput = Record<string, unknown>, TOutput = unknown> = WebMCPTool<TInput, TOutput>
+export type VueWebMCPTool<TInput = Record<string, unknown>, TOutput = unknown> = WebMCPTool<
+  TInput,
+  TOutput
+>

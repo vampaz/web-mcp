@@ -11,26 +11,31 @@ import type {
   WebMCPCommandErrorEventDetail,
   WebMCPCommandInputConfigureOptions,
   WebMCPCommandInputElement,
+  WebMCPCommandInputEndpointOption,
   WebMCPCommandInputPhase,
   WebMCPCommandPlanEventDetail,
   WebMCPCommandPlannerEventDetail,
   WebMCPCommandResultEventDetail
 } from './interfaces/command-input'
 import { escapeAttribute, escapeHtml } from './command-input-html'
+import { getErrorMessage } from './confirmation'
 import {
   createCommandInputPlanner,
   defaultEndpoint,
   defaultModel,
+  getDefaultProvider,
   getDefaultModelForProvider,
   getModelControlMarkup,
+  getModelOptionCount,
   getOptionsStatusText,
   getProviderControlMarkup,
+  getProviderOptionCount,
   isAuthMode,
   isPlannerAttribute,
-  isPlannerProviderKind,
-  usesModelInput
+  isPlannerProviderKind
 } from './command-input-options'
 import { getStyles } from './command-input-styles'
+import { createChromeAIPlanner } from './planner'
 import { invokeTool, listTools } from './registry'
 
 type CommandInputConstructor = CustomElementConstructor & {
@@ -86,7 +91,9 @@ const observedAttributes = [
   'provider'
 ]
 
-export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): CommandInputConstructor {
+export function defineWebMCPCommandInput(
+  tagName = webMCPCommandInputTagName
+): CommandInputConstructor {
   assertCustomElementsAvailable()
 
   const existingConstructor = customElements.get(tagName)
@@ -101,6 +108,10 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
     baseUrl?: string
     context?: PlannerContext | (() => PlannerContext)
     endpoint?: string
+    endpointOptions?: WebMCPCommandInputEndpointOption[]
+    showChromeAI = true
+    private chromeAIAvailable = false
+    private chromeAILoadId = 0
     private floatingDragState?: FloatingDragState
     private floatingPanelBottom = 'auto'
     private floatingPanelLeft = '8px'
@@ -125,6 +136,7 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
     private currentPlannerSignature = ''
     private currentPlannerWasCreated = false
     private isConnectedToDom = false
+    private providerWasChosen = false
     private lightDomObserver?: MutationObserver
     private plannerLoadId = 0
     private plannerRevision = 0
@@ -161,6 +173,7 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       this.floatingViewport = this.getViewportSize()
       this.render()
       window.addEventListener('resize', this.handleViewportChanged)
+      void this.refreshChromeAIAvailability()
       void this.refreshPlannerStatus()
     }
 
@@ -263,6 +276,7 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
 
     set provider(value: PlannerProviderKind | undefined) {
       this.state.fixedProvider = isPlannerProviderKind(value) ? value : undefined
+      this.providerWasChosen = Boolean(this.state.fixedProvider)
       this.state.provider = this.state.fixedProvider ?? 'auto'
       this.invalidatePlanner()
       this.renderIfConnected()
@@ -276,12 +290,35 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       this.baseUrl = options.baseUrl ?? this.baseUrl
       this.context = options.context ?? this.context
       this.endpoint = options.endpoint ?? this.endpoint
+      this.endpointOptions = options.endpointOptions ?? this.endpointOptions
+      if (options.showChromeAI !== undefined) {
+        this.showChromeAI = options.showChromeAI
+        if (!this.showChromeAI) {
+          this.chromeAIAvailable = false
+          if (!this.state.fixedProvider && this.state.provider === 'chrome-built-in') {
+            this.state.provider = getDefaultProvider(this.endpointOptions, false)
+            this.state.model = getDefaultModelForProvider(this.state.provider, this.endpointOptions)
+          }
+        }
+      }
       if (options.floating !== undefined) this.floating = options.floating
       if (options.initialProvider !== undefined && !this.state.fixedProvider) {
+        this.providerWasChosen = true
         this.state.provider = options.initialProvider
+      } else if (
+        options.endpointOptions !== undefined &&
+        !this.state.fixedProvider &&
+        this.state.provider === 'auto'
+      ) {
+        this.state.provider = getDefaultProvider(
+          options.endpointOptions,
+          this.shouldShowChromeAIOption()
+        )
       }
       if (options.initialModel !== undefined && !this.state.fixedModel) {
         this.state.model = options.initialModel
+      } else if (options.endpointOptions !== undefined && !this.state.fixedModel) {
+        this.state.model = getDefaultModelForProvider(this.state.provider, options.endpointOptions)
       }
       this.planner = options.planner ?? this.planner
       this.plannerConfig = options.plannerConfig ?? this.plannerConfig
@@ -290,10 +327,14 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       if (options.disabled !== undefined) this.disabled = options.disabled
       if (options.placeholder !== undefined) this.placeholder = options.placeholder
       if (options.model !== undefined) this.model = options.model
-      if (options.provider !== undefined) this.provider = options.provider
+      if (options.provider !== undefined) {
+        this.providerWasChosen = true
+        this.provider = options.provider
+      }
 
       this.invalidatePlanner()
       this.renderIfConnected()
+      void this.refreshChromeAIAvailability()
       void this.refreshPlannerStatus()
     }
 
@@ -313,6 +354,7 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       this.setPhase('preparing')
 
       try {
+        this.invalidateAutoPlannerBeforeRun()
         const planner = await this.getCurrentPlanner()
         const tools = listTools().map(function mapRegistration(registration) {
           return registration.tool
@@ -397,6 +439,7 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       if (name === 'placeholder') this.state.placeholder = value || defaultPlaceholder
       if (name === 'provider') {
         this.state.fixedProvider = isPlannerProviderKind(value) ? value : undefined
+        this.providerWasChosen = Boolean(this.state.fixedProvider)
         this.state.provider = this.state.fixedProvider ?? 'auto'
       }
     }
@@ -411,7 +454,8 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
 
       const plannerConfig = this.getPlannerConfig()
       const plannerSignature = JSON.stringify(plannerConfig ?? { provider: 'auto' })
-      if (this.currentPlanner && this.currentPlannerSignature === plannerSignature) return this.currentPlanner
+      if (this.currentPlanner && this.currentPlannerSignature === plannerSignature)
+        return this.currentPlanner
 
       this.disposeCreatedPlanner()
       const loadId = this.plannerLoadId + 1
@@ -451,22 +495,23 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
         model: model || undefined,
         baseUrl: this.baseUrl || undefined,
         accountId: this.accountId || undefined,
-        auth: authMode === 'server'
-          ? {
-              mode: 'server',
-              endpoint: this.endpoint || defaultEndpoint
-            }
-          : {
-              mode: authMode,
-              apiKey: this.apiKey || undefined
-            }
+        auth:
+          authMode === 'server'
+            ? {
+                mode: 'server',
+                endpoint: this.endpoint || defaultEndpoint
+              }
+            : {
+                mode: authMode,
+                apiKey: this.apiKey || undefined
+              }
       }
     }
 
     private getAuthMode(provider: PlannerProviderKind): 'none' | 'server' | 'user-key' {
       if (this.authMode) return this.authMode
       if (provider === 'cloudflare-binding') return 'server'
-      if (this.endpoint && provider !== 'openrouter' && provider !== 'openai-compatible') return 'server'
+      if (this.endpoint && provider !== 'openai-compatible') return 'server'
       return 'user-key'
     }
 
@@ -490,6 +535,35 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       this.renderIfConnected()
     }
 
+    private async refreshChromeAIAvailability() {
+      const loadId = this.chromeAILoadId + 1
+      this.chromeAILoadId = loadId
+      if (!this.showChromeAI) {
+        this.chromeAIAvailable = false
+        this.renderIfConnected()
+        return
+      }
+
+      const planner = await createChromeAIPlanner()
+      planner.dispose?.()
+      if (!this.isConnectedToDom || loadId !== this.chromeAILoadId) return
+      if (this.chromeAIAvailable === planner.available) return
+      const wasAvailable = this.chromeAIAvailable
+      this.chromeAIAvailable = planner.available
+      if (
+        !wasAvailable &&
+        this.chromeAIAvailable &&
+        !this.providerWasChosen &&
+        !this.state.fixedProvider
+      ) {
+        this.state.provider = 'chrome-built-in'
+        this.state.model = ''
+        this.invalidatePlanner()
+        void this.refreshPlannerStatus()
+      }
+      this.renderIfConnected()
+    }
+
     private disposeCreatedPlanner() {
       if (this.currentPlannerWasCreated) this.currentPlanner?.dispose?.()
       this.currentPlanner = undefined
@@ -503,6 +577,16 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       this.disposeCreatedPlanner()
     }
 
+    private invalidateAutoPlannerBeforeRun() {
+      if (this.planner || this.plannerConfig) return
+      const provider = this.state.fixedProvider ?? this.state.provider
+      if (provider === 'auto') this.invalidatePlanner()
+    }
+
+    private shouldShowChromeAIOption(): boolean {
+      return this.showChromeAI && this.chromeAIAvailable
+    }
+
     private setPhase(phase: WebMCPCommandInputPhase) {
       this.state.phase = phase
       this.renderIfConnected()
@@ -514,48 +598,56 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
     }
 
     private dispatchPlanEvent(message: string, plan: ToolPlan, planner: ToolPlanner) {
-      this.dispatchEvent(new CustomEvent<WebMCPCommandPlanEventDetail>('webmcp-command-plan', {
-        bubbles: true,
-        composed: true,
-        detail: {
-          message,
-          plan,
-          planner
-        }
-      }))
+      this.dispatchEvent(
+        new CustomEvent<WebMCPCommandPlanEventDetail>('webmcp-command-plan', {
+          bubbles: true,
+          composed: true,
+          detail: {
+            message,
+            plan,
+            planner
+          }
+        })
+      )
     }
 
     private dispatchPlannerEvent(planner: ToolPlanner) {
-      this.dispatchEvent(new CustomEvent<WebMCPCommandPlannerEventDetail>('webmcp-command-planner', {
-        bubbles: true,
-        composed: true,
-        detail: {
-          planner
-        }
-      }))
+      this.dispatchEvent(
+        new CustomEvent<WebMCPCommandPlannerEventDetail>('webmcp-command-planner', {
+          bubbles: true,
+          composed: true,
+          detail: {
+            planner
+          }
+        })
+      )
     }
 
     private dispatchResultEvent(message: string, plan: ToolPlan, result: ToolInvocationResult) {
-      this.dispatchEvent(new CustomEvent<WebMCPCommandResultEventDetail>('webmcp-command-result', {
-        bubbles: true,
-        composed: true,
-        detail: {
-          message,
-          plan,
-          result
-        }
-      }))
+      this.dispatchEvent(
+        new CustomEvent<WebMCPCommandResultEventDetail>('webmcp-command-result', {
+          bubbles: true,
+          composed: true,
+          detail: {
+            message,
+            plan,
+            result
+          }
+        })
+      )
     }
 
     private dispatchErrorEvent(message: string, error: string) {
-      this.dispatchEvent(new CustomEvent<WebMCPCommandErrorEventDetail>('webmcp-command-error', {
-        bubbles: true,
-        composed: true,
-        detail: {
-          error,
-          message
-        }
-      }))
+      this.dispatchEvent(
+        new CustomEvent<WebMCPCommandErrorEventDetail>('webmcp-command-error', {
+          bubbles: true,
+          composed: true,
+          detail: {
+            error,
+            message
+          }
+        })
+      )
     }
 
     private getPromptInput(): HTMLInputElement | null {
@@ -571,8 +663,9 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       const target = event.target
       if (!(target instanceof HTMLSelectElement)) return
       const provider = isPlannerProviderKind(target.value) ? target.value : 'auto'
+      this.providerWasChosen = true
       this.state.provider = provider
-      this.state.model = getDefaultModelForProvider(provider)
+      this.state.model = getDefaultModelForProvider(provider, this.endpointOptions)
       this.state.settingsOpen = true
       this.invalidatePlanner()
       this.render()
@@ -614,12 +707,24 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
     private render() {
       if (!this.shadowRoot) return
 
-      const provider = this.plannerConfig?.provider ?? this.state.fixedProvider ?? this.state.provider
+      const provider =
+        this.plannerConfig?.provider ?? this.state.fixedProvider ?? this.state.provider
       const model = this.plannerConfig?.model ?? this.state.fixedModel ?? this.state.model
-      const showProviderControl = !this.planner && !this.plannerConfig && !this.state.fixedProvider
-      const showModelControl = !this.planner && !this.plannerConfig && !this.state.fixedModel && usesModelInput(provider)
+      const showChromeAIOption = this.shouldShowChromeAIOption()
+      const showProviderControl =
+        !this.planner &&
+        !this.plannerConfig &&
+        !this.state.fixedProvider &&
+        getProviderOptionCount(this.endpointOptions, showChromeAIOption) > 1
+      const showModelControl =
+        !this.planner &&
+        !this.plannerConfig &&
+        !this.state.fixedModel &&
+        getModelOptionCount(provider, this.endpointOptions) > 1
       const showDiagnostics = this.state.hasDiagnostics
-      const optionsStatus = this.planner ? this.state.plannerName : getOptionsStatusText(provider, model)
+      const optionsStatus = this.planner
+        ? this.state.plannerName
+        : getOptionsStatusText(provider, model, this.endpointOptions)
       const statusLabel = getStatusLabel(this.state.phase)
       const buttonLabel = this.running ? statusLabel : this.state.buttonLabel
       const commandMarkup = `
@@ -646,30 +751,27 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
             ${escapeHtml(buttonLabel)}
           </button>
         </form>
-        ${showProviderControl || showModelControl ? `
+        ${
+          showProviderControl || showModelControl
+            ? `
           <details class="webmcp-settings" ${this.state.settingsOpen ? 'open' : ''}>
             <summary class="webmcp-settings-summary">
               <span>Options</span>
               <span class="webmcp-status" aria-live="polite" aria-atomic="true">
-                ${escapeHtml(optionsStatus)}
+              ${escapeHtml(optionsStatus)}
               </span>
             </summary>
             <div class="webmcp-settings-grid">
-              ${showProviderControl ? getProviderControlMarkup(provider) : ''}
-              ${showModelControl ? getModelControlMarkup(provider, model) : ''}
+              ${showProviderControl ? getProviderControlMarkup(provider, this.endpointOptions, showChromeAIOption) : ''}
+              ${showModelControl ? getModelControlMarkup(provider, model, this.endpointOptions) : ''}
             </div>
           </details>
-        ` : `
-          <div class="webmcp-settings webmcp-settings--status-only">
-            <div class="webmcp-settings-summary">
-              <span>Options</span>
-              <span class="webmcp-status" aria-live="polite" aria-atomic="true">
-                ${escapeHtml(optionsStatus)}
-              </span>
-            </div>
-          </div>
-        `}
-        ${showDiagnostics ? `
+        `
+            : ''
+        }
+        ${
+          showDiagnostics
+            ? `
           <details class="webmcp-diagnostics" ${this.state.diagnosticsOpen ? 'open' : ''}>
             <summary class="webmcp-disclosure-summary">
               <span>Developer diagnostics</span>
@@ -678,10 +780,13 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
               <slot name="diagnostics"></slot>
             </div>
           </details>
-        ` : ''}
+        `
+            : ''
+        }
       `
 
-      this.shadowRoot.innerHTML = this.state.floating ? `
+      this.shadowRoot.innerHTML = this.state.floating
+        ? `
         <style>${getStyles()}</style>
         <button
           class="webmcp-floating-trigger"
@@ -699,18 +804,24 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
         >
           ${commandMarkup}
         </section>
-      ` : `
+      `
+        : `
         <style>${getStyles()}</style>
         ${commandMarkup}
       `
 
       const form = this.shadowRoot.querySelector<HTMLFormElement>('form')
       const input = this.shadowRoot.querySelector<HTMLInputElement>('[data-command-input]')
-      const floatingTrigger = this.shadowRoot.querySelector<HTMLButtonElement>('.webmcp-floating-trigger')
+      const floatingTrigger = this.shadowRoot.querySelector<HTMLButtonElement>(
+        '.webmcp-floating-trigger'
+      )
       const settingsControl = this.shadowRoot.querySelector<HTMLDetailsElement>('.webmcp-settings')
-      const diagnosticsControl = this.shadowRoot.querySelector<HTMLDetailsElement>('.webmcp-diagnostics')
+      const diagnosticsControl =
+        this.shadowRoot.querySelector<HTMLDetailsElement>('.webmcp-diagnostics')
       const providerControl = this.shadowRoot.querySelector<HTMLSelectElement>('[data-provider]')
-      const modelControl = this.shadowRoot.querySelector<HTMLInputElement | HTMLSelectElement>('[data-model]')
+      const modelControl = this.shadowRoot.querySelector<HTMLInputElement | HTMLSelectElement>(
+        '[data-model]'
+      )
 
       this.syncFloatingHost()
 
@@ -781,8 +892,10 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       const triggerHeight = this.getFloatingTriggerHeight()
       const previousMaxX = Math.max(8, this.floatingViewport.width - triggerWidth - 8)
       const previousMaxY = Math.max(8, this.floatingViewport.height - triggerHeight - 8)
-      const wasPinnedRight = this.floatingPinnedRight || Math.abs(this.floatingPosition.x - previousMaxX) <= 2
-      const wasPinnedBottom = this.floatingPinnedBottom || Math.abs(this.floatingPosition.y - previousMaxY) <= 2
+      const wasPinnedRight =
+        this.floatingPinnedRight || Math.abs(this.floatingPosition.x - previousMaxX) <= 2
+      const wasPinnedBottom =
+        this.floatingPinnedBottom || Math.abs(this.floatingPosition.y - previousMaxY) <= 2
       this.floatingViewport = this.getViewportSize()
       const nextMaxX = Math.max(8, this.floatingViewport.width - triggerWidth - 8)
       const nextMaxY = Math.max(8, this.floatingViewport.height - triggerHeight - 8)
@@ -798,7 +911,10 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
 
     private syncFloatingHost() {
       this.toggleAttribute('data-floating', this.state.floating)
-      this.toggleAttribute('data-floating-expanded', this.state.floating && this.state.floatingExpanded)
+      this.toggleAttribute(
+        'data-floating-expanded',
+        this.state.floating && this.state.floatingExpanded
+      )
       if (!this.state.floating) {
         this.style.removeProperty('left')
         this.style.removeProperty('top')
@@ -837,7 +953,7 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       this.floatingWasPositioned = true
     }
 
-    private clampFloatingPosition(x: number, y: number): { x: number, y: number } {
+    private clampFloatingPosition(x: number, y: number): { x: number; y: number } {
       const { maxX, maxY } = this.getFloatingBounds()
 
       return {
@@ -847,14 +963,18 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
     }
 
     private getFloatingTriggerWidth(): number {
-      return this.shadowRoot?.querySelector<HTMLElement>('.webmcp-floating-trigger')?.offsetWidth || 0
+      return (
+        this.shadowRoot?.querySelector<HTMLElement>('.webmcp-floating-trigger')?.offsetWidth || 0
+      )
     }
 
     private getFloatingTriggerHeight(): number {
-      return this.shadowRoot?.querySelector<HTMLElement>('.webmcp-floating-trigger')?.offsetHeight || 0
+      return (
+        this.shadowRoot?.querySelector<HTMLElement>('.webmcp-floating-trigger')?.offsetHeight || 0
+      )
     }
 
-    private getFloatingBounds(): { maxX: number, maxY: number } {
+    private getFloatingBounds(): { maxX: number; maxY: number } {
       const viewport = this.getViewportSize()
       const width = this.getFloatingTriggerWidth()
       const height = this.getFloatingTriggerHeight()
@@ -865,7 +985,7 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       }
     }
 
-    private getViewportSize(): { height: number, width: number } {
+    private getViewportSize(): { height: number; width: number } {
       return {
         height: window.innerHeight,
         width: window.innerWidth
@@ -888,23 +1008,24 @@ export function defineWebMCPCommandInput(tagName = webMCPCommandInputTagName): C
       const vertical = spaceBelow >= panelHeight || spaceBelow >= spaceAbove ? 'down' : 'up'
       const horizontal = spaceRight >= panelWidth || spaceRight >= spaceLeft ? 'right' : 'left'
       const maxHeight = Math.max(0, vertical === 'down' ? spaceBelow - 8 : spaceAbove - 8)
-      const panelLeft = horizontal === 'right'
-        ? Math.min(triggerRect.left, window.innerWidth - panelWidth - 8)
-        : Math.max(8, triggerRect.right - panelWidth)
-      const panelTop = vertical === 'down'
-        ? `${Math.min(triggerRect.bottom + 8, window.innerHeight - panelHeight - 8)}px`
-        : 'auto'
-      const panelBottom = vertical === 'up'
-        ? `${Math.max(8, window.innerHeight - triggerRect.top + 8)}px`
-        : 'auto'
+      const panelLeft =
+        horizontal === 'right'
+          ? Math.min(triggerRect.left, window.innerWidth - panelWidth - 8)
+          : Math.max(8, triggerRect.right - panelWidth)
+      const panelTop =
+        vertical === 'down'
+          ? `${Math.min(triggerRect.bottom + 8, window.innerHeight - panelHeight - 8)}px`
+          : 'auto'
+      const panelBottom =
+        vertical === 'up' ? `${Math.max(8, window.innerHeight - triggerRect.top + 8)}px` : 'auto'
 
       if (
-        this.floatingPlacement.vertical === vertical
-        && this.floatingPlacement.horizontal === horizontal
-        && this.floatingPanelMaxHeight === `${maxHeight}px`
-        && this.floatingPanelLeft === `${panelLeft}px`
-        && this.floatingPanelTop === panelTop
-        && this.floatingPanelBottom === panelBottom
+        this.floatingPlacement.vertical === vertical &&
+        this.floatingPlacement.horizontal === horizontal &&
+        this.floatingPanelMaxHeight === `${maxHeight}px` &&
+        this.floatingPanelLeft === `${panelLeft}px` &&
+        this.floatingPanelTop === panelTop &&
+        this.floatingPanelBottom === panelBottom
       ) {
         return
       }
@@ -930,7 +1051,8 @@ async function invokePlannedSteps(
   let result: ToolInvocationResult | undefined
 
   for (const [index, step] of steps.entries()) {
-    const toolName = steps.length > 1 ? `${step.toolName} (${index + 1}/${steps.length})` : step.toolName
+    const toolName =
+      steps.length > 1 ? `${step.toolName} (${index + 1}/${steps.length})` : step.toolName
     setActiveToolName(toolName)
     result = await invokeTool({
       toolName: step.toolName,
@@ -940,12 +1062,14 @@ async function invokePlannedSteps(
     if (result.status !== 'success') return result
   }
 
-  return result ?? {
-    toolName: plan.toolName,
-    status: 'error',
-    error: 'Planner returned no executable steps.',
-    durationMs: 0
-  }
+  return (
+    result ?? {
+      toolName: plan.toolName,
+      status: 'error',
+      error: 'Planner returned no executable steps.',
+      durationMs: 0
+    }
+  )
 }
 
 function getPlanSteps(plan: ToolPlan): ToolPlanStep[] {
@@ -968,12 +1092,10 @@ function getStatusLabel(phase: WebMCPCommandInputPhase): string {
   return defaultButtonLabel
 }
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Command failed.'
-}
-
 function assertCustomElementsAvailable() {
   if (typeof customElements === 'undefined' || typeof HTMLElement === 'undefined') {
-    throw new Error('WebMCP command input can only be defined in a browser custom elements environment.')
+    throw new Error(
+      'WebMCP command input can only be defined in a browser custom elements environment.'
+    )
   }
 }

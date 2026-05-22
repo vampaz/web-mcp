@@ -13,7 +13,12 @@
     <div class="table-controls">
       <label>
         Search
-        <input :value="filters.query" type="search" placeholder="Customer, owner, status..." @input="updateQuery" />
+        <input
+          :value="filters.query"
+          type="search"
+          placeholder="Customer, owner, status..."
+          @input="updateQuery"
+        />
       </label>
 
       <label>
@@ -54,8 +59,12 @@
     <div class="bulk-bar">
       <button type="button" @click="selectVisible">Select visible</button>
       <button type="button" @click="clearSelection">Clear</button>
-      <button type="button" :disabled="selectedCount === 0" @click="markSelected('sent')">Mark sent</button>
-      <button type="button" :disabled="selectedCount === 0" @click="markSelected('paid')">Mark paid</button>
+      <button type="button" :disabled="selectedCount === 0" @click="markSelected('sent')">
+        Mark sent
+      </button>
+      <button type="button" :disabled="selectedCount === 0" @click="markSelected('paid')">
+        Mark paid
+      </button>
     </div>
 
     <div class="table-shell">
@@ -83,7 +92,12 @@
             @keydown.space.prevent="openInvoice(invoice.id)"
           >
             <td class="col-select" @click.stop>
-              <input :checked="invoice.selected" type="checkbox" :aria-label="`Select ${invoice.customerName}`" @change="toggleInvoice(invoice.id, $event)" />
+              <input
+                :checked="invoice.selected"
+                type="checkbox"
+                :aria-label="`Select ${invoice.customerName}`"
+                @change="toggleInvoice(invoice.id, $event)"
+              />
             </td>
             <td>
               <strong>{{ invoice.customerName }}</strong>
@@ -96,7 +110,9 @@
             <td class="col-due">{{ invoice.dueDate }}</td>
             <td class="col-owner">{{ invoice.owner }}</td>
             <td class="col-open">
-              <button type="button" @click.stop="openInvoice(invoice.id)">{{ invoice.id === activeInvoiceId ? 'Viewing' : 'View' }}</button>
+              <button type="button" @click.stop="openInvoice(invoice.id)">
+                {{ invoice.id === activeInvoiceId ? 'Viewing' : 'View' }}
+              </button>
             </td>
           </tr>
         </tbody>
@@ -323,7 +339,9 @@ tr.active {
 
 tbody tr {
   cursor: pointer;
-  transition: background 120ms ease, box-shadow 120ms ease;
+  transition:
+    background 120ms ease,
+    box-shadow 120ms ease;
 }
 
 tbody tr:hover {

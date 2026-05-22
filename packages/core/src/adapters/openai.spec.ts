@@ -56,7 +56,8 @@ describe('OpenAI adapter', () => {
   it('formats a list of tools', () => {
     const tool = defineTool({
       name: 'search_products',
-      description: 'Search the local product catalog for items matching the current shopper request.',
+      description:
+        'Search the local product catalog for items matching the current shopper request.',
       inputSchema: {
         type: 'object',
         properties: {

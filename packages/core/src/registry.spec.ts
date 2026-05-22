@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { defineTool } from './define-tool'
-import { clearToolsForTest, invokeTool, listTools, registerTool, setConfirmationHandler } from './index'
+import {
+  clearToolsForTest,
+  invokeTool,
+  listTools,
+  registerTool,
+  setConfirmationHandler
+} from './index'
 
 describe('registry', () => {
   beforeEach(() => {
@@ -14,20 +20,22 @@ describe('registry', () => {
   })
 
   it('registers and invokes a fallback tool', async () => {
-    registerTool(defineTool({
-      name: 'create_invoice',
-      description: 'Create an invoice for a customer and open it in the current workspace.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          amount: { type: 'number' }
+    registerTool(
+      defineTool({
+        name: 'create_invoice',
+        description: 'Create an invoice for a customer and open it in the current workspace.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            amount: { type: 'number' }
+          },
+          required: ['amount']
         },
-        required: ['amount']
-      },
-      execute(input) {
-        return { id: 'inv_1', amount: input.amount }
-      }
-    }))
+        execute(input) {
+          return { id: 'inv_1', amount: input.amount }
+        }
+      })
+    )
 
     expect(listTools()).toHaveLength(1)
 
@@ -45,24 +53,26 @@ describe('registry', () => {
       return false
     })
 
-    registerTool(defineTool({
-      name: 'void_invoice',
-      description: 'Void an existing invoice after the user has reviewed the pending action.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          invoiceId: { type: 'string' }
+    registerTool(
+      defineTool({
+        name: 'void_invoice',
+        description: 'Void an existing invoice after the user has reviewed the pending action.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            invoiceId: { type: 'string' }
+          },
+          required: ['invoiceId']
         },
-        required: ['invoiceId']
-      },
-      confirmation: {
-        required: true,
-        reason: 'Voiding an invoice cannot be undone in this demo.'
-      },
-      execute() {
-        return { voided: true }
-      }
-    }))
+        confirmation: {
+          required: true,
+          reason: 'Voiding an invoice cannot be undone in this demo.'
+        },
+        execute() {
+          return { voided: true }
+        }
+      })
+    )
 
     const blocked = await invokeTool({
       toolName: 'void_invoice',
@@ -86,24 +96,26 @@ describe('registry', () => {
     })
     setConfirmationHandler(confirm)
 
-    registerTool(defineTool({
-      name: 'void_invoice',
-      description: 'Void an existing invoice after the user has reviewed the pending action.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          invoiceId: { type: 'string' }
+    registerTool(
+      defineTool({
+        name: 'void_invoice',
+        description: 'Void an existing invoice after the user has reviewed the pending action.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            invoiceId: { type: 'string' }
+          },
+          required: ['invoiceId']
         },
-        required: ['invoiceId']
-      },
-      confirmation: {
-        required: true,
-        reason: 'Voiding an invoice cannot be undone in this demo.'
-      },
-      execute() {
-        return { voided: true }
-      }
-    }))
+        confirmation: {
+          required: true,
+          reason: 'Voiding an invoice cannot be undone in this demo.'
+        },
+        execute() {
+          return { voided: true }
+        }
+      })
+    )
 
     const result = await invokeTool({
       toolName: 'void_invoice',
@@ -126,27 +138,31 @@ describe('registry', () => {
       throw new Error('modal crashed')
     })
 
-    registerTool(defineTool({
-      name: 'void_invoice',
-      description: 'Void an existing invoice after the user has reviewed the pending action.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          invoiceId: { type: 'string' }
+    registerTool(
+      defineTool({
+        name: 'void_invoice',
+        description: 'Void an existing invoice after the user has reviewed the pending action.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            invoiceId: { type: 'string' }
+          },
+          required: ['invoiceId']
         },
-        required: ['invoiceId']
-      },
-      confirmation: {
-        required: true,
-        reason: 'Voiding an invoice cannot be undone in this demo.'
-      },
-      execute
-    }))
+        confirmation: {
+          required: true,
+          reason: 'Voiding an invoice cannot be undone in this demo.'
+        },
+        execute
+      })
+    )
 
-    await expect(invokeTool({
-      toolName: 'void_invoice',
-      input: { invoiceId: 'inv_1' }
-    })).resolves.toMatchObject({
+    await expect(
+      invokeTool({
+        toolName: 'void_invoice',
+        input: { invoiceId: 'inv_1' }
+      })
+    ).resolves.toMatchObject({
       status: 'error',
       error: 'Confirmation handler failed: modal crashed'
     })
@@ -159,30 +175,34 @@ describe('registry', () => {
     })
     setConfirmationHandler(confirm)
 
-    registerTool(defineTool({
-      name: 'void_invoice',
-      description: 'Void an existing invoice after the user has reviewed the pending action.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          invoiceId: { type: 'string' }
+    registerTool(
+      defineTool({
+        name: 'void_invoice',
+        description: 'Void an existing invoice after the user has reviewed the pending action.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            invoiceId: { type: 'string' }
+          },
+          required: ['invoiceId']
         },
-        required: ['invoiceId']
-      },
-      confirmation: {
-        required: true,
-        reason: 'Voiding an invoice cannot be undone in this demo.'
-      },
-      execute(input) {
-        return input
-      }
-    }))
+        confirmation: {
+          required: true,
+          reason: 'Voiding an invoice cannot be undone in this demo.'
+        },
+        execute(input) {
+          return input
+        }
+      })
+    )
 
-    await expect(invokeTool({
-      toolName: 'void_invoice',
-      input: { invoiceId: 'inv_1' },
-      confirmed: true
-    })).resolves.toMatchObject({
+    await expect(
+      invokeTool({
+        toolName: 'void_invoice',
+        input: { invoiceId: 'inv_1' },
+        confirmed: true
+      })
+    ).resolves.toMatchObject({
       status: 'success',
       output: { invoiceId: 'inv_1' }
     })
@@ -201,25 +221,27 @@ describe('registry', () => {
     })
     setConfirmationHandler(confirm)
 
-    registerTool(defineTool({
-      name: 'create_invoice',
-      description: 'Create an invoice for a customer and open it in the current workspace.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          customerName: { type: 'string' },
-          amount: { type: 'number', minimum: 0.01 }
+    registerTool(
+      defineTool({
+        name: 'create_invoice',
+        description: 'Create an invoice for a customer and open it in the current workspace.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            customerName: { type: 'string' },
+            amount: { type: 'number', minimum: 0.01 }
+          },
+          required: ['customerName', 'amount'],
+          additionalProperties: false
         },
-        required: ['customerName', 'amount'],
-        additionalProperties: false
-      },
-      confirmation: {
-        required: true,
-        reason: 'Creates a billable invoice.'
-      },
-      guard,
-      execute
-    }))
+        confirmation: {
+          required: true,
+          reason: 'Creates a billable invoice.'
+        },
+        guard,
+        execute
+      })
+    )
 
     const result = await invokeTool({
       toolName: 'create_invoice',
@@ -228,7 +250,9 @@ describe('registry', () => {
     })
 
     expect(result.status).toBe('error')
-    expect(result.error).toBe('input validation failed: /customerName expected string, got integer. /amount expected number, got string.')
+    expect(result.error).toBe(
+      'input validation failed: /customerName expected string, got integer. /amount expected number, got string.'
+    )
     expect(confirm).not.toHaveBeenCalled()
     expect(guard).not.toHaveBeenCalled()
     expect(execute).not.toHaveBeenCalled()

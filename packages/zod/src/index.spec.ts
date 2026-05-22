@@ -11,7 +11,7 @@ describe('defineZodTool', () => {
   })
 
   it('converts a Zod schema into a typed WebMCP tool', async () => {
-    const execute = vi.fn(function createInvoice(input: { customerName: string, amount: number }) {
+    const execute = vi.fn(function createInvoice(input: { customerName: string; amount: number }) {
       return { id: 'inv_1', amount: input.amount }
     })
 
@@ -64,15 +64,17 @@ describe('defineZodTool', () => {
       return { id: 'inv_1' }
     })
 
-    registerTool(defineZodTool({
-      name: 'create_invoice',
-      description: 'Create a draft invoice for a customer in the current workspace.',
-      schema: z.object({
-        customerName: z.string(),
-        amount: z.number().min(0.01)
-      }),
-      execute
-    }))
+    registerTool(
+      defineZodTool({
+        name: 'create_invoice',
+        description: 'Create a draft invoice for a customer in the current workspace.',
+        schema: z.object({
+          customerName: z.string(),
+          amount: z.number().min(0.01)
+        }),
+        execute
+      })
+    )
 
     const result = await invokeTool({
       toolName: 'create_invoice',
@@ -80,7 +82,9 @@ describe('defineZodTool', () => {
     })
 
     expect(result.status).toBe('error')
-    expect(result.error).toBe('input validation failed: /customerName expected string, got integer. /amount expected number, got string.')
+    expect(result.error).toBe(
+      'input validation failed: /customerName expected string, got integer. /amount expected number, got string.'
+    )
     expect(execute).not.toHaveBeenCalled()
   })
 
@@ -99,10 +103,7 @@ describe('defineZodTool', () => {
     })
 
     expect(tool.inputSchema.properties?.note).toEqual({
-      anyOf: [
-        { type: 'string' },
-        { type: 'null' }
-      ]
+      anyOf: [{ type: 'string' }, { type: 'null' }]
     })
 
     registerTool(tool)

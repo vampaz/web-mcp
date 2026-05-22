@@ -1,4 +1,6 @@
 import {
+  escapeAttribute,
+  escapeHtml,
   getIntegrationHealthReport,
   getSupportLabel,
   invokeTool,
@@ -310,7 +312,8 @@ const overlayStyles = `
 
 export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): DevtoolsOverlay {
   const root = document.createElement('section')
-  root.className = options.placement === 'inline' ? 'wmk-devtools wmk-devtools--inline' : 'wmk-devtools'
+  root.className =
+    options.placement === 'inline' ? 'wmk-devtools wmk-devtools--inline' : 'wmk-devtools'
   root.setAttribute('aria-label', 'WebMCP Kit devtools')
 
   const style = document.createElement('style')
@@ -335,7 +338,9 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
 
     if (event.type === 'succeeded' || event.type === 'failed' || event.type === 'blocked') {
       const result = event.detail as ToolInvocationResult | undefined
-      const invocation = result?.invocationId ? pendingInvocations.get(result.invocationId) : undefined
+      const invocation = result?.invocationId
+        ? pendingInvocations.get(result.invocationId)
+        : undefined
       history.unshift(toHistoryItem(nextHistoryId, event, invocation))
       nextHistoryId += 1
       if (result?.invocationId) {
@@ -358,8 +363,12 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
     }
 
     if (action === 'sample') {
-      const textarea = root.querySelector<HTMLTextAreaElement>(`textarea[data-tool-name="${targetElement.dataset.toolName}"]`)
-      const registration = listTools().find((item) => item.tool.name === targetElement.dataset.toolName)
+      const textarea = root.querySelector<HTMLTextAreaElement>(
+        `textarea[data-tool-name="${targetElement.dataset.toolName}"]`
+      )
+      const registration = listTools().find(
+        (item) => item.tool.name === targetElement.dataset.toolName
+      )
       if (textarea && registration) {
         textarea.value = JSON.stringify(createSampleInput(registration.tool.inputSchema), null, 2)
       }
@@ -372,7 +381,9 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
     }
 
     if (action === 'replay') {
-      const historyItem = history.find((item) => String(item.id) === targetElement.dataset.historyId)
+      const historyItem = history.find(
+        (item) => String(item.id) === targetElement.dataset.historyId
+      )
       if (historyItem) {
         void invokeFromOverlay(historyItem.toolName, historyItem.input)
       }
@@ -411,15 +422,21 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
               <div class="wmk-devtools__health-title">Integration health</div>
               <div class="wmk-devtools__health-summary">${escapeHtml(healthReport.summary)}</div>
             </div>
-            <span class="wmk-devtools__badge wmk-devtools__badge--${escapeHtml(healthReport.status)}">${escapeHtml(healthReport.status)}</span>
+            <span class="wmk-devtools__badge wmk-devtools__badge--${escapeAttribute(healthReport.status)}">${escapeHtml(healthReport.status)}</span>
           </div>
-          ${healthReport.diagnostics.length === 0 ? '<div class="wmk-devtools__health-summary">No integration issues found.</div>' : `
+          ${
+            healthReport.diagnostics.length === 0
+              ? '<div class="wmk-devtools__health-summary">No integration issues found.</div>'
+              : `
             <div class="wmk-devtools__diagnostics">
               ${healthReport.diagnostics.slice(0, 6).map(formatDiagnostic).join('')}
             </div>
-          `}
+          `
+          }
         </section>
-        ${registrations.map((registration) => `
+        ${registrations
+          .map(
+            (registration) => `
           <article class="wmk-devtools__tool">
             <div class="wmk-devtools__meta">${escapeHtml(registration.mode)}</div>
             <div class="wmk-devtools__tool-badges">${formatToolBadges(registration.tool)}</div>
@@ -431,31 +448,43 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
               <summary>Prompt preview</summary>
               <pre>${escapeHtml(createPromptPreview(registration.tool.name, registration.tool.description, registration.tool.inputSchema))}</pre>
             </details>
-            <textarea data-tool-name="${escapeHtml(registration.tool.name)}">${escapeHtml(JSON.stringify(createSampleInput(registration.tool.inputSchema), null, 2))}</textarea>
+            <textarea data-tool-name="${escapeAttribute(registration.tool.name)}">${escapeHtml(JSON.stringify(createSampleInput(registration.tool.inputSchema), null, 2))}</textarea>
             <div class="wmk-devtools__actions">
-              <button type="button" data-action="invoke" data-tool-name="${escapeHtml(registration.tool.name)}">Invoke</button>
-              <button type="button" data-action="sample" data-tool-name="${escapeHtml(registration.tool.name)}">Sample</button>
+              <button type="button" data-action="invoke" data-tool-name="${escapeAttribute(registration.tool.name)}">Invoke</button>
+              <button type="button" data-action="sample" data-tool-name="${escapeAttribute(registration.tool.name)}">Sample</button>
             </div>
           </article>
-        `).join('')}
+        `
+          )
+          .join('')}
         <div class="wmk-devtools__history">
           <strong>Invocation history</strong>
-          ${history.length === 0 ? '<span>No invocations yet.</span>' : history.map((item) => `
+          ${
+            history.length === 0
+              ? '<span>No invocations yet.</span>'
+              : history
+                  .map(
+                    (item) => `
             <article class="wmk-devtools__history-item">
               <span>${escapeHtml(item.toolName)} - ${escapeHtml(item.status)} - ${escapeHtml(item.detail)}${item.durationMs === undefined ? '' : ` - ${item.durationMs}ms`}</span>
               <pre>${escapeHtml(JSON.stringify({ input: item.input, output: item.output }, null, 2))}</pre>
               <button type="button" data-action="replay" data-history-id="${item.id}">Replay</button>
             </article>
-          `).join('')}
+          `
+                  )
+                  .join('')
+          }
         </div>
       </div>
     `
   }
 
   async function invokeFromOverlay(toolName: string, replayInput?: Record<string, unknown>) {
-    const textarea = root.querySelector<HTMLTextAreaElement>(`textarea[data-tool-name="${toolName}"]`)
+    const textarea = root.querySelector<HTMLTextAreaElement>(
+      `textarea[data-tool-name="${toolName}"]`
+    )
     const parsedInput = replayInput
-      ? { ok: true, input: replayInput } as const
+      ? ({ ok: true, input: replayInput } as const)
       : parseInput(toolName, textarea?.value ?? '')
     if (!parsedInput.ok) return
 
@@ -470,7 +499,10 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
     await invokeTool(invocation)
   }
 
-  function parseInput(toolName: string, value: string): { ok: true, input: Record<string, unknown> } | { ok: false } {
+  function parseInput(
+    toolName: string,
+    value: string
+  ): { ok: true; input: Record<string, unknown> } | { ok: false } {
     if (!value.trim()) {
       return {
         ok: true,
@@ -564,7 +596,7 @@ function createSampleValue(key: string, schema: JsonSchema): unknown {
 
 function formatDiagnostic(diagnostic: IntegrationDiagnostic): string {
   return `
-    <article class="wmk-devtools__diagnostic wmk-devtools__diagnostic--${escapeHtml(diagnostic.severity)}">
+    <article class="wmk-devtools__diagnostic wmk-devtools__diagnostic--${escapeAttribute(diagnostic.severity)}">
       <strong>${escapeHtml(diagnostic.title)}</strong>
       <span>${escapeHtml(diagnostic.detail)}</span>
       <span>${escapeHtml(diagnostic.action)}</span>
@@ -572,7 +604,11 @@ function formatDiagnostic(diagnostic: IntegrationDiagnostic): string {
   `
 }
 
-function toHistoryItem(id: number, event: WebMCPKitEvent, invocation?: ToolInvocation): HistoryItem {
+function toHistoryItem(
+  id: number,
+  event: WebMCPKitEvent,
+  invocation?: ToolInvocation
+): HistoryItem {
   const result = event.detail as ToolInvocationResult | undefined
 
   return {
@@ -584,13 +620,4 @@ function toHistoryItem(id: number, event: WebMCPKitEvent, invocation?: ToolInvoc
     durationMs: result?.durationMs,
     detail: result?.error ?? 'Completed'
   }
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;')
 }

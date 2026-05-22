@@ -1,9 +1,5 @@
 <template>
-  <section
-    class="diagnostics-content"
-    aria-label="Developer diagnostics"
-    data-webmcp-diagnostics
-  >
+  <section class="diagnostics-content" aria-label="Developer diagnostics" data-webmcp-diagnostics>
     <section class="status-strip" aria-label="Runtime status">
       <div>
         <span>WebMCP</span>

@@ -37,20 +37,23 @@ describe('native WebMCP adapter', () => {
       registerTool: registerNativeTool
     }
 
-    const registration = registerTool(defineTool({
-      name: 'search_products',
-      description: 'Search the local product catalog and return matching products for the current shopper.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          query: { type: 'string' }
+    const registration = registerTool(
+      defineTool({
+        name: 'search_products',
+        description:
+          'Search the local product catalog and return matching products for the current shopper.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string' }
+          },
+          required: ['query']
         },
-        required: ['query']
-      },
-      execute(input) {
-        return { query: input.query }
-      }
-    }))
+        execute(input) {
+          return { query: input.query }
+        }
+      })
+    )
 
     expect(isWebMCPSupported()).toBe(true)
     expect(registration.mode).toBe('native-and-fallback')
@@ -75,24 +78,26 @@ describe('native WebMCP adapter', () => {
       registerTool: registerNativeTool
     }
 
-    registerTool(defineTool({
-      name: 'get_order_status',
-      description: 'Search visible order status information for a selected timeframe.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          timeframe: { type: 'string' }
+    registerTool(
+      defineTool({
+        name: 'get_order_status',
+        description: 'Search visible order status information for a selected timeframe.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            timeframe: { type: 'string' }
+          },
+          required: ['timeframe']
         },
-        required: ['timeframe']
-      },
-      annotations: {
-        readOnlyHint: true,
-        untrustedContentHint: true
-      },
-      execute(input) {
-        return input
-      }
-    }))
+        annotations: {
+          readOnlyHint: true,
+          untrustedContentHint: true
+        },
+        execute(input) {
+          return input
+        }
+      })
+    )
 
     expect(registerNativeTool).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -114,18 +119,20 @@ describe('native WebMCP adapter', () => {
       })
     }
 
-    const registration = registerTool(defineTool({
-      name: 'clear_selection',
-      description: 'Clear the current selection from the visible workspace list.',
-      inputSchema: {
-        type: 'object',
-        properties: {},
-        required: []
-      },
-      execute() {
-        return []
-      }
-    }))
+    const registration = registerTool(
+      defineTool({
+        name: 'clear_selection',
+        description: 'Clear the current selection from the visible workspace list.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          required: []
+        },
+        execute() {
+          return []
+        }
+      })
+    )
 
     expect(signal?.aborted).toBe(false)
 
@@ -162,10 +169,12 @@ describe('native WebMCP adapter', () => {
     }
 
     registerTool(defineTool(baseTool))
-    registerTool(defineTool({
-      ...baseTool,
-      description: 'Create a draft invoice with an updated description for the current workspace.'
-    }))
+    registerTool(
+      defineTool({
+        ...baseTool,
+        description: 'Create a draft invoice with an updated description for the current workspace.'
+      })
+    )
 
     expect(firstUnregister).toHaveBeenCalledOnce()
     expect(secondUnregister).not.toHaveBeenCalled()
@@ -179,20 +188,22 @@ describe('native WebMCP adapter', () => {
       })
     }
 
-    const registration = registerTool(defineTool({
-      name: 'create_ticket',
-      description: 'Create a support ticket for the currently visible customer account.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          subject: { type: 'string' }
+    const registration = registerTool(
+      defineTool({
+        name: 'create_ticket',
+        description: 'Create a support ticket for the currently visible customer account.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            subject: { type: 'string' }
+          },
+          required: ['subject']
         },
-        required: ['subject']
-      },
-      execute(input) {
-        return input
-      }
-    }))
+        execute(input) {
+          return input
+        }
+      })
+    )
 
     registration.unregister()
 
@@ -206,26 +217,30 @@ describe('native WebMCP adapter', () => {
       })
     }
 
-    const registration = registerTool(defineTool({
-      name: 'select_items',
-      description: 'Select checklist items by stable IDs from the current visible checklist.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          ids: {
-            type: 'array',
-            items: { type: 'string' }
-          }
+    const registration = registerTool(
+      defineTool({
+        name: 'select_items',
+        description: 'Select checklist items by stable IDs from the current visible checklist.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            ids: {
+              type: 'array',
+              items: { type: 'string' }
+            }
+          },
+          required: ['ids']
         },
-        required: ['ids']
-      },
-      execute(input) {
-        return input
-      }
-    }))
+        execute(input) {
+          return input
+        }
+      })
+    )
 
     expect(registration.mode).toBe('native-and-fallback')
-    expect(registration.warnings).not.toContain('Native WebMCP registration returned a handle without unregister or dispose; local unregister cannot remove the native tool.')
+    expect(registration.warnings).not.toContain(
+      'Native WebMCP registration returned a handle without unregister or dispose; local unregister cannot remove the native tool.'
+    )
   })
 
   it('executes native calls with native source context', async () => {
@@ -237,20 +252,23 @@ describe('native WebMCP adapter', () => {
       })
     }
 
-    registerTool(defineTool({
-      name: 'search_products',
-      description: 'Search the local product catalog and return matching products for the current shopper.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          query: { type: 'string' }
+    registerTool(
+      defineTool({
+        name: 'search_products',
+        description:
+          'Search the local product catalog and return matching products for the current shopper.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string' }
+          },
+          required: ['query']
         },
-        required: ['query']
-      },
-      execute(input, context) {
-        return { query: input.query, source: context.source }
-      }
-    }))
+        execute(input, context) {
+          return { query: input.query, source: context.source }
+        }
+      })
+    )
 
     expect(await nativeExecute?.({ query: 'dock' })).toEqual({
       query: 'dock',
@@ -271,20 +289,25 @@ describe('native WebMCP adapter', () => {
       })
     }
 
-    registerTool(defineTool({
-      name: 'search_products',
-      description: 'Search the local product catalog and return matching products for the current shopper.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          query: { type: 'string' }
+    registerTool(
+      defineTool({
+        name: 'search_products',
+        description:
+          'Search the local product catalog and return matching products for the current shopper.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string' }
+          },
+          required: ['query']
         },
-        required: ['query']
-      },
-      execute
-    }))
+        execute
+      })
+    )
 
-    await expect(nativeExecute?.({ query: 42 })).rejects.toThrow('input validation failed: /query expected string, got integer.')
+    await expect(nativeExecute?.({ query: 42 })).rejects.toThrow(
+      'input validation failed: /query expected string, got integer.'
+    )
     expect(execute).not.toHaveBeenCalled()
   })
 
@@ -305,22 +328,24 @@ describe('native WebMCP adapter', () => {
       })
     }
 
-    registerTool(defineTool({
-      name: 'void_invoice',
-      description: 'Void an existing invoice after the user has reviewed the pending action.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          invoiceId: { type: 'string' }
+    registerTool(
+      defineTool({
+        name: 'void_invoice',
+        description: 'Void an existing invoice after the user has reviewed the pending action.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            invoiceId: { type: 'string' }
+          },
+          required: ['invoiceId']
         },
-        required: ['invoiceId']
-      },
-      confirmation: {
-        required: true,
-        reason: 'Voiding an invoice cannot be undone in this demo.'
-      },
-      execute
-    }))
+        confirmation: {
+          required: true,
+          reason: 'Voiding an invoice cannot be undone in this demo.'
+        },
+        execute
+      })
+    )
 
     await expect(nativeExecute?.({ invoiceId: 'inv_1' })).resolves.toEqual({ invoiceId: 'inv_1' })
     expect(confirm).toHaveBeenCalledWith(
@@ -347,24 +372,28 @@ describe('native WebMCP adapter', () => {
       })
     }
 
-    registerTool(defineTool({
-      name: 'void_invoice',
-      description: 'Void an existing invoice after the user has reviewed the pending action.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          invoiceId: { type: 'string' }
+    registerTool(
+      defineTool({
+        name: 'void_invoice',
+        description: 'Void an existing invoice after the user has reviewed the pending action.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            invoiceId: { type: 'string' }
+          },
+          required: ['invoiceId']
         },
-        required: ['invoiceId']
-      },
-      confirmation: {
-        required: true,
-        reason: 'Voiding an invoice cannot be undone in this demo.'
-      },
-      execute
-    }))
+        confirmation: {
+          required: true,
+          reason: 'Voiding an invoice cannot be undone in this demo.'
+        },
+        execute
+      })
+    )
 
-    await expect(nativeExecute?.({ invoiceId: 'inv_1' })).rejects.toThrow('Confirmation handler failed: modal crashed')
+    await expect(nativeExecute?.({ invoiceId: 'inv_1' })).rejects.toThrow(
+      'Confirmation handler failed: modal crashed'
+    )
     expect(execute).not.toHaveBeenCalled()
   })
 })

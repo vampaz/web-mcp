@@ -7,7 +7,19 @@ import type {
   ToolPlanner
 } from './tool'
 
-export type WebMCPCommandInputPhase = 'idle' | 'preparing' | 'planning' | 'executing' | 'completed' | 'failed'
+export type WebMCPCommandInputPhase =
+  | 'idle'
+  | 'preparing'
+  | 'planning'
+  | 'executing'
+  | 'completed'
+  | 'failed'
+
+export interface WebMCPCommandInputEndpointOption {
+  label: string
+  model?: string
+  provider: PlannerProviderKind
+}
 
 export interface WebMCPCommandInputConfigureOptions {
   apiKey?: string
@@ -18,6 +30,7 @@ export interface WebMCPCommandInputConfigureOptions {
   context?: PlannerContext | (() => PlannerContext)
   disabled?: boolean
   endpoint?: string
+  endpointOptions?: WebMCPCommandInputEndpointOption[]
   floating?: boolean
   initialModel?: string
   initialProvider?: PlannerProviderKind
@@ -26,6 +39,7 @@ export interface WebMCPCommandInputConfigureOptions {
   planner?: ToolPlanner
   plannerConfig?: PlannerProviderConfig
   provider?: PlannerProviderKind
+  showChromeAI?: boolean
 }
 
 export interface WebMCPCommandInputElement extends HTMLElement {
@@ -37,12 +51,14 @@ export interface WebMCPCommandInputElement extends HTMLElement {
   context?: PlannerContext | (() => PlannerContext)
   disabled: boolean
   endpoint?: string
+  endpointOptions?: WebMCPCommandInputEndpointOption[]
   floating: boolean
   model?: string
   placeholder: string
   planner?: ToolPlanner
   plannerConfig?: PlannerProviderConfig
   provider?: PlannerProviderKind
+  showChromeAI?: boolean
   configure: (options: WebMCPCommandInputConfigureOptions) => void
   run: (message?: string) => Promise<ToolInvocationResult | undefined>
 }

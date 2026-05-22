@@ -10,6 +10,7 @@ describe('/api/webmcp/plan', () => {
     delete env.CLOUDFLARE_ACCOUNT_ID
     delete env.CLOUDFLARE_API_TOKEN
     delete env.OPENAI_API_KEY
+    delete env.OPENROUTER_API_KEY
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
   })
@@ -27,23 +28,23 @@ describe('/api/webmcp/plan', () => {
       run
     } as unknown as typeof env.AI
 
-    const response = await POST(createContext({
-      provider: 'cloudflare-binding',
-      model: '@cf/google/gemma-4-26b-a4b-it',
-      message: 'Select all items with water',
-      tools: [
-        {
-          name: 'select_items',
-          description: 'Select checklist items.',
-          inputSchema: { type: 'object' }
+    const response = await POST(
+      createContext({
+        provider: 'cloudflare-binding',
+        model: '@cf/google/gemma-4-26b-a4b-it',
+        message: 'Select all items with water',
+        tools: [
+          {
+            name: 'select_items',
+            description: 'Select checklist items.',
+            inputSchema: { type: 'object' }
+          }
+        ],
+        context: {
+          checklistItems: [{ id: 'item_8', name: 'Water', description: 'drink, beverage' }]
         }
-      ],
-      context: {
-        checklistItems: [
-          { id: 'item_8', name: 'Water', description: 'drink, beverage' }
-        ]
-      }
-    }))
+      })
+    )
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({
@@ -52,81 +53,89 @@ describe('/api/webmcp/plan', () => {
       confidence: 0.89,
       reason: 'Selected liquids.'
     })
-    expect(run).toHaveBeenCalledWith('@cf/google/gemma-4-26b-a4b-it', expect.objectContaining({
-      temperature: 0
-    }))
+    expect(run).toHaveBeenCalledWith(
+      '@cf/google/gemma-4-26b-a4b-it',
+      expect.objectContaining({
+        temperature: 0
+      })
+    )
   })
 
   it('returns a clear error when Cloudflare Workers AI server env is missing', async () => {
     vi.spyOn(console, 'error').mockImplementation(function ignoreErrorLog() {})
 
-    const response = await POST(createContext({
-      provider: 'cloudflare-workers-ai',
-      model: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
-      message: 'Select all items with water',
-      tools: [
-        {
-          name: 'select_items',
-          description: 'Select checklist items.',
-          inputSchema: { type: 'object' }
-        }
-      ],
-      context: {}
-    }))
+    const response = await POST(
+      createContext({
+        provider: 'cloudflare-workers-ai',
+        model: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
+        message: 'Select all items with water',
+        tools: [
+          {
+            name: 'select_items',
+            description: 'Select checklist items.',
+            inputSchema: { type: 'object' }
+          }
+        ],
+        context: {}
+      })
+    )
 
     expect(response.status).toBe(502)
     expect(await response.json()).toEqual({
-      error: 'Cloudflare Workers AI server mode needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN on the server, or a custom planner endpoint.'
+      error:
+        'Cloudflare Workers AI server mode needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN on the server, or a custom planner endpoint.'
     })
   })
 
   it('plans through OpenAI using GPT-5.4 mini', async () => {
-    const fetch = vi.fn(async () => Response.json({
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
-              toolName: 'select_items',
-              input: { ids: ['item_8'] },
-              confidence: 0.91,
-              reason: 'Selected water.'
-            })
+    const fetch = vi.fn(async () =>
+      Response.json({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                toolName: 'select_items',
+                input: { ids: ['item_8'] },
+                confidence: 0.91,
+                reason: 'Selected water.'
+              })
+            }
           }
-        }
-      ]
-    }))
+        ]
+      })
+    )
     vi.stubGlobal('fetch', fetch)
     env.OPENAI_API_KEY = 'test-openai-key'
 
-    const response = await POST(createContext({
-      provider: 'openai',
-      model: 'gpt-5.4-mini',
-      message: 'Select water',
-      tools: [
-        {
-          name: 'select_items',
-          description: 'Select checklist items.',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              ids: {
-                type: 'array',
-                items: {
-                  type: 'string'
+    const response = await POST(
+      createContext({
+        provider: 'openai',
+        model: 'gpt-5.4-mini',
+        message: 'Select water',
+        tools: [
+          {
+            name: 'select_items',
+            description: 'Select checklist items.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                ids: {
+                  type: 'array',
+                  items: {
+                    type: 'string'
+                  }
                 }
-              }
-            },
-            required: ['ids'],
-            additionalProperties: false
+              },
+              required: ['ids'],
+              additionalProperties: false
+            }
           }
+        ],
+        context: {
+          checklistItems: [{ id: 'item_8', name: 'Water' }]
         }
-      ],
-      context: {
-        checklistItems: [
-          { id: 'item_8', name: 'Water' }
-        ]
-      }
-    }))
+      })
+    )
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({
@@ -135,12 +144,15 @@ describe('/api/webmcp/plan', () => {
       confidence: 0.91,
       reason: 'Selected water.'
     })
-    expect(fetch).toHaveBeenCalledWith('https://api.openai.com/v1/chat/completions', expect.objectContaining({
-      headers: expect.objectContaining({
-        Authorization: 'Bearer test-openai-key'
-      }),
-      method: 'POST'
-    }))
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.openai.com/v1/chat/completions',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer test-openai-key'
+        }),
+        method: 'POST'
+      })
+    )
     const fetchOptions = (fetch.mock.calls as unknown as Array<[string, RequestInit]>)[0]?.[1]
     const request = JSON.parse(String(fetchOptions?.body)) as { model?: string }
     expect(request.model).toBe('gpt-5.4-mini')
@@ -150,19 +162,21 @@ describe('/api/webmcp/plan', () => {
     vi.spyOn(console, 'error').mockImplementation(function ignoreErrorLog() {})
     env.OPENAI_API_KEY = ''
 
-    const response = await POST(createContext({
-      provider: 'openai',
-      model: 'gpt-5.4-mini',
-      message: 'Select water',
-      tools: [
-        {
-          name: 'select_items',
-          description: 'Select checklist items.',
-          inputSchema: { type: 'object' }
-        }
-      ],
-      context: {}
-    }))
+    const response = await POST(
+      createContext({
+        provider: 'openai',
+        model: 'gpt-5.4-mini',
+        message: 'Select water',
+        tools: [
+          {
+            name: 'select_items',
+            description: 'Select checklist items.',
+            inputSchema: { type: 'object' }
+          }
+        ],
+        context: {}
+      })
+    )
 
     expect(response.status).toBe(502)
     expect(await response.json()).toEqual({
@@ -170,48 +184,159 @@ describe('/api/webmcp/plan', () => {
     })
   })
 
-  it('logs upstream OpenAI errors before returning 502', async () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(function ignoreErrorLog() {})
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
-      error: {
-        message: 'upstream failed for sk-test-secret'
-      }
-    }, {
-      status: 502
-    })))
-    env.OPENAI_API_KEY = 'test-openai-key'
+  it('plans through OpenRouter using the server API key', async () => {
+    const fetch = vi.fn(async () =>
+      Response.json({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                toolName: 'select_items',
+                input: { ids: ['item_8'] },
+                confidence: 0.91,
+                reason: 'Selected water.'
+              })
+            }
+          }
+        ]
+      })
+    )
+    vi.stubGlobal('fetch', fetch)
+    env.OPENROUTER_API_KEY = 'test-openrouter-key'
 
-    const response = await POST(createContext({
-      provider: 'openai',
-      model: 'gpt-5.4-mini',
-      message: 'Select water',
-      tools: [
-        {
-          name: 'select_items',
-          description: 'Select checklist items.',
-          inputSchema: { type: 'object' }
+    const response = await POST(
+      createContext({
+        provider: 'openrouter',
+        model: 'nvidia/nemotron-3-super-120b-a12b:free',
+        message: 'Select water',
+        tools: [
+          {
+            name: 'select_items',
+            description: 'Select checklist items.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                ids: {
+                  type: 'array',
+                  items: {
+                    type: 'string'
+                  }
+                }
+              },
+              required: ['ids'],
+              additionalProperties: false
+            }
+          }
+        ],
+        context: {
+          checklistItems: [{ id: 'item_8', name: 'Water' }]
         }
-      ],
-      context: {}
-    }))
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      toolName: 'select_items',
+      input: { ids: ['item_8'] },
+      confidence: 0.91,
+      reason: 'Selected water.'
+    })
+    expect(fetch).toHaveBeenCalledWith(
+      'https://openrouter.ai/api/v1/chat/completions',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer test-openrouter-key'
+        }),
+        method: 'POST'
+      })
+    )
+    const fetchOptions = (fetch.mock.calls as unknown as Array<[string, RequestInit]>)[0]?.[1]
+    const request = JSON.parse(String(fetchOptions?.body)) as { model?: string }
+    expect(request.model).toBe('nvidia/nemotron-3-super-120b-a12b:free')
+  })
+
+  it('returns a clear error when OpenRouter server env is missing', async () => {
+    vi.spyOn(console, 'error').mockImplementation(function ignoreErrorLog() {})
+    env.OPENROUTER_API_KEY = ''
+
+    const response = await POST(
+      createContext({
+        provider: 'openrouter',
+        model: 'nvidia/nemotron-3-super-120b-a12b:free',
+        message: 'Select water',
+        tools: [
+          {
+            name: 'select_items',
+            description: 'Select checklist items.',
+            inputSchema: { type: 'object' }
+          }
+        ],
+        context: {}
+      })
+    )
 
     expect(response.status).toBe(502)
     expect(await response.json()).toEqual({
-      error: 'OpenAI returned 502'
+      error: 'OpenRouter server mode needs OPENROUTER_API_KEY on the server.'
     })
-    expect(consoleError).toHaveBeenCalledWith('Server planner returned 502', expect.objectContaining({
-      event: 'webmcp.serverPlanner.502',
-      provider: 'openai',
-      model: 'gpt-5.4-mini',
-      status: 502,
-      toolCount: 1,
-      toolNames: ['select_items'],
-      publicError: 'OpenAI returned 502',
-      error: expect.objectContaining({
-        message: 'OpenAI returned 502',
-        upstreamResponse: expect.stringContaining('sk-[redacted]')
+  })
+
+  it('logs upstream OpenAI errors before returning 502', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(function ignoreErrorLog() {})
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json(
+          {
+            error: {
+              message: 'upstream failed for sk-test-secret'
+            }
+          },
+          {
+            status: 502
+          }
+        )
+      )
+    )
+    env.OPENAI_API_KEY = 'test-openai-key'
+
+    const response = await POST(
+      createContext({
+        provider: 'openai',
+        model: 'gpt-5.4-mini',
+        message: 'Select water',
+        tools: [
+          {
+            name: 'select_items',
+            description: 'Select checklist items.',
+            inputSchema: { type: 'object' }
+          }
+        ],
+        context: {}
       })
-    }))
+    )
+
+    expect(response.status).toBe(502)
+    expect(await response.json()).toEqual({
+      error: 'OpenAI returned 502',
+      upstreamError: expect.stringContaining('sk-[redacted]')
+    })
+    expect(consoleError).toHaveBeenCalledWith(
+      'Server planner returned 502',
+      expect.objectContaining({
+        event: 'webmcp.serverPlanner.502',
+        provider: 'openai',
+        model: 'gpt-5.4-mini',
+        status: 502,
+        toolCount: 1,
+        toolNames: ['select_items'],
+        publicError: 'OpenAI returned 502',
+        error: expect.objectContaining({
+          message: 'OpenAI returned 502',
+          upstreamResponse: expect.stringContaining('sk-[redacted]')
+        })
+      })
+    )
   })
 
   it('returns a clear error when the Cloudflare AI binding is local-only', async () => {
@@ -222,19 +347,21 @@ describe('/api/webmcp/plan', () => {
       }
     } as unknown as typeof env.AI
 
-    const response = await POST(createContext({
-      provider: 'cloudflare-binding',
-      model: '@cf/google/gemma-4-26b-a4b-it',
-      message: 'Select all items with water',
-      tools: [
-        {
-          name: 'select_items',
-          description: 'Select checklist items.',
-          inputSchema: { type: 'object' }
-        }
-      ],
-      context: {}
-    }))
+    const response = await POST(
+      createContext({
+        provider: 'cloudflare-binding',
+        model: '@cf/google/gemma-4-26b-a4b-it',
+        message: 'Select all items with water',
+        tools: [
+          {
+            name: 'select_items',
+            description: 'Select checklist items.',
+            inputSchema: { type: 'object' }
+          }
+        ],
+        context: {}
+      })
+    )
 
     expect(response.status).toBe(502)
     expect(await response.json()).toEqual({
@@ -243,7 +370,8 @@ describe('/api/webmcp/plan', () => {
   })
 
   it('retries Cloudflare AI binding without response_format when the model rejects it', async () => {
-    const run = vi.fn()
+    const run = vi
+      .fn()
       .mockRejectedValueOnce(new Error('response_format is not supported by this model'))
       .mockResolvedValueOnce({
         response: JSON.stringify({
@@ -257,23 +385,23 @@ describe('/api/webmcp/plan', () => {
       run
     } as unknown as typeof env.AI
 
-    const response = await POST(createContext({
-      provider: 'cloudflare-binding',
-      model: '@cf/nvidia/nemotron-3-120b-a12b',
-      message: 'Select all fruits',
-      tools: [
-        {
-          name: 'select_items',
-          description: 'Select checklist items.',
-          inputSchema: { type: 'object' }
+    const response = await POST(
+      createContext({
+        provider: 'cloudflare-binding',
+        model: '@cf/nvidia/nemotron-3-120b-a12b',
+        message: 'Select all fruits',
+        tools: [
+          {
+            name: 'select_items',
+            description: 'Select checklist items.',
+            inputSchema: { type: 'object' }
+          }
+        ],
+        context: {
+          checklistItems: [{ id: 'item_1', name: 'Apple' }]
         }
-      ],
-      context: {
-        checklistItems: [
-          { id: 'item_1', name: 'Apple' }
-        ]
-      }
-    }))
+      })
+    )
 
     expect(response.status).toBe(200)
     expect(await response.json()).toMatchObject({
@@ -281,12 +409,20 @@ describe('/api/webmcp/plan', () => {
       input: { ids: ['item_1'] }
     })
     expect(run).toHaveBeenCalledTimes(2)
-    expect(run).toHaveBeenNthCalledWith(1, '@cf/nvidia/nemotron-3-120b-a12b', expect.objectContaining({
-      response_format: { type: 'json_object' }
-    }))
-    expect(run).toHaveBeenNthCalledWith(2, '@cf/nvidia/nemotron-3-120b-a12b', expect.not.objectContaining({
-      response_format: expect.anything()
-    }))
+    expect(run).toHaveBeenNthCalledWith(
+      1,
+      '@cf/nvidia/nemotron-3-120b-a12b',
+      expect.objectContaining({
+        response_format: { type: 'json_object' }
+      })
+    )
+    expect(run).toHaveBeenNthCalledWith(
+      2,
+      '@cf/nvidia/nemotron-3-120b-a12b',
+      expect.not.objectContaining({
+        response_format: expect.anything()
+      })
+    )
     expect(run.mock.calls[1]?.[1]).not.toHaveProperty('response_format')
   })
 
@@ -296,13 +432,15 @@ describe('/api/webmcp/plan', () => {
       run
     } as unknown as typeof env.AI
 
-    const response = await POST(createContext({
-      provider: 'cloudflare-binding',
-      model: '@cf/google/gemma-4-26b-a4b-it',
-      message: 'x'.repeat(140 * 1024),
-      tools: [],
-      context: {}
-    }))
+    const response = await POST(
+      createContext({
+        provider: 'cloudflare-binding',
+        model: '@cf/google/gemma-4-26b-a4b-it',
+        message: 'x'.repeat(140 * 1024),
+        tools: [],
+        context: {}
+      })
+    )
 
     expect(response.status).toBe(413)
     expect(await response.json()).toEqual({
@@ -324,31 +462,33 @@ describe('/api/webmcp/plan', () => {
       }))
     } as unknown as typeof env.AI
 
-    const response = await POST(createContext({
-      provider: 'cloudflare-binding',
-      model: '@cf/google/gemma-4-26b-a4b-it',
-      message: 'Select all items with water',
-      tools: [
-        {
-          name: 'select_items',
-          description: 'Select checklist items.',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              ids: {
-                type: 'array',
-                items: {
-                  type: 'string'
+    const response = await POST(
+      createContext({
+        provider: 'cloudflare-binding',
+        model: '@cf/google/gemma-4-26b-a4b-it',
+        message: 'Select all items with water',
+        tools: [
+          {
+            name: 'select_items',
+            description: 'Select checklist items.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                ids: {
+                  type: 'array',
+                  items: {
+                    type: 'string'
+                  }
                 }
-              }
-            },
-            required: ['ids'],
-            additionalProperties: false
+              },
+              required: ['ids'],
+              additionalProperties: false
+            }
           }
-        }
-      ],
-      context: {}
-    }))
+        ],
+        context: {}
+      })
+    )
 
     expect(response.status).toBe(502)
     expect(await response.json()).toEqual({
@@ -383,46 +523,48 @@ describe('/api/webmcp/plan', () => {
       }))
     } as unknown as typeof env.AI
 
-    const response = await POST(createContext({
-      provider: 'cloudflare-binding',
-      model: '@cf/google/gemma-4-26b-a4b-it',
-      message: 'Mark Stark Industries invoices as paid',
-      tools: [
-        {
-          name: 'select_invoices',
-          description: 'Select invoice rows.',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              ids: {
-                type: 'array',
-                items: {
-                  type: 'string'
+    const response = await POST(
+      createContext({
+        provider: 'cloudflare-binding',
+        model: '@cf/google/gemma-4-26b-a4b-it',
+        message: 'Mark Stark Industries invoices as paid',
+        tools: [
+          {
+            name: 'select_invoices',
+            description: 'Select invoice rows.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                ids: {
+                  type: 'array',
+                  items: {
+                    type: 'string'
+                  }
                 }
-              }
-            },
-            required: ['ids'],
-            additionalProperties: false
+              },
+              required: ['ids'],
+              additionalProperties: false
+            }
+          },
+          {
+            name: 'update_selected_invoice_status',
+            description: 'Update selected invoice statuses.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                status: {
+                  type: 'string',
+                  enum: ['draft', 'sent', 'overdue', 'paid', 'void']
+                }
+              },
+              required: ['status'],
+              additionalProperties: false
+            }
           }
-        },
-        {
-          name: 'update_selected_invoice_status',
-          description: 'Update selected invoice statuses.',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              status: {
-                type: 'string',
-                enum: ['draft', 'sent', 'overdue', 'paid', 'void']
-              }
-            },
-            required: ['status'],
-            additionalProperties: false
-          }
-        }
-      ],
-      context: {}
-    }))
+        ],
+        context: {}
+      })
+    )
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual(sequencePlan)

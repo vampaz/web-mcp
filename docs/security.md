@@ -77,3 +77,7 @@ unsubscribe()
 ```
 
 Event payloads can include invocation details in `detail`, including tool inputs and outputs for invocation events. Treat event subscribers as trusted application code, and do not forward event details to analytics, logs, or third-party services without redaction.
+
+## Demo Admin Toggle
+
+The demo exposes planner provider/model controls when `localStorage.setItem('webmcp:admin', 'true')` is set. This is a **development-only convenience** and is trivially discoverable by any user with browser devtools access. Do not rely on this mechanism for production access control. In production, pass app-owned planner configuration to keep provider/model choices hidden from end users.

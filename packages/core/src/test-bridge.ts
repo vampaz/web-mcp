@@ -1,4 +1,9 @@
-import type { RegisteredTool, RegistrySnapshot, ToolInvocation, ToolInvocationResult } from './interfaces/tool'
+import type {
+  RegisteredTool,
+  RegistrySnapshot,
+  ToolInvocation,
+  ToolInvocationResult
+} from './interfaces/tool'
 import { getRegistrySnapshot, invokeTool, listTools } from './registry'
 
 export interface TestBridgeTool {
@@ -16,7 +21,9 @@ export interface TestBridgeTool {
 export interface WebMCPKitTestBridge {
   getRegistrySnapshot: () => TestBridgeSnapshot
   listTools: () => TestBridgeTool[]
-  invokeTool: <TOutput = unknown>(invocation: ToolInvocation) => Promise<ToolInvocationResult<TOutput>>
+  invokeTool: <TOutput = unknown>(
+    invocation: ToolInvocation
+  ) => Promise<ToolInvocationResult<TOutput>>
 }
 
 export interface TestBridgeSnapshot extends Omit<RegistrySnapshot, 'tools'> {

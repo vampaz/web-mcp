@@ -1,4 +1,9 @@
-import type { JsonSchema, RegisteredTool, ToolConfirmation, ToolScopeResult } from '../interfaces/tool'
+import type {
+  JsonSchema,
+  RegisteredTool,
+  ToolConfirmation,
+  ToolScopeResult
+} from '../interfaces/tool'
 
 export interface ToolCatalog {
   title: string
@@ -36,7 +41,10 @@ interface CatalogRegistration {
   warnings: string[]
 }
 
-export function createToolCatalog(registrations: CatalogRegistration[], options: ToolCatalogOptions = {}): ToolCatalog {
+export function createToolCatalog(
+  registrations: CatalogRegistration[],
+  options: ToolCatalogOptions = {}
+): ToolCatalog {
   return {
     title: options.title ?? 'WebMCP Tool Catalog',
     tools: registrations.map(function mapRegistration(registration) {
@@ -96,7 +104,14 @@ function formatCatalogEntry(entry: ToolCatalogEntry): string {
   lines.push('', 'Input schema:', '', '```json', JSON.stringify(entry.inputSchema, null, 2), '```')
 
   if (entry.outputSchema) {
-    lines.push('', 'Output schema:', '', '```json', JSON.stringify(entry.outputSchema, null, 2), '```')
+    lines.push(
+      '',
+      'Output schema:',
+      '',
+      '```json',
+      JSON.stringify(entry.outputSchema, null, 2),
+      '```'
+    )
   }
 
   if (entry.examples.length > 0) {

@@ -31,7 +31,7 @@ This is the single most important safety improvement. Every tool should be valid
 
 ```ts
 // Current: two sources of truth
-defineTool<{ customerName: string, amount: number }>({
+defineTool<{ customerName: string; amount: number }>({
   inputSchema: {
     properties: {
       customerName: { type: 'string' },
@@ -170,8 +170,12 @@ This makes the most common agent use case — "do a multi-step thing for me" —
 defineTool({
   name: 'void_invoice',
   description: 'Void an invoice and mark it as cancelled.',
-  execute(input) { return voidInvoice(input.invoiceId) },
-  undo(input, output) { return restoreInvoice(input.invoiceId, output.previousStatus) }
+  execute(input) {
+    return voidInvoice(input.invoiceId)
+  },
+  undo(input, output) {
+    return restoreInvoice(input.invoiceId, output.previousStatus)
+  }
 })
 ```
 
@@ -191,7 +195,7 @@ The registry tracks the last `N` invocations per tool. The devtools overlay gets
 const sendInvoiceTool = defineServerTool({
   name: 'send_invoice',
   description: 'Send a finalized invoice to the customer by email.',
-  endpoint: '/api/tools/send-invoice',
+  endpoint: '/api/tools/send-invoice'
   // Frontend validates the schema and sends input to endpoint
   // Server handles execution with secrets
 })
@@ -254,15 +258,15 @@ Generated at build time or served by a lightweight endpoint. Agents can prefetch
 
 ---
 
-## What *Not* To Build Yet
+## What _Not_ To Build Yet
 
-| Idea | Why defer |
-|---|---|
-| Streaming tool results | Adds complexity; the execute-then-return model is sufficient for most use cases. Revisit when Chrome's WebMCP streaming semantics stabilize. |
-| Cross-tab/origin tool orchestration | Massive scope creep. Tools should be page-scoped. |
-| Built-in rate limiting | App-level concern. Provide hooks for it but don't enforce policy. |
-| Tool-to-OpenAPI generator | Niche. The OpenAI adapter already covers the main interoperability case. |
-| Visual tool builder / no-code | Not the target audience. This kit is for developers who already have apps. |
+| Idea                                | Why defer                                                                                                                                    |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Streaming tool results              | Adds complexity; the execute-then-return model is sufficient for most use cases. Revisit when Chrome's WebMCP streaming semantics stabilize. |
+| Cross-tab/origin tool orchestration | Massive scope creep. Tools should be page-scoped.                                                                                            |
+| Built-in rate limiting              | App-level concern. Provide hooks for it but don't enforce policy.                                                                            |
+| Tool-to-OpenAPI generator           | Niche. The OpenAI adapter already covers the main interoperability case.                                                                     |
+| Visual tool builder / no-code       | Not the target audience. This kit is for developers who already have apps.                                                                   |
 
 ---
 

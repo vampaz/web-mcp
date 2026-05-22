@@ -69,13 +69,13 @@ One token = one successful planner invocation. A planner invocation is a single 
 
 The following do NOT consume a token:
 
-| Response | Reason |
-|---|---|
-| `402 Payment Required` | Tokens exhausted; no plan produced |
-| `429 Too Many Requests` | Rate limited; retryable |
-| `5xx` server errors | Infrastructure failure; not the customer's fault |
-| `400 Bad Request` | Malformed request; rejected before planning |
-| Cached responses | Account-scoped identical requests within TTL |
+| Response                | Reason                                           |
+| ----------------------- | ------------------------------------------------ |
+| `402 Payment Required`  | Tokens exhausted; no plan produced               |
+| `429 Too Many Requests` | Rate limited; retryable                          |
+| `5xx` server errors     | Infrastructure failure; not the customer's fault |
+| `400 Bad Request`       | Malformed request; rejected before planning      |
+| Cached responses        | Account-scoped identical requests within TTL     |
 
 Only `200` with a valid plan debits a token. This keeps the contract simple and fair.
 
@@ -89,12 +89,12 @@ This prevents parallel requests from overdrawing an account and prevents client 
 
 Tokens are bought in packs. Each account starts with a free allocation.
 
-| Pack | Tokens | Price | Effective per-plan | Free allocation |
-|---|---|---|---|---|
-| Starter | 1,000 | Free | $0 | Yes (on signup) |
-| Small | 10,000 | $9 | $0.0009 | No |
-| Medium | 100,000 | $49 | $0.00049 | No |
-| Large | 1,000,000 | $199 | $0.000199 | No |
+| Pack    | Tokens    | Price | Effective per-plan | Free allocation |
+| ------- | --------- | ----- | ------------------ | --------------- |
+| Starter | 1,000     | Free  | $0                 | Yes (on signup) |
+| Small   | 10,000    | $9    | $0.0009            | No              |
+| Medium  | 100,000   | $49   | $0.00049           | No              |
+| Large   | 1,000,000 | $199  | $0.000199          | No              |
 
 Exact pricing is TBD. The point is a generous free tier for evaluation and volume pricing that decreases per-plan cost.
 
@@ -125,11 +125,25 @@ POST https://api.webmcpkit.com/plan
     {
       "name": "create_invoice",
       "description": "Create an invoice for a customer.",
-      "inputSchema": { "type": "object", "properties": { "customerName": { "type": "string" }, "amount": { "type": "number" } }, "required": ["customerName", "amount"] }
+      "inputSchema": {
+        "type": "object",
+        "properties": { "customerName": { "type": "string" }, "amount": { "type": "number" } },
+        "required": ["customerName", "amount"]
+      }
     }
   ],
   "context": { "route": "/invoices", "selectedIds": [] },
-  "responseSchema": { "type": "object", "properties": { "toolName": { "type": "string" }, "input": { "type": "object" }, "confidence": { "type": "number" }, "reason": { "type": "string" }, "steps": { "type": "array" } }, "required": ["toolName", "input", "confidence", "reason"] }
+  "responseSchema": {
+    "type": "object",
+    "properties": {
+      "toolName": { "type": "string" },
+      "input": { "type": "object" },
+      "confidence": { "type": "number" },
+      "reason": { "type": "string" },
+      "steps": { "type": "array" }
+    },
+    "required": ["toolName", "input", "confidence", "reason"]
+  }
 }
 ```
 
@@ -214,11 +228,11 @@ No token is debited.
 
 The `model` field in the request controls which underlying model the API uses:
 
-| `model` value | Behavior |
-|---|---|
-| `auto` | The API selects the best available model for tool planning. Starts with a fast, cheap model; escalates to a more capable model if the first attempt returns invalid JSON or an unknown tool. |
-| `fast` | Uses the fastest available model (lowest latency, lowest cost per token). |
-| `capable` | Uses the most capable available model (highest planning accuracy). |
+| `model` value | Behavior                                                                                                                                                                                     |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auto`        | The API selects the best available model for tool planning. Starts with a fast, cheap model; escalates to a more capable model if the first attempt returns invalid JSON or an unknown tool. |
+| `fast`        | Uses the fastest available model (lowest latency, lowest cost per token).                                                                                                                    |
+| `capable`     | Uses the most capable available model (highest planning accuracy).                                                                                                                           |
 
 This keeps the API simple while allowing the backend to swap providers without client changes.
 
@@ -258,10 +272,10 @@ Context changes invalidate the cache — if the selected rows, route, or app sta
 
 ## Rate Limiting
 
-| Tier | Requests per minute | Burst |
-|---|---|---|
-| Free (1K tokens) | 10 | 20 |
-| Paid | 60 | 120 |
+| Tier             | Requests per minute | Burst |
+| ---------------- | ------------------- | ----- |
+| Free (1K tokens) | 10                  | 20    |
+| Paid             | 60                  | 120   |
 
 Rate limits are per-account, identified by the API token. The `429` response includes a `Retry-After` header. Automatic client retry is not required for the initial launch unless it is added to the client implementation and covered by tests.
 
@@ -371,37 +385,37 @@ Steps:
 
 ### Variable Costs per 1,000 Invocations
 
-| Provider | Approx. cost per 1K plans | Notes |
-|---|---|---|
-| Cloudflare Workers AI | $0.00 | Free tier covers most early usage |
-| OpenRouter (auto) | $0.10–$0.50 | Depends on model selected |
-| OpenAI (gpt-4.1-mini) | $0.15–$0.60 | More capable, higher cost |
+| Provider              | Approx. cost per 1K plans | Notes                             |
+| --------------------- | ------------------------- | --------------------------------- |
+| Cloudflare Workers AI | $0.00                     | Free tier covers most early usage |
+| OpenRouter (auto)     | $0.10–$0.50               | Depends on model selected         |
+| OpenAI (gpt-4.1-mini) | $0.15–$0.60               | More capable, higher cost         |
 
 At the Medium pack price ($49 for 100K tokens), variable cost is approximately $5-$60 depending on model mix, leaving $44 to -$11 gross margin. The launch model must keep most `auto` traffic on low-cost Workers AI models or raise prices before routing substantial traffic to premium providers.
 
 ### Fixed Costs
 
-| Item | Cost |
-|---|---|
-| Cloudflare Workers | Free tier for first 100K requests/day |
-| Cloudflare D1 | Free tier covers early usage |
-| Cloudflare KV | Free tier covers caching and rate limiting |
-| Domain + SSL | ~$15/year |
+| Item               | Cost                                                              |
+| ------------------ | ----------------------------------------------------------------- |
+| Cloudflare Workers | Free tier for first 100K requests/day                             |
+| Cloudflare D1      | Free tier covers early usage                                      |
+| Cloudflare KV      | Free tier covers caching and rate limiting                        |
+| Domain + SSL       | ~$15/year                                                         |
 | Stripe integration | 2.9% + $0.30 per transaction (minimally impacting at pack prices) |
 
 Initial infrastructure cost is near zero. Costs scale linearly with usage, and token pricing is layered to maintain margin at every tier.
 
 ## Launch Sequence
 
-| Step | Deliverable | Dependencies |
-|---|---|---|
-| 1 | Add `webmcp-cloud` provider kind, command-input support, and `402` fallback to `@webmcp-kit/core` | None |
-| 2 | Build `api.webmcpkit.com/plan` Worker with atomic token ledger, model routing, and account-scoped caching | D1 schema, KV namespace |
-| 3 | Build dashboard (sign-up, tokens, usage, purchase) | Stripe account, Cloudflare Pages |
-| 4 | Add `getTokenBalance()` to core | API Worker running |
-| 5 | Update planner-providers docs with `webmcp-cloud` usage | Steps 1–4 complete |
-| 6 | Publish npm packages with `webmcp-cloud` support | Steps 1–4 complete |
-| 7 | Launch landing page with pricing, docs, and signup CTA | Steps 2–3 complete |
+| Step | Deliverable                                                                                               | Dependencies                     |
+| ---- | --------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| 1    | Add `webmcp-cloud` provider kind, command-input support, and `402` fallback to `@webmcp-kit/core`         | None                             |
+| 2    | Build `api.webmcpkit.com/plan` Worker with atomic token ledger, model routing, and account-scoped caching | D1 schema, KV namespace          |
+| 3    | Build dashboard (sign-up, tokens, usage, purchase)                                                        | Stripe account, Cloudflare Pages |
+| 4    | Add `getTokenBalance()` to core                                                                           | API Worker running               |
+| 5    | Update planner-providers docs with `webmcp-cloud` usage                                                   | Steps 1–4 complete               |
+| 6    | Publish npm packages with `webmcp-cloud` support                                                          | Steps 1–4 complete               |
+| 7    | Launch landing page with pricing, docs, and signup CTA                                                    | Steps 2–3 complete               |
 
 Steps 1 and 2 can start immediately. Step 3 is the largest effort. Step 5 and 6 depend on the API being live. Step 7 is marketing, not engineering.
 

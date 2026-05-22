@@ -1,12 +1,19 @@
-import { hasConfirmationHandler } from './confirmation'
-import type { IntegrationDiagnostic, IntegrationHealthReport, RegisteredTool, ToolPlanner } from './interfaces/tool'
+import { getErrorMessage, hasConfirmationHandler } from './confirmation'
+import type {
+  IntegrationDiagnostic,
+  IntegrationHealthReport,
+  RegisteredTool,
+  ToolPlanner
+} from './interfaces/tool'
 import { getRegistrySnapshot, listTools } from './registry'
 
 export interface IntegrationHealthOptions {
   planner?: ToolPlanner
 }
 
-export function getIntegrationHealthReport(options: IntegrationHealthOptions = {}): IntegrationHealthReport {
+export function getIntegrationHealthReport(
+  options: IntegrationHealthOptions = {}
+): IntegrationHealthReport {
   const snapshot = getRegistrySnapshot()
   const tools = listTools()
   const diagnostics = [
@@ -27,7 +34,9 @@ export function getIntegrationHealthReport(options: IntegrationHealthOptions = {
   }
 }
 
-export function assertWebMCPIntegration(options: IntegrationHealthOptions = {}): IntegrationHealthReport {
+export function assertWebMCPIntegration(
+  options: IntegrationHealthOptions = {}
+): IntegrationHealthReport {
   const report = getIntegrationHealthReport(options)
   if (report.status === 'error') {
     throw new Error(report.summary)
@@ -39,13 +48,16 @@ export function assertWebMCPIntegration(options: IntegrationHealthOptions = {}):
 function getRegistryDiagnostics(tools: RegisteredTool[]): IntegrationDiagnostic[] {
   if (tools.length > 0) return []
 
-  return [{
-    id: 'no-tools-registered',
-    severity: 'error',
-    title: 'No WebMCP tools are registered',
-    detail: 'The app is running WebMCP Kit, but agents cannot do anything until at least one tool is registered.',
-    action: 'Register a tool with registerTool(), a framework helper, or registerFormTool().'
-  }]
+  return [
+    {
+      id: 'no-tools-registered',
+      severity: 'error',
+      title: 'No WebMCP tools are registered',
+      detail:
+        'The app is running WebMCP Kit, but agents cannot do anything until at least one tool is registered.',
+      action: 'Register a tool with registerTool(), a framework helper, or registerFormTool().'
+    }
+  ]
 }
 
 function getToolDiagnostics(tools: RegisteredTool[]): IntegrationDiagnostic[] {
@@ -71,7 +83,8 @@ function getToolDiagnostics(tools: RegisteredTool[]): IntegrationDiagnostic[] {
         id: `schema-allows-extra-properties:${tool.name}`,
         severity: 'warning',
         title: `${tool.name} accepts extra input properties`,
-        detail: 'Object schemas should usually set additionalProperties: false so model-generated input stays predictable.',
+        detail:
+          'Object schemas should usually set additionalProperties: false so model-generated input stays predictable.',
         action: 'Add additionalProperties: false and list required fields explicitly.',
         toolName: tool.name
       })
@@ -129,26 +142,27 @@ function getPlannerDiagnostics(planner: ToolPlanner | undefined): IntegrationDia
   if (!planner) return []
 
   if (planner.available && planner.status === 'ready') {
-    return [{
-      id: 'planner-ready',
-      severity: 'info',
-      title: `${planner.name} planner is ready`,
-      detail: planner.detail,
-      action: 'Run a command through the demo or your app command input.'
-    }]
+    return [
+      {
+        id: 'planner-ready',
+        severity: 'info',
+        title: `${planner.name} planner is ready`,
+        detail: planner.detail,
+        action: 'Run a command through the demo or your app command input.'
+      }
+    ]
   }
 
-  return [{
-    id: `planner-${planner.status}`,
-    severity: planner.status === 'needs-key' || planner.status === 'unavailable' ? 'warning' : 'info',
-    title: `${planner.name} planner is ${planner.status}`,
-    detail: planner.detail,
-    action: 'Check the selected provider, model, endpoint, and server environment.'
-  }]
-}
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Unknown scope error.'
+  return [
+    {
+      id: `planner-${planner.status}`,
+      severity:
+        planner.status === 'needs-key' || planner.status === 'unavailable' ? 'warning' : 'info',
+      title: `${planner.name} planner is ${planner.status}`,
+      detail: planner.detail,
+      action: 'Check the selected provider, model, endpoint, and server environment.'
+    }
+  ]
 }
 
 function getSummary(toolCount: number, errorCount: number, warningCount: number): string {

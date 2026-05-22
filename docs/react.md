@@ -7,26 +7,29 @@ import { defineTool } from '@webmcp-kit/core'
 import { useWebMCPTool } from '@webmcp-kit/react'
 
 export function CartTools() {
-  useWebMCPTool(defineTool({
-    name: 'add_to_cart',
-    description: 'Add a known product to the current cart.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        productId: { type: 'string' },
-        quantity: { type: 'integer', minimum: 1 }
+  useWebMCPTool(
+    defineTool({
+      name: 'add_to_cart',
+      description: 'Add a known product to the current cart.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          productId: { type: 'string' },
+          quantity: { type: 'integer', minimum: 1 }
+        },
+        required: ['productId', 'quantity'],
+        additionalProperties: false
       },
-      required: ['productId', 'quantity'],
-      additionalProperties: false
-    },
-    execute(input) {
-      return input
+      execute(input) {
+        return input
+      }
+    }),
+    {
+      when: function isCartRoute() {
+        return window.location.pathname.startsWith('/cart')
+      }
     }
-  }), {
-    when: function isCartRoute() {
-      return window.location.pathname.startsWith('/cart')
-    }
-  })
+  )
 
   return null
 }

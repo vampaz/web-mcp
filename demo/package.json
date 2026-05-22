@@ -18,6 +18,7 @@
     "@webmcp-kit/core": "0.0.0",
     "@webmcp-kit/devtools": "0.0.0",
     "astro": "latest",
+    "mermaid": "^11.15.0",
     "vue": "latest"
   },
   "devDependencies": {

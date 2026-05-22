@@ -22,29 +22,68 @@ What is in this repo now:
 
 Packages are still private while the MVP API settles. See [Package Publishing Shape](./Dev-Docs/PACKAGE-PUBLISHING.md) for the release-readiness checklist and package boundary notes.
 
+## How It Fits
+
+Consumers keep ownership of app state, tools, secrets, and approved planner endpoints. WebMCP Kit provides the browser-facing registration layer, the fallback registry, the command input, diagnostics, tests, and planner clients.
+
+```mermaid
+flowchart TB
+  User["User command"]
+  Consumer["Consumer app config<br/>tools, context, endpointOptions"]
+  Command["WebMCP command input<br/>provider + model controls"]
+  Choice{"Selected planner"}
+  ChromeAI["Browser local<br/>Chrome built-in AI"]
+  LocalPlanner["Browser local<br/>deterministic fallback"]
+  Server["Consumer server endpoint<br/>/api/webmcp/plan"]
+  Secrets["Server-owned secrets<br/>API keys + bindings"]
+  Providers["Provider APIs<br/>OpenAI / OpenRouter / Workers AI"]
+  Plan["Validated tool plan"]
+  Registry["WebMCP tool registry<br/>native adapter + fallback"]
+  Native["Optional integrations<br/>navigator.modelContext, devtools, tests, MCP bridge"]
+  Tools["Consumer tools execute<br/>guards, confirmations, app state updates"]
+
+  User --> Command
+  Consumer --> Command
+  Consumer --> Registry
+  Command --> Choice
+  Choice -->|"Chrome AI"| ChromeAI
+  Choice -->|"local fallback"| LocalPlanner
+  Choice -->|"server mode"| Server
+  Server --> Secrets
+  Server --> Providers
+  ChromeAI --> Plan
+  LocalPlanner --> Plan
+  Providers --> Plan
+  Plan --> Registry
+  Registry --> Tools
+  Registry -.-> Native
+```
+
 ## Quick Start
 
 ```ts
 import { defineTool, registerTool } from '@webmcp-kit/core'
 
-registerTool(defineTool({
-  name: 'search_products',
-  description: 'Search the local product catalog.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      query: { type: 'string' }
+registerTool(
+  defineTool({
+    name: 'search_products',
+    description: 'Search the local product catalog.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string' }
+      },
+      required: ['query'],
+      additionalProperties: false
     },
-    required: ['query'],
-    additionalProperties: false
-  },
-  annotations: {
-    readOnlyHint: true
-  },
-  execute(input) {
-    return searchProducts(String(input.query))
-  }
-}))
+    annotations: {
+      readOnlyHint: true
+    },
+    execute(input) {
+      return searchProducts(String(input.query))
+    }
+  })
+)
 ```
 
 For tools that change important state, add confirmation metadata and configure one app-level approval handler:
@@ -52,33 +91,35 @@ For tools that change important state, add confirmation metadata and configure o
 ```ts
 import { defineTool, registerTool, setConfirmationHandler } from '@webmcp-kit/core'
 
-registerTool(defineTool({
-  name: 'create_invoice',
-  description: 'Create a draft invoice for a customer and add it to the invoice list.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      customerName: {
-        type: 'string',
-        description: 'The customer name to invoice.'
+registerTool(
+  defineTool({
+    name: 'create_invoice',
+    description: 'Create a draft invoice for a customer and add it to the invoice list.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        customerName: {
+          type: 'string',
+          description: 'The customer name to invoice.'
+        },
+        amount: {
+          type: 'number',
+          minimum: 0.01,
+          description: 'The invoice amount.'
+        }
       },
-      amount: {
-        type: 'number',
-        minimum: 0.01,
-        description: 'The invoice amount.'
-      }
+      required: ['customerName', 'amount'],
+      additionalProperties: false
     },
-    required: ['customerName', 'amount'],
-    additionalProperties: false
-  },
-  confirmation: {
-    required: true,
-    reason: 'Creating an invoice changes business state.'
-  },
-  async execute(input) {
-    return createInvoice(input)
-  }
-}))
+    confirmation: {
+      required: true,
+      reason: 'Creating an invoice changes business state.'
+    },
+    async execute(input) {
+      return createInvoice(input)
+    }
+  })
+)
 
 setConfirmationHandler(async function confirmTool(tool, input, reason) {
   return showConfirmationModal({
@@ -209,7 +250,7 @@ import { createWebMCPKit } from '@webmcp-kit/core'
 const kit = await createWebMCPKit({
   planner: {
     provider: 'openrouter',
-    model: 'openrouter/auto',
+    model: 'nvidia/nemotron-3-super-120b-a12b:free',
     auth: {
       mode: 'user-key',
       apiKey: userProvidedKey
@@ -257,18 +298,45 @@ defineWebMCPCommandInput()
 ></webmcp-command-input>
 ```
 
-When `provider` and `model` are initialized by attributes or properties, the component treats them as app-owned configuration and does not show those settings to the user. If they are omitted, the component shows provider/model controls where they apply.
+When `provider` and `model` are initialized by attributes or properties, the component treats them as app-owned configuration and does not show those settings to the user. If they are omitted, the component shows provider/model controls only when there is a real choice.
 
-For local development, leave `provider` and `model` unset when configuring the input so developers can switch planners from the command box:
+Chrome built-in AI is detected from the browser `LanguageModel` API and appears automatically when available. Consumers can hide it with `showChromeAI: false`.
+
+For local development, leave `provider` and `model` unset and pass the endpoint options your app supports so developers can switch server-backed planners from the command box:
 
 ```ts
 input.configure({
   context: getPlannerContext,
-  endpoint: '/api/webmcp/plan'
+  endpoint: '/api/webmcp/plan',
+  endpointOptions: [
+    {
+      label: 'GPT-5.4 mini',
+      model: 'gpt-5.4-mini',
+      provider: 'openai'
+    },
+    {
+      label: 'Nemotron 3 Super 120B A12B',
+      model: 'nvidia/nemotron-3-super-120b-a12b:free',
+      provider: 'openrouter'
+    },
+    {
+      label: 'GLM 4.7 Flash',
+      model: '@cf/zai-org/glm-4.7-flash',
+      provider: 'cloudflare-binding'
+    },
+    {
+      label: 'Auto',
+      provider: 'auto'
+    },
+    {
+      label: 'Local deterministic',
+      provider: 'local'
+    }
+  ]
 })
 ```
 
-The demo follows this pattern in dev mode. Preview and production can pass the app-owned planner/provider/model to keep those choices hidden from end users.
+The demo follows this pattern in dev mode. Preview and production can pass the app-owned planner/provider/model to keep those choices hidden from end users. If the consumer provides only one option and Chrome AI is hidden or unavailable, the options panel is not rendered.
 
 For app context, assign a property before or after mounting:
 

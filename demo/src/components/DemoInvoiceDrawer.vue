@@ -6,7 +6,10 @@
 
     <div v-if="activeInvoice" class="active-record">
       <strong>{{ activeInvoice.customerName }}</strong>
-      <span>{{ activeInvoice.status }} · €{{ activeInvoice.amount }} · due {{ activeInvoice.dueDate }}</span>
+      <span
+        >{{ activeInvoice.status }} · €{{ activeInvoice.amount }} · due
+        {{ activeInvoice.dueDate }}</span
+      >
     </div>
 
     <form class="invoice-form" @submit.prevent="submitDraft">

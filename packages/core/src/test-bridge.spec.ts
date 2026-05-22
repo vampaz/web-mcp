@@ -13,25 +13,27 @@ describe('test bridge', () => {
   })
 
   it('exposes serializable tool summaries and invocation for tests', async () => {
-    registerTool(defineTool({
-      name: 'select_items',
-      description: 'Select checklist items by their stable IDs from the visible page state.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          ids: {
-            type: 'array',
-            items: {
-              type: 'string'
+    registerTool(
+      defineTool({
+        name: 'select_items',
+        description: 'Select checklist items by their stable IDs from the visible page state.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            ids: {
+              type: 'array',
+              items: {
+                type: 'string'
+              }
             }
-          }
+          },
+          required: ['ids']
         },
-        required: ['ids']
-      },
-      execute(input) {
-        return input.ids
-      }
-    }))
+        execute(input) {
+          return input.ids
+        }
+      })
+    )
 
     const uninstall = installWebMCPKitTestBridge()
 
@@ -62,25 +64,27 @@ describe('test bridge', () => {
       return false
     })
 
-    registerTool(defineTool({
-      name: 'checkout_cart',
-      description: 'Checkout the current cart.',
-      inputSchema: {
-        type: 'object',
-        properties: {},
-        required: [],
-        additionalProperties: false
-      },
-      confirmation: {
-        required: true,
-        reason: 'Checkout requires approval.'
-      },
-      execute() {
-        return {
-          ok: true
+    registerTool(
+      defineTool({
+        name: 'checkout_cart',
+        description: 'Checkout the current cart.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          required: [],
+          additionalProperties: false
+        },
+        confirmation: {
+          required: true,
+          reason: 'Checkout requires approval.'
+        },
+        execute() {
+          return {
+            ok: true
+          }
         }
-      }
-    }))
+      })
+    )
 
     installWebMCPKitTestBridge()
 

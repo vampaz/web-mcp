@@ -34,9 +34,10 @@ export function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unknow
     if (isReadable(options.when)) {
       unsubscribe = options.when.subscribe(syncRegistration)
     } else {
-      syncRegistration(options.when === undefined || (
-        typeof options.when === 'function' ? options.when() : options.when
-      ))
+      syncRegistration(
+        options.when === undefined ||
+          (typeof options.when === 'function' ? options.when() : options.when)
+      )
     }
 
     return function disposeWebMCPTool() {

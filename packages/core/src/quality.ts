@@ -1,7 +1,27 @@
 import type { WebMCPTool } from './interfaces/tool'
 
-const sensitiveWords = ['delete', 'remove', 'void', 'charge', 'pay', 'send', 'publish', 'export', 'email']
-const sensitiveFieldWords = ['password', 'token', 'secret', 'card', 'iban', 'ssn', 'tax', 'credential', 'api_key']
+const sensitiveWords = [
+  'delete',
+  'remove',
+  'void',
+  'charge',
+  'pay',
+  'send',
+  'publish',
+  'export',
+  'email'
+]
+const sensitiveFieldWords = [
+  'password',
+  'token',
+  'secret',
+  'card',
+  'iban',
+  'ssn',
+  'tax',
+  'credential',
+  'api_key'
+]
 const weakWords = ['do', 'thing', 'stuff', 'manage', 'handle', 'process']
 
 export function getToolWarnings<TInput = Record<string, unknown>, TOutput = unknown>(
@@ -25,7 +45,9 @@ export function getToolWarnings<TInput = Record<string, unknown>, TOutput = unkn
     warnings.push('Input schema should usually be an object with named parameters.')
   }
 
-  const looksSensitive = sensitiveWords.some((word) => tool.name.includes(word) || tool.description.toLowerCase().includes(word))
+  const looksSensitive = sensitiveWords.some(
+    (word) => tool.name.includes(word) || tool.description.toLowerCase().includes(word)
+  )
   if (looksSensitive && !tool.confirmation?.required) {
     warnings.push('Sensitive action likely needs explicit confirmation metadata.')
   }
@@ -55,7 +77,9 @@ function getFormToolWarnings<TInput = Record<string, unknown>, TOutput = unknown
     const fieldText = `${fieldName} ${description ?? ''}`.toLowerCase()
     const looksSensitive = sensitiveFieldWords.some((word) => fieldText.includes(word))
     if (looksSensitive && !tool.confirmation?.required) {
-      warnings.push(`Sensitive form field "${fieldName}" should require explicit confirmation or be excluded.`)
+      warnings.push(
+        `Sensitive form field "${fieldName}" should require explicit confirmation or be excluded.`
+      )
     }
   }
 
@@ -66,7 +90,11 @@ function isUnconstrainedField(schema: WebMCPTool['inputSchema']): boolean {
   if (schema.enum?.length) return false
 
   if (schema.type === 'string') {
-    return schema.minLength === undefined && schema.maxLength === undefined && schema.pattern === undefined
+    return (
+      schema.minLength === undefined &&
+      schema.maxLength === undefined &&
+      schema.pattern === undefined
+    )
   }
 
   if (schema.type === 'number' || schema.type === 'integer') {

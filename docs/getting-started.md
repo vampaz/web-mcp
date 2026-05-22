@@ -25,27 +25,29 @@ npm install @webmcp-kit/devtools
 ```ts
 import { defineTool, registerTool } from '@webmcp-kit/core'
 
-const registration = registerTool(defineTool({
-  name: 'search_products',
-  description: 'Search the local product catalog for products matching the shopper request.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      query: {
-        type: 'string',
-        description: 'Product name or category to search for.'
-      }
+const registration = registerTool(
+  defineTool({
+    name: 'search_products',
+    description: 'Search the local product catalog for products matching the shopper request.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Product name or category to search for.'
+        }
+      },
+      required: ['query'],
+      additionalProperties: false
     },
-    required: ['query'],
-    additionalProperties: false
-  },
-  annotations: {
-    readOnlyHint: true
-  },
-  execute(input) {
-    return searchProducts(String(input.query ?? ''))
-  }
-}))
+    annotations: {
+      readOnlyHint: true
+    },
+    execute(input) {
+      return searchProducts(String(input.query ?? ''))
+    }
+  })
+)
 
 function searchProducts(query: string) {
   return []
@@ -91,6 +93,45 @@ const devtools = mountDevtoolsOverlay({ initiallyOpen: true })
 
 devtools.destroy()
 ```
+
+## Add A Command Input
+
+Apps can use the built-in command input for natural-language planning against registered tools. The app supplies server-backed endpoint options; WebMCP Kit detects Chrome built-in AI from the browser when available.
+
+```ts
+import { defineWebMCPCommandInput, type WebMCPCommandInputElement } from '@webmcp-kit/core'
+
+defineWebMCPCommandInput()
+
+const input = document.querySelector<WebMCPCommandInputElement>('webmcp-command-input')
+
+input?.configure({
+  context: getPlannerContext,
+  endpoint: '/api/webmcp/plan',
+  endpointOptions: [
+    {
+      label: 'GPT-5.4 mini',
+      model: 'gpt-5.4-mini',
+      provider: 'openai'
+    },
+    {
+      label: 'Nemotron 3 Super 120B A12B',
+      model: 'nvidia/nemotron-3-super-120b-a12b:free',
+      provider: 'openrouter'
+    },
+    {
+      label: 'Auto',
+      provider: 'auto'
+    },
+    {
+      label: 'Local deterministic',
+      provider: 'local'
+    }
+  ]
+})
+```
+
+Use `showChromeAI: false` when a consumer wants to hide the detected local Chrome AI provider.
 
 ## Test Tools
 

@@ -12,34 +12,35 @@ export function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unknow
 ): void {
   const registration = useRef<RegisteredTool<TInput, TOutput> | undefined>(undefined)
   const registeredTool = useRef<WebMCPTool<TInput, TOutput> | undefined>(undefined)
+  const whenValue = typeof options.when === 'function' ? options.when() : options.when
 
-  function unregister(): void {
-    registration.current?.unregister()
-    registration.current = undefined
-    registeredTool.current = undefined
-  }
+  useEffect(
+    function syncWebMCPTool() {
+      const available = whenValue === undefined || whenValue
 
-  useEffect(function syncWebMCPTool() {
-    const available = options.when === undefined || (
-      typeof options.when === 'function' ? options.when() : options.when
-    )
+      if (registration.current && registeredTool.current !== tool) {
+        registration.current?.unregister()
+        registration.current = undefined
+        registeredTool.current = undefined
+      }
 
-    if (registration.current && registeredTool.current !== tool) {
-      unregister()
-    }
+      if (available && !registration.current) {
+        registration.current = registerTool(tool)
+        registeredTool.current = tool
+      }
 
-    if (available && !registration.current) {
-      registration.current = registerTool(tool)
-      registeredTool.current = tool
-      return
-    }
+      if (!available) {
+        registration.current?.unregister()
+        registration.current = undefined
+        registeredTool.current = undefined
+      }
 
-    if (!available) {
-      unregister()
-    }
-  })
-
-  useEffect(function disposeWebMCPTool() {
-    return unregister
-  }, [])
+      return function disposeWebMCPTool() {
+        registration.current?.unregister()
+        registration.current = undefined
+        registeredTool.current = undefined
+      }
+    },
+    [tool, whenValue]
+  )
 }

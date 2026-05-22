@@ -309,20 +309,20 @@ Fallback mode is useful for development, QA, demos, docs, and adapters. It is no
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Language | TypeScript 5.x, ESM |
-| Core | Vanilla TypeScript |
-| Schemas | JSON Schema first, optional Zod adapter |
-| Native Target | WebMCP browser APIs |
-| Devtools | Vanilla TypeScript + CSS |
-| Frameworks | Framework-agnostic core, optional recipes/extensions later |
-| Testing | Vitest, Playwright helpers |
-| Monorepo | npm workspaces |
-| Demo Runtime | Astro server demo with Cloudflare Workers adapter |
-| Cloudflare Project | Existing Worker project `web-mcp` |
-| Local HTTPS | Caddy TLS plugin for `*.localtest.me` development |
-| AI Providers | Chrome built-in AI, OpenAI-compatible APIs, Cloudflare Workers AI REST, Cloudflare `AI` binding |
+| Layer              | Technology                                                                                      |
+| ------------------ | ----------------------------------------------------------------------------------------------- |
+| Language           | TypeScript 5.x, ESM                                                                             |
+| Core               | Vanilla TypeScript                                                                              |
+| Schemas            | JSON Schema first, optional Zod adapter                                                         |
+| Native Target      | WebMCP browser APIs                                                                             |
+| Devtools           | Vanilla TypeScript + CSS                                                                        |
+| Frameworks         | Framework-agnostic core, optional recipes/extensions later                                      |
+| Testing            | Vitest, Playwright helpers                                                                      |
+| Monorepo           | npm workspaces                                                                                  |
+| Demo Runtime       | Astro server demo with Cloudflare Workers adapter                                               |
+| Cloudflare Project | Existing Worker project `web-mcp`                                                               |
+| Local HTTPS        | Caddy TLS plugin for `*.localtest.me` development                                               |
+| AI Providers       | Chrome built-in AI, OpenAI-compatible APIs, Cloudflare Workers AI REST, Cloudflare `AI` binding |
 
 ## Success Criteria
 

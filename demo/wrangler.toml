@@ -18,4 +18,4 @@ remote = true
 PUBLIC_WEBMCP_PREVIEW = "true"
 
 [secrets]
-required = ["OPENAI_API_KEY"]
+required = ["OPENAI_API_KEY", "OPENROUTER_API_KEY"]

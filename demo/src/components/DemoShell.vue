@@ -38,13 +38,18 @@ import {
   type ToolPlan,
   type ToolPlanner,
   type WebMCPCommandInputElement,
+  type WebMCPCommandInputEndpointOption,
   type WebMCPCommandPlannerEventDetail
 } from '@webmcp-kit/core'
 import { mountDevtoolsOverlay, type DevtoolsOverlay } from '@webmcp-kit/devtools'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 import DemoRuntimeStatus from '@/components/DemoRuntimeStatus.vue'
-import { getCloudflareBindingModels } from '@/utils/demo-data'
+import {
+  getCloudflareBindingModels,
+  getOpenAIPlannerEndpoints,
+  getOpenRouterPlannerEndpoints
+} from '@/utils/demo-data'
 
 interface Props {
   confirmationsEnabled?: boolean
@@ -63,10 +68,58 @@ const shouldInstallTestBridge = import.meta.env.DEV || import.meta.env.MODE === 
 const shouldDefaultToCloudflareBinding = import.meta.env.MODE !== 'test'
 const plannerControlsStorageKey = 'webmcp:admin'
 const cloudflareBindingModels = getCloudflareBindingModels()
+const openAIPlannerEndpoints = getOpenAIPlannerEndpoints()
+const openRouterPlannerEndpoints = getOpenRouterPlannerEndpoints()
+const plannerEndpointOptions: WebMCPCommandInputEndpointOption[] = [
+  ...cloudflareBindingModels.flatMap(function mapCloudflareEndpoint(model) {
+    return [
+      {
+        label: model.label,
+        model: model.id,
+        provider: 'cloudflare-binding' as const
+      },
+      {
+        label: model.label,
+        model: model.id,
+        provider: 'cloudflare-workers-ai' as const
+      }
+    ]
+  }),
+  ...openRouterPlannerEndpoints.map(function mapOpenRouterEndpoint(model) {
+    return {
+      label: model.label,
+      model: model.id,
+      provider: 'openrouter' as const
+    }
+  }),
+  ...openAIPlannerEndpoints.map(function mapOpenAIEndpoint(model) {
+    return {
+      label: model.label,
+      model: model.id,
+      provider: 'openai' as const
+    }
+  }),
+  {
+    label: 'Auto',
+    provider: 'auto'
+  },
+  {
+    label: 'Local deterministic',
+    provider: 'local'
+  }
+]
 const plannerName = ref('Loading')
-const plannerDetail = ref(shouldDefaultToCloudflareBinding ? 'Using the Cloudflare AI binding planner endpoint.' : 'Checking Chrome built-in AI availability.')
-const defaultPlannerProvider: PlannerProviderKind = shouldDefaultToCloudflareBinding ? 'cloudflare-binding' : 'auto'
-const defaultPlannerModel = shouldDefaultToCloudflareBinding ? cloudflareBindingModels[0].id : 'openrouter/auto'
+const plannerDetail = ref(
+  shouldDefaultToCloudflareBinding
+    ? 'Using the Cloudflare AI binding planner endpoint.'
+    : 'Checking Chrome built-in AI availability.'
+)
+const defaultPlannerProvider: PlannerProviderKind = shouldDefaultToCloudflareBinding
+  ? 'cloudflare-binding'
+  : 'auto'
+const defaultPlannerModel = shouldDefaultToCloudflareBinding
+  ? cloudflareBindingModels[0].id
+  : openRouterPlannerEndpoints[0].id
 const plannerEndpoint = '/api/webmcp/plan'
 const unregisterCallbacks: Array<() => void> = []
 const commandInput = ref<WebMCPCommandInputElement | null>(null)
@@ -105,10 +158,18 @@ onUnmounted(function handleUnmounted() {
 })
 
 function configureCommandInput() {
+  if (import.meta.env.MODE === 'test') {
+    commandInput.value?.configure({
+      context: props.getContext
+    })
+    return
+  }
+
   if (shouldShowPlannerControls()) {
     commandInput.value?.configure({
       context: props.getContext,
       endpoint: plannerEndpoint,
+      endpointOptions: plannerEndpointOptions,
       initialModel: shouldDefaultToCloudflareBinding ? defaultPlannerModel : undefined,
       initialProvider: shouldDefaultToCloudflareBinding ? defaultPlannerProvider : undefined
     })
@@ -118,12 +179,14 @@ function configureCommandInput() {
   commandInput.value?.configure({
     context: props.getContext,
     endpoint: plannerEndpoint,
+    endpointOptions: plannerEndpointOptions,
     model: defaultPlannerModel,
     provider: defaultPlannerProvider
   })
 }
 
 function shouldShowPlannerControls(): boolean {
+  if (import.meta.env.MODE === 'test') return false
   if (import.meta.env.DEV) return true
   try {
     return localStorage.getItem(plannerControlsStorageKey) === 'true'
@@ -151,7 +214,11 @@ declare global {
       available: ToolPlanner['available']
       status: ToolPlanner['status']
       detail: ToolPlanner['detail']
-      plan: (message: string, tools: ReturnType<typeof listTools>[number]['tool'][], context?: unknown) => Promise<ToolPlan>
+      plan: (
+        message: string,
+        tools: ReturnType<typeof listTools>[number]['tool'][],
+        context?: unknown
+      ) => Promise<ToolPlan>
     }
   }
 }

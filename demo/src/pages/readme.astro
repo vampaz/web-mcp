@@ -17,6 +17,33 @@ export const prerender = true
   </section>
 </DemoLayout>
 
+<script>
+  import mermaid from 'mermaid'
+
+  mermaid.initialize({
+    flowchart: {
+      htmlLabels: true
+    },
+    securityLevel: 'strict',
+    startOnLoad: false,
+    theme: 'dark'
+  })
+
+  document.querySelectorAll('pre[data-language="mermaid"]').forEach(function replaceMermaidPre(pre) {
+    const diagram = document.createElement('div')
+    diagram.className = 'mermaid readme-mermaid'
+    diagram.textContent = pre.textContent ?? ''
+    pre.replaceWith(diagram)
+  })
+
+  const diagrams = document.querySelectorAll('.readme-mermaid')
+  if (diagrams.length > 0) {
+    await mermaid.run({
+      nodes: diagrams
+    })
+  }
+</script>
+
 <style>
   .readme-shell {
     width: min(980px, calc(100% - 32px));
@@ -116,6 +143,22 @@ export const prerender = true
     background: transparent;
     padding: 0;
     color: #f4f0e8;
+  }
+
+  .readme-document :global(.readme-mermaid) {
+    overflow-x: auto;
+    margin: 18px 0 26px;
+    border: 1px solid rgba(244, 240, 232, 0.14);
+    background: #101514;
+    padding: 18px;
+  }
+
+  .readme-document :global(.readme-mermaid svg) {
+    display: block;
+    min-width: min(760px, 100%);
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
   }
 
   @media (max-width: 620px) {

@@ -8,6 +8,7 @@ import type {
   WebMCPTool
 } from './interfaces/tool'
 import { formatJsonValueValidationError, validateJsonValue } from './schema'
+import { getErrorMessage } from './confirmation'
 
 interface LanguageModelSession {
   prompt: (message: string, options?: ChromeAIPromptOptions) => Promise<string>
@@ -116,7 +117,8 @@ export function createHeuristicPlanner(): ToolPlanner {
     name: 'Local heuristic planner',
     available: true,
     status: 'fallback',
-    detail: 'Chrome built-in AI is unavailable, so WebMCP Kit is using deterministic local planning.',
+    detail:
+      'Chrome built-in AI is unavailable, so WebMCP Kit is using deterministic local planning.',
     async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
       return planWithHeuristics(message, tools, context)
     }
@@ -142,7 +144,10 @@ export async function createChromeAIPlanner(strict = false): Promise<ToolPlanner
   try {
     const availability = await languageModel.availability(chromeAITextOptions)
     if (availability === 'unavailable') {
-      return createUnavailableChromePlanner('Chrome reports that built-in AI is unavailable in this environment.', strict)
+      return createUnavailableChromePlanner(
+        'Chrome reports that built-in AI is unavailable in this environment.',
+        strict
+      )
     }
 
     if (availability === 'downloadable' || availability === 'downloading') {
@@ -163,7 +168,10 @@ export async function createChromeAIPlanner(strict = false): Promise<ToolPlanner
       strict
     )
   } catch {
-    return createUnavailableChromePlanner('Chrome built-in AI could not create a planning session.', strict)
+    return createUnavailableChromePlanner(
+      'Chrome built-in AI could not create a planning session.',
+      strict
+    )
   }
 }
 
@@ -174,7 +182,9 @@ export async function createBestPlanner(): Promise<ToolPlanner> {
   return createHeuristicPlanner()
 }
 
-export async function createConfiguredPlanner(config?: PlannerProviderConfig): Promise<ToolPlanner> {
+export async function createConfiguredPlanner(
+  config?: PlannerProviderConfig
+): Promise<ToolPlanner> {
   if (!config || config.provider === 'auto') return createBestPlanner()
 
   if (config.provider === 'chrome-built-in') return createChromeAIPlanner(true)
@@ -238,7 +248,9 @@ async function planWithChromeAI(
   tools: WebMCPTool[],
   context: PlannerContext = {}
 ): Promise<ToolPlan> {
-  const response = await session.prompt(createPlannerPrompt(message, tools, context), { responseConstraint: toolPlanSchema })
+  const response = await session.prompt(createPlannerPrompt(message, tools, context), {
+    responseConstraint: toolPlanSchema
+  })
 
   return parseToolPlanJson(response, 'Chrome built-in AI')
 }
@@ -249,7 +261,8 @@ function createChromeAISession(languageModel: LanguageModelApi): Promise<Languag
     initialPrompts: [
       {
         role: 'system',
-        content: 'Choose one app tool, or a short ordered tool_sequence when the request requires multiple app actions. Return only JSON matching the requested schema.'
+        content:
+          'Choose one app tool, or a short ordered tool_sequence when the request requires multiple app actions. Return only JSON matching the requested schema.'
       }
     ]
   })
@@ -302,7 +315,7 @@ async function planWithServerEndpoint(
     throw new Error(await getServerPlannerError(response))
   }
 
-  return await response.json() as ToolPlan
+  return (await response.json()) as ToolPlan
 }
 
 async function planWithOpenAICompatible(
@@ -344,7 +357,7 @@ async function planWithOpenAICompatible(
     throw new Error(`${getProviderLabel(config)} returned ${response.status}`)
   }
 
-  const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> }
+  const payload = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> }
   const content = payload.choices?.[0]?.message?.content
   if (!content) throw new Error('provider returned no message content')
 
@@ -363,27 +376,30 @@ async function planWithCloudflareRest(
     throw new Error('Cloudflare REST planning needs accountId or server endpoint mode')
   }
 
-  const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${config.accountId}/ai/run/${model}`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      messages: createPlannerMessages(message, tools, context),
-      response_format: {
-        type: 'json_schema',
-        json_schema: toolPlanSchema
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/ai/run/${model}`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
       },
-      temperature: 0
-    })
-  })
+      body: JSON.stringify({
+        messages: createPlannerMessages(message, tools, context),
+        response_format: {
+          type: 'json_schema',
+          json_schema: toolPlanSchema
+        },
+        temperature: 0
+      })
+    }
+  )
 
   if (!response.ok) {
     throw new Error(`Cloudflare Workers AI returned ${response.status}`)
   }
 
-  const payload = await response.json() as { result?: { response?: string } }
+  const payload = (await response.json()) as { result?: { response?: string } }
   const content = payload.result?.response
   if (!content) throw new Error('Cloudflare returned no response content')
 
@@ -394,7 +410,8 @@ function createPlannerMessages(message: string, tools: WebMCPTool[], context: Pl
   return [
     {
       role: 'system',
-      content: 'Choose one app tool, or a short ordered tool_sequence when the request requires multiple app actions. Return only JSON with toolName, input, confidence, reason, and optional steps.'
+      content:
+        'Choose one app tool, or a short ordered tool_sequence when the request requires multiple app actions. Return only JSON with toolName, input, confidence, reason, and optional steps.'
     },
     {
       role: 'user',
@@ -403,7 +420,11 @@ function createPlannerMessages(message: string, tools: WebMCPTool[], context: Pl
   ]
 }
 
-function createPlannerPrompt(message: string, tools: WebMCPTool[], context: PlannerContext): string {
+function createPlannerPrompt(
+  message: string,
+  tools: WebMCPTool[],
+  context: PlannerContext
+): string {
   return [
     `User request: ${message}`,
     `Current app context:\n${JSON.stringify(context, null, 2)}`,
@@ -423,22 +444,41 @@ function createToolCatalog(tools: WebMCPTool[]) {
   }))
 }
 
-function planWithHeuristics(message: string, tools: WebMCPTool[], context: PlannerContext = {}): ToolPlan {
+function planWithHeuristics(
+  message: string,
+  tools: WebMCPTool[],
+  context: PlannerContext = {}
+): ToolPlan {
   const normalizedMessage = message.toLowerCase()
 
-  if (normalizedMessage.includes('invoice') && normalizedMessage.includes('sort') && hasTool(tools, 'sort_invoices')) {
+  if (
+    normalizedMessage.includes('invoice') &&
+    normalizedMessage.includes('sort') &&
+    hasTool(tools, 'sort_invoices')
+  ) {
     return {
       toolName: 'sort_invoices',
       input: {
-        sortBy: normalizedMessage.includes('amount') ? 'amount' : normalizedMessage.includes('customer') ? 'customerName' : 'dueDate',
-        direction: normalizedMessage.includes('desc') || normalizedMessage.includes('highest') ? 'desc' : 'asc'
+        sortBy: normalizedMessage.includes('amount')
+          ? 'amount'
+          : normalizedMessage.includes('customer')
+            ? 'customerName'
+            : 'dueDate',
+        direction:
+          normalizedMessage.includes('desc') || normalizedMessage.includes('highest')
+            ? 'desc'
+            : 'asc'
       },
       confidence: 0.7,
       reason: 'Matched invoice table sorting wording.'
     }
   }
 
-  if (normalizedMessage.includes('invoice') && normalizedMessage.includes('open') && hasTool(tools, 'open_invoice')) {
+  if (
+    normalizedMessage.includes('invoice') &&
+    normalizedMessage.includes('open') &&
+    hasTool(tools, 'open_invoice')
+  ) {
     return {
       toolName: 'open_invoice',
       input: {
@@ -449,7 +489,11 @@ function planWithHeuristics(message: string, tools: WebMCPTool[], context: Plann
     }
   }
 
-  if (normalizedMessage.includes('invoice') && normalizedMessage.includes('select') && hasTool(tools, 'select_invoices')) {
+  if (
+    normalizedMessage.includes('invoice') &&
+    normalizedMessage.includes('select') &&
+    hasTool(tools, 'select_invoices')
+  ) {
     return {
       toolName: 'select_invoices',
       input: {
@@ -460,26 +504,43 @@ function planWithHeuristics(message: string, tools: WebMCPTool[], context: Plann
     }
   }
 
-  if (normalizedMessage.includes('invoice') && (normalizedMessage.includes('filter') || normalizedMessage.includes('show')) && hasTool(tools, 'filter_invoices')) {
+  if (
+    normalizedMessage.includes('invoice') &&
+    (normalizedMessage.includes('filter') || normalizedMessage.includes('show')) &&
+    hasTool(tools, 'filter_invoices')
+  ) {
     return {
       toolName: 'filter_invoices',
       input: {
         status: getInvoiceStatusFromMessage(normalizedMessage),
-        minAmount: messageRequestsMinimumAmount(normalizedMessage) ? extractAmount(message) : undefined
+        minAmount: messageRequestsMinimumAmount(normalizedMessage)
+          ? extractAmount(message)
+          : undefined
       },
       confidence: 0.7,
       reason: 'Matched invoice table filter wording.'
     }
   }
 
-  if (normalizedMessage.includes('invoice') && (normalizedMessage.includes('mark') || normalizedMessage.includes('status')) && hasTool(tools, 'update_selected_invoice_status')) {
-    const matchingInvoiceIds = getMatchingInvoiceIds(normalizedMessage, context, { ignoreRequestedStatus: true })
-    if (matchingInvoiceIds.length > 0 && hasInvoiceSelectionTerms(normalizedMessage) && hasTool(tools, 'select_invoices')) {
+  if (
+    normalizedMessage.includes('invoice') &&
+    (normalizedMessage.includes('mark') || normalizedMessage.includes('status')) &&
+    hasTool(tools, 'update_selected_invoice_status')
+  ) {
+    const matchingInvoiceIds = getMatchingInvoiceIds(normalizedMessage, context, {
+      ignoreRequestedStatus: true
+    })
+    if (
+      matchingInvoiceIds.length > 0 &&
+      hasInvoiceSelectionTerms(normalizedMessage) &&
+      hasTool(tools, 'select_invoices')
+    ) {
       return {
         toolName: 'tool_sequence',
         input: {},
         confidence: 0.74,
-        reason: 'Matched invoice status mutation for specific invoice rows, so selected matching rows before updating status.',
+        reason:
+          'Matched invoice status mutation for specific invoice rows, so selected matching rows before updating status.',
         steps: [
           {
             toolName: 'select_invoices',
@@ -532,7 +593,11 @@ function planWithHeuristics(message: string, tools: WebMCPTool[], context: Plann
     }
   }
 
-  if (normalizedMessage.includes('cart') || normalizedMessage.includes('card') || normalizedMessage.includes('add ')) {
+  if (
+    normalizedMessage.includes('cart') ||
+    normalizedMessage.includes('card') ||
+    normalizedMessage.includes('add ')
+  ) {
     return {
       toolName: pickToolName(tools, 'add_to_cart'),
       input: {
@@ -579,10 +644,16 @@ function planWithHeuristics(message: string, tools: WebMCPTool[], context: Plann
   }
 
   if (normalizedMessage.includes('select') && hasTool(tools, 'select_items')) {
-    throw new Error('Semantic checklist selection needs an AI planner to choose IDs from the current app context.')
+    throw new Error(
+      'Semantic checklist selection needs an AI planner to choose IDs from the current app context.'
+    )
   }
 
-  if (normalizedMessage.includes('support') || normalizedMessage.includes('ticket') || normalizedMessage.includes('help')) {
+  if (
+    normalizedMessage.includes('support') ||
+    normalizedMessage.includes('ticket') ||
+    normalizedMessage.includes('help')
+  ) {
     return {
       toolName: pickToolName(tools, 'create_support_ticket'),
       input: {
@@ -676,15 +747,21 @@ function getMatchingInvoiceIds(
     .filter(function invoiceMatches(invoice) {
       if (!invoice || typeof invoice !== 'object') return false
       const record = invoice as Record<string, unknown>
-      const searchableText = `${record.customerName ?? ''} ${record.owner ?? ''} ${record.status ?? ''} ${record.id ?? ''}`.toLowerCase()
+      const searchableText =
+        `${record.customerName ?? ''} ${record.owner ?? ''} ${record.status ?? ''} ${record.id ?? ''}`.toLowerCase()
       const matchesStatus = getInvoiceStatusMatch(record, status, wantsUnpaid, options)
-      const matchesAmount = messageRequestsMinimumAmount(normalizedMessage) && typeof record.amount === 'number'
-        ? record.amount >= extractAmount(normalizedMessage)
-        : true
-      return matchesStatus && matchesAmount && normalizedMessage.split(/\W+/).every(function hasTerm(term) {
-        if (isIgnoredInvoiceTerm(term)) return true
-        return searchableText.includes(term)
-      })
+      const matchesAmount =
+        messageRequestsMinimumAmount(normalizedMessage) && typeof record.amount === 'number'
+          ? record.amount >= extractAmount(normalizedMessage)
+          : true
+      return (
+        matchesStatus &&
+        matchesAmount &&
+        normalizedMessage.split(/\W+/).every(function hasTerm(term) {
+          if (isIgnoredInvoiceTerm(term)) return true
+          return searchableText.includes(term)
+        })
+      )
     })
     .map((invoice) => getContextItemId(invoice))
     .filter((id): id is string => Boolean(id))
@@ -722,11 +799,13 @@ function messageRequestsUnpaid(normalizedMessage: string): boolean {
 }
 
 function messageRequestsMinimumAmount(normalizedMessage: string): boolean {
-  return normalizedMessage.includes('over')
-    || normalizedMessage.includes('above')
-    || normalizedMessage.includes('greater than')
-    || normalizedMessage.includes('more than')
-    || normalizedMessage.includes('at least')
+  return (
+    normalizedMessage.includes('over') ||
+    normalizedMessage.includes('above') ||
+    normalizedMessage.includes('greater than') ||
+    normalizedMessage.includes('more than') ||
+    normalizedMessage.includes('at least')
+  )
 }
 
 function hasInvoiceSelectionTerms(normalizedMessage: string): boolean {
@@ -736,9 +815,10 @@ function hasInvoiceSelectionTerms(normalizedMessage: string): boolean {
 }
 
 function isIgnoredInvoiceTerm(term: string): boolean {
-  return term.length <= 2
-    || /^\d+$/.test(term)
-    || [
+  return (
+    term.length <= 2 ||
+    /^\d+$/.test(term) ||
+    [
       'all',
       'above',
       'amount',
@@ -768,13 +848,14 @@ function isIgnoredInvoiceTerm(term: string): boolean {
       'void',
       'with'
     ].includes(term)
+  )
 }
 
 function getChecklistSelectionTerms(normalizedMessage: string): string[] {
-  return normalizedMessage
-    .split(/\W+/)
-    .filter(function keepChecklistTerm(term) {
-      return term.length > 2 && ![
+  return normalizedMessage.split(/\W+/).filter(function keepChecklistTerm(term) {
+    return (
+      term.length > 2 &&
+      ![
         'all',
         'and',
         'are',
@@ -789,7 +870,8 @@ function getChecklistSelectionTerms(normalizedMessage: string): string[] {
         'those',
         'with'
       ].includes(term)
-    })
+    )
+  })
 }
 
 function getContextItemSearchableText(item: unknown): string {
@@ -864,7 +946,10 @@ function createActiveChromePlanner(
         session ??= await createChromeAISession(languageModel)
         return await planWithChromeAI(session, message, tools, context)
       } catch (error) {
-        if (strict) throw new Error(`Chrome built-in AI could not plan this command (${getErrorMessage(error)})`)
+        if (strict)
+          throw new Error(
+            `Chrome built-in AI could not plan this command (${getErrorMessage(error)})`
+          )
 
         return {
           ...planWithHeuristics(message, tools, context),
@@ -890,15 +975,15 @@ function disposeChromeAISession(session: LanguageModelSession | undefined): void
 
 function parseToolPlanJson(value: string, source: string): ToolPlan {
   try {
-    return JSON.parse(normalizeJsonText(value)) as ToolPlan
+    return JSON.parse(normalizeJsonText(value, source)) as ToolPlan
   } catch {
     throw new Error(`${source} returned unparseable JSON`)
   }
 }
 
-function normalizeJsonText(value: string): string {
+export function normalizeJsonText(value: string, source = 'AI'): string {
   const trimmedValue = value.trim()
-  if (!trimmedValue) throw new Error('empty JSON')
+  if (!trimmedValue) throw new Error(`${source} returned empty text`)
 
   const fencedMatch = trimmedValue.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
   if (fencedMatch?.[1]) return fencedMatch[1].trim()
@@ -909,7 +994,7 @@ function normalizeJsonText(value: string): string {
     return trimmedValue.slice(firstBraceIndex, lastBraceIndex + 1)
   }
 
-  return trimmedValue
+  throw new Error(`${source} returned non-JSON text: ${trimmedValue.slice(0, 120)}`)
 }
 
 function createUnavailableChromePlanner(detail: string, strict = false): ToolPlanner {
@@ -927,9 +1012,12 @@ function createUnavailableChromePlanner(detail: string, strict = false): ToolPla
 
 function validateRemotePlan(plan: ToolPlan, tools: WebMCPTool[]): void {
   if (!plan || typeof plan !== 'object') throw new Error('provider returned an invalid plan')
-  if (typeof plan.toolName !== 'string') throw new Error('provider returned a plan without toolName')
-  if (!plan.input || typeof plan.input !== 'object' || Array.isArray(plan.input)) throw new Error('provider returned a plan with invalid input')
-  if (typeof plan.confidence !== 'number') throw new Error('provider returned a plan without numeric confidence')
+  if (typeof plan.toolName !== 'string')
+    throw new Error('provider returned a plan without toolName')
+  if (!plan.input || typeof plan.input !== 'object' || Array.isArray(plan.input))
+    throw new Error('provider returned a plan with invalid input')
+  if (typeof plan.confidence !== 'number')
+    throw new Error('provider returned a plan without numeric confidence')
   if (typeof plan.reason !== 'string') throw new Error('provider returned a plan without reason')
   if (plan.steps !== undefined) {
     validateRemotePlanSequence(plan, tools)
@@ -940,8 +1028,10 @@ function validateRemotePlan(plan: ToolPlan, tools: WebMCPTool[]): void {
 }
 
 function validateRemotePlanSequence(plan: ToolPlan, tools: WebMCPTool[]): void {
-  if (plan.toolName !== 'tool_sequence') throw new Error('provider returned steps without tool_sequence')
-  if (!Array.isArray(plan.steps) || plan.steps.length === 0) throw new Error('provider returned an empty tool sequence')
+  if (plan.toolName !== 'tool_sequence')
+    throw new Error('provider returned steps without tool_sequence')
+  if (!Array.isArray(plan.steps) || plan.steps.length === 0)
+    throw new Error('provider returned an empty tool sequence')
   if (plan.steps.length > 5) throw new Error('provider returned too many tool sequence steps')
 
   plan.steps.forEach(function validateSequenceStep(step) {
@@ -951,21 +1041,30 @@ function validateRemotePlanSequence(plan: ToolPlan, tools: WebMCPTool[]): void {
 
 function validateRemotePlanStep(step: ToolPlanStep, tools: WebMCPTool[]): void {
   if (!step || typeof step !== 'object') throw new Error('provider returned an invalid plan step')
-  if (typeof step.toolName !== 'string') throw new Error('provider returned a plan step without toolName')
-  if (!step.input || typeof step.input !== 'object' || Array.isArray(step.input)) throw new Error('provider returned a plan step with invalid input')
-  if (typeof step.confidence !== 'number') throw new Error('provider returned a plan step without numeric confidence')
-  if (typeof step.reason !== 'string') throw new Error('provider returned a plan step without reason')
+  if (typeof step.toolName !== 'string')
+    throw new Error('provider returned a plan step without toolName')
+  if (!step.input || typeof step.input !== 'object' || Array.isArray(step.input))
+    throw new Error('provider returned a plan step with invalid input')
+  if (typeof step.confidence !== 'number')
+    throw new Error('provider returned a plan step without numeric confidence')
+  if (typeof step.reason !== 'string')
+    throw new Error('provider returned a plan step without reason')
 
   const selectedTool = tools.find((tool) => tool.name === step.toolName)
   if (!selectedTool) throw new Error(`provider selected unknown tool "${step.toolName}"`)
 
   const inputValidationErrors = validateJsonValue(step.input, selectedTool.inputSchema)
   if (inputValidationErrors.length > 0) {
-    throw new Error(`provider returned invalid input for "${step.toolName}": ${formatJsonValueValidationError(inputValidationErrors)}`)
+    throw new Error(
+      `provider returned invalid input for "${step.toolName}": ${formatJsonValueValidationError(inputValidationErrors)}`
+    )
   }
 }
 
-function getPlannerApiKey(provider: PlannerProviderConfig['provider'], auth: PlannerAuth): string | undefined {
+function getPlannerApiKey(
+  provider: PlannerProviderConfig['provider'],
+  auth: PlannerAuth
+): string | undefined {
   if (auth.mode !== 'user-key') return undefined
   if (auth.apiKey) return auth.apiKey
   if (typeof localStorage === 'undefined') return undefined
@@ -975,10 +1074,12 @@ function getPlannerApiKey(provider: PlannerProviderConfig['provider'], auth: Pla
 }
 
 function requiresBrowserKey(config: PlannerProviderConfig, auth: PlannerAuth): boolean {
-  return auth.mode === 'user-key'
-    && config.provider !== 'chrome-built-in'
-    && config.provider !== 'local'
-    && config.provider !== 'cloudflare-binding'
+  return (
+    auth.mode === 'user-key' &&
+    config.provider !== 'chrome-built-in' &&
+    config.provider !== 'local' &&
+    config.provider !== 'cloudflare-binding'
+  )
 }
 
 function requiresServerBinding(config: PlannerProviderConfig, auth: PlannerAuth): boolean {
@@ -987,9 +1088,12 @@ function requiresServerBinding(config: PlannerProviderConfig, auth: PlannerAuth)
 
 function getRemotePlannerDetail(config: PlannerProviderConfig, auth: PlannerAuth): string {
   const provider = getProviderLabel(config)
-  if (config.provider === 'cloudflare-binding') return `${provider} will plan through ${auth.mode === 'server' ? auth.endpoint : 'a server endpoint'} using a Cloudflare AI binding.`
-  if (auth.mode === 'server') return `${provider} will plan through ${auth.endpoint}; provider secrets stay server-side.`
-  if (auth.mode === 'user-key') return `${provider} will plan directly from the browser with a user-provided key. This is convenient but the key is visible to this page.`
+  if (config.provider === 'cloudflare-binding')
+    return `${provider} will plan through ${auth.mode === 'server' ? auth.endpoint : 'a server endpoint'} using a Cloudflare AI binding.`
+  if (auth.mode === 'server')
+    return `${provider} will plan through ${auth.endpoint}; provider secrets stay server-side.`
+  if (auth.mode === 'user-key')
+    return `${provider} will plan directly from the browser with a user-provided key. This is convenient but the key is visible to this page.`
   return `${provider} will plan without an API key.`
 }
 
@@ -1005,7 +1109,8 @@ function getDefaultModel(config: PlannerProviderConfig): string {
   if (config.provider === 'openrouter') return 'openrouter/auto'
   if (config.provider === 'openai') return 'gpt-5.4-mini'
   if (config.provider === 'cloudflare-binding') return '@cf/zai-org/glm-4.7-flash'
-  if (config.provider === 'cloudflare-workers-ai') return '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b'
+  if (config.provider === 'cloudflare-workers-ai')
+    return '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b'
 
   return 'default'
 }
@@ -1028,16 +1133,11 @@ function getDefaultStorageKey(provider: PlannerProviderConfig['provider']): stri
 
 async function getServerPlannerError(response: Response): Promise<string> {
   try {
-    const payload = await response.json() as { error?: string }
+    const payload = (await response.json()) as { error?: string }
     if (payload.error) return `server planner returned ${response.status}: ${payload.error}`
   } catch {
     return `server planner returned ${response.status}`
   }
 
   return `server planner returned ${response.status}`
-}
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message
-  return 'unknown error'
 }

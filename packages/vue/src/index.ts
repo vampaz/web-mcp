@@ -4,7 +4,11 @@ import { registerTool, type RegisteredTool, type WebMCPTool } from '@webmcp-kit/
 
 import type { UseWebMCPToolOptions, UseWebMCPToolResult } from './interfaces/webmcp-tool'
 
-export type { UseWebMCPToolOptions, UseWebMCPToolResult, VueWebMCPTool } from './interfaces/webmcp-tool'
+export type {
+  UseWebMCPToolOptions,
+  UseWebMCPToolResult,
+  VueWebMCPTool
+} from './interfaces/webmcp-tool'
 
 export function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unknown>(
   tool: WebMCPTool<TInput, TOutput>,

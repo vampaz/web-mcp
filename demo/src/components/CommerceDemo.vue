@@ -60,170 +60,200 @@ onUnmounted(function handleUnmounted() {
 })
 
 function registerCommerceTools() {
-  unregisterCallbacks.push(registerTool(defineTool({
-    name: 'search_products',
-    description: 'Search the local product catalog and return matching products for the current shopper.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: {
-          type: 'string',
-          description: 'Search words for product name or category.'
-        }
-      },
-      required: ['query'],
-      additionalProperties: false
-    },
-    annotations: {
-      readOnlyHint: true
-    },
-    execute(input) {
-      const query = String(input.query ?? '').toLowerCase()
-      const tokens = getSearchTokens(query)
-      const matches = products.value.filter(function filterProduct(product) {
-        const searchableText = `${product.name} ${product.category}`.toLowerCase()
-        return tokens.some(function hasToken(token) {
-          return searchableText.includes(token)
-        })
-      })
-      return matches
-    }
-  })).unregister)
-
-  unregisterCallbacks.push(registerTool(defineTool({
-    name: 'add_to_cart',
-    description: 'Add a known product to the cart for the current shopping session.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        productId: {
-          type: 'string',
-          description: 'The product ID to add.'
+  unregisterCallbacks.push(
+    registerTool(
+      defineTool({
+        name: 'search_products',
+        description:
+          'Search the local product catalog and return matching products for the current shopper.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description: 'Search words for product name or category.'
+            }
+          },
+          required: ['query'],
+          additionalProperties: false
         },
-        quantity: {
-          type: 'number',
-          minimum: 1,
-          description: 'How many units to add.'
-        }
-      },
-      required: ['productId', 'quantity'],
-      additionalProperties: false
-    },
-    guard(input) {
-      return products.value.some(function hasProduct(item) {
-        return item.id === String(input.productId ?? '')
-      }) || 'Product is not available in the current catalog.'
-    },
-    execute(input) {
-      addProductToCart(String(input.productId ?? ''), Number(input.quantity ?? 1))
-      const line = cart.value.find(function findLine(item) {
-        return item.productId === String(input.productId ?? '')
-      })
-      return line
-    }
-  })).unregister)
-
-  unregisterCallbacks.push(registerTool(defineTool({
-    name: 'update_cart_quantity',
-    description: 'Update the quantity for an existing cart line.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        productId: {
-          type: 'string'
+        annotations: {
+          readOnlyHint: true
         },
-        quantity: {
-          type: 'number',
-          minimum: 1
+        execute(input) {
+          const query = String(input.query ?? '').toLowerCase()
+          const tokens = getSearchTokens(query)
+          const matches = products.value.filter(function filterProduct(product) {
+            const searchableText = `${product.name} ${product.category}`.toLowerCase()
+            return tokens.some(function hasToken(token) {
+              return searchableText.includes(token)
+            })
+          })
+          return matches
         }
-      },
-      required: ['productId', 'quantity'],
-      additionalProperties: false
-    },
-    guard(input) {
-      return cart.value.some(function hasLine(line) {
-        return line.productId === String(input.productId ?? '')
-      }) || 'Cart line does not exist.'
-    },
-    execute(input) {
-      updateCartLineQuantity(String(input.productId), Number(input.quantity ?? 1))
-      return cart.value
-    }
-  })).unregister)
+      })
+    ).unregister
+  )
 
-  unregisterCallbacks.push(registerTool(defineTool({
-    name: 'remove_from_cart',
-    description: 'Remove a product line from the visible cart.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        productId: {
-          type: 'string'
+  unregisterCallbacks.push(
+    registerTool(
+      defineTool({
+        name: 'add_to_cart',
+        description: 'Add a known product to the cart for the current shopping session.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            productId: {
+              type: 'string',
+              description: 'The product ID to add.'
+            },
+            quantity: {
+              type: 'number',
+              minimum: 1,
+              description: 'How many units to add.'
+            }
+          },
+          required: ['productId', 'quantity'],
+          additionalProperties: false
+        },
+        guard(input) {
+          return (
+            products.value.some(function hasProduct(item) {
+              return item.id === String(input.productId ?? '')
+            }) || 'Product is not available in the current catalog.'
+          )
+        },
+        execute(input) {
+          addProductToCart(String(input.productId ?? ''), Number(input.quantity ?? 1))
+          const line = cart.value.find(function findLine(item) {
+            return item.productId === String(input.productId ?? '')
+          })
+          return line
         }
-      },
-      required: ['productId'],
-      additionalProperties: false
-    },
-    confirmation: {
-      required: true,
-      reason: 'Removing a cart line changes the current order.'
-    },
-    execute(input) {
-      removeCartLine(String(input.productId ?? ''))
-      return cart.value
-    }
-  })).unregister)
+      })
+    ).unregister
+  )
 
-  unregisterCallbacks.push(registerTool(defineTool({
-    name: 'apply_cart_discount',
-    description: 'Set the cart discount percentage control.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        percent: {
-          type: 'number',
-          minimum: 0,
-          maximum: 100
+  unregisterCallbacks.push(
+    registerTool(
+      defineTool({
+        name: 'update_cart_quantity',
+        description: 'Update the quantity for an existing cart line.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            productId: {
+              type: 'string'
+            },
+            quantity: {
+              type: 'number',
+              minimum: 1
+            }
+          },
+          required: ['productId', 'quantity'],
+          additionalProperties: false
+        },
+        guard(input) {
+          return (
+            cart.value.some(function hasLine(line) {
+              return line.productId === String(input.productId ?? '')
+            }) || 'Cart line does not exist.'
+          )
+        },
+        execute(input) {
+          updateCartLineQuantity(String(input.productId), Number(input.quantity ?? 1))
+          return cart.value
         }
-      },
-      required: ['percent'],
-      additionalProperties: false
-    },
-    execute(input) {
-      cartDiscountPercent.value = Math.max(0, Math.min(100, Number(input.percent ?? 0)))
-      return {
-        discountPercent: cartDiscountPercent.value,
-        total: cartTotal.value
-      }
-    }
-  })).unregister)
+      })
+    ).unregister
+  )
 
-  unregisterCallbacks.push(registerTool(defineTool({
-    name: 'checkout_cart',
-    description: 'Checkout the current cart and clear all cart lines after explicit confirmation.',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-      required: [],
-      additionalProperties: false
-    },
-    confirmation: {
-      required: true,
-      reason: 'Checkout clears the cart and represents a purchase action.'
-    },
-    guard() {
-      return cart.value.length > 0 || 'Cart is empty.'
-    },
-    execute() {
-      const lines = [...cart.value]
-      const total = cartTotal.value
-      cart.value = []
-      return {
-        lines,
-        total
-      }
-    }
-  })).unregister)
+  unregisterCallbacks.push(
+    registerTool(
+      defineTool({
+        name: 'remove_from_cart',
+        description: 'Remove a product line from the visible cart.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            productId: {
+              type: 'string'
+            }
+          },
+          required: ['productId'],
+          additionalProperties: false
+        },
+        confirmation: {
+          required: true,
+          reason: 'Removing a cart line changes the current order.'
+        },
+        execute(input) {
+          removeCartLine(String(input.productId ?? ''))
+          return cart.value
+        }
+      })
+    ).unregister
+  )
+
+  unregisterCallbacks.push(
+    registerTool(
+      defineTool({
+        name: 'apply_cart_discount',
+        description: 'Set the cart discount percentage control.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            percent: {
+              type: 'number',
+              minimum: 0,
+              maximum: 100
+            }
+          },
+          required: ['percent'],
+          additionalProperties: false
+        },
+        execute(input) {
+          cartDiscountPercent.value = Math.max(0, Math.min(100, Number(input.percent ?? 0)))
+          return {
+            discountPercent: cartDiscountPercent.value,
+            total: cartTotal.value
+          }
+        }
+      })
+    ).unregister
+  )
+
+  unregisterCallbacks.push(
+    registerTool(
+      defineTool({
+        name: 'checkout_cart',
+        description:
+          'Checkout the current cart and clear all cart lines after explicit confirmation.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          required: [],
+          additionalProperties: false
+        },
+        confirmation: {
+          required: true,
+          reason: 'Checkout clears the cart and represents a purchase action.'
+        },
+        guard() {
+          return cart.value.length > 0 || 'Cart is empty.'
+        },
+        execute() {
+          const lines = [...cart.value]
+          const total = cartTotal.value
+          cart.value = []
+          return {
+            lines,
+            total
+          }
+        }
+      })
+    ).unregister
+  )
 }
 
 function addSelectedProductToCart() {
@@ -285,11 +315,9 @@ function getPlannerContext() {
 }
 
 function getSearchTokens(query: string): string[] {
-  const tokens = query
-    .split(/\W+/)
-    .filter(function keepSearchToken(token) {
-      return token.length > 2 && !['find', 'for', 'the', 'products', 'product'].includes(token)
-    })
+  const tokens = query.split(/\W+/).filter(function keepSearchToken(token) {
+    return token.length > 2 && !['find', 'for', 'the', 'products', 'product'].includes(token)
+  })
 
   return tokens.length > 0 ? tokens : [query]
 }

@@ -11,20 +11,39 @@
           <strong>{{ ticket.subject }}</strong>
           <span>{{ ticket.body }}</span>
           <div class="ticket-controls">
-            <select :key="`${ticket.id}-status-${ticket.status}`" :value="ticket.status" :aria-label="`Status for ${ticket.subject}`" @change="updateStatus(ticket.id, $event)">
+            <select
+              :key="`${ticket.id}-status-${ticket.status}`"
+              :value="ticket.status"
+              :aria-label="`Status for ${ticket.subject}`"
+              @change="updateStatus(ticket.id, $event)"
+            >
               <option value="new" :selected="ticket.status === 'new'">New</option>
               <option value="triaged" :selected="ticket.status === 'triaged'">Triaged</option>
-              <option value="in_progress" :selected="ticket.status === 'in_progress'">In progress</option>
+              <option value="in_progress" :selected="ticket.status === 'in_progress'">
+                In progress
+              </option>
               <option value="resolved" :selected="ticket.status === 'resolved'">Resolved</option>
             </select>
-            <select :key="`${ticket.id}-assignee-${ticket.assignee}`" :value="ticket.assignee" :aria-label="`Assignee for ${ticket.subject}`" @change="updateAssignee(ticket.id, $event)">
-              <option value="Unassigned" :selected="ticket.assignee === 'Unassigned'">Unassigned</option>
+            <select
+              :key="`${ticket.id}-assignee-${ticket.assignee}`"
+              :value="ticket.assignee"
+              :aria-label="`Assignee for ${ticket.subject}`"
+              @change="updateAssignee(ticket.id, $event)"
+            >
+              <option value="Unassigned" :selected="ticket.assignee === 'Unassigned'">
+                Unassigned
+              </option>
               <option value="Carlos" :selected="ticket.assignee === 'Carlos'">Carlos</option>
               <option value="Marta" :selected="ticket.assignee === 'Marta'">Marta</option>
               <option value="Rui" :selected="ticket.assignee === 'Rui'">Rui</option>
               <option value="Sofia" :selected="ticket.assignee === 'Sofia'">Sofia</option>
             </select>
-            <select :key="`${ticket.id}-priority-${ticket.priority}`" :value="ticket.priority" :aria-label="`Priority for ${ticket.subject}`" @change="updatePriority(ticket.id, $event)">
+            <select
+              :key="`${ticket.id}-priority-${ticket.priority}`"
+              :value="ticket.priority"
+              :aria-label="`Priority for ${ticket.subject}`"
+              @change="updatePriority(ticket.id, $event)"
+            >
               <option value="low" :selected="ticket.priority === 'low'">Low</option>
               <option value="medium" :selected="ticket.priority === 'medium'">Medium</option>
               <option value="high" :selected="ticket.priority === 'high'">High</option>

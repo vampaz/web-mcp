@@ -1,16 +1,29 @@
 import type { PlannerProviderConfig, PlannerProviderKind, ToolPlanner } from './interfaces/tool'
-import { createBestPlanner, createChromeAIPlanner, createConfiguredPlanner, createHeuristicPlanner } from './planner'
-import { escapeAttribute, escapeHtml } from './command-input-html'
+import type { WebMCPCommandInputEndpointOption } from './interfaces/command-input'
+import {
+  createBestPlanner,
+  createChromeAIPlanner,
+  createConfiguredPlanner,
+  createHeuristicPlanner
+} from './planner'
+import { escapeAttribute } from './command-input-html'
 
 type ModelOption = {
   label: string
   value: string
 }
 
-export const defaultModel = 'openrouter/auto'
+type ProviderOption = {
+  label: string
+  value: PlannerProviderKind
+}
+
+export const defaultModel = ''
 export const defaultEndpoint = '/api/webmcp/plan'
 
-export async function createCommandInputPlanner(config: PlannerProviderConfig | undefined): Promise<ToolPlanner> {
+export async function createCommandInputPlanner(
+  config: PlannerProviderConfig | undefined
+): Promise<ToolPlanner> {
   if (!config) return createBestPlanner()
   if (config.provider === 'chrome-built-in') return createChromeAIPlanner(false)
   if (config.provider === 'local') return createHeuristicPlanner()
@@ -18,33 +31,38 @@ export async function createCommandInputPlanner(config: PlannerProviderConfig | 
   return createConfiguredPlanner(config)
 }
 
-export function getProviderControlMarkup(provider: PlannerProviderKind): string {
+export function getProviderControlMarkup(
+  provider: PlannerProviderKind,
+  endpointOptions?: WebMCPCommandInputEndpointOption[],
+  includeChromeAI = false
+): string {
   return `
     <label>
       <span>Provider</span>
       <select data-provider>
-        ${getProviderOptionsMarkup(provider)}
+        ${getProviderOptionsMarkup(provider, endpointOptions, includeChromeAI)}
       </select>
     </label>
   `
 }
 
-export function getOptionsStatusText(provider: PlannerProviderKind, model: string): string {
+export function getOptionsStatusText(
+  provider: PlannerProviderKind,
+  model: string,
+  endpointOptions?: WebMCPCommandInputEndpointOption[]
+): string {
   if (provider === 'auto') return 'Auto'
-  if (!usesModelInput(provider)) return getProviderLabel(provider)
-  return `${getProviderLabel(provider)} · ${getModelLabel(provider, model)}`
+  const modelLabel = getModelLabel(provider, model, endpointOptions)
+  if (!modelLabel) return getProviderLabel(provider)
+  return `${getProviderLabel(provider)} · ${modelLabel}`
 }
 
-export function getModelControlMarkup(provider: PlannerProviderKind, model: string): string {
-  const options = getModelOptions(provider)
-  if (options.length === 0) {
-    return `
-      <label>
-        <span>Model</span>
-        <input data-model value="${escapeAttribute(model)}" placeholder="provider/model" />
-      </label>
-    `
-  }
+export function getModelControlMarkup(
+  provider: PlannerProviderKind,
+  model: string,
+  endpointOptions?: WebMCPCommandInputEndpointOption[]
+): string {
+  const options = getModelOptions(provider, endpointOptions)
 
   return `
     <label>
@@ -56,31 +74,47 @@ export function getModelControlMarkup(provider: PlannerProviderKind, model: stri
   `
 }
 
-export function getDefaultModelForProvider(provider: PlannerProviderKind): string {
-  if (provider === 'openai') return 'gpt-5.4-mini'
-  if (provider === 'cloudflare-binding') return '@cf/zai-org/glm-4.7-flash'
-  if (provider === 'cloudflare-workers-ai') return '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b'
-  if (provider === 'openai-compatible') return ''
-  if (provider === 'openrouter') return 'openrouter/auto'
-  return defaultModel
+export function getDefaultModelForProvider(
+  provider: PlannerProviderKind,
+  endpointOptions?: WebMCPCommandInputEndpointOption[]
+): string {
+  const configuredOption = getConfiguredEndpointOptions(provider, endpointOptions)[0]
+  if (configuredOption) return configuredOption.value
+  return ''
 }
 
-export function usesModelInput(provider: PlannerProviderKind): boolean {
-  return provider === 'openai'
-    || provider === 'openrouter'
-    || provider === 'openai-compatible'
-    || provider === 'cloudflare-binding'
-    || provider === 'cloudflare-workers-ai'
+export function getDefaultProvider(
+  endpointOptions?: WebMCPCommandInputEndpointOption[],
+  includeChromeAI = false
+): PlannerProviderKind {
+  if (includeChromeAI) return 'chrome-built-in'
+  return endpointOptions?.[0]?.provider ?? 'auto'
+}
+
+export function getModelOptionCount(
+  provider: PlannerProviderKind,
+  endpointOptions?: WebMCPCommandInputEndpointOption[]
+): number {
+  return getConfiguredEndpointOptions(provider, endpointOptions).length
+}
+
+export function getProviderOptionCount(
+  endpointOptions?: WebMCPCommandInputEndpointOption[],
+  includeChromeAI = false
+): number {
+  return getConfiguredProviderOptions(endpointOptions, includeChromeAI).length
 }
 
 export function isPlannerAttribute(name: string): boolean {
-  return name === 'account-id'
-    || name === 'api-key'
-    || name === 'auth-mode'
-    || name === 'base-url'
-    || name === 'endpoint'
-    || name === 'model'
-    || name === 'provider'
+  return (
+    name === 'account-id' ||
+    name === 'api-key' ||
+    name === 'auth-mode' ||
+    name === 'base-url' ||
+    name === 'endpoint' ||
+    name === 'model' ||
+    name === 'provider'
+  )
 }
 
 export function isAuthMode(value: unknown): value is 'none' | 'server' | 'user-key' {
@@ -88,80 +122,109 @@ export function isAuthMode(value: unknown): value is 'none' | 'server' | 'user-k
 }
 
 export function isPlannerProviderKind(value: unknown): value is PlannerProviderKind {
-  return value === 'auto'
-    || value === 'chrome-built-in'
-    || value === 'local'
-    || value === 'openai'
-    || value === 'openrouter'
-    || value === 'openai-compatible'
-    || value === 'cloudflare-binding'
-    || value === 'cloudflare-workers-ai'
+  return (
+    value === 'auto' ||
+    value === 'chrome-built-in' ||
+    value === 'local' ||
+    value === 'openai' ||
+    value === 'openrouter' ||
+    value === 'openai-compatible' ||
+    value === 'cloudflare-binding' ||
+    value === 'cloudflare-workers-ai'
+  )
 }
 
-function getProviderOptionsMarkup(provider: PlannerProviderKind): string {
-  return getProviderOptions().map(function mapProviderOption(option) {
-    return `<option value="${escapeAttribute(option.value)}" ${option.value === provider ? 'selected' : ''}>${escapeHtml(option.label)}</option>`
-  }).join('')
-}
-
-function getProviderOptions(): Array<{ label: string, value: PlannerProviderKind }> {
-  return [
-    { label: 'Auto', value: 'auto' },
-    { label: 'Chrome built-in AI', value: 'chrome-built-in' },
-    { label: 'Local deterministic', value: 'local' },
-    { label: 'OpenRouter', value: 'openrouter' },
-    { label: 'OpenAI', value: 'openai' },
-    { label: 'OpenAI-compatible', value: 'openai-compatible' },
-    { label: 'Cloudflare binding', value: 'cloudflare-binding' },
-    { label: 'Cloudflare Workers AI', value: 'cloudflare-workers-ai' }
-  ]
+function getProviderOptionsMarkup(
+  provider: PlannerProviderKind,
+  endpointOptions?: WebMCPCommandInputEndpointOption[],
+  includeChromeAI = false
+): string {
+  return getConfiguredProviderOptions(endpointOptions, includeChromeAI)
+    .map(function mapProviderOption(option) {
+      return `<option value="${escapeAttribute(option.value)}" ${option.value === provider ? 'selected' : ''}>${escapeAttribute(option.label)}</option>`
+    })
+    .join('')
 }
 
 function getProviderLabel(provider: PlannerProviderKind): string {
-  const option = getProviderOptions().find(function findProviderOption(item) {
-    return item.value === provider
-  })
-  return option?.label ?? provider
+  if (provider === 'auto') return 'Auto'
+  if (provider === 'chrome-built-in') return 'Chrome built-in AI'
+  if (provider === 'local') return 'Local deterministic'
+  if (provider === 'openrouter') return 'OpenRouter'
+  if (provider === 'openai') return 'OpenAI'
+  if (provider === 'openai-compatible') return 'OpenAI-compatible'
+  if (provider === 'cloudflare-binding') return 'Cloudflare binding'
+  if (provider === 'cloudflare-workers-ai') return 'Cloudflare Workers AI'
+  return provider
 }
 
-function getModelLabel(provider: PlannerProviderKind, model: string): string {
-  const option = getModelOptions(provider).find(function findModelOption(item) {
+function getModelLabel(
+  provider: PlannerProviderKind,
+  model: string,
+  endpointOptions?: WebMCPCommandInputEndpointOption[]
+): string | undefined {
+  if (!model) return undefined
+  const option = getModelOptions(provider, endpointOptions).find(function findModelOption(item) {
     return item.value === model
   })
   return option?.label ?? model
 }
 
 function getModelOptionsMarkup(options: ModelOption[], model: string): string {
-  return options.map(function mapModelOption(option) {
-    return `<option value="${escapeAttribute(option.value)}" ${option.value === model ? 'selected' : ''}>${escapeHtml(option.label)}</option>`
-  }).join('')
+  return options
+    .map(function mapModelOption(option) {
+      return `<option value="${escapeAttribute(option.value)}" ${option.value === model ? 'selected' : ''}>${escapeAttribute(option.label)}</option>`
+    })
+    .join('')
 }
 
-function getModelOptions(provider: PlannerProviderKind): ModelOption[] {
-  if (provider === 'openai') {
-    return [
-      { label: 'GPT-5.4 mini', value: 'gpt-5.4-mini' }
-    ]
+function getModelOptions(
+  provider: PlannerProviderKind,
+  endpointOptions?: WebMCPCommandInputEndpointOption[]
+): ModelOption[] {
+  return getConfiguredEndpointOptions(provider, endpointOptions)
+}
+
+function getConfiguredEndpointOptions(
+  provider: PlannerProviderKind,
+  endpointOptions: WebMCPCommandInputEndpointOption[] | undefined
+): ModelOption[] {
+  return (endpointOptions ?? [])
+    .filter(function matchesProvider(option) {
+      return option.provider === provider && Boolean(option.model)
+    })
+    .map(function mapEndpointOption(option) {
+      return {
+        label: option.label,
+        value: option.model ?? ''
+      }
+    })
+}
+
+function getConfiguredProviderOptions(
+  endpointOptions: WebMCPCommandInputEndpointOption[] | undefined,
+  includeChromeAI = false
+): ProviderOption[] {
+  const providers: ProviderOption[] = []
+  if (includeChromeAI) {
+    providers.push({
+      label: getProviderLabel('chrome-built-in'),
+      value: 'chrome-built-in'
+    })
   }
 
-  if (provider === 'openrouter') {
-    return [
-      { label: 'OpenRouter auto', value: 'openrouter/auto' }
-    ]
+  for (const option of endpointOptions ?? []) {
+    if (
+      providers.some(function hasProvider(provider) {
+        return provider.value === option.provider
+      })
+    )
+      continue
+    providers.push({
+      label: getProviderLabel(option.provider),
+      value: option.provider
+    })
   }
 
-  if (provider === 'cloudflare-binding' || provider === 'cloudflare-workers-ai') {
-    return [
-      { label: 'GLM 4.7 Flash', value: '@cf/zai-org/glm-4.7-flash' },
-      { label: 'GPT OSS 20B', value: '@cf/openai/gpt-oss-20b' },
-      { label: 'Kimi K2.6', value: '@cf/moonshotai/kimi-k2.6' },
-      { label: 'Qwen3 30B A3B FP8', value: '@cf/qwen/qwen3-30b-a3b-fp8' },
-      { label: 'DeepSeek R1 Distill Qwen 32B', value: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b' },
-      { label: 'Qwen QwQ 32B', value: '@cf/qwen/qwq-32b' },
-      { label: 'Nemotron 3 120B A12B', value: '@cf/nvidia/nemotron-3-120b-a12b' },
-      { label: 'Gemma 4 26B A4B', value: '@cf/google/gemma-4-26b-a4b-it' }
-    ]
-  }
-
-  return []
+  return providers
 }

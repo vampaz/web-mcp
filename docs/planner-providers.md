@@ -12,7 +12,7 @@ import { createWebMCPKit } from '@webmcp-kit/core'
 const kit = await createWebMCPKit({
   planner: {
     provider: 'openrouter',
-    model: 'openrouter/auto',
+    model: 'nvidia/nemotron-3-super-120b-a12b:free',
     auth: {
       mode: 'server',
       endpoint: '/api/webmcp/plan'
@@ -31,7 +31,7 @@ Use user-key mode when the key belongs to the person using the browser, or for l
 const kit = await createWebMCPKit({
   planner: {
     provider: 'openrouter',
-    model: 'openrouter/auto',
+    model: 'nvidia/nemotron-3-super-120b-a12b:free',
     auth: {
       mode: 'user-key',
       apiKey: userProvidedKey
@@ -101,7 +101,8 @@ await createWebMCPKit({
 })
 ```
 
-The demo includes `/api/webmcp/plan` for Cloudflare server planning. For `provider: 'cloudflare-workers-ai'`, that route uses `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` from the server environment. For `provider: 'cloudflare-binding'`, it uses the Astro Cloudflare adapter and expects a Cloudflare runtime with `env.AI`.
+The demo includes `/api/webmcp/plan` for server planning. For `provider: 'cloudflare-workers-ai'`, that route uses `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` from the server environment. For `provider: 'cloudflare-binding'`, it uses the Astro Cloudflare adapter and expects a Cloudflare runtime with `env.AI`. For `provider: 'openrouter'`, it uses `OPENROUTER_API_KEY` from the server environment.
+For `provider: 'openai'`, it uses `OPENAI_API_KEY` from the server environment.
 
 For local development, keep Wrangler authentication in an ignored project `.env` file instead of relying on the global interactive OAuth refresh token:
 
@@ -109,7 +110,7 @@ For local development, keep Wrangler authentication in an ignored project `.env`
 cp demo/.env.example demo/.env
 ```
 
-Then fill in `CLOUDFLARE_API_TOKEN`. `CLOUDFLARE_ACCOUNT_ID` is already present in `demo/.env.example` for this project. This keeps `npm run dev` and remote AI bindings on stable project-local credentials while avoiding committed secrets.
+Then fill in `CLOUDFLARE_API_TOKEN`, `OPENAI_API_KEY`, and `OPENROUTER_API_KEY`. `CLOUDFLARE_ACCOUNT_ID` is already present in `demo/.env.example` for this project. This keeps `npm run dev` and remote AI bindings on stable project-local credentials while avoiding committed secrets.
 
 Keep `.dev.vars` for Worker runtime values only. Do not put `CLOUDFLARE_API_TOKEN` there; Wrangler reads system authentication from the process environment / `.env`, while `.dev.vars` is loaded into the local Worker runtime.
 
@@ -160,16 +161,56 @@ defineWebMCPCommandInput()
 ></webmcp-command-input>
 ```
 
-Provider and model controls are only shown when the app has not fixed those values through attributes, properties, `configure()`, or a supplied `plannerConfig`.
+Provider and model controls are only shown when the app has not fixed those values through attributes, properties, `configure()`, or a supplied `plannerConfig`, and when the available planner options contain a real choice.
 
-In local development, omit fixed `provider` and `model` values if you want the command input to expose planner controls:
+Chrome built-in AI is not a server endpoint. The command input detects the browser `LanguageModel` API and adds the Chrome built-in AI provider automatically when it is available. Apps can hide that local provider:
+
+```ts
+commandInput.configure({
+  showChromeAI: false
+})
+```
+
+In local development, omit fixed `provider` and `model` values and pass the endpoint options your app supports if you want the command input to expose planner controls. If the app passes only one endpoint option, the options panel stays hidden because there is nothing to choose.
 
 ```ts
 commandInput.configure({
   context: getPlannerContext,
-  endpoint: '/api/webmcp/plan'
+  endpoint: '/api/webmcp/plan',
+  endpointOptions: [
+    {
+      label: 'GPT-5.4 mini',
+      model: 'gpt-5.4-mini',
+      provider: 'openai'
+    },
+    {
+      label: 'Nemotron 3 Super 120B A12B',
+      model: 'nvidia/nemotron-3-super-120b-a12b:free',
+      provider: 'openrouter'
+    },
+    {
+      label: 'Nemotron Nano 9B V2',
+      model: 'nvidia/nemotron-nano-9b-v2:free',
+      provider: 'openrouter'
+    },
+    {
+      label: 'GLM 4.7 Flash',
+      model: '@cf/zai-org/glm-4.7-flash',
+      provider: 'cloudflare-binding'
+    },
+    {
+      label: 'Auto',
+      provider: 'auto'
+    },
+    {
+      label: 'Local deterministic',
+      provider: 'local'
+    }
+  ]
 })
 ```
+
+`endpointOptions` lets the app provide the concrete planner endpoints it has tested and allows through its server route. Provider-only options such as `auto` and `local` can omit `model`. The command input only renders those choices; it does not own the demo's OpenRouter, OpenAI, Cloudflare, or local planner curation.
 
 For preview or production, pass the selected planner config when the app should own those choices and hide them from users.
 
@@ -232,7 +273,7 @@ interface Env {
 
 export default {
   async fetch(request: Request, env: Env) {
-    const body = await request.json() as {
+    const body = (await request.json()) as {
       model: string
       message: string
       tools: unknown[]

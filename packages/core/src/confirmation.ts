@@ -64,6 +64,6 @@ function isProduction(): boolean {
   return runtime.process?.env?.NODE_ENV === 'production'
 }
 
-function getErrorMessage(error: unknown): string {
+export function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'unknown error'
 }

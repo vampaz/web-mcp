@@ -40,9 +40,11 @@ describe('React useWebMCPTool', () => {
       useWebMCPTool(tool)
     })
 
-    expect(listTools().map(function getToolName(registration) {
-      return registration.tool.name
-    })).toEqual(['create_ticket'])
+    expect(
+      listTools().map(function getToolName(registration) {
+        return registration.tool.name
+      })
+    ).toEqual(['create_ticket'])
 
     runtime.cleanup()
 
@@ -59,21 +61,24 @@ describe('React useWebMCPTool', () => {
     const { defineTool, listTools } = await import('@webmcp-kit/core')
 
     runtime.render(function renderHook() {
-      useWebMCPTool(defineTool({
-        name: 'create_ticket',
-        description: 'Create a support ticket from the current React screen.',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-          required: [],
-          additionalProperties: false
-        },
-        execute() {
-          return {}
+      useWebMCPTool(
+        defineTool({
+          name: 'create_ticket',
+          description: 'Create a support ticket from the current React screen.',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+            required: [],
+            additionalProperties: false
+          },
+          execute() {
+            return {}
+          }
+        }),
+        {
+          when: false
         }
-      }), {
-        when: false
-      })
+      )
     })
 
     expect(listTools()).toEqual([])

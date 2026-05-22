@@ -1,9 +1,15 @@
 import { expect, test, type Page } from '@playwright/test'
-import { invokeWebMCPTool, listWebMCPTools, waitForWebMCPTool } from '@webmcp-kit/testing/playwright'
+import {
+  invokeWebMCPTool,
+  listWebMCPTools,
+  waitForWebMCPTool
+} from '@webmcp-kit/testing/playwright'
 
 type LanguageModelAvailability = 'available' | 'downloadable' | 'downloading' | 'unavailable'
 
-test('uses Chrome AI context to select semantic inventory items and open records', async function testSemanticInventorySelection({ page }) {
+test('uses Chrome AI context to select semantic inventory items and open records', async function testSemanticInventorySelection({
+  page
+}) {
   await installLanguageModelMock(page, 'downloadable')
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible()
@@ -32,7 +38,9 @@ test('uses Chrome AI context to select semantic inventory items and open records
   await getCommandTextbox(page).fill('Open the Stark invoice')
   await page.getByRole('button', { name: 'Run' }).click()
 
-  await expect(page.locator('.active-record strong').filter({ hasText: 'Stark Industries' })).toBeVisible()
+  await expect(
+    page.locator('.active-record strong').filter({ hasText: 'Stark Industries' })
+  ).toBeVisible()
 
   const invoicePromptMessages = await page.evaluate(function getPromptMessages() {
     return (window as Window & { __webMCPPromptMessages?: string[] }).__webMCPPromptMessages ?? []
@@ -42,7 +50,9 @@ test('uses Chrome AI context to select semantic inventory items and open records
   expect(invoicePromptMessages[0]).not.toContain('Pain au chocolat')
 })
 
-test('uses the local planner for semantic item selections when AI is unavailable', async function testFallbackItemSelection({ page }) {
+test('uses the local planner for semantic item selections when AI is unavailable', async function testFallbackItemSelection({
+  page
+}) {
   await installUnavailableLanguageModelMock(page)
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible()
@@ -58,7 +68,9 @@ test('uses the local planner for semantic item selections when AI is unavailable
   await expect(getItemInput(page, 'Apple')).not.toBeChecked()
 })
 
-test('executes chained local invoice commands with confirmation', async function testLocalInvoiceChain({ page }) {
+test('executes chained local invoice commands with confirmation', async function testLocalInvoiceChain({
+  page
+}) {
   await page.goto('/invoices/')
   await expect(page.getByRole('heading', { name: 'Invoices', exact: true })).toBeVisible()
 
@@ -80,7 +92,9 @@ test('executes chained local invoice commands with confirmation', async function
   await expect(starkInvoiceRow).toContainText('paid')
 })
 
-test('rechecks Chrome AI before running a command if the page mounted with fallback', async function testPlannerRefresh({ page }) {
+test('rechecks Chrome AI before running a command if the page mounted with fallback', async function testPlannerRefresh({
+  page
+}) {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible()
   await selectPlannerProvider(page, 'auto')
@@ -94,15 +108,19 @@ test('rechecks Chrome AI before running a command if the page mounted with fallb
   await expect(getItemInput(page, 'Grapefruit')).toBeChecked()
 })
 
-test('exposes registered tools through Playwright helpers', async function testPlaywrightHelpers({ page }) {
+test('exposes registered tools through Playwright helpers', async function testPlaywrightHelpers({
+  page
+}) {
   await installLanguageModelMock(page, 'available')
   await page.goto('/')
   await waitForWebMCPTool(page, 'select_items')
 
   const tools = await listWebMCPTools(page)
-  expect(tools.map(function getToolName(tool) {
-    return tool.name
-  })).toContain('select_items')
+  expect(
+    tools.map(function getToolName(tool) {
+      return tool.name
+    })
+  ).toContain('select_items')
 
   const result = await invokeWebMCPTool(page, {
     toolName: 'select_items',
@@ -117,7 +135,9 @@ test('exposes registered tools through Playwright helpers', async function testP
   await expect(getItemInput(page, 'Baguette')).toBeChecked()
 })
 
-test('exposes only page-specific tools on each demo route', async function testRouteSpecificTools({ page }) {
+test('exposes only page-specific tools on each demo route', async function testRouteSpecificTools({
+  page
+}) {
   const routeTools = [
     {
       path: '/',
@@ -127,12 +147,26 @@ test('exposes only page-specific tools on each demo route', async function testR
     {
       path: '/invoices/',
       readyTool: 'open_invoice',
-      tools: ['create_invoice', 'filter_invoices', 'open_invoice', 'select_invoices', 'sort_invoices', 'update_selected_invoice_status']
+      tools: [
+        'create_invoice',
+        'filter_invoices',
+        'open_invoice',
+        'select_invoices',
+        'sort_invoices',
+        'update_selected_invoice_status'
+      ]
     },
     {
       path: '/commerce/',
       readyTool: 'search_products',
-      tools: ['add_to_cart', 'apply_cart_discount', 'checkout_cart', 'remove_from_cart', 'search_products', 'update_cart_quantity']
+      tools: [
+        'add_to_cart',
+        'apply_cart_discount',
+        'checkout_cart',
+        'remove_from_cart',
+        'search_products',
+        'update_cart_quantity'
+      ]
     },
     {
       path: '/support/',
@@ -146,33 +180,33 @@ test('exposes only page-specific tools on each demo route', async function testR
     await waitForWebMCPTool(page, route.readyTool)
 
     const tools = await listWebMCPTools(page)
-    expect(tools.map(function getToolName(tool) {
-      return tool.name
-    }).sort()).toEqual(route.tools)
+    expect(
+      tools
+        .map(function getToolName(tool) {
+          return tool.name
+        })
+        .sort()
+    ).toEqual(route.tools)
   }
 })
 
-test('plans through a selected user-key provider', async function testUserKeyProviderSelection({ page }) {
-  await page.addInitScript(function storePlannerKey() {
-    localStorage.setItem('webmcp-kit:openrouter:api-key', 'local-user-key')
-  })
-  await page.route('https://openrouter.ai/api/v1/chat/completions', async function fulfillOpenRouter(route, request) {
-    expect(request.headers().authorization).toBe('Bearer local-user-key')
+test('plans through the dev OpenRouter server provider', async function testOpenRouterProviderSelection({
+  page
+}) {
+  await page.route('**/api/webmcp/plan', async function fulfillOpenRouter(route, request) {
+    expect(request.postDataJSON()).toMatchObject({
+      provider: 'openrouter',
+      model: 'nvidia/nemotron-3-super-120b-a12b:free',
+      message: 'Select all French items'
+    })
+
     await route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                toolName: 'select_items',
-                input: { ids: ['item_4', 'item_7', 'item_13', 'item_18', 'item_22'] },
-                confidence: 0.94,
-                reason: 'OpenRouter selected French items from current inventory context.'
-              })
-            }
-          }
-        ]
+        toolName: 'select_items',
+        input: { ids: ['item_4', 'item_7', 'item_13', 'item_18', 'item_22'] },
+        confidence: 0.94,
+        reason: 'OpenRouter selected French items from current inventory context.'
       })
     })
   })
@@ -188,7 +222,41 @@ test('plans through a selected user-key provider', async function testUserKeyPro
   await expect(getItemInput(page, 'Quiche')).toBeChecked()
 })
 
-test('plans through the dev Cloudflare binding provider', async function testCloudflareBindingProviderSelection({ page }) {
+test('plans through the dev OpenAI server provider', async function testOpenAIProviderSelection({
+  page
+}) {
+  await page.route('**/api/webmcp/plan', async function fulfillOpenAI(route, request) {
+    expect(request.postDataJSON()).toMatchObject({
+      provider: 'openai',
+      model: 'gpt-5.4-mini',
+      message: 'Select all French items'
+    })
+
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        toolName: 'select_items',
+        input: { ids: ['item_4', 'item_7', 'item_13', 'item_18', 'item_22'] },
+        confidence: 0.93,
+        reason: 'OpenAI selected French items from current inventory context.'
+      })
+    })
+  })
+
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible()
+  await selectPlannerProvider(page, 'openai')
+
+  await getCommandTextbox(page).fill('Select all French items')
+  await page.getByRole('button', { name: 'Run' }).click()
+
+  await expect(getItemInput(page, 'Croissant')).toBeChecked()
+  await expect(getItemInput(page, 'Quiche')).toBeChecked()
+})
+
+test('plans through the dev Cloudflare binding provider', async function testCloudflareBindingProviderSelection({
+  page
+}) {
   await page.route('**/api/webmcp/plan', async function fulfillCloudflareBinding(route, request) {
     expect(request.postDataJSON()).toMatchObject({
       provider: 'cloudflare-binding',
@@ -218,7 +286,9 @@ test('plans through the dev Cloudflare binding provider', async function testClo
   await expect(getItemInput(page, 'Quiche')).toBeChecked()
 })
 
-test('keeps demo pages responsive without forcing cramped columns', async function testResponsiveDemoLayouts({ page }) {
+test('keeps demo pages responsive without forcing cramped columns', async function testResponsiveDemoLayouts({
+  page
+}) {
   const viewports = [
     { width: 390, height: 840 },
     { width: 768, height: 900 },
@@ -275,6 +345,19 @@ test('keeps demo pages responsive without forcing cramped columns', async functi
   expect(Math.abs(regrownTriggerBox.x - wideTriggerBox.x)).toBeLessThanOrEqual(2)
 })
 
+test('renders README Mermaid diagrams', async function testReadmeMermaidDiagrams({ page }) {
+  await page.goto('/readme/')
+
+  const mermaidDiagram = page.locator('.readme-mermaid').first()
+  await expect(mermaidDiagram.locator('svg')).toBeVisible()
+  await expect(page.locator('pre[data-language="mermaid"]')).toHaveCount(0)
+
+  const hasHorizontalOverflow = await page.evaluate(function hasHorizontalPageOverflow() {
+    return document.documentElement.scrollWidth > document.documentElement.clientWidth
+  })
+  expect(hasHorizontalOverflow).toBe(false)
+})
+
 async function installLanguageModelMock(page: Page, availability: LanguageModelAvailability) {
   await page.addInitScript({
     content: `(${installLanguageModel.toString()})(window, ${JSON.stringify(availability)})`
@@ -282,13 +365,19 @@ async function installLanguageModelMock(page: Page, availability: LanguageModelA
 }
 
 async function installLanguageModelInPage(page: Page, availability: LanguageModelAvailability) {
-  await page.evaluate(function mockLanguageModel(options) {
-    const install = new Function(`return (${options.source})`)() as (targetWindow: Window, mockAvailability: LanguageModelAvailability) => void
-    install(window, options.availability)
-  }, {
-    availability,
-    source: installLanguageModel.toString()
-  })
+  await page.evaluate(
+    function mockLanguageModel(options) {
+      const install = new Function(`return (${options.source})`)() as (
+        targetWindow: Window,
+        mockAvailability: LanguageModelAvailability
+      ) => void
+      install(window, options.availability)
+    },
+    {
+      availability,
+      source: installLanguageModel.toString()
+    }
+  )
 }
 
 async function installUnavailableLanguageModelMock(page: Page) {
@@ -319,7 +408,7 @@ async function selectPlannerProvider(page: Page, provider: string, toolName = 's
 
 async function openWebMCPInput(page: Page) {
   const launcher = page.getByRole('button', { name: 'Open WebMCP command input' })
-  if (await launcher.getAttribute('aria-expanded') !== 'true') {
+  if ((await launcher.getAttribute('aria-expanded')) !== 'true') {
     await launcher.click()
   }
 }
@@ -355,7 +444,8 @@ function installLanguageModel(targetWindow: Window, mockAvailability: LanguageMo
       return {
         prompt: async function planFromPrompt(message: string) {
           browserWindow.__webMCPPromptMessages?.push(message)
-          const request = message.match(/User request: ([\s\S]*?)\n\nCurrent app context/)?.[1] ?? message
+          const request =
+            message.match(/User request: ([\s\S]*?)\n\nCurrent app context/)?.[1] ?? message
 
           if (request.includes('Stark')) {
             return JSON.stringify({

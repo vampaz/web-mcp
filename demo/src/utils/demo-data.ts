@@ -1,4 +1,12 @@
-import type { DemoSettings, Invoice, InvoiceDraft, PlannerModelOption, Product, SelectableItem, SupportTicket } from '@/interfaces/demo'
+import type {
+  DemoSettings,
+  Invoice,
+  InvoiceDraft,
+  PlannerModelOption,
+  Product,
+  SelectableItem,
+  SupportTicket
+} from '@/interfaces/demo'
 
 export function getCloudflareBindingModels(): PlannerModelOption[] {
   return [
@@ -37,16 +45,102 @@ export function getCloudflareBindingModels(): PlannerModelOption[] {
   ]
 }
 
+export function getOpenRouterPlannerEndpoints(): PlannerModelOption[] {
+  return [
+    {
+      id: 'nvidia/nemotron-3-super-120b-a12b:free',
+      label: 'Nemotron 3 Super 120B A12B'
+    },
+    {
+      id: 'nvidia/nemotron-nano-9b-v2:free',
+      label: 'Nemotron Nano 9B V2'
+    }
+  ]
+}
+
+export function getOpenAIPlannerEndpoints(): PlannerModelOption[] {
+  return [
+    {
+      id: 'gpt-5.4-mini',
+      label: 'GPT-5.4 mini'
+    }
+  ]
+}
+
 export function getInitialInvoices(): Invoice[] {
   return [
-    { id: 'inv_100', customerName: 'Globex', amount: 230, status: 'sent', dueDate: '2026-05-20', owner: 'Marta', selected: false },
-    { id: 'inv_101', customerName: 'Northwind', amount: 920, status: 'overdue', dueDate: '2026-05-05', owner: 'Carlos', selected: false },
-    { id: 'inv_102', customerName: 'Aperture Labs', amount: 1480, status: 'draft', dueDate: '2026-05-28', owner: 'Sofia', selected: false },
-    { id: 'inv_103', customerName: 'Initech', amount: 640, status: 'paid', dueDate: '2026-05-11', owner: 'Rui', selected: false },
-    { id: 'inv_104', customerName: 'Stark Industries', amount: 2310, status: 'overdue', dueDate: '2026-05-02', owner: 'Carlos', selected: false },
-    { id: 'inv_105', customerName: 'Umbrella Health', amount: 790, status: 'sent', dueDate: '2026-05-23', owner: 'Marta', selected: false },
-    { id: 'inv_106', customerName: 'Soylent Systems', amount: 510, status: 'draft', dueDate: '2026-06-01', owner: 'Sofia', selected: false },
-    { id: 'inv_107', customerName: 'Wayne Logistics', amount: 1750, status: 'sent', dueDate: '2026-05-18', owner: 'Rui', selected: false }
+    {
+      id: 'inv_100',
+      customerName: 'Globex',
+      amount: 230,
+      status: 'sent',
+      dueDate: '2026-05-20',
+      owner: 'Marta',
+      selected: false
+    },
+    {
+      id: 'inv_101',
+      customerName: 'Northwind',
+      amount: 920,
+      status: 'overdue',
+      dueDate: '2026-05-05',
+      owner: 'Carlos',
+      selected: false
+    },
+    {
+      id: 'inv_102',
+      customerName: 'Aperture Labs',
+      amount: 1480,
+      status: 'draft',
+      dueDate: '2026-05-28',
+      owner: 'Sofia',
+      selected: false
+    },
+    {
+      id: 'inv_103',
+      customerName: 'Initech',
+      amount: 640,
+      status: 'paid',
+      dueDate: '2026-05-11',
+      owner: 'Rui',
+      selected: false
+    },
+    {
+      id: 'inv_104',
+      customerName: 'Stark Industries',
+      amount: 2310,
+      status: 'overdue',
+      dueDate: '2026-05-02',
+      owner: 'Carlos',
+      selected: false
+    },
+    {
+      id: 'inv_105',
+      customerName: 'Umbrella Health',
+      amount: 790,
+      status: 'sent',
+      dueDate: '2026-05-23',
+      owner: 'Marta',
+      selected: false
+    },
+    {
+      id: 'inv_106',
+      customerName: 'Soylent Systems',
+      amount: 510,
+      status: 'draft',
+      dueDate: '2026-06-01',
+      owner: 'Sofia',
+      selected: false
+    },
+    {
+      id: 'inv_107',
+      customerName: 'Wayne Logistics',
+      amount: 1750,
+      status: 'sent',
+      dueDate: '2026-05-18',
+      owner: 'Rui',
+      selected: false
+    }
   ]
 }
 

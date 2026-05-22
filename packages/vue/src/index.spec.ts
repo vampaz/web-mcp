@@ -18,21 +18,23 @@ describe('useWebMCPTool', () => {
   it('registers a tool for the component scope and unregisters on unmount', () => {
     const component = defineComponent({
       setup() {
-        useWebMCPTool(defineTool({
-          name: 'create_ticket',
-          description: 'Create a support ticket from the current Vue screen.',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              subject: { type: 'string' }
+        useWebMCPTool(
+          defineTool({
+            name: 'create_ticket',
+            description: 'Create a support ticket from the current Vue screen.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                subject: { type: 'string' }
+              },
+              required: ['subject'],
+              additionalProperties: false
             },
-            required: ['subject'],
-            additionalProperties: false
-          },
-          execute(input) {
-            return input
-          }
-        }))
+            execute(input) {
+              return input
+            }
+          })
+        )
 
         return function render() {
           return null
@@ -42,9 +44,11 @@ describe('useWebMCPTool', () => {
 
     const wrapper = mountWithDeps(component)
 
-    expect(listTools().map(function getToolName(registration) {
-      return registration.tool.name
-    })).toEqual(['create_ticket'])
+    expect(
+      listTools().map(function getToolName(registration) {
+        return registration.tool.name
+      })
+    ).toEqual(['create_ticket'])
 
     wrapper.unmount()
 
@@ -55,23 +59,26 @@ describe('useWebMCPTool', () => {
     const available = ref(false)
     const component = defineComponent({
       setup() {
-        useWebMCPTool(defineTool({
-          name: 'create_ticket',
-          description: 'Create a support ticket from the current Vue screen.',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              subject: { type: 'string' }
+        useWebMCPTool(
+          defineTool({
+            name: 'create_ticket',
+            description: 'Create a support ticket from the current Vue screen.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                subject: { type: 'string' }
+              },
+              required: ['subject'],
+              additionalProperties: false
             },
-            required: ['subject'],
-            additionalProperties: false
-          },
-          execute(input) {
-            return input
+            execute(input) {
+              return input
+            }
+          }),
+          {
+            when: available
           }
-        }), {
-          when: available
-        })
+        )
 
         return function render() {
           return null
@@ -87,10 +94,12 @@ describe('useWebMCPTool', () => {
     await nextTick()
 
     expect(listTools()).toHaveLength(1)
-    await expect(invokeTool({
-      toolName: 'create_ticket',
-      input: { subject: 'Billing' }
-    })).resolves.toMatchObject({
+    await expect(
+      invokeTool({
+        toolName: 'create_ticket',
+        input: { subject: 'Billing' }
+      })
+    ).resolves.toMatchObject({
       status: 'success',
       output: { subject: 'Billing' }
     })

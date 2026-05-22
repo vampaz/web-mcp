@@ -1,10 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { createBestPlanner, createChromeAIPlanner, createConfiguredPlanner, createHeuristicPlanner } from './planner'
+import {
+  createBestPlanner,
+  createChromeAIPlanner,
+  createConfiguredPlanner,
+  createHeuristicPlanner
+} from './planner'
 
 interface WindowWithLanguageModel extends Window {
   LanguageModel?: {
-    availability: (options?: unknown) => Promise<'available' | 'downloadable' | 'downloading' | 'unavailable'>
+    availability: (
+      options?: unknown
+    ) => Promise<'available' | 'downloadable' | 'downloading' | 'unavailable'>
     create: (options?: unknown) => Promise<{
       prompt: (message: string) => Promise<string>
       destroy?: () => void
@@ -31,12 +38,13 @@ describe('planner', () => {
 
   it('uses Chrome AI as the active planner when the model is downloadable', async () => {
     const create = vi.fn(async () => ({
-      prompt: async () => JSON.stringify({
-        toolName: 'select_items',
-        input: { ids: ['item_4', 'item_7'] },
-        confidence: 0.9,
-        reason: 'Chrome chose French foods.'
-      })
+      prompt: async () =>
+        JSON.stringify({
+          toolName: 'select_items',
+          input: { ids: ['item_4', 'item_7'] },
+          confidence: 0.9,
+          reason: 'Chrome chose French foods.'
+        })
     }))
     ;(window as WindowWithLanguageModel).LanguageModel = {
       availability: async () => 'downloadable',
@@ -57,12 +65,13 @@ describe('planner', () => {
 
   it('uses Chrome built-in AI when available', async () => {
     const create = vi.fn(async () => ({
-      prompt: async () => JSON.stringify({
-        toolName: 'search_products',
-        input: { query: 'dock' },
-        confidence: 0.9,
-        reason: 'Chrome chose product search.'
-      })
+      prompt: async () =>
+        JSON.stringify({
+          toolName: 'search_products',
+          input: { query: 'dock' },
+          confidence: 0.9,
+          reason: 'Chrome chose product search.'
+        })
     }))
     ;(window as WindowWithLanguageModel).LanguageModel = {
       availability: async () => 'available',
@@ -112,7 +121,9 @@ describe('planner', () => {
       }
     })
 
-    await expect(planner.plan('Add ten keyboards to the cart.', [])).rejects.toThrow('Chrome built-in AI could not plan this command')
+    await expect(planner.plan('Add ten keyboards to the cart.', [])).rejects.toThrow(
+      'Chrome built-in AI could not plan this command'
+    )
   })
 
   it('reports malformed Chrome AI JSON distinctly before falling back', async () => {
@@ -136,12 +147,13 @@ describe('planner', () => {
       availability: async () => 'available',
       create: async () => ({
         destroy,
-        prompt: async () => JSON.stringify({
-          toolName: 'search_products',
-          input: { query: 'dock' },
-          confidence: 0.9,
-          reason: 'Chrome chose product search.'
-        })
+        prompt: async () =>
+          JSON.stringify({
+            toolName: 'search_products',
+            input: { query: 'dock' },
+            confidence: 0.9,
+            reason: 'Chrome chose product search.'
+          })
       })
     }
 
@@ -210,23 +222,27 @@ describe('planner', () => {
 
   it('plans checklist selection from visible item names in current app context', async () => {
     const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Select all items with water', [
+    const plan = await planner.plan(
+      'Select all items with water',
+      [
+        {
+          name: 'select_items',
+          description: 'Select checklist items by ID.',
+          inputSchema: {
+            type: 'object'
+          },
+          execute: () => []
+        }
+      ],
       {
-        name: 'select_items',
-        description: 'Select checklist items by ID.',
-        inputSchema: {
-          type: 'object'
-        },
-        execute: () => []
+        checklistItems: [
+          { id: 'item_1', name: 'Apple' },
+          { id: 'item_8', name: 'Water' },
+          { id: 'item_16', name: 'Sparkling water' },
+          { id: 'item_20', name: 'Tea' }
+        ]
       }
-    ], {
-      checklistItems: [
-        { id: 'item_1', name: 'Apple' },
-        { id: 'item_8', name: 'Water' },
-        { id: 'item_16', name: 'Sparkling water' },
-        { id: 'item_20', name: 'Tea' }
-      ]
-    })
+    )
 
     expect(plan.toolName).toBe('select_items')
     expect(plan.input).toEqual({
@@ -290,23 +306,27 @@ describe('planner', () => {
 
   it('plans invoice selection from business state and amount wording', async () => {
     const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Select unpaid invoices over 500', [
+    const plan = await planner.plan(
+      'Select unpaid invoices over 500',
+      [
+        {
+          name: 'select_invoices',
+          description: 'Select invoice rows by ID.',
+          inputSchema: {
+            type: 'object'
+          },
+          execute: () => []
+        }
+      ],
       {
-        name: 'select_invoices',
-        description: 'Select invoice rows by ID.',
-        inputSchema: {
-          type: 'object'
-        },
-        execute: () => []
+        invoices: [
+          { id: 'inv_1', customerName: 'Northwind', amount: 920, status: 'overdue' },
+          { id: 'inv_2', customerName: 'Initech', amount: 640, status: 'paid' },
+          { id: 'inv_3', customerName: 'Aperture Labs', amount: 1480, status: 'draft' },
+          { id: 'inv_4', customerName: 'Globex', amount: 230, status: 'sent' }
+        ]
       }
-    ], {
-      invoices: [
-        { id: 'inv_1', customerName: 'Northwind', amount: 920, status: 'overdue' },
-        { id: 'inv_2', customerName: 'Initech', amount: 640, status: 'paid' },
-        { id: 'inv_3', customerName: 'Aperture Labs', amount: 1480, status: 'draft' },
-        { id: 'inv_4', customerName: 'Globex', amount: 230, status: 'sent' }
-      ]
-    })
+    )
 
     expect(plan.toolName).toBe('select_invoices')
     expect(plan.input).toEqual({
@@ -316,21 +336,25 @@ describe('planner', () => {
 
   it('plans invoice opening from the visible customer name', async () => {
     const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Open the Stark invoice', [
+    const plan = await planner.plan(
+      'Open the Stark invoice',
+      [
+        {
+          name: 'open_invoice',
+          description: 'Open invoice detail.',
+          inputSchema: {
+            type: 'object'
+          },
+          execute: () => []
+        }
+      ],
       {
-        name: 'open_invoice',
-        description: 'Open invoice detail.',
-        inputSchema: {
-          type: 'object'
-        },
-        execute: () => []
+        invoices: [
+          { id: 'inv_1', customerName: 'Northwind', amount: 920, status: 'overdue' },
+          { id: 'inv_2', customerName: 'Stark Industries', amount: 2310, status: 'overdue' }
+        ]
       }
-    ], {
-      invoices: [
-        { id: 'inv_1', customerName: 'Northwind', amount: 920, status: 'overdue' },
-        { id: 'inv_2', customerName: 'Stark Industries', amount: 2310, status: 'overdue' }
-      ]
-    })
+    )
 
     expect(plan.toolName).toBe('open_invoice')
     expect(plan.input).toEqual({
@@ -340,29 +364,33 @@ describe('planner', () => {
 
   it('plans invoice status changes as a tool sequence when rows must be selected first', async () => {
     const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Mark Stark Industries invoices as paid', [
-      {
-        name: 'select_invoices',
-        description: 'Select invoice rows by ID.',
-        inputSchema: {
-          type: 'object'
+    const plan = await planner.plan(
+      'Mark Stark Industries invoices as paid',
+      [
+        {
+          name: 'select_invoices',
+          description: 'Select invoice rows by ID.',
+          inputSchema: {
+            type: 'object'
+          },
+          execute: () => []
         },
-        execute: () => []
-      },
+        {
+          name: 'update_selected_invoice_status',
+          description: 'Update selected invoice statuses.',
+          inputSchema: {
+            type: 'object'
+          },
+          execute: () => []
+        }
+      ],
       {
-        name: 'update_selected_invoice_status',
-        description: 'Update selected invoice statuses.',
-        inputSchema: {
-          type: 'object'
-        },
-        execute: () => []
+        invoices: [
+          { id: 'inv_1', customerName: 'Northwind', amount: 920, status: 'overdue' },
+          { id: 'inv_2', customerName: 'Stark Industries', amount: 2310, status: 'overdue' }
+        ]
       }
-    ], {
-      invoices: [
-        { id: 'inv_1', customerName: 'Northwind', amount: 920, status: 'overdue' },
-        { id: 'inv_2', customerName: 'Stark Industries', amount: 2310, status: 'overdue' }
-      ]
-    })
+    )
 
     expect(plan).toMatchObject({
       toolName: 'tool_sequence',
@@ -386,29 +414,33 @@ describe('planner', () => {
 
   it('does not chain broad invoice status changes without a row target', async () => {
     const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Mark invoices as paid', [
-      {
-        name: 'select_invoices',
-        description: 'Select invoice rows by ID.',
-        inputSchema: {
-          type: 'object'
+    const plan = await planner.plan(
+      'Mark invoices as paid',
+      [
+        {
+          name: 'select_invoices',
+          description: 'Select invoice rows by ID.',
+          inputSchema: {
+            type: 'object'
+          },
+          execute: () => []
         },
-        execute: () => []
-      },
+        {
+          name: 'update_selected_invoice_status',
+          description: 'Update selected invoice statuses.',
+          inputSchema: {
+            type: 'object'
+          },
+          execute: () => []
+        }
+      ],
       {
-        name: 'update_selected_invoice_status',
-        description: 'Update selected invoice statuses.',
-        inputSchema: {
-          type: 'object'
-        },
-        execute: () => []
+        invoices: [
+          { id: 'inv_1', customerName: 'Northwind', amount: 920, status: 'overdue' },
+          { id: 'inv_2', customerName: 'Stark Industries', amount: 2310, status: 'overdue' }
+        ]
       }
-    ], {
-      invoices: [
-        { id: 'inv_1', customerName: 'Northwind', amount: 920, status: 'overdue' },
-        { id: 'inv_2', customerName: 'Stark Industries', amount: 2310, status: 'overdue' }
-      ]
-    })
+    )
 
     expect(plan).toMatchObject({
       toolName: 'update_selected_invoice_status',
@@ -421,24 +453,26 @@ describe('planner', () => {
 
   it('does not pretend to understand unmatched semantic checklist selection in fallback mode', async () => {
     const planner = createHeuristicPlanner()
-    await expect(planner.plan('Select all the items that are French food.', [
-      {
-        name: 'select_items',
-        description: 'Select checklist items by ID.',
-        inputSchema: {
-          type: 'object'
+    await expect(
+      planner.plan('Select all the items that are French food.', [
+        {
+          name: 'select_items',
+          description: 'Select checklist items by ID.',
+          inputSchema: {
+            type: 'object'
+          },
+          execute: () => []
         },
-        execute: () => []
-      },
-      {
-        name: 'search_products',
-        description: 'Search products.',
-        inputSchema: {
-          type: 'object'
-        },
-        execute: () => []
-      }
-    ])).rejects.toThrow('Semantic checklist selection needs an AI planner')
+        {
+          name: 'search_products',
+          description: 'Search products.',
+          inputSchema: {
+            type: 'object'
+          },
+          execute: () => []
+        }
+      ])
+    ).rejects.toThrow('Semantic checklist selection needs an AI planner')
   })
 
   it('passes app context to Chrome AI for semantic selection', async () => {
@@ -502,24 +536,31 @@ describe('planner', () => {
     ]
 
     expect(planner.status).toBe('needs-key')
-    await expect(planner.plan('Select all the items that are French food.', tools)).rejects.toThrow('OpenRouter needs a user API key')
+    await expect(planner.plan('Select all the items that are French food.', tools)).rejects.toThrow(
+      'OpenRouter needs a user API key'
+    )
   })
 
   it('plans through OpenRouter with a user key in the browser', async () => {
-    const fetch = vi.fn(async () => new Response(JSON.stringify({
-      choices: [
-        {
-          message: {
-            content: `Here is the plan:\n\n\`\`\`json\n${JSON.stringify({
-              toolName: 'select_items',
-              input: { ids: ['item_4', 'item_7'] },
-              confidence: 0.92,
-              reason: 'OpenRouter selected French foods.'
-            })}\n\`\`\``
-          }
-        }
-      ]
-    })))
+    const fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: `Here is the plan:\n\n\`\`\`json\n${JSON.stringify({
+                    toolName: 'select_items',
+                    input: { ids: ['item_4', 'item_7'] },
+                    confidence: 0.92,
+                    reason: 'OpenRouter selected French foods.'
+                  })}\n\`\`\``
+                }
+              }
+            ]
+          })
+        )
+    )
     vi.stubGlobal('fetch', fetch)
 
     const planner = await createConfiguredPlanner({
@@ -545,20 +586,28 @@ describe('planner', () => {
     expect(plan.input).toEqual({
       ids: ['item_4', 'item_7']
     })
-    expect(fetch).toHaveBeenCalledWith('https://openrouter.ai/api/v1/chat/completions', expect.objectContaining({
-      headers: expect.objectContaining({
-        Authorization: 'Bearer test-key'
+    expect(fetch).toHaveBeenCalledWith(
+      'https://openrouter.ai/api/v1/chat/completions',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer test-key'
+        })
       })
-    }))
+    )
   })
 
   it('rejects remote planner input that does not match the selected tool schema', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
-      toolName: 'select_items',
-      input: {},
-      confidence: 0.88,
-      reason: 'Server planner selected the tool but omitted input.'
-    })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          toolName: 'select_items',
+          input: {},
+          confidence: 0.88,
+          reason: 'Server planner selected the tool but omitted input.'
+        })
+      )
+    )
 
     const planner = await createConfiguredPlanner({
       provider: 'cloudflare-binding',
@@ -569,35 +618,39 @@ describe('planner', () => {
       }
     })
 
-    await expect(planner.plan('Select all liquids', [
-      {
-        name: 'select_items',
-        description: 'Select checklist items by ID.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            ids: {
-              type: 'array',
-              items: {
-                type: 'string'
+    await expect(
+      planner.plan('Select all liquids', [
+        {
+          name: 'select_items',
+          description: 'Select checklist items by ID.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              ids: {
+                type: 'array',
+                items: {
+                  type: 'string'
+                }
               }
-            }
+            },
+            required: ['ids'],
+            additionalProperties: false
           },
-          required: ['ids'],
-          additionalProperties: false
-        },
-        execute: () => []
-      }
-    ])).rejects.toThrow('provider returned invalid input')
+          execute: () => []
+        }
+      ])
+    ).rejects.toThrow('provider returned invalid input')
   })
 
   it('plans through a server endpoint without browser secrets', async () => {
-    const fetch = vi.fn(async () => Response.json({
-      toolName: 'search_products',
-      input: { query: 'dock' },
-      confidence: 0.88,
-      reason: 'Server planner selected search.'
-    }))
+    const fetch = vi.fn(async () =>
+      Response.json({
+        toolName: 'search_products',
+        input: { query: 'dock' },
+        confidence: 0.88,
+        reason: 'Server planner selected search.'
+      })
+    )
     vi.stubGlobal('fetch', fetch)
 
     const planner = await createConfiguredPlanner({
@@ -620,19 +673,31 @@ describe('planner', () => {
     ])
 
     expect(plan.toolName).toBe('search_products')
-    expect(fetch).toHaveBeenCalledWith('/api/webmcp/plan', expect.objectContaining({
-      body: expect.stringContaining('"provider":"openai"')
-    }))
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/webmcp/plan',
+      expect.objectContaining({
+        body: expect.stringContaining('"provider":"openai"')
+      })
+    )
     const fetchOptions = (fetch.mock.calls as unknown as Array<[string, RequestInit]>)[0]?.[1]
     expect(String(fetchOptions?.body)).not.toContain('test-key')
   })
 
   it('reports server endpoint error details for explicit providers', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
-      error: 'Cloudflare Workers AI server mode needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN on the server, or a custom planner endpoint.'
-    }, {
-      status: 502
-    })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json(
+          {
+            error:
+              'Cloudflare Workers AI server mode needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN on the server, or a custom planner endpoint.'
+          },
+          {
+            status: 502
+          }
+        )
+      )
+    )
 
     const planner = await createConfiguredPlanner({
       provider: 'cloudflare-workers-ai',
@@ -642,25 +707,29 @@ describe('planner', () => {
         endpoint: '/api/webmcp/plan'
       }
     })
-    await expect(planner.plan('Select all liquids', [
-      {
-        name: 'select_items',
-        description: 'Select checklist items by ID.',
-        inputSchema: {
-          type: 'object'
-        },
-        execute: () => []
-      }
-    ])).rejects.toThrow('CLOUDFLARE_ACCOUNT_ID')
+    await expect(
+      planner.plan('Select all liquids', [
+        {
+          name: 'select_items',
+          description: 'Select checklist items by ID.',
+          inputSchema: {
+            type: 'object'
+          },
+          execute: () => []
+        }
+      ])
+    ).rejects.toThrow('CLOUDFLARE_ACCOUNT_ID')
   })
 
   it('plans through a Cloudflare binding server endpoint with the selected model', async () => {
-    const fetch = vi.fn(async () => Response.json({
-      toolName: 'select_items',
-      input: { ids: ['item_3', 'item_9'] },
-      confidence: 0.9,
-      reason: 'Cloudflare binding selected roots.'
-    }))
+    const fetch = vi.fn(async () =>
+      Response.json({
+        toolName: 'select_items',
+        input: { ids: ['item_3', 'item_9'] },
+        confidence: 0.9,
+        reason: 'Cloudflare binding selected roots.'
+      })
+    )
     vi.stubGlobal('fetch', fetch)
 
     const planner = await createConfiguredPlanner({
@@ -686,24 +755,29 @@ describe('planner', () => {
     expect(plan.input).toEqual({
       ids: ['item_3', 'item_9']
     })
-    expect(fetch).toHaveBeenCalledWith('/api/webmcp/plan', expect.objectContaining({
-      body: expect.stringContaining('"provider":"cloudflare-binding"')
-    }))
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/webmcp/plan',
+      expect.objectContaining({
+        body: expect.stringContaining('"provider":"cloudflare-binding"')
+      })
+    )
     const fetchOptions = (fetch.mock.calls as unknown as Array<[string, RequestInit]>)[0]?.[1]
     expect(String(fetchOptions?.body)).toContain('"model":"@cf/qwen/qwq-32b"')
   })
 
   it('plans through Cloudflare Workers AI REST with a user key', async () => {
-    const fetch = vi.fn(async () => Response.json({
-      result: {
-        response: JSON.stringify({
-          toolName: 'select_items',
-          input: { ids: ['item_8'] },
-          confidence: 0.87,
-          reason: 'Cloudflare REST selected liquids.'
-        })
-      }
-    }))
+    const fetch = vi.fn(async () =>
+      Response.json({
+        result: {
+          response: JSON.stringify({
+            toolName: 'select_items',
+            input: { ids: ['item_8'] },
+            confidence: 0.87,
+            reason: 'Cloudflare REST selected liquids.'
+          })
+        }
+      })
+    )
     vi.stubGlobal('fetch', fetch)
 
     const planner = await createConfiguredPlanner({

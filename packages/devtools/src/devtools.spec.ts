@@ -22,20 +22,22 @@ describe('devtools overlay', () => {
       return { ok: true }
     })
 
-    registerTool(defineTool({
-      name: 'create_invoice',
-      description: 'Create a draft invoice for a customer and add it to the local invoice list.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          customerName: { type: 'string' },
-          amount: { type: 'number', minimum: 1 }
+    registerTool(
+      defineTool({
+        name: 'create_invoice',
+        description: 'Create a draft invoice for a customer and add it to the local invoice list.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            customerName: { type: 'string' },
+            amount: { type: 'number', minimum: 1 }
+          },
+          required: ['customerName', 'amount'],
+          additionalProperties: false
         },
-        required: ['customerName', 'amount'],
-        additionalProperties: false
-      },
-      execute
-    }))
+        execute
+      })
+    )
 
     const overlay = mountDevtoolsOverlay()
 
@@ -50,7 +52,10 @@ describe('devtools overlay', () => {
     invokeButton?.click()
     await flushPromises()
 
-    expect(execute).toHaveBeenCalledWith({ customerName: 'Acme Corp', amount: 1 }, { source: 'devtools' })
+    expect(execute).toHaveBeenCalledWith(
+      { customerName: 'Acme Corp', amount: 1 },
+      { source: 'devtools' }
+    )
     expect(document.body.textContent).toContain('create_invoice - success')
     expect(document.body.textContent).toContain('Invocation history')
     expect(document.body.textContent).toContain('"input"')
@@ -71,21 +76,25 @@ describe('devtools overlay', () => {
       return { ok: true }
     })
 
-    registerTool(defineTool({
-      name: 'create_invoice',
-      description: 'Create a draft invoice for a customer and add it to the local invoice list.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          amount: { type: 'number', minimum: 1 }
+    registerTool(
+      defineTool({
+        name: 'create_invoice',
+        description: 'Create a draft invoice for a customer and add it to the local invoice list.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            amount: { type: 'number', minimum: 1 }
+          },
+          additionalProperties: false
         },
-        additionalProperties: false
-      },
-      execute
-    }))
+        execute
+      })
+    )
 
     const overlay = mountDevtoolsOverlay()
-    const textarea = document.querySelector<HTMLTextAreaElement>('textarea[data-tool-name="create_invoice"]')
+    const textarea = document.querySelector<HTMLTextAreaElement>(
+      'textarea[data-tool-name="create_invoice"]'
+    )
     if (!textarea) throw new Error('Expected devtools textarea.')
 
     textarea.value = '{'
@@ -99,24 +108,26 @@ describe('devtools overlay', () => {
   })
 
   it('shows read-only hints for annotated tools', () => {
-    registerTool(defineTool({
-      name: 'get_invoice_status',
-      description: 'Read visible invoice status information without changing invoice data.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          invoiceId: { type: 'string' }
+    registerTool(
+      defineTool({
+        name: 'get_invoice_status',
+        description: 'Read visible invoice status information without changing invoice data.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            invoiceId: { type: 'string' }
+          },
+          required: ['invoiceId'],
+          additionalProperties: false
         },
-        required: ['invoiceId'],
-        additionalProperties: false
-      },
-      annotations: {
-        readOnlyHint: true
-      },
-      execute(input) {
-        return input
-      }
-    }))
+        annotations: {
+          readOnlyHint: true
+        },
+        execute(input) {
+          return input
+        }
+      })
+    )
 
     const overlay = mountDevtoolsOverlay()
 
@@ -135,21 +146,25 @@ describe('devtools overlay', () => {
       })
     })
 
-    registerTool(defineTool({
-      name: 'create_invoice',
-      description: 'Create a draft invoice for a customer and add it to the local invoice list.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          amount: { type: 'number', minimum: 1 }
+    registerTool(
+      defineTool({
+        name: 'create_invoice',
+        description: 'Create a draft invoice for a customer and add it to the local invoice list.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            amount: { type: 'number', minimum: 1 }
+          },
+          additionalProperties: false
         },
-        additionalProperties: false
-      },
-      execute
-    }))
+        execute
+      })
+    )
 
     const overlay = mountDevtoolsOverlay()
-    const textarea = document.querySelector<HTMLTextAreaElement>('textarea[data-tool-name="create_invoice"]')
+    const textarea = document.querySelector<HTMLTextAreaElement>(
+      'textarea[data-tool-name="create_invoice"]'
+    )
     const invokeButton = document.querySelector<HTMLButtonElement>('button[data-action="invoke"]')
     if (!textarea || !invokeButton) throw new Error('Expected devtools controls.')
 

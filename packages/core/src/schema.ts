@@ -1,6 +1,14 @@
 import type { JsonSchema } from './interfaces/tool'
 
-const supportedTypes = new Set(['object', 'string', 'number', 'integer', 'boolean', 'array', 'null'])
+const supportedTypes = new Set([
+  'object',
+  'string',
+  'number',
+  'integer',
+  'boolean',
+  'array',
+  'null'
+])
 
 export function validateJsonValue(value: unknown, schema: JsonSchema, path = ''): string[] {
   const errors: string[] = []
@@ -46,9 +54,13 @@ function validateType(schema: JsonSchema, path: string, errors: string[]): void 
 
   if (typeof schema.type === 'string' && supportedTypes.has(schema.type)) return
 
-  if (Array.isArray(schema.type) && schema.type.length > 0 && schema.type.every(function isSupportedType(type) {
-    return typeof type === 'string' && supportedTypes.has(type)
-  })) {
+  if (
+    Array.isArray(schema.type) &&
+    schema.type.length > 0 &&
+    schema.type.every(function isSupportedType(type) {
+      return typeof type === 'string' && supportedTypes.has(type)
+    })
+  ) {
     return
   }
 
@@ -60,7 +72,11 @@ function validateType(schema: JsonSchema, path: string, errors: string[]): void 
 function validateProperties(schema: JsonSchema, path: string, errors: string[]): void {
   if (schema.properties === undefined) return
 
-  if (!schema.properties || typeof schema.properties !== 'object' || Array.isArray(schema.properties)) {
+  if (
+    !schema.properties ||
+    typeof schema.properties !== 'object' ||
+    Array.isArray(schema.properties)
+  ) {
     errors.push(`${path}.properties must be an object of named schemas.`)
     return
   }
@@ -85,7 +101,9 @@ function validateRequired(schema: JsonSchema, path: string, errors: string[]): v
     }
 
     if (schema.properties && !(requiredName in schema.properties)) {
-      errors.push(`${path}.required includes "${requiredName}", but ${path}.properties does not define it.`)
+      errors.push(
+        `${path}.required includes "${requiredName}", but ${path}.properties does not define it.`
+      )
     }
   }
 }
@@ -156,9 +174,16 @@ function validateAdditionalProperties(schema: JsonSchema, path: string, errors: 
   validateSchemaNode(schema.additionalProperties, `${path}.additionalProperties`, errors)
 }
 
-function validateValueNode(value: unknown, schema: JsonSchema, path: string, errors: string[]): void {
+function validateValueNode(
+  value: unknown,
+  schema: JsonSchema,
+  path: string,
+  errors: string[]
+): void {
   if (schema.type && !matchesJsonSchemaType(value, schema.type)) {
-    errors.push(`${formatValuePath(path)} expected ${formatExpectedType(schema.type)}, got ${getJsonValueType(value)}.`)
+    errors.push(
+      `${formatValuePath(path)} expected ${formatExpectedType(schema.type)}, got ${getJsonValueType(value)}.`
+    )
     return
   }
 
@@ -174,17 +199,31 @@ function validateValueNode(value: unknown, schema: JsonSchema, path: string, err
   validateStringValue(value, schema, path, errors)
 }
 
-function validateEnumValue(value: unknown, schema: JsonSchema, path: string, errors: string[]): void {
+function validateEnumValue(
+  value: unknown,
+  schema: JsonSchema,
+  path: string,
+  errors: string[]
+): void {
   if (!schema.enum) return
 
-  if (!schema.enum.some(function isMatchingEnumValue(enumValue) {
-    return areJsonValuesEqual(value, enumValue)
-  })) {
-    errors.push(`${formatValuePath(path)} expected one of ${schema.enum.map(formatJsonValue).join(', ')}, got ${formatJsonValue(value)}.`)
+  if (
+    !schema.enum.some(function isMatchingEnumValue(enumValue) {
+      return areJsonValuesEqual(value, enumValue)
+    })
+  ) {
+    errors.push(
+      `${formatValuePath(path)} expected one of ${schema.enum.map(formatJsonValue).join(', ')}, got ${formatJsonValue(value)}.`
+    )
   }
 }
 
-function validateObjectValue(value: unknown, schema: JsonSchema, path: string, errors: string[]): void {
+function validateObjectValue(
+  value: unknown,
+  schema: JsonSchema,
+  path: string,
+  errors: string[]
+): void {
   if (!isJsonObject(value)) return
 
   for (const requiredName of schema.required ?? []) {
@@ -196,7 +235,12 @@ function validateObjectValue(value: unknown, schema: JsonSchema, path: string, e
   const properties = schema.properties ?? {}
   for (const [propertyName, propertySchema] of Object.entries(properties)) {
     if (propertyName in value) {
-      validateValueNode(value[propertyName], propertySchema, appendValuePath(path, propertyName), errors)
+      validateValueNode(
+        value[propertyName],
+        propertySchema,
+        appendValuePath(path, propertyName),
+        errors
+      )
     }
   }
 
@@ -223,15 +267,30 @@ function validateObjectValue(value: unknown, schema: JsonSchema, path: string, e
   }
 }
 
-function validateArrayValue(value: unknown, schema: JsonSchema, path: string, errors: string[]): void {
+function validateArrayValue(
+  value: unknown,
+  schema: JsonSchema,
+  path: string,
+  errors: string[]
+): void {
   if (!Array.isArray(value) || !schema.items) return
 
   value.forEach(function validateArrayItem(item, index) {
-    validateValueNode(item, schema.items as JsonSchema, appendValuePath(path, String(index)), errors)
+    validateValueNode(
+      item,
+      schema.items as JsonSchema,
+      appendValuePath(path, String(index)),
+      errors
+    )
   })
 }
 
-function validateNumberValue(value: unknown, schema: JsonSchema, path: string, errors: string[]): void {
+function validateNumberValue(
+  value: unknown,
+  schema: JsonSchema,
+  path: string,
+  errors: string[]
+): void {
   if (typeof value !== 'number') return
 
   if (schema.minimum !== undefined && value < schema.minimum) {
@@ -243,19 +302,30 @@ function validateNumberValue(value: unknown, schema: JsonSchema, path: string, e
   }
 }
 
-function validateStringValue(value: unknown, schema: JsonSchema, path: string, errors: string[]): void {
+function validateStringValue(
+  value: unknown,
+  schema: JsonSchema,
+  path: string,
+  errors: string[]
+): void {
   if (typeof value !== 'string') return
 
   if (schema.minLength !== undefined && value.length < schema.minLength) {
-    errors.push(`${formatValuePath(path)} expected string length >= ${schema.minLength}, got ${value.length}.`)
+    errors.push(
+      `${formatValuePath(path)} expected string length >= ${schema.minLength}, got ${value.length}.`
+    )
   }
 
   if (schema.maxLength !== undefined && value.length > schema.maxLength) {
-    errors.push(`${formatValuePath(path)} expected string length <= ${schema.maxLength}, got ${value.length}.`)
+    errors.push(
+      `${formatValuePath(path)} expected string length <= ${schema.maxLength}, got ${value.length}.`
+    )
   }
 
   if (schema.pattern !== undefined && !new RegExp(schema.pattern).test(value)) {
-    errors.push(`${formatValuePath(path)} expected string matching ${schema.pattern}, got ${formatJsonValue(value)}.`)
+    errors.push(
+      `${formatValuePath(path)} expected string matching ${schema.pattern}, got ${formatJsonValue(value)}.`
+    )
   }
 }
 

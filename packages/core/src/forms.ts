@@ -25,21 +25,23 @@ export function registerFormTool<TOutput = FormData>(
   options.form.setAttribute('tooldescription', options.description)
   applyFormToolFieldOptions(options.form, options.fields)
 
-  return registerTool(defineTool<FormInput, TOutput>({
-    name: options.name,
-    description: options.description,
-    inputSchema: inferFormInputSchema(options.form),
-    confirmation: options.confirmation,
-    execute(input) {
-      fillForm(options.form, input)
+  return registerTool(
+    defineTool<FormInput, TOutput>({
+      name: options.name,
+      description: options.description,
+      inputSchema: inferFormInputSchema(options.form),
+      confirmation: options.confirmation,
+      execute(input) {
+        fillForm(options.form, input)
 
-      if (options.execute) {
-        return options.execute(input, options.form)
+        if (options.execute) {
+          return options.execute(input, options.form)
+        }
+
+        return new FormData(options.form) as TOutput
       }
-
-      return new FormData(options.form) as TOutput
-    }
-  }))
+    })
+  )
 }
 
 export function inferFormInputSchema(form: HTMLFormElement): JsonSchema {
@@ -65,7 +67,9 @@ export function inferFormInputSchema(form: HTMLFormElement): JsonSchema {
   }
 }
 
-function inferFieldSchema(field: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement): JsonSchema {
+function inferFieldSchema(
+  field: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+): JsonSchema {
   if (field instanceof HTMLInputElement && field.type === 'number') {
     return {
       type: 'number',
@@ -137,7 +141,13 @@ function applyFormToolFieldOptions(
     const elements = field instanceof RadioNodeList ? Array.from(field) : [field]
 
     for (const element of elements) {
-      if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement)) {
+      if (
+        !(
+          element instanceof HTMLInputElement ||
+          element instanceof HTMLTextAreaElement ||
+          element instanceof HTMLSelectElement
+        )
+      ) {
         continue
       }
 
@@ -158,7 +168,7 @@ function fillForm(form: HTMLFormElement, input: FormInput): void {
     if (!field) continue
 
     if (field instanceof RadioNodeList) {
-      field.value = Array.isArray(value) ? value[0] ?? '' : String(value)
+      field.value = Array.isArray(value) ? (value[0] ?? '') : String(value)
       dispatchRadioGroupEvents(field)
       continue
     }
@@ -169,8 +179,12 @@ function fillForm(form: HTMLFormElement, input: FormInput): void {
       continue
     }
 
-    if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) {
-      field.value = Array.isArray(value) ? value[0] ?? '' : String(value)
+    if (
+      field instanceof HTMLInputElement ||
+      field instanceof HTMLTextAreaElement ||
+      field instanceof HTMLSelectElement
+    ) {
+      field.value = Array.isArray(value) ? (value[0] ?? '') : String(value)
       dispatchFieldEvents(field)
     }
   }
@@ -186,12 +200,16 @@ function dispatchRadioGroupEvents(field: RadioNodeList): void {
   }
 }
 
-function dispatchFieldEvents(field: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement): void {
+function dispatchFieldEvents(
+  field: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+): void {
   field.dispatchEvent(new Event('input', { bubbles: true }))
   field.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
-function getFieldDescription(field: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement): string {
+function getFieldDescription(
+  field: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+): string {
   const toolParamDescription = field.getAttribute('toolparamdescription')
   if (toolParamDescription) return toolParamDescription
 
@@ -204,23 +222,33 @@ function getFieldDescription(field: HTMLInputElement | HTMLTextAreaElement | HTM
   return field.name
 }
 
-function getLabelDescription(field: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement): string {
+function getLabelDescription(
+  field: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+): string {
   const label = field.labels?.[0]
   if (!label) return ''
 
   const clone = label.cloneNode(true)
   if (!(clone instanceof HTMLElement)) return label.textContent?.trim() ?? ''
 
-  clone.querySelectorAll('button, input, meter, output, progress, select, textarea').forEach(function removeLabelableElement(element) {
-    element.remove()
-  })
+  clone
+    .querySelectorAll('button, input, meter, output, progress, select, textarea')
+    .forEach(function removeLabelableElement(element) {
+      element.remove()
+    })
 
   return clone.textContent?.replace(/\s+/g, ' ').trim() ?? ''
 }
 
-function isNamedField(element: Element): element is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement {
-  return (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement)
-    && Boolean(element.name)
-    && element.type !== 'submit'
-    && element.type !== 'button'
+function isNamedField(
+  element: Element
+): element is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement {
+  return (
+    (element instanceof HTMLInputElement ||
+      element instanceof HTMLTextAreaElement ||
+      element instanceof HTMLSelectElement) &&
+    Boolean(element.name) &&
+    element.type !== 'submit' &&
+    element.type !== 'button'
+  )
 }
