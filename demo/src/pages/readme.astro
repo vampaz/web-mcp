@@ -41,6 +41,9 @@ export const prerender = true
     await mermaid.run({
       nodes: diagrams
     })
+    diagrams.forEach(function markRenderedDiagram(diagram) {
+      diagram.setAttribute('data-rendered', 'true')
+    })
   }
 </script>
 
@@ -150,7 +153,12 @@ export const prerender = true
     margin: 18px 0 26px;
     border: 1px solid rgba(244, 240, 232, 0.14);
     background: #101514;
+    color: transparent;
     padding: 18px;
+  }
+
+  .readme-document :global(.readme-mermaid[data-rendered='true']) {
+    color: #d7ddd8;
   }
 
   .readme-document :global(.readme-mermaid svg) {

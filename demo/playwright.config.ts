@@ -9,9 +9,6 @@ export default defineConfig({
   },
   webServer: {
     command: 'npm run dev',
-    env: {
-      CLOUDFLARE_REMOTE_BINDINGS: 'false'
-    },
     url: 'http://127.0.0.1:60001',
     reuseExistingServer: true
   }

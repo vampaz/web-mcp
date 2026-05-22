@@ -17,24 +17,16 @@
     "test:demo": "npm --workspace @webmcp-kit/demo run test",
     "test:e2e": "npm --workspace @webmcp-kit/demo run test:e2e",
     "test:watch": "vitest --watch",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "lint": "oxlint .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check ."
   },
   "devDependencies": {
     "@types/node": "^25.7.0",
-    "eslint": "^9.39.4",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-svelte": "^3.17.1",
-    "eslint-plugin-vue": "^10.9.1",
-    "globals": "^17.6.0",
     "jsdom": "^29.1.1",
-    "prettier": "^3.8.3",
-    "svelte-eslint-parser": "^1.6.1",
+    "oxfmt": "^0.51.0",
+    "oxlint": "^1.66.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.59.3",
     "vitest": "^4.1.6"
   },
   "engines": {

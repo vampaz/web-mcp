@@ -12,6 +12,7 @@ import type {
   WebMCPCommandInputConfigureOptions,
   WebMCPCommandInputElement,
   WebMCPCommandInputEndpointOption,
+  WebMCPCommandInputPlannerOption,
   WebMCPCommandInputPhase,
   WebMCPCommandPlanEventDetail,
   WebMCPCommandPlannerEventDetail,
@@ -28,6 +29,8 @@ import {
   getModelControlMarkup,
   getModelOptionCount,
   getOptionsStatusText,
+  getPlannerOptionId,
+  getPlannerOptionValue,
   getProviderControlMarkup,
   getProviderOptionCount,
   isAuthMode,
@@ -53,6 +56,7 @@ type CommandInputRuntimeState = {
   diagnosticsOpen: boolean
   model: string
   phase: WebMCPCommandInputPhase
+  plannerOptionId?: string
   placeholder: string
   prompt: string
   plannerDetail: string
@@ -109,6 +113,7 @@ export function defineWebMCPCommandInput(
     context?: PlannerContext | (() => PlannerContext)
     endpoint?: string
     endpointOptions?: WebMCPCommandInputEndpointOption[]
+    plannerOptions?: WebMCPCommandInputPlannerOption[]
     showChromeAI = true
     private chromeAIAvailable = false
     private chromeAILoadId = 0
@@ -277,6 +282,7 @@ export function defineWebMCPCommandInput(
     set provider(value: PlannerProviderKind | undefined) {
       this.state.fixedProvider = isPlannerProviderKind(value) ? value : undefined
       this.providerWasChosen = Boolean(this.state.fixedProvider)
+      this.state.plannerOptionId = undefined
       this.state.provider = this.state.fixedProvider ?? 'auto'
       this.invalidatePlanner()
       this.renderIfConnected()
@@ -291,6 +297,7 @@ export function defineWebMCPCommandInput(
       this.context = options.context ?? this.context
       this.endpoint = options.endpoint ?? this.endpoint
       this.endpointOptions = options.endpointOptions ?? this.endpointOptions
+      this.plannerOptions = options.plannerOptions ?? this.plannerOptions
       if (options.showChromeAI !== undefined) {
         this.showChromeAI = options.showChromeAI
         if (!this.showChromeAI) {
@@ -304,6 +311,7 @@ export function defineWebMCPCommandInput(
       if (options.floating !== undefined) this.floating = options.floating
       if (options.initialProvider !== undefined && !this.state.fixedProvider) {
         this.providerWasChosen = true
+        this.state.plannerOptionId = undefined
         this.state.provider = options.initialProvider
       } else if (
         options.endpointOptions !== undefined &&
@@ -440,6 +448,7 @@ export function defineWebMCPCommandInput(
       if (name === 'provider') {
         this.state.fixedProvider = isPlannerProviderKind(value) ? value : undefined
         this.providerWasChosen = Boolean(this.state.fixedProvider)
+        this.state.plannerOptionId = undefined
         this.state.provider = this.state.fixedProvider ?? 'auto'
       }
     }
@@ -450,6 +459,31 @@ export function defineWebMCPCommandInput(
         this.state.plannerDetail = this.planner.detail
         this.dispatchPlannerEvent(this.planner)
         return this.planner
+      }
+
+      const plannerOption = this.getSelectedPlannerOption()
+      if (plannerOption) {
+        const plannerSignature = JSON.stringify({ plannerOption: plannerOption.id })
+        if (this.currentPlanner && this.currentPlannerSignature === plannerSignature)
+          return this.currentPlanner
+
+        this.disposeCreatedPlanner()
+        const loadId = this.plannerLoadId + 1
+        this.plannerLoadId = loadId
+        const revision = this.plannerRevision
+        const planner = await plannerOption.createPlanner()
+        if (revision !== this.plannerRevision || loadId !== this.plannerLoadId) {
+          planner.dispose?.()
+          throw new Error(supersededPlannerRefreshMessage)
+        }
+
+        this.currentPlanner = planner
+        this.currentPlannerWasCreated = true
+        this.currentPlannerSignature = plannerSignature
+        this.state.plannerName = `${this.currentPlanner.name} (${this.currentPlanner.status})`
+        this.state.plannerDetail = this.currentPlanner.detail
+        this.dispatchPlannerEvent(this.currentPlanner)
+        return this.currentPlanner
       }
 
       const plannerConfig = this.getPlannerConfig()
@@ -554,7 +588,8 @@ export function defineWebMCPCommandInput(
         !wasAvailable &&
         this.chromeAIAvailable &&
         !this.providerWasChosen &&
-        !this.state.fixedProvider
+        !this.state.fixedProvider &&
+        !this.state.plannerOptionId
       ) {
         this.state.provider = 'chrome-built-in'
         this.state.model = ''
@@ -579,6 +614,7 @@ export function defineWebMCPCommandInput(
 
     private invalidateAutoPlannerBeforeRun() {
       if (this.planner || this.plannerConfig) return
+      if (this.state.plannerOptionId) return
       const provider = this.state.fixedProvider ?? this.state.provider
       if (provider === 'auto') this.invalidatePlanner()
     }
@@ -662,10 +698,14 @@ export function defineWebMCPCommandInput(
     private handleProviderChanged(event: Event) {
       const target = event.target
       if (!(target instanceof HTMLSelectElement)) return
+      const plannerOptionId = getPlannerOptionId(target.value)
       const provider = isPlannerProviderKind(target.value) ? target.value : 'auto'
       this.providerWasChosen = true
+      this.state.plannerOptionId = plannerOptionId
       this.state.provider = provider
-      this.state.model = getDefaultModelForProvider(provider, this.endpointOptions)
+      this.state.model = plannerOptionId
+        ? ''
+        : getDefaultModelForProvider(provider, this.endpointOptions)
       this.state.settingsOpen = true
       this.invalidatePlanner()
       this.render()
@@ -707,16 +747,21 @@ export function defineWebMCPCommandInput(
     private render() {
       if (!this.shadowRoot) return
 
+      const plannerOption = this.getSelectedPlannerOption()
       const provider =
         this.plannerConfig?.provider ?? this.state.fixedProvider ?? this.state.provider
       const model = this.plannerConfig?.model ?? this.state.fixedModel ?? this.state.model
+      const providerControlValue = plannerOption
+        ? getPlannerOptionValue(plannerOption.id)
+        : provider
       const showChromeAIOption = this.shouldShowChromeAIOption()
       const showProviderControl =
         !this.planner &&
         !this.plannerConfig &&
         !this.state.fixedProvider &&
-        getProviderOptionCount(this.endpointOptions, showChromeAIOption) > 1
+        getProviderOptionCount(this.endpointOptions, showChromeAIOption, this.plannerOptions) > 1
       const showModelControl =
+        !plannerOption &&
         !this.planner &&
         !this.plannerConfig &&
         !this.state.fixedModel &&
@@ -724,7 +769,9 @@ export function defineWebMCPCommandInput(
       const showDiagnostics = this.state.hasDiagnostics
       const optionsStatus = this.planner
         ? this.state.plannerName
-        : getOptionsStatusText(provider, model, this.endpointOptions)
+        : plannerOption
+          ? plannerOption.label
+          : getOptionsStatusText(provider, model, this.endpointOptions)
       const statusLabel = getStatusLabel(this.state.phase)
       const buttonLabel = this.running ? statusLabel : this.state.buttonLabel
       const commandMarkup = `
@@ -762,7 +809,7 @@ export function defineWebMCPCommandInput(
               </span>
             </summary>
             <div class="webmcp-settings-grid">
-              ${showProviderControl ? getProviderControlMarkup(provider, this.endpointOptions, showChromeAIOption) : ''}
+              ${showProviderControl ? getProviderControlMarkup(providerControlValue, this.endpointOptions, showChromeAIOption, this.plannerOptions) : ''}
               ${showModelControl ? getModelControlMarkup(provider, model, this.endpointOptions) : ''}
             </div>
           </details>
@@ -835,6 +882,15 @@ export function defineWebMCPCommandInput(
       modelControl?.addEventListener('input', this.handleModelChanged.bind(this))
       modelControl?.addEventListener('change', this.handleModelChanged.bind(this))
       this.updateFloatingPlacement()
+    }
+
+    private getSelectedPlannerOption(): WebMCPCommandInputPlannerOption | undefined {
+      const plannerOptionId = this.state.plannerOptionId
+      if (!plannerOptionId) return undefined
+
+      return this.plannerOptions?.find(function findPlannerOption(option) {
+        return option.id === plannerOptionId
+      })
     }
 
     private readonly handleFloatingTriggerClicked = () => {

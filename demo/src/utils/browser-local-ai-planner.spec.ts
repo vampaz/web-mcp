@@ -106,7 +106,85 @@ describe('browser local AI planner', () => {
       type: 'json_object',
       schema: expect.any(String)
     })
+    expect(JSON.stringify(request.messages)).toContain('id_from_context_a')
+    expect(JSON.stringify(request.messages)).toContain('Do not copy placeholder IDs')
     expect(request.temperature).toBe(0)
+  })
+
+  it('grounds bad checklist IDs from the local model against visible context', async () => {
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      gpu: {
+        requestAdapter: async () => ({})
+      }
+    })
+    webLLMMocks.createMLCEngine.mockResolvedValue({
+      chat: {
+        completions: {
+          create: vi.fn(async () => ({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    toolName: 'select_items',
+                    input: {
+                      ids: ['item_4', 'item_7']
+                    },
+                    confidence: 0.91,
+                    reason: 'Incorrectly copied unrelated item IDs.'
+                  })
+                }
+              }
+            ]
+          }))
+        }
+      },
+      unload: vi.fn()
+    })
+    const planner = createBrowserLocalAIPlanner()
+
+    const plan = await planner.plan(
+      'Select all the liquids',
+      [
+        {
+          name: 'select_items',
+          description: 'Select visible inventory items by stable item IDs.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              ids: {
+                type: 'array',
+                items: {
+                  type: 'string'
+                }
+              }
+            },
+            required: ['ids'],
+            additionalProperties: false
+          },
+          execute: () => []
+        }
+      ],
+      {
+        checklistItems: [
+          { id: 'item_4', name: 'Croissant' },
+          { id: 'item_7', name: 'Baguette' },
+          { id: 'item_8', name: 'Water' },
+          { id: 'item_10', name: 'Coffee' },
+          { id: 'item_14', name: 'Milk' },
+          { id: 'item_16', name: 'Sparkling water' },
+          { id: 'item_20', name: 'Tea' }
+        ]
+      }
+    )
+
+    expect(plan).toMatchObject({
+      toolName: 'select_items',
+      input: {
+        ids: ['item_8', 'item_10', 'item_14', 'item_16', 'item_20']
+      }
+    })
+    expect(plan.reason).toContain('grounded against visible checklist context')
   })
 
   it('ignores stray sequence steps on a valid single-tool plan', async () => {

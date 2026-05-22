@@ -32,6 +32,7 @@ export type {
   WebMCPCommandInputConfigureOptions,
   WebMCPCommandInputElement,
   WebMCPCommandInputEndpointOption,
+  WebMCPCommandInputPlannerOption,
   WebMCPCommandInputPhase,
   WebMCPCommandPlanEventDetail,
   WebMCPCommandPlannerEventDetail,

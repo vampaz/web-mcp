@@ -1,5 +1,8 @@
 import type { PlannerProviderConfig, PlannerProviderKind, ToolPlanner } from './interfaces/tool'
-import type { WebMCPCommandInputEndpointOption } from './interfaces/command-input'
+import type {
+  WebMCPCommandInputEndpointOption,
+  WebMCPCommandInputPlannerOption
+} from './interfaces/command-input'
 import {
   createBestPlanner,
   createChromeAIPlanner,
@@ -15,11 +18,12 @@ type ModelOption = {
 
 type ProviderOption = {
   label: string
-  value: PlannerProviderKind
+  value: string
 }
 
 export const defaultModel = ''
 export const defaultEndpoint = '/api/webmcp/plan'
+export const plannerOptionValuePrefix = 'planner:'
 
 export async function createCommandInputPlanner(
   config: PlannerProviderConfig | undefined
@@ -32,15 +36,16 @@ export async function createCommandInputPlanner(
 }
 
 export function getProviderControlMarkup(
-  provider: PlannerProviderKind,
+  provider: string,
   endpointOptions?: WebMCPCommandInputEndpointOption[],
-  includeChromeAI = false
+  includeChromeAI = false,
+  plannerOptions?: WebMCPCommandInputPlannerOption[]
 ): string {
   return `
     <label>
       <span>Provider</span>
       <select data-provider>
-        ${getProviderOptionsMarkup(provider, endpointOptions, includeChromeAI)}
+        ${getProviderOptionsMarkup(provider, endpointOptions, includeChromeAI, plannerOptions)}
       </select>
     </label>
   `
@@ -100,9 +105,10 @@ export function getModelOptionCount(
 
 export function getProviderOptionCount(
   endpointOptions?: WebMCPCommandInputEndpointOption[],
-  includeChromeAI = false
+  includeChromeAI = false,
+  plannerOptions?: WebMCPCommandInputPlannerOption[]
 ): number {
-  return getConfiguredProviderOptions(endpointOptions, includeChromeAI).length
+  return getConfiguredProviderOptions(endpointOptions, includeChromeAI, plannerOptions).length
 }
 
 export function isPlannerAttribute(name: string): boolean {
@@ -134,12 +140,22 @@ export function isPlannerProviderKind(value: unknown): value is PlannerProviderK
   )
 }
 
+export function getPlannerOptionValue(id: string): string {
+  return `${plannerOptionValuePrefix}${id}`
+}
+
+export function getPlannerOptionId(value: string): string | undefined {
+  if (!value.startsWith(plannerOptionValuePrefix)) return undefined
+  return value.slice(plannerOptionValuePrefix.length) || undefined
+}
+
 function getProviderOptionsMarkup(
-  provider: PlannerProviderKind,
+  provider: string,
   endpointOptions?: WebMCPCommandInputEndpointOption[],
-  includeChromeAI = false
+  includeChromeAI = false,
+  plannerOptions?: WebMCPCommandInputPlannerOption[]
 ): string {
-  return getConfiguredProviderOptions(endpointOptions, includeChromeAI)
+  return getConfiguredProviderOptions(endpointOptions, includeChromeAI, plannerOptions)
     .map(function mapProviderOption(option) {
       return `<option value="${escapeAttribute(option.value)}" ${option.value === provider ? 'selected' : ''}>${escapeAttribute(option.label)}</option>`
     })
@@ -203,13 +219,21 @@ function getConfiguredEndpointOptions(
 
 function getConfiguredProviderOptions(
   endpointOptions: WebMCPCommandInputEndpointOption[] | undefined,
-  includeChromeAI = false
+  includeChromeAI = false,
+  plannerOptions?: WebMCPCommandInputPlannerOption[]
 ): ProviderOption[] {
   const providers: ProviderOption[] = []
   if (includeChromeAI) {
     providers.push({
       label: getProviderLabel('chrome-built-in'),
       value: 'chrome-built-in'
+    })
+  }
+
+  for (const option of plannerOptions ?? []) {
+    providers.push({
+      label: option.label,
+      value: getPlannerOptionValue(option.id)
     })
   }
 

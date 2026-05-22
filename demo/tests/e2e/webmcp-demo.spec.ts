@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page, type Route } from '@playwright/test'
 import type { WebMCPCommandInputElement } from '@webmcp-kit/core'
 import {
   invokeWebMCPTool,
@@ -67,6 +67,222 @@ test('uses the local planner for semantic item selections when AI is unavailable
   await expect(getItemInput(page, 'Coffee')).toBeChecked()
   await expect(getItemInput(page, 'Milk')).toBeChecked()
   await expect(getItemInput(page, 'Apple')).not.toBeChecked()
+})
+
+test('shows browser local AI as a selectable demo provider', async function testBrowserLocalProviderOption({
+  page
+}) {
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible()
+  await openWebMCPInput(page)
+  await page.getByText('Options', { exact: true }).click()
+
+  const providerSelect = page.getByLabel('Provider')
+  await expect(providerSelect).toBeVisible()
+  const providerLabels = await providerSelect.locator('option').allTextContents()
+  expect(providerLabels).toContain('Browser local AI · Qwen2.5-3B-Instruct-q4f16_1-MLC')
+
+  await providerSelect.selectOption('planner:browser-local-ai')
+  await expect(providerSelect).toHaveValue('planner:browser-local-ai')
+  await expect(page.locator('webmcp-command-input .webmcp-status')).toContainText(
+    'Browser local AI · Qwen2.5-3B-Instruct-q4f16_1-MLC'
+  )
+})
+
+test('exposes the full demo provider and model matrix', async function testProviderModelMatrix({
+  page
+}) {
+  await installLanguageModelMock(page, 'available')
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible()
+  await openWebMCPInput(page)
+  await page.getByText('Options', { exact: true }).click()
+
+  const providerSelect = page.getByLabel('Provider')
+  await expect(providerSelect).toBeVisible()
+  await expect(providerSelect.locator('option')).toHaveText([
+    'Chrome built-in AI',
+    'Browser local AI · Qwen2.5-3B-Instruct-q4f16_1-MLC',
+    'Cloudflare binding',
+    'Cloudflare Workers AI',
+    'OpenRouter',
+    'OpenAI',
+    'Auto',
+    'Local deterministic'
+  ])
+
+  await providerSelect.selectOption('cloudflare-binding')
+  await expect(page.getByLabel('Model').locator('option')).toHaveText([
+    'GLM 4.7 Flash',
+    'GPT OSS 20B',
+    'Kimi K2.6',
+    'Qwen3 30B A3B FP8',
+    'DeepSeek R1 Distill Qwen 32B',
+    'Qwen QwQ 32B',
+    'Nemotron 3 120B A12B',
+    'Gemma 4 26B A4B'
+  ])
+
+  await providerSelect.selectOption('openrouter')
+  await expect(page.getByLabel('Model').locator('option')).toHaveText([
+    'Nemotron 3 Super 120B A12B',
+    'Nemotron Nano 9B V2'
+  ])
+
+  await providerSelect.selectOption('openai')
+  await expect(page.getByLabel('Model')).toHaveCount(0)
+  await expect(page.locator('webmcp-command-input .webmcp-status')).toContainText(
+    'OpenAI · GPT-5.4 mini'
+  )
+
+  await providerSelect.selectOption('planner:browser-local-ai')
+  await expect(page.getByLabel('Model')).toHaveCount(0)
+  await expect(page.locator('webmcp-command-input .webmcp-status')).toContainText(
+    'Browser local AI · Qwen2.5-3B-Instruct-q4f16_1-MLC'
+  )
+})
+
+test('serves the browser local AI module in dev', async function testBrowserLocalModuleServed({
+  page
+}) {
+  await page.goto('/')
+  const response = await page.request.get('/node_modules/.vite/deps/@mlc-ai_web-llm.js')
+
+  expect(response.status()).toBeLessThan(500)
+  expect(response.status()).not.toBe(404)
+})
+
+test('runs the browser local AI provider through the command input', async function testBrowserLocalProviderRun({
+  page
+}) {
+  const failedBrowserLocalRequests: string[] = []
+  page.on('requestfailed', function trackFailedBrowserLocalRequest(request) {
+    if (request.url().includes('@mlc-ai_web-llm')) {
+      failedBrowserLocalRequests.push(`${request.url()} ${request.failure()?.errorText ?? ''}`)
+    }
+  })
+  await page.route('**/node_modules/.vite/deps/@mlc-ai_web-llm.js*', fulfillWebLLMRoute)
+  await page.addInitScript(function installWebGPUMock() {
+    Object.defineProperty(navigator, 'gpu', {
+      configurable: true,
+      value: {
+        requestAdapter: async function requestAdapter() {
+          return {}
+        }
+      }
+    })
+  })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible()
+  await selectPlannerProvider(page, 'planner:browser-local-ai')
+
+  await getCommandTextbox(page).fill('Select all the liquids')
+  await page.getByRole('button', { name: 'Run' }).click()
+
+  await expect(page.getByText('5 selected')).toBeVisible()
+  await expect(getItemInput(page, 'Water')).toBeChecked()
+  await expect(getItemInput(page, 'Coffee')).toBeChecked()
+  await expect(getItemInput(page, 'Milk')).toBeChecked()
+  await expect(getItemInput(page, 'Sparkling water')).toBeChecked()
+  await expect(getItemInput(page, 'Tea')).toBeChecked()
+  expect(failedBrowserLocalRequests).toEqual([])
+})
+
+test('covers commerce tools through the browser bridge and confirmation flow', async function testCommerceToolFlows({
+  page
+}) {
+  await page.goto('/commerce/')
+  await expect(page.getByRole('heading', { name: 'Commerce', exact: true })).toBeVisible()
+  await waitForWebMCPTool(page, 'search_products')
+
+  const searchResult = await invokeWebMCPTool<Array<{ id: string }>>(page, {
+    toolName: 'search_products',
+    input: { query: 'camera' },
+    source: 'planner'
+  })
+  expect(searchResult.status).toBe('success')
+  expect(searchResult.output).toEqual([
+    expect.objectContaining({
+      id: 'cam-03'
+    })
+  ])
+
+  await invokeWebMCPTool(page, {
+    toolName: 'add_to_cart',
+    input: {
+      productId: 'kbd-01',
+      quantity: 2
+    },
+    source: 'planner'
+  })
+  await expect(page.getByLabel('Quantity for Low-profile keyboard')).toHaveValue('2')
+  await expect(page.locator('.cart-total')).toContainText('€258')
+
+  await invokeWebMCPTool(page, {
+    toolName: 'update_cart_quantity',
+    input: {
+      productId: 'kbd-01',
+      quantity: 3
+    },
+    source: 'planner'
+  })
+  await expect(page.getByLabel('Quantity for Low-profile keyboard')).toHaveValue('3')
+  await expect(page.locator('.cart-total')).toContainText('€387')
+
+  await invokeWebMCPTool(page, {
+    toolName: 'apply_cart_discount',
+    input: {
+      percent: 10
+    },
+    source: 'planner'
+  })
+  await expect(page.getByLabel('Discount %')).toHaveValue('10')
+  await expect(page.locator('.cart-total')).toContainText('€348')
+
+  page.once('dialog', async function acceptCheckoutConfirmation(dialog) {
+    expect(dialog.message()).toContain('Checkout clears the cart')
+    await dialog.accept()
+  })
+  const checkoutResult = await invokeWebMCPTool(page, {
+    toolName: 'checkout_cart',
+    input: {},
+    source: 'planner'
+  })
+  expect(checkoutResult.status).toBe('success')
+  await expect(page.getByText('No cart lines yet.')).toBeVisible()
+  await expect(page.locator('.cart-total')).toContainText('€0')
+})
+
+test('covers support form tools and ticket board mutations', async function testSupportToolFlows({
+  page
+}) {
+  await page.goto('/support/')
+  await expect(page.getByRole('heading', { name: 'Support', exact: true })).toBeVisible()
+  await waitForWebMCPTool(page, 'create_support_ticket')
+
+  await page.getByLabel('Subject').fill('Workspace login')
+  await page.getByLabel('Details').fill('The user cannot sign in after the password reset.')
+  await page.getByRole('button', { name: 'Create ticket' }).click()
+
+  await expect(page.getByText('Workspace login', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('Status for Workspace login')).toHaveValue('new')
+  await expect(page.getByLabel('Assignee for Workspace login')).toHaveValue('Unassigned')
+  await expect(page.getByLabel('Priority for Workspace login')).toHaveValue('medium')
+
+  const updateResult = await invokeWebMCPTool(page, {
+    toolName: 'update_ticket',
+    input: {
+      assignee: 'Sofia',
+      id: 'ticket_1',
+      priority: 'urgent',
+      status: 'resolved'
+    },
+    source: 'planner'
+  })
+  expect(updateResult.status).toBe('success')
+  await expect(page.getByLabel('Status for Billing access')).toHaveValue('resolved')
+  await expect(page.getByLabel('Assignee for Billing access')).toHaveValue('Sofia')
+  await expect(page.getByLabel('Priority for Billing access')).toHaveValue('urgent')
 })
 
 test('executes chained local invoice commands with confirmation', async function testLocalInvoiceChain({
@@ -286,6 +502,42 @@ test('plans through the dev Cloudflare binding provider', async function testClo
   await expect(getItemInput(page, 'Quiche')).toBeChecked()
 })
 
+test('plans through the dev Cloudflare Workers AI server provider', async function testCloudflareWorkersAIProviderSelection({
+  page
+}) {
+  await page.route('**/api/webmcp/plan', async function fulfillCloudflareWorkersAI(route, request) {
+    expect(request.postDataJSON()).toMatchObject({
+      provider: 'cloudflare-workers-ai',
+      model: '@cf/openai/gpt-oss-20b',
+      message: 'Select all French items'
+    })
+
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        toolName: 'select_items',
+        input: { ids: ['item_4', 'item_7', 'item_13', 'item_18', 'item_22'] },
+        confidence: 0.92,
+        reason: 'Cloudflare Workers AI selected French items from current inventory context.'
+      })
+    })
+  })
+
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible()
+  await selectPlannerProvider(
+    page,
+    'cloudflare-workers-ai',
+    'select_items',
+    '@cf/openai/gpt-oss-20b'
+  )
+  await getCommandTextbox(page).fill('Select all French items')
+  await page.getByRole('button', { name: 'Run' }).click()
+
+  await expect(getItemInput(page, 'Croissant')).toBeChecked()
+  await expect(getItemInput(page, 'Quiche')).toBeChecked()
+})
+
 test('keeps demo pages responsive without forcing cramped columns', async function testResponsiveDemoLayouts({
   page
 }) {
@@ -346,11 +598,22 @@ test('keeps demo pages responsive without forcing cramped columns', async functi
 })
 
 test('renders README Mermaid diagrams', async function testReadmeMermaidDiagrams({ page }) {
+  const htmlResponse = await page.request.get('/readme/')
+  const html = await htmlResponse.text()
+  expect(html.indexOf('color:transparent')).toBeGreaterThan(-1)
+  expect(html.indexOf('color:transparent')).toBeLessThan(html.indexOf('flowchart TB'))
+  expect(html).toContain("diagram.setAttribute('data-rendered', 'true')")
+
   await page.goto('/readme/')
 
   const mermaidDiagram = page.locator('.readme-mermaid').first()
   await expect(mermaidDiagram.locator('svg')).toBeVisible()
+  await expect(mermaidDiagram).toHaveAttribute('data-rendered', 'true')
+  await expect(mermaidDiagram.locator('svg')).toContainText('User command')
+  await expect(mermaidDiagram.locator('svg')).toContainText('WebMCP tool registry')
   await expect(page.locator('pre[data-language="mermaid"]')).toHaveCount(0)
+  const iconResponse = await page.request.get('/webmcp-circuit.svg')
+  expect(iconResponse.ok()).toBe(true)
 
   const hasHorizontalOverflow = await page.evaluate(function hasHorizontalPageOverflow() {
     return document.documentElement.scrollWidth > document.documentElement.clientWidth
@@ -401,6 +664,10 @@ async function selectPlannerProvider(
 ) {
   await waitForWebMCPTool(page, toolName)
   await openWebMCPInput(page)
+  const optionsSummary = page.getByText('Options', { exact: true })
+  if (await optionsSummary.isVisible()) {
+    await optionsSummary.click()
+  }
 
   const providerSelect = page.getByLabel('Provider')
   if (!(await providerSelect.isVisible())) {
@@ -415,7 +682,7 @@ async function selectPlannerProvider(
         commandInput.configure({
           endpoint: options.endpoint,
           model: options.model,
-          provider: options.provider
+          provider: options.provider.startsWith('planner:') ? undefined : options.provider
         })
       },
       {
@@ -429,6 +696,12 @@ async function selectPlannerProvider(
 
   await providerSelect.selectOption(provider)
   await expect(providerSelect).toHaveValue(provider)
+  if (model) {
+    const modelSelect = page.getByLabel('Model')
+    await expect(modelSelect).toBeVisible()
+    await modelSelect.selectOption(model)
+    await expect(modelSelect).toHaveValue(model)
+  }
 }
 
 function isServerProvider(provider: string): boolean {
@@ -454,6 +727,40 @@ function getItemInput(page: Page, itemName: string) {
 
 function getCommandTextbox(page: Page) {
   return page.getByRole('textbox', { name: 'WebMCP' })
+}
+
+async function fulfillWebLLMRoute(route: Route) {
+  await route.fulfill({
+    contentType: 'application/javascript',
+    body: `
+      export async function CreateMLCEngine(_model, config) {
+        config?.initProgressCallback?.({ progress: 1, text: 'Test model ready' })
+        return {
+          chat: {
+            completions: {
+              async create() {
+                return {
+                  choices: [
+                    {
+                      message: {
+                        content: JSON.stringify({
+                          toolName: 'select_items',
+                          input: { ids: ['item_4', 'item_7'] },
+                          confidence: 0.95,
+                          reason: 'Incorrectly selected unrelated IDs from the test model.'
+                        })
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          async unload() {}
+        }
+      }
+    `
+  })
 }
 
 async function getWebMCPTriggerBox(page: Page) {

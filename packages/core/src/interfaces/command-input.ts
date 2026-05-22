@@ -21,6 +21,12 @@ export interface WebMCPCommandInputEndpointOption {
   provider: PlannerProviderKind
 }
 
+export interface WebMCPCommandInputPlannerOption {
+  createPlanner: () => Promise<ToolPlanner> | ToolPlanner
+  id: string
+  label: string
+}
+
 export interface WebMCPCommandInputConfigureOptions {
   apiKey?: string
   accountId?: string
@@ -38,6 +44,7 @@ export interface WebMCPCommandInputConfigureOptions {
   placeholder?: string
   planner?: ToolPlanner
   plannerConfig?: PlannerProviderConfig
+  plannerOptions?: WebMCPCommandInputPlannerOption[]
   provider?: PlannerProviderKind
   showChromeAI?: boolean
 }
@@ -57,6 +64,7 @@ export interface WebMCPCommandInputElement extends HTMLElement {
   placeholder: string
   planner?: ToolPlanner
   plannerConfig?: PlannerProviderConfig
+  plannerOptions?: WebMCPCommandInputPlannerOption[]
   provider?: PlannerProviderKind
   showChromeAI?: boolean
   configure: (options: WebMCPCommandInputConfigureOptions) => void

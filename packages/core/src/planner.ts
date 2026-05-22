@@ -357,7 +357,9 @@ async function planWithOpenAICompatible(
     throw new Error(`${getProviderLabel(config)} returned ${response.status}`)
   }
 
-  const payload = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> }
+  const payload = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>
+  }
   const content = payload.choices?.[0]?.message?.content
   if (!content) throw new Error('provider returned no message content')
 

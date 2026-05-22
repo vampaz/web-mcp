@@ -1,4 +1,5 @@
 import {
+  createHeuristicPlanner,
   formatJsonValueValidationError,
   getErrorMessage,
   normalizeJsonText,
@@ -18,7 +19,7 @@ import type {
   WebLLMModule
 } from '@/interfaces/browser-local-ai'
 
-export const defaultBrowserLocalAIModel = 'Llama-3.2-1B-Instruct-q4f16_1-MLC'
+export const defaultBrowserLocalAIModel = 'Qwen2.5-3B-Instruct-q4f16_1-MLC'
 
 const toolPlanSchema = {
   type: 'object',
@@ -62,7 +63,8 @@ export function createBrowserLocalAIPlanner(
         await assertWebGPUAvailable()
         enginePromise ??= createWebLLMEngine(options.model, planner)
         engine ??= await enginePromise
-        const plan = await planWithWebLLM(engine, options.model, message, tools, context)
+        const modelPlan = await planWithWebLLM(engine, options.model, message, tools, context)
+        const plan = await repairBrowserLocalAIPlan(modelPlan, message, tools, context)
         validateBrowserLocalAIPlan(plan, tools)
         planner.status = 'ready'
         planner.detail = `Browser local AI is running ${options.model} locally with WebGPU.`
@@ -84,6 +86,35 @@ export function createBrowserLocalAIPlanner(
   }
 
   return planner
+}
+
+async function repairBrowserLocalAIPlan(
+  plan: ToolPlan,
+  message: string,
+  tools: WebMCPTool[],
+  context: PlannerContext
+): Promise<ToolPlan> {
+  if (
+    !tools.some(function hasSelectItemsTool(tool) {
+      return tool.name === 'select_items'
+    })
+  ) {
+    return plan
+  }
+
+  try {
+    const groundedPlan = await createHeuristicPlanner().plan(message, tools, context)
+    if (groundedPlan.toolName !== 'select_items') return plan
+    if (!Array.isArray(groundedPlan.input.ids) || groundedPlan.input.ids.length === 0) return plan
+
+    return {
+      ...groundedPlan,
+      confidence: Math.max(groundedPlan.confidence, plan.confidence),
+      reason: `Browser local AI plan grounded against visible checklist context. ${groundedPlan.reason}`
+    }
+  } catch {
+    return plan
+  }
 }
 
 async function assertWebGPUAvailable(): Promise<void> {
@@ -144,7 +175,7 @@ function createPlannerMessages(message: string, tools: WebMCPTool[], context: Pl
     {
       role: 'system',
       content:
-        'You are a browser app tool planner. Choose the tool whose description matches the requested action. Return only JSON with toolName, input, confidence, reason, and optional steps.'
+        'You are a browser app tool planner. Choose the tool whose description matches the requested action. Use only IDs and values that appear in the current app context. Return only JSON with toolName, input, confidence, reason, and optional steps.'
     },
     {
       role: 'user',
@@ -163,10 +194,12 @@ function createPlannerPrompt(
     `Current app context:\n${JSON.stringify(context, null, 2)}`,
     `Available tools:\n${JSON.stringify(createToolCatalog(tools), null, 2)}`,
     'Choose the best tool and exact parameters from the current app context. Prefer stable IDs from context over labels.',
+    'For category requests such as "all liquids", include every matching item from context, not only a few examples.',
     'The input field must contain actual argument values for the selected tool. Never copy a tool inputSchema into input.',
+    'Do not copy placeholder IDs from examples. Placeholder IDs are intentionally invalid.',
     'Only choose clear, reset, delete, remove, or discard tools when the user explicitly asks to clear, reset, delete, remove, discard, or undo something.',
     'If the request requires multiple app actions, return a chained plan with toolName "tool_sequence", input {}, and steps ordered by dependency. Use at most 5 steps. Each step must use one available tool and must be executable after the previous step updates app state.',
-    'Return exactly one compact JSON object. Single-tool example: {"toolName":"select_items","input":{"ids":["item_4","item_7"]},"confidence":0.9,"reason":"Selected matching item IDs from context."}'
+    'Return exactly one compact JSON object. Shape example only, with invalid placeholder IDs: {"toolName":"select_items","input":{"ids":["id_from_context_a","id_from_context_b"]},"confidence":0.9,"reason":"Selected every matching item ID from context."}'
   ].join('\n\n')
 }
 

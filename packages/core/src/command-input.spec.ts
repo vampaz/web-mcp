@@ -261,6 +261,102 @@ describe('WebMCP command input', () => {
     ).toEqual(['OpenRouter Nemotron', 'OpenRouter Nano'])
   })
 
+  it('shows consumer planner options and runs the selected planner', async () => {
+    registerTool(
+      defineTool({
+        name: 'select_items',
+        description: 'Select checklist items.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            ids: {
+              type: 'array',
+              items: { type: 'string' }
+            }
+          },
+          required: ['ids'],
+          additionalProperties: false
+        },
+        execute(input) {
+          return input
+        }
+      })
+    )
+    const element = createCommandInputElement()
+    element.configure({
+      endpointOptions: [
+        {
+          label: 'GPT-5.4 mini',
+          model: 'gpt-5.4-mini',
+          provider: 'openai'
+        }
+      ],
+      plannerOptions: [
+        {
+          id: 'browser-local-ai',
+          label: 'Browser local AI',
+          createPlanner() {
+            return {
+              name: 'Browser local AI',
+              available: true,
+              status: 'downloadable',
+              detail: 'Runs in the browser.',
+              async plan() {
+                return {
+                  toolName: 'select_items',
+                  input: { ids: ['item_4'] },
+                  confidence: 0.9,
+                  reason: 'Selected with a consumer planner.'
+                }
+              }
+            }
+          }
+        },
+        {
+          id: 'custom-browser-planner',
+          label: 'Custom browser planner',
+          createPlanner() {
+            return {
+              name: 'Custom browser planner',
+              available: true,
+              status: 'ready',
+              detail: 'Consumer-provided browser planner.',
+              async plan() {
+                return {
+                  toolName: 'select_items',
+                  input: { ids: ['item_7'] },
+                  confidence: 0.9,
+                  reason: 'Selected with a second consumer planner.'
+                }
+              }
+            }
+          }
+        }
+      ]
+    })
+    document.body.append(element)
+    await Promise.resolve()
+
+    const provider = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
+    expect(provider).toBeInstanceOf(HTMLSelectElement)
+    expect(
+      Array.from(provider?.options ?? []).map(function mapOption(option) {
+        return option.textContent
+      })
+    ).toEqual(['Browser local AI', 'Custom browser planner', 'OpenAI'])
+
+    provider!.value = 'planner:browser-local-ai'
+    provider!.dispatchEvent(new Event('change', { bubbles: true }))
+    await Promise.resolve()
+
+    expect(element.shadowRoot?.querySelector('[data-model]')).toBeNull()
+    expect(element.shadowRoot?.textContent).toContain('Browser local AI')
+    await expect(element.run('Select French items')).resolves.toMatchObject({
+      status: 'success',
+      output: { ids: ['item_4'] }
+    })
+  })
+
   it('updates the model control when the selected configured provider changes', async () => {
     const element = createCommandInputElement()
     element.configure({

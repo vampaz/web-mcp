@@ -27,7 +27,7 @@ WebMCP Kit is an ESM-only TypeScript npm workspace for exposing app actions as W
 - Node: `24.12.0` from `.nvmrc`.
 - Package manager: npm workspaces with checked-in `package-lock.json`.
 - Do not use `npx`; use package scripts or `npm exec <tool> -- ...`.
-- `.npmrc` sets `min-release-age=4`; preserve it.
+- No npm `min-release-age` rule is configured.
 - Dev server: `npm run dev`, delegated to `demo`, port `60001`.
 - Astro uses the Cloudflare adapter and Caddy TLS default domain `web-mcp.localtest.me`.
 
