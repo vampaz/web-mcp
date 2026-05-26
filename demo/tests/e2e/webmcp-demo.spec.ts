@@ -76,12 +76,12 @@ test('shows browser local AI as a selectable demo provider', async function test
   const providerSelect = page.getByLabel('Provider')
   await expect(providerSelect).toBeVisible()
   const providerLabels = await providerSelect.locator('option').allTextContents()
-  expect(providerLabels).toContain('Browser local AI · Qwen2.5-3B-Instruct-q4f16_1-MLC')
+  expect(providerLabels).toContain('Browser local AI · Qwen3.5-2B-q4f16_1-MLC')
 
   await providerSelect.selectOption('planner:browser-local-ai')
   await expect(providerSelect).toHaveValue('planner:browser-local-ai')
   await expect(page.locator('webmcp-command-input .webmcp-status')).toContainText(
-    'Browser local AI · Qwen2.5-3B-Instruct-q4f16_1-MLC'
+    'Browser local AI · Qwen3.5-2B-q4f16_1-MLC'
   )
 })
 
@@ -98,7 +98,7 @@ test('exposes the full demo provider and model matrix', async function testProvi
   await expect(providerSelect).toBeVisible()
   await expect(providerSelect.locator('option')).toHaveText([
     'Chrome built-in AI',
-    'Browser local AI · Qwen2.5-3B-Instruct-q4f16_1-MLC',
+    'Browser local AI · Qwen3.5-2B-q4f16_1-MLC',
     'Cloudflare binding',
     'Cloudflare Workers AI',
     'OpenRouter',
@@ -134,7 +134,7 @@ test('exposes the full demo provider and model matrix', async function testProvi
   await providerSelect.selectOption('planner:browser-local-ai')
   await expect(page.getByLabel('Model')).toHaveCount(0)
   await expect(page.locator('webmcp-command-input .webmcp-status')).toContainText(
-    'Browser local AI · Qwen2.5-3B-Instruct-q4f16_1-MLC'
+    'Browser local AI · Qwen3.5-2B-q4f16_1-MLC'
   )
 })
 

@@ -18,7 +18,7 @@ import type {
   WebLLMModule
 } from '@/interfaces/browser-local-ai'
 
-export const defaultBrowserLocalAIModel = 'Qwen2.5-3B-Instruct-q4f16_1-MLC'
+export const defaultBrowserLocalAIModel = 'Qwen3.5-2B-q4f16_1-MLC'
 
 export function createBrowserLocalAIPlanner(
   options: BrowserLocalAIPlannerOptions = { model: defaultBrowserLocalAIModel }
@@ -42,10 +42,11 @@ export function createBrowserLocalAIPlanner(
         planner.detail = `Browser local AI is running ${options.model} locally with WebGPU.`
         return plan
       } catch (error) {
+        const errorMessage = getErrorMessage(error)
         if (!engine) enginePromise = undefined
         planner.status = engine ? 'ready' : 'unavailable'
-        planner.detail = getErrorMessage(error)
-        throw new Error(`Browser local AI could not plan this command (${getErrorMessage(error)})`)
+        planner.detail = errorMessage
+        throw new Error(`Browser local AI could not plan this command (${errorMessage})`)
       }
     },
     dispose() {
@@ -143,6 +144,8 @@ async function planWithWebLLM(
 }
 
 function createPlannerMessages(message: string, tools: WebMCPTool[], context: PlannerContext) {
+  const promptContext = getPromptContext(message, tools, context)
+
   return [
     {
       role: 'system',
@@ -151,9 +154,51 @@ function createPlannerMessages(message: string, tools: WebMCPTool[], context: Pl
     },
     {
       role: 'user',
-      content: createPlannerPrompt(message, tools, context)
+      content: createPlannerPrompt(message, tools, promptContext)
     }
   ]
+}
+
+function getPromptContext(
+  message: string,
+  tools: WebMCPTool[],
+  context: PlannerContext
+): PlannerContext {
+  if (!isSortRequest(message, tools)) return context
+
+  const compactContext = { ...(context as Record<string, unknown>) }
+  const omittedRows: Record<string, number> = {}
+
+  omitContextRows(compactContext, omittedRows, 'checklistItems')
+  omitContextRows(compactContext, omittedRows, 'invoices')
+  omitContextRows(compactContext, omittedRows, 'selectedInvoices')
+  omitContextRows(compactContext, omittedRows, 'visibleInvoices')
+
+  if (Object.keys(omittedRows).length > 0) {
+    compactContext.omittedRows = omittedRows
+  }
+
+  return compactContext
+}
+
+function isSortRequest(message: string, tools: WebMCPTool[]): boolean {
+  if (!message.toLowerCase().includes('sort')) return false
+
+  return tools.some(function hasSortTool(tool) {
+    return tool.name === 'sort_inventory' || tool.name === 'sort_invoices'
+  })
+}
+
+function omitContextRows(
+  context: Record<string, unknown>,
+  omittedRows: Record<string, number>,
+  key: string
+) {
+  const value = context[key]
+  if (!Array.isArray(value)) return
+
+  omittedRows[key] = value.length
+  delete context[key]
 }
 
 function createPlannerPrompt(
@@ -165,7 +210,9 @@ function createPlannerPrompt(
     `User request: ${message}`,
     `Current app context:\n${JSON.stringify(context, null, 2)}`,
     `Available tools:\n${JSON.stringify(createToolCatalog(tools), null, 2)}`,
+    `Sort tool options:\n${JSON.stringify(createSortToolOptions(tools), null, 2)}`,
     'Choose the best tool and exact parameters from the current app context. Prefer stable IDs from context over labels.',
+    'For sort requests, choose the matching sort tool directly. Do not return tool_sequence for a single sort. Use sortBy exactly from the advertised sort tool options and direction as "asc" or "desc".',
     'For category requests such as "all liquids", include every matching item from context, not only a few examples.',
     'The input field must contain actual argument values for the selected tool. Never copy a tool inputSchema into input.',
     'Do not copy placeholder IDs from examples. Placeholder IDs are intentionally invalid.',
@@ -200,6 +247,8 @@ function createInputExample(inputSchema: WebMCPTool['inputSchema']): Record<stri
 
 function createPropertyExample(propertySchema: unknown): unknown {
   if (!propertySchema || typeof propertySchema !== 'object') return 'value'
+  const enumValues = (propertySchema as { enum?: unknown }).enum
+  if (Array.isArray(enumValues) && enumValues.length > 0) return enumValues[0]
   const type = (propertySchema as { type?: unknown }).type
 
   if (type === 'array') return ['id_from_context']
@@ -208,6 +257,30 @@ function createPropertyExample(propertySchema: unknown): unknown {
   if (type === 'object') return {}
 
   return 'value_from_context'
+}
+
+function createSortToolOptions(tools: WebMCPTool[]) {
+  return tools.flatMap(function mapSortTool(tool) {
+    if (!tool.name.startsWith('sort_')) return []
+
+    return [
+      {
+        toolName: tool.name,
+        sortBy: getStringEnumValues(tool.inputSchema?.properties?.sortBy),
+        direction: getStringEnumValues(tool.inputSchema?.properties?.direction)
+      }
+    ]
+  })
+}
+
+function getStringEnumValues(schema: unknown): string[] {
+  if (!schema || typeof schema !== 'object') return []
+  const enumValues = (schema as { enum?: unknown }).enum
+  if (!Array.isArray(enumValues)) return []
+
+  return enumValues.filter(function isStringEnumValue(value): value is string {
+    return typeof value === 'string'
+  })
 }
 
 function normalizeBrowserLocalAIPlan(plan: ToolPlan): ToolPlan {

@@ -192,6 +192,88 @@ describe('browser local AI planner', () => {
     expect(plan.reason).toContain('grounded against visible checklist context')
   })
 
+  it('omits table rows from Browser local AI sort prompts', async () => {
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      gpu: {
+        requestAdapter: async () => ({})
+      }
+    })
+    const completionCreate = vi.fn(async () => ({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              toolName: 'sort_inventory',
+              input: {
+                direction: 'asc',
+                sortBy: 'demand'
+              },
+              confidence: 0.9,
+              reason: 'Sorted inventory by demand.'
+            })
+          }
+        }
+      ]
+    }))
+    webLLMMocks.createMLCEngine.mockResolvedValue({
+      chat: {
+        completions: {
+          create: completionCreate
+        }
+      },
+      unload: vi.fn()
+    })
+    const planner = createBrowserLocalAIPlanner()
+
+    await planner.plan(
+      'sort by demand',
+      [
+        {
+          name: 'sort_inventory',
+          description: 'Sort the visible inventory table by a supported column.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              sortBy: {
+                type: 'string',
+                enum: ['aisle', 'demand', 'margin', 'name', 'stock', 'supplier']
+              },
+              direction: {
+                type: 'string',
+                enum: ['asc', 'desc']
+              }
+            },
+            required: ['sortBy'],
+            additionalProperties: false
+          },
+          execute: () => []
+        }
+      ],
+      {
+        checklistItems: [
+          { id: 'item_1', name: 'Apple' },
+          { id: 'item_68', name: 'Sourdough' }
+        ],
+        settings: {
+          confirmationsEnabled: true,
+          density: 'comfortable'
+        }
+      }
+    )
+
+    const request = completionCreate.mock.calls[0]?.[0] as Record<string, unknown> | undefined
+    if (!request) throw new Error('Expected WebLLM request.')
+    const promptText = JSON.stringify(request.messages)
+    expect(promptText).toContain('\\"checklistItems\\": 2')
+    expect(promptText).toContain('Sort tool options:')
+    expect(promptText).toContain('\\"sortBy\\": [')
+    expect(promptText).toContain('\\"demand\\"')
+    expect(promptText).toContain('choose the matching sort tool directly')
+    expect(promptText).not.toContain('Sourdough')
+    expect(promptText).not.toContain('item_68')
+  })
+
   it('ignores stray sequence steps on a valid single-tool plan', async () => {
     vi.stubGlobal('navigator', {
       ...navigator,
