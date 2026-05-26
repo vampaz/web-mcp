@@ -3,12 +3,11 @@ import type {
   PlannerContext,
   PlannerProviderConfig,
   ToolPlan,
-  ToolPlanStep,
   ToolPlanner,
   WebMCPTool
 } from './interfaces/tool'
-import { formatJsonValueValidationError, validateJsonValue } from './schema'
 import { getErrorMessage } from './confirmation'
+import { toolPlanSchema, validateToolPlan } from './plan-validation'
 
 interface LanguageModelSession {
   prompt: (message: string, options?: ChromeAIPromptOptions) => Promise<string>
@@ -61,33 +60,6 @@ const chromeAITextOptions = {
     }
   ]
 } satisfies ChromeAIOptions
-
-const toolPlanSchema = {
-  type: 'object',
-  properties: {
-    toolName: { type: 'string' },
-    input: { type: 'object' },
-    confidence: { type: 'number' },
-    reason: { type: 'string' },
-    steps: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          toolName: { type: 'string' },
-          input: { type: 'object' },
-          confidence: { type: 'number' },
-          reason: { type: 'string' }
-        },
-        required: ['toolName', 'input', 'confidence', 'reason'],
-        additionalProperties: false
-      },
-      maxItems: 5
-    }
-  },
-  required: ['toolName', 'input', 'confidence', 'reason'],
-  additionalProperties: false
-}
 
 const numberWords = new Map([
   ['one', 1],
@@ -233,7 +205,7 @@ export function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner 
     async plan(message: string, tools: WebMCPTool[], context: PlannerContext = {}) {
       try {
         const plan = await planWithRemoteProvider(config, auth, key, model, message, tools, context)
-        validateRemotePlan(plan, tools)
+        validateToolPlan(plan, tools)
         return plan
       } catch (error) {
         throw new Error(`${providerLabel} could not plan this command (${getErrorMessage(error)})`)
@@ -1009,57 +981,6 @@ function createUnavailableChromePlanner(detail: string, strict = false): ToolPla
       if (strict) throw new Error(detail)
       return planWithHeuristics(message, tools, context)
     }
-  }
-}
-
-function validateRemotePlan(plan: ToolPlan, tools: WebMCPTool[]): void {
-  if (!plan || typeof plan !== 'object') throw new Error('provider returned an invalid plan')
-  if (typeof plan.toolName !== 'string')
-    throw new Error('provider returned a plan without toolName')
-  if (!plan.input || typeof plan.input !== 'object' || Array.isArray(plan.input))
-    throw new Error('provider returned a plan with invalid input')
-  if (typeof plan.confidence !== 'number')
-    throw new Error('provider returned a plan without numeric confidence')
-  if (typeof plan.reason !== 'string') throw new Error('provider returned a plan without reason')
-  if (plan.steps !== undefined) {
-    validateRemotePlanSequence(plan, tools)
-    return
-  }
-
-  validateRemotePlanStep(plan, tools)
-}
-
-function validateRemotePlanSequence(plan: ToolPlan, tools: WebMCPTool[]): void {
-  if (plan.toolName !== 'tool_sequence')
-    throw new Error('provider returned steps without tool_sequence')
-  if (!Array.isArray(plan.steps) || plan.steps.length === 0)
-    throw new Error('provider returned an empty tool sequence')
-  if (plan.steps.length > 5) throw new Error('provider returned too many tool sequence steps')
-
-  plan.steps.forEach(function validateSequenceStep(step) {
-    validateRemotePlanStep(step, tools)
-  })
-}
-
-function validateRemotePlanStep(step: ToolPlanStep, tools: WebMCPTool[]): void {
-  if (!step || typeof step !== 'object') throw new Error('provider returned an invalid plan step')
-  if (typeof step.toolName !== 'string')
-    throw new Error('provider returned a plan step without toolName')
-  if (!step.input || typeof step.input !== 'object' || Array.isArray(step.input))
-    throw new Error('provider returned a plan step with invalid input')
-  if (typeof step.confidence !== 'number')
-    throw new Error('provider returned a plan step without numeric confidence')
-  if (typeof step.reason !== 'string')
-    throw new Error('provider returned a plan step without reason')
-
-  const selectedTool = tools.find((tool) => tool.name === step.toolName)
-  if (!selectedTool) throw new Error(`provider selected unknown tool "${step.toolName}"`)
-
-  const inputValidationErrors = validateJsonValue(step.input, selectedTool.inputSchema)
-  if (inputValidationErrors.length > 0) {
-    throw new Error(
-      `provider returned invalid input for "${step.toolName}": ${formatJsonValueValidationError(inputValidationErrors)}`
-    )
   }
 }
 

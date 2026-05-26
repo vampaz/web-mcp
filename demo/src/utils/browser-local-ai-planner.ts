@@ -1,12 +1,11 @@
 import {
   createHeuristicPlanner,
-  formatJsonValueValidationError,
   getErrorMessage,
   normalizeJsonText,
-  validateJsonValue,
+  toolPlanSchema,
+  validateToolPlan,
   type PlannerContext,
   type ToolPlan,
-  type ToolPlanStep,
   type ToolPlanner,
   type WebMCPTool
 } from '@webmcp-kit/core'
@@ -20,33 +19,6 @@ import type {
 } from '@/interfaces/browser-local-ai'
 
 export const defaultBrowserLocalAIModel = 'Qwen2.5-3B-Instruct-q4f16_1-MLC'
-
-const toolPlanSchema = {
-  type: 'object',
-  properties: {
-    toolName: { type: 'string' },
-    input: { type: 'object' },
-    confidence: { type: 'number' },
-    reason: { type: 'string' },
-    steps: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          toolName: { type: 'string' },
-          input: { type: 'object' },
-          confidence: { type: 'number' },
-          reason: { type: 'string' }
-        },
-        required: ['toolName', 'input', 'confidence', 'reason'],
-        additionalProperties: false
-      },
-      maxItems: 5
-    }
-  },
-  required: ['toolName', 'input', 'confidence', 'reason'],
-  additionalProperties: false
-}
 
 export function createBrowserLocalAIPlanner(
   options: BrowserLocalAIPlannerOptions = { model: defaultBrowserLocalAIModel }
@@ -65,7 +37,7 @@ export function createBrowserLocalAIPlanner(
         engine ??= await enginePromise
         const modelPlan = await planWithWebLLM(engine, options.model, message, tools, context)
         const plan = await repairBrowserLocalAIPlan(modelPlan, message, tools, context)
-        validateBrowserLocalAIPlan(plan, tools)
+        validateToolPlan(plan, tools)
         planner.status = 'ready'
         planner.detail = `Browser local AI is running ${options.model} locally with WebGPU.`
         return plan
@@ -250,59 +222,6 @@ function normalizeBrowserLocalAIPlan(plan: ToolPlan): ToolPlan {
     confidence: plan.confidence,
     reason: plan.reason,
     steps: plan.steps
-  }
-}
-
-function validateBrowserLocalAIPlan(plan: ToolPlan, tools: WebMCPTool[]): void {
-  if (!plan || typeof plan !== 'object') throw new Error('provider returned an invalid plan')
-  if (typeof plan.toolName !== 'string')
-    throw new Error('provider returned a plan without toolName')
-  if (!plan.input || typeof plan.input !== 'object' || Array.isArray(plan.input))
-    throw new Error('provider returned a plan with invalid input')
-  if (typeof plan.confidence !== 'number')
-    throw new Error('provider returned a plan without numeric confidence')
-  if (typeof plan.reason !== 'string') throw new Error('provider returned a plan without reason')
-  if (plan.steps !== undefined) {
-    validateBrowserLocalAISequence(plan, tools)
-    return
-  }
-
-  validateBrowserLocalAIStep(plan, tools)
-}
-
-function validateBrowserLocalAISequence(plan: ToolPlan, tools: WebMCPTool[]): void {
-  if (plan.toolName !== 'tool_sequence')
-    throw new Error('provider returned steps without tool_sequence')
-  if (!Array.isArray(plan.steps) || plan.steps.length === 0)
-    throw new Error('provider returned an empty tool sequence')
-  if (plan.steps.length > 5) throw new Error('provider returned too many tool sequence steps')
-
-  plan.steps.forEach(function validateSequenceStep(step) {
-    validateBrowserLocalAIStep(step, tools)
-  })
-}
-
-function validateBrowserLocalAIStep(step: ToolPlanStep, tools: WebMCPTool[]): void {
-  if (!step || typeof step !== 'object') throw new Error('provider returned an invalid plan step')
-  if (typeof step.toolName !== 'string')
-    throw new Error('provider returned a plan step without toolName')
-  if (!step.input || typeof step.input !== 'object' || Array.isArray(step.input))
-    throw new Error('provider returned a plan step with invalid input')
-  if (typeof step.confidence !== 'number')
-    throw new Error('provider returned a plan step without numeric confidence')
-  if (typeof step.reason !== 'string')
-    throw new Error('provider returned a plan step without reason')
-
-  const selectedTool = tools.find(function findSelectedTool(tool) {
-    return tool.name === step.toolName
-  })
-  if (!selectedTool) throw new Error(`provider selected unknown tool "${step.toolName}"`)
-
-  const inputValidationErrors = validateJsonValue(step.input, selectedTool.inputSchema)
-  if (inputValidationErrors.length > 0) {
-    throw new Error(
-      `provider returned invalid input for "${step.toolName}": ${formatJsonValueValidationError(inputValidationErrors)}`
-    )
   }
 }
 
