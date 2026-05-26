@@ -6,10 +6,28 @@
 
     <form ref="supportForm" class="support-form" @submit.prevent="submitForm">
       <label>
+        Account
+        <select
+          :value="account"
+          name="account"
+          required
+          toolparamdescription="Customer account connected to this ticket."
+          @change="updateAccount"
+        >
+          <option>Northwind</option>
+          <option>Globex</option>
+          <option>Stark Industries</option>
+          <option>Aperture Labs</option>
+          <option>Umbrella Health</option>
+        </select>
+      </label>
+      <label>
         Subject
         <input
           :value="subject"
           name="subject"
+          maxlength="80"
+          minlength="4"
           required
           toolparamdescription="Short issue summary."
           @input="updateSubject"
@@ -20,6 +38,8 @@
         <textarea
           :value="body"
           name="body"
+          maxlength="500"
+          minlength="12"
           required
           rows="5"
           toolparamdescription="Detailed issue description."
@@ -35,6 +55,7 @@
 import { ref } from 'vue'
 
 interface Props {
+  account: string
   body: string
   subject: string
 }
@@ -42,6 +63,7 @@ interface Props {
 withDefaults(defineProps<Props>(), {})
 const emit = defineEmits<{
   submit: []
+  'update:account': [value: string]
   'update:body': [value: string]
   'update:subject': [value: string]
 }>()
@@ -55,6 +77,10 @@ function submitForm() {
   emit('submit')
 }
 
+function updateAccount(event: Event) {
+  emit('update:account', getInputValue(event))
+}
+
 function updateBody(event: Event) {
   emit('update:body', getInputValue(event))
 }
@@ -64,7 +90,9 @@ function updateSubject(event: Event) {
 }
 
 function getInputValue(event: Event): string {
-  return event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement
+  return event.target instanceof HTMLInputElement ||
+    event.target instanceof HTMLTextAreaElement ||
+    event.target instanceof HTMLSelectElement
     ? event.target.value
     : ''
 }
@@ -105,6 +133,7 @@ h2 {
 }
 
 .support-form input,
+.support-form select,
 textarea {
   width: 100%;
   border: 1px solid rgba(244, 240, 232, 0.2);
@@ -117,6 +146,11 @@ textarea {
 .support-form input {
   min-height: 46px;
   padding: 12px;
+}
+
+.support-form select {
+  min-height: 46px;
+  padding: 0 12px;
 }
 
 textarea {

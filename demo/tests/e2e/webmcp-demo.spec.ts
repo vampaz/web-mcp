@@ -235,15 +235,19 @@ test('covers commerce tools through the browser bridge and confirmation flow', a
   await expect(page.getByLabel('Discount %')).toHaveValue('10')
   await expect(page.locator('.cart-total')).toContainText('€348')
 
-  page.once('dialog', async function acceptCheckoutConfirmation(dialog) {
-    expect(dialog.message()).toContain('Checkout clears the cart')
-    await dialog.accept()
-  })
-  const checkoutResult = await invokeWebMCPTool(page, {
+  const checkoutPromise = invokeWebMCPTool(page, {
     toolName: 'checkout_cart',
     input: {},
     source: 'planner'
   })
+  const checkoutDialog = page.getByRole('dialog', {
+    name: /Checkout clears the cart/
+  })
+  await expect(checkoutDialog).toBeVisible()
+  await expect(checkoutDialog).toContainText('checkout_cart')
+  await checkoutDialog.getByRole('button', { name: 'Approve action' }).click()
+
+  const checkoutResult = await checkoutPromise
   expect(checkoutResult.status).toBe('success')
   await expect(page.getByText('No cart lines yet.')).toBeVisible()
   await expect(page.locator('.cart-total')).toContainText('€0')
@@ -292,13 +296,14 @@ test('executes chained local invoice commands with confirmation', async function
 
   await selectPlannerProvider(page, 'local', 'update_selected_invoice_status')
 
-  page.once('dialog', async function acceptStatusConfirmation(dialog) {
-    expect(dialog.message()).toContain('"status": "paid"')
-    await dialog.accept()
-  })
-
   await getCommandTextbox(page).fill('Mark Stark Industries invoices as paid')
   await page.getByRole('button', { name: 'Run' }).click()
+  const statusDialog = page.getByRole('dialog', {
+    name: /Changing invoice status mutates business records/
+  })
+  await expect(statusDialog).toBeVisible()
+  await expect(statusDialog).toContainText('"status": "paid"')
+  await statusDialog.getByRole('button', { name: 'Approve action' }).click()
 
   const starkInvoiceRow = page.getByRole('row', { name: /Stark Industries/ })
   await expect(page.getByLabel('Select Stark Industries')).toBeChecked()

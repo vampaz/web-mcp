@@ -3,6 +3,7 @@
     <div class="inventory-header">
       <div>
         <h2 id="inventory-title">Inventory list</h2>
+        <p>Merchandising context includes aisle, stock, supplier, demand, and margin.</p>
       </div>
       <div class="inventory-summary">
         <strong>{{ selectedCount }} selected</strong>
@@ -26,6 +27,7 @@
           />
           <span>{{ index + 1 }}.</span>
           <strong>{{ item.name }}</strong>
+          <small>{{ item.aisle }} · {{ item.stock }} units · {{ item.margin }}% margin</small>
         </label>
       </li>
     </ul>
@@ -88,6 +90,12 @@ h2 {
   margin: 0;
   font-size: clamp(1.05rem, 1.5vw, 1.32rem);
   letter-spacing: 0;
+}
+
+.inventory-header p {
+  max-width: 42rem;
+  margin: 0.35rem 0 0;
+  color: #9ea8a1;
 }
 
 .inventory-summary strong {
@@ -157,6 +165,13 @@ label strong {
   color: #f4f0e8;
   font-size: 0.98rem;
   font-weight: 500;
+}
+
+label small {
+  grid-column: 3;
+  min-width: 0;
+  color: #8fa098;
+  font-size: 0.76rem;
 }
 
 @media (max-width: 620px) {

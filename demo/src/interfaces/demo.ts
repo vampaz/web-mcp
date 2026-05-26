@@ -1,24 +1,33 @@
 export interface Invoice {
   id: string
+  customerId: string
   customerName: string
   amount: number
   status: 'draft' | 'sent' | 'overdue' | 'paid' | 'void'
   dueDate: string
   owner: string
+  risk: 'low' | 'medium' | 'high'
   selected: boolean
 }
 
 export interface SelectableItem {
+  aisle: string
+  demand: 'low' | 'normal' | 'high'
   id: string
+  margin: number
   name: string
+  stock: number
   selected: boolean
+  supplier: string
 }
 
 export interface Product {
+  available: number
   id: string
   name: string
   category: string
   price: number
+  sku: string
 }
 
 export interface CartLine {
@@ -29,12 +38,46 @@ export interface CartLine {
 }
 
 export interface SupportTicket {
+  account: string
+  ageHours: number
   id: string
   subject: string
   body: string
   status: 'new' | 'triaged' | 'in_progress' | 'resolved'
   priority: 'low' | 'medium' | 'high' | 'urgent'
   assignee: string
+}
+
+export interface Customer {
+  accountTier: 'starter' | 'growth' | 'enterprise'
+  health: 'healthy' | 'watch' | 'risk'
+  id: string
+  name: string
+  openTickets: number
+  outstandingBalance: number
+  region: string
+}
+
+export interface DemoActivityItem {
+  detail: string
+  id: string
+  kind: 'ai' | 'manual' | 'system'
+  time: string
+  title: string
+}
+
+export interface DemoMetric {
+  label: string
+  tone?: 'good' | 'warn' | 'danger'
+  value: string
+}
+
+export interface DemoConfirmationRequest {
+  approve: () => void
+  deny: () => void
+  input: unknown
+  reason: string
+  toolName: string
 }
 
 export interface PlannerModelOption {

@@ -9,22 +9,40 @@
         Product
         <select :value="selectedProductId" @change="updateProduct">
           <option v-for="product in products" :key="product.id" :value="product.id">
-            {{ product.name }} · €{{ product.price }}
+            {{ product.name }} · {{ product.sku }} · {{ product.available }} in stock · €{{
+              product.price
+            }}
           </option>
         </select>
       </label>
       <label>
         Qty
-        <input :value="quantity" type="number" min="1" @input="updateQuantity" />
+        <input
+          :disabled="getProductRemainingAvailability(selectedProductId) <= 0"
+          :max="Math.max(1, getProductRemainingAvailability(selectedProductId))"
+          :value="quantity"
+          type="number"
+          min="1"
+          @input="updateQuantity"
+        />
       </label>
-      <button type="button" @click="addProduct">Add</button>
+      <button
+        type="button"
+        :disabled="getProductRemainingAvailability(selectedProductId) <= 0"
+        @click="addProduct"
+      >
+        Add
+      </button>
     </div>
 
     <div class="cart-lines">
-      <div v-if="cart.length === 0" class="empty-state">No cart lines yet.</div>
+      <div v-if="cart.length === 0" class="empty-state">
+        No cart lines yet. Pending order is empty.
+      </div>
       <div v-for="line in cart" :key="line.productId" class="cart-line">
         <span>{{ line.name }}</span>
         <input
+          :max="getProductAvailability(line.productId)"
           :value="line.quantity"
           type="number"
           min="1"
@@ -62,7 +80,7 @@ interface Props {
   total: number
 }
 
-withDefaults(defineProps<Props>(), {})
+const props = withDefaults(defineProps<Props>(), {})
 const emit = defineEmits<{
   'add-product': []
   checkout: []
@@ -83,6 +101,21 @@ function checkout() {
 
 function removeLine(productId: string) {
   emit('remove-line', productId)
+}
+
+function getProductAvailability(productId: string): number | undefined {
+  return props.products.find(function findProduct(product) {
+    return product.id === productId
+  })?.available
+}
+
+function getProductRemainingAvailability(productId: string): number {
+  const available = getProductAvailability(productId) ?? 0
+  const currentQuantity =
+    props.cart.find(function findLine(line) {
+      return line.productId === productId
+    })?.quantity ?? 0
+  return Math.max(0, available - currentQuantity)
 }
 
 function updateProduct(event: Event) {

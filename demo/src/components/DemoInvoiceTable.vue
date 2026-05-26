@@ -101,7 +101,7 @@
             </td>
             <td>
               <strong>{{ invoice.customerName }}</strong>
-              <span>{{ invoice.id }}</span>
+              <span>{{ invoice.id }} · {{ invoice.risk }} risk</span>
             </td>
             <td class="col-status">
               <span class="status" :class="invoice.status">{{ invoice.status }}</span>

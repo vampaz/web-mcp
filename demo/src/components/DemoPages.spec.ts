@@ -186,6 +186,49 @@ describe('demo pages', () => {
     expect(wrapper.text()).toContain('No cart lines yet.')
   })
 
+  it('blocks commerce cart quantities beyond available stock', async () => {
+    mountWithDeps(CommerceDemo, { attachTo: document.body })
+    await flushPromises()
+
+    await expect(
+      invokeTool({
+        toolName: 'add_to_cart',
+        input: {
+          productId: 'kbd-01',
+          quantity: 18
+        }
+      })
+    ).resolves.toMatchObject({
+      status: 'success'
+    })
+
+    await expect(
+      invokeTool({
+        toolName: 'add_to_cart',
+        input: {
+          productId: 'kbd-01',
+          quantity: 1
+        }
+      })
+    ).resolves.toMatchObject({
+      status: 'blocked',
+      error: 'Requested quantity exceeds available stock.'
+    })
+
+    await expect(
+      invokeTool({
+        toolName: 'update_cart_quantity',
+        input: {
+          productId: 'kbd-01',
+          quantity: 19
+        }
+      })
+    ).resolves.toMatchObject({
+      status: 'blocked',
+      error: 'Requested quantity exceeds available stock.'
+    })
+  })
+
   it('registers only inventory tools on the inventory page', async () => {
     mountWithDeps(InventoryDemo, { attachTo: document.body })
     await flushPromises()

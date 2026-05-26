@@ -1,4 +1,5 @@
 import type {
+  Customer,
   DemoSettings,
   Invoice,
   InvoiceDraft,
@@ -67,85 +68,160 @@ export function getOpenAIPlannerEndpoints(): PlannerModelOption[] {
   ]
 }
 
+export function getInitialCustomers(): Customer[] {
+  return [
+    {
+      id: 'cust_globex',
+      name: 'Globex',
+      accountTier: 'enterprise',
+      health: 'healthy',
+      openTickets: 0,
+      outstandingBalance: 230,
+      region: 'EMEA'
+    },
+    {
+      id: 'cust_northwind',
+      name: 'Northwind',
+      accountTier: 'growth',
+      health: 'risk',
+      openTickets: 2,
+      outstandingBalance: 1420,
+      region: 'North America'
+    },
+    {
+      id: 'cust_aperture',
+      name: 'Aperture Labs',
+      accountTier: 'enterprise',
+      health: 'watch',
+      openTickets: 1,
+      outstandingBalance: 1480,
+      region: 'North America'
+    },
+    {
+      id: 'cust_initech',
+      name: 'Initech',
+      accountTier: 'starter',
+      health: 'healthy',
+      openTickets: 0,
+      outstandingBalance: 0,
+      region: 'EMEA'
+    },
+    {
+      id: 'cust_stark',
+      name: 'Stark Industries',
+      accountTier: 'enterprise',
+      health: 'risk',
+      openTickets: 3,
+      outstandingBalance: 2310,
+      region: 'North America'
+    },
+    {
+      id: 'cust_umbrella',
+      name: 'Umbrella Health',
+      accountTier: 'growth',
+      health: 'watch',
+      openTickets: 1,
+      outstandingBalance: 790,
+      region: 'EMEA'
+    }
+  ]
+}
+
 export function getInitialInvoices(): Invoice[] {
   return [
     {
       id: 'inv_100',
+      customerId: 'cust_globex',
       customerName: 'Globex',
       amount: 230,
       status: 'sent',
       dueDate: '2026-05-20',
       owner: 'Marta',
+      risk: 'low',
       selected: false
     },
     {
       id: 'inv_101',
+      customerId: 'cust_northwind',
       customerName: 'Northwind',
       amount: 920,
       status: 'overdue',
       dueDate: '2026-05-05',
       owner: 'Carlos',
+      risk: 'high',
       selected: false
     },
     {
       id: 'inv_102',
+      customerId: 'cust_aperture',
       customerName: 'Aperture Labs',
       amount: 1480,
       status: 'draft',
       dueDate: '2026-05-28',
       owner: 'Sofia',
+      risk: 'medium',
       selected: false
     },
     {
       id: 'inv_103',
+      customerId: 'cust_initech',
       customerName: 'Initech',
       amount: 640,
       status: 'paid',
       dueDate: '2026-05-11',
       owner: 'Rui',
+      risk: 'low',
       selected: false
     },
     {
       id: 'inv_104',
+      customerId: 'cust_stark',
       customerName: 'Stark Industries',
       amount: 2310,
       status: 'overdue',
       dueDate: '2026-05-02',
       owner: 'Carlos',
+      risk: 'high',
       selected: false
     },
     {
       id: 'inv_105',
+      customerId: 'cust_umbrella',
       customerName: 'Umbrella Health',
       amount: 790,
       status: 'sent',
       dueDate: '2026-05-23',
       owner: 'Marta',
+      risk: 'medium',
       selected: false
     },
     {
       id: 'inv_106',
+      customerId: 'cust_soylent',
       customerName: 'Soylent Systems',
       amount: 510,
       status: 'draft',
       dueDate: '2026-06-01',
       owner: 'Sofia',
+      risk: 'low',
       selected: false
     },
     {
       id: 'inv_107',
+      customerId: 'cust_wayne',
       customerName: 'Wayne Logistics',
       amount: 1750,
       status: 'sent',
       dueDate: '2026-05-18',
       owner: 'Rui',
+      risk: 'medium',
       selected: false
     }
   ]
 }
 
 export function getInitialSelectableItems(): SelectableItem[] {
-  return [
+  const names = [
     { id: 'item_1', name: 'Apple', selected: false },
     { id: 'item_2', name: 'Banana', selected: false },
     { id: 'item_3', name: 'Carrot', selected: false },
@@ -219,13 +295,77 @@ export function getInitialSelectableItems(): SelectableItem[] {
     { id: 'item_71', name: 'Honey', selected: false },
     { id: 'item_72', name: 'Jam', selected: false }
   ]
+
+  return names.map(function mapInventoryItem(item, index) {
+    const aisle = getInventoryAisle(item.name)
+    return {
+      ...item,
+      aisle,
+      demand: index % 9 === 0 ? 'high' : index % 7 === 0 ? 'low' : 'normal',
+      margin: 12 + ((index * 7) % 31),
+      stock: 18 + ((index * 13) % 92),
+      supplier:
+        index % 4 === 0
+          ? 'Lisbon Fresh'
+          : index % 4 === 1
+            ? 'Nord Market'
+            : index % 4 === 2
+              ? 'Atelier Pantry'
+              : 'Cascais Co-op'
+    }
+  })
 }
 
 export function getInitialProducts(): Product[] {
   return [
-    { id: 'kbd-01', name: 'Low-profile keyboard', category: 'Input', price: 129 },
-    { id: 'dock-02', name: 'Travel USB-C dock', category: 'Connectivity', price: 89 },
-    { id: 'cam-03', name: 'Desk camera', category: 'Video', price: 149 }
+    {
+      id: 'kbd-01',
+      name: 'Low-profile keyboard',
+      category: 'Input',
+      price: 129,
+      sku: 'KBD-LP-01',
+      available: 18
+    },
+    {
+      id: 'dock-02',
+      name: 'Travel USB-C dock',
+      category: 'Connectivity',
+      price: 89,
+      sku: 'DOCK-TR-02',
+      available: 7
+    },
+    {
+      id: 'cam-03',
+      name: 'Desk camera',
+      category: 'Video',
+      price: 149,
+      sku: 'CAM-HD-03',
+      available: 11
+    },
+    {
+      id: 'mic-04',
+      name: 'Studio microphone',
+      category: 'Audio',
+      price: 179,
+      sku: 'MIC-ST-04',
+      available: 5
+    },
+    {
+      id: 'stand-05',
+      name: 'Monitor arm',
+      category: 'Ergonomics',
+      price: 119,
+      sku: 'ARM-DS-05',
+      available: 23
+    },
+    {
+      id: 'hub-06',
+      name: 'Conference hub',
+      category: 'Meeting room',
+      price: 329,
+      sku: 'HUB-CF-06',
+      available: 4
+    }
   ]
 }
 
@@ -233,6 +373,8 @@ export function getInitialTickets(): SupportTicket[] {
   return [
     {
       id: 'ticket_1',
+      account: 'Northwind',
+      ageHours: 18,
       subject: 'Billing access',
       body: 'Cannot open the latest invoice from the workspace.',
       status: 'new',
@@ -241,6 +383,8 @@ export function getInitialTickets(): SupportTicket[] {
     },
     {
       id: 'ticket_2',
+      account: 'Globex',
+      ageHours: 7,
       subject: 'Camera order',
       body: 'Customer asked for an updated delivery estimate.',
       status: 'triaged',
@@ -249,6 +393,8 @@ export function getInitialTickets(): SupportTicket[] {
     },
     {
       id: 'ticket_3',
+      account: 'Stark Industries',
+      ageHours: 31,
       subject: 'Checkout confirmation',
       body: 'Need review of checkout confirmation copy.',
       status: 'in_progress',
@@ -266,6 +412,62 @@ export function getInitialInvoiceDraft(): InvoiceDraft {
     owner: 'Carlos',
     status: 'draft'
   }
+}
+
+function getInventoryAisle(name: string): string {
+  const lowerName = name.toLowerCase()
+  if (
+    ['croissant', 'baguette', 'pain au chocolat', 'quiche', 'sourdough', 'pita bread'].some(
+      function hasBakeryItem(item) {
+        return lowerName.includes(item)
+      }
+    )
+  ) {
+    return 'Bakery'
+  }
+  if (
+    [
+      'brie',
+      'milk',
+      'yogurt',
+      'cheddar',
+      'mozzarella',
+      'camembert',
+      'goat cheese',
+      'butter',
+      'eggs'
+    ].some(function hasDairyItem(item) {
+      return lowerName.includes(item)
+    })
+  ) {
+    return 'Dairy'
+  }
+  if (
+    ['water', 'coffee', 'tea'].some(function hasDrinkItem(item) {
+      return lowerName.includes(item)
+    })
+  ) {
+    return 'Drinks'
+  }
+  if (
+    ['ham', 'chicken', 'salmon', 'tuna', 'shrimp', 'tofu', 'tempeh'].some(
+      function hasProteinItem(item) {
+        return lowerName.includes(item)
+      }
+    )
+  ) {
+    return 'Protein'
+  }
+  if (
+    ['chocolate', 'macarons', 'madeleines', 'honey', 'jam', 'sugar'].some(
+      function hasTreatItem(item) {
+        return lowerName.includes(item)
+      }
+    )
+  ) {
+    return 'Specialty'
+  }
+  return 'Produce'
 }
 
 export function getInitialDemoSettings(): DemoSettings {

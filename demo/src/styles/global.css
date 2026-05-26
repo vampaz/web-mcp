@@ -8,6 +8,8 @@
     sans-serif;
   background: #090b0b;
   color: #f4f0e8;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
 }
 
 * {
@@ -18,7 +20,17 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
-  background: #090b0b;
+  background:
+    linear-gradient(120deg, rgba(232, 190, 83, 0.06), transparent 28rem),
+    linear-gradient(180deg, rgba(48, 167, 121, 0.055), transparent 22rem),
+    repeating-linear-gradient(
+      90deg,
+      rgba(244, 240, 232, 0.018) 0,
+      rgba(244, 240, 232, 0.018) 1px,
+      transparent 1px,
+      transparent 64px
+    ),
+    #070a09;
 }
 
 button,
@@ -30,6 +42,15 @@ select {
 
 button {
   cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
 }
 
 .demo-topbar {
@@ -42,7 +63,7 @@ button {
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid rgba(244, 240, 232, 0.14);
-  background: rgba(9, 11, 11, 0.92);
+  background: rgba(7, 10, 9, 0.9);
   padding: 10px max(16px, calc((100vw - 1440px) / 2 + 16px));
   backdrop-filter: blur(18px);
 }
@@ -55,6 +76,7 @@ button {
 
 .demo-brand {
   font-weight: 900;
+  letter-spacing: 0;
 }
 
 .demo-nav {
@@ -66,6 +88,7 @@ button {
 
 .demo-nav a {
   border: 1px solid rgba(244, 240, 232, 0.18);
+  border-radius: 4px;
   padding: 6px 10px;
   color: #c9d1cb;
   font-size: 0.78rem;
@@ -83,7 +106,7 @@ button {
 .demo-shell {
   width: min(1440px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 18px 0 80px;
+  padding: 18px 0 96px;
 }
 
 @media (max-width: 620px) {

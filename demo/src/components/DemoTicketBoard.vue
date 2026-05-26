@@ -9,7 +9,8 @@
         <h3>{{ column.label }}</h3>
         <div v-for="ticket in ticketsByStatus(column.status)" :key="ticket.id" class="ticket-card">
           <strong>{{ ticket.subject }}</strong>
-          <span>{{ ticket.body }}</span>
+          <span>{{ ticket.account }} · {{ ticket.ageHours }}h open</span>
+          <p>{{ ticket.body }}</p>
           <div class="ticket-controls">
             <select
               :key="`${ticket.id}-status-${ticket.status}`"
@@ -160,8 +161,15 @@ h3 {
   background: rgba(0, 0, 0, 0.16);
 }
 
-.ticket-card span {
+.ticket-card span,
+.ticket-card p {
+  margin: 0;
   color: #9ea8a1;
+}
+
+.ticket-card span {
+  color: #e8be53;
+  font-size: 0.8rem;
 }
 
 .ticket-controls {

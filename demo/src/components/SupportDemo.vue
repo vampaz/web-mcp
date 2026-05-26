@@ -1,18 +1,28 @@
 <template>
   <DemoShell
+    :activity-items="activityItems"
     :confirmations-enabled="settings.confirmationsEnabled"
     :eyebrow="`${tickets.length} tickets`"
     :get-context="getPlannerContext"
+    :metrics="metrics"
     placeholder="Try: Mark billing access as resolved"
     :registered-tools-count="registeredToolsCount"
+    description="Triage account-linked tickets with SLA age, priority, assignee, and status context in one queue."
+    :suggestions="[
+      'Mark billing access as resolved',
+      'Assign urgent Northwind tickets to Sofia',
+      'Create a support ticket for Stark Industries'
+    ]"
     title="Support"
   >
     <section class="demo-page-content demo-page-content--support">
       <DemoSupportTicketPanel
         ref="supportTicketPanel"
+        :account="supportAccount"
         :body="supportBody"
         :subject="supportSubject"
         @submit="submitSupportForm"
+        @update:account="supportAccount = $event"
         @update:body="supportBody = $event"
         @update:subject="supportSubject = $event"
       />
@@ -29,21 +39,62 @@
 
 <script setup lang="ts">
 import { defineTool, invokeTool, listTools, registerFormTool, registerTool } from 'webmcp-kit'
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 import DemoShell from '@/components/DemoShell.vue'
 import DemoSupportTicketPanel from '@/components/DemoSupportTicketPanel.vue'
 import DemoTicketBoard from '@/components/DemoTicketBoard.vue'
-import type { SupportTicket } from '@/interfaces/demo'
+import type { DemoActivityItem, DemoMetric, SupportTicket } from '@/interfaces/demo'
 import { getInitialDemoSettings, getInitialTickets } from '@/utils/demo-data'
 
 const tickets = ref<SupportTicket[]>(getInitialTickets())
 const settings = ref(getInitialDemoSettings())
 const registeredToolsCount = ref(0)
 const supportTicketPanel = ref<{ supportForm: HTMLFormElement | null } | null>(null)
+const supportAccount = ref('Northwind')
 const supportSubject = ref('Billing access')
 const supportBody = ref('I cannot open the latest invoice from the workspace.')
+const activityItems = ref<DemoActivityItem[]>([
+  {
+    id: 'support-seed',
+    kind: 'system',
+    time: '09:18',
+    title: 'Support queue loaded',
+    detail: 'Tickets include account, SLA age, priority, and ownership context.'
+  }
+])
 const unregisterCallbacks: Array<() => void> = []
+const metrics = computed<DemoMetric[]>(function getSupportMetrics() {
+  const urgent = tickets.value.filter(function filterUrgent(ticket) {
+    return ticket.priority === 'urgent' || ticket.priority === 'high'
+  }).length
+  const unresolved = tickets.value.filter(function filterUnresolved(ticket) {
+    return ticket.status !== 'resolved'
+  }).length
+  const oldest = Math.max(
+    ...tickets.value.map(function mapAge(ticket) {
+      return ticket.ageHours
+    })
+  )
+
+  return [
+    {
+      label: 'Unresolved',
+      value: String(unresolved),
+      tone: unresolved > 0 ? 'warn' : 'good'
+    },
+    {
+      label: 'High priority',
+      value: String(urgent),
+      tone: urgent > 0 ? 'danger' : 'good'
+    },
+    {
+      label: 'Oldest SLA',
+      value: `${oldest}h`,
+      tone: oldest > 24 ? 'danger' : 'good'
+    }
+  ]
+})
 
 onMounted(function handleMounted() {
   registerSupportTools()
@@ -102,6 +153,16 @@ function registerSupportTools() {
               status: isTicketStatus(input.status) ? input.status : ticket.status
             }
           })
+          const updatedTicket = tickets.value.find(function findTicket(ticket) {
+            return ticket.id === String(input.id)
+          })
+          if (updatedTicket) {
+            addActivity(
+              'ai',
+              'Ticket updated',
+              `${updatedTicket.subject} is ${updatedTicket.status} and owned by ${updatedTicket.assignee}.`
+            )
+          }
           return tickets.value.find(function findTicket(ticket) {
             return ticket.id === String(input.id)
           })
@@ -123,6 +184,7 @@ function registerSupportFormTool() {
         'Create a support ticket from the visible support form and mark it as open for triage.',
       execute(input) {
         return createSupportTicket(
+          String(input.account ?? supportAccount.value),
           String(input.subject ?? 'Support request'),
           String(input.body ?? '')
         )
@@ -139,6 +201,7 @@ function updateTicketStatus(id: string, status: SupportTicket['status']) {
       status
     }
   })
+  addActivity('manual', 'Ticket status updated', `${id} moved to ${status}.`)
 }
 
 function updateTicketAssignee(id: string, assignee: string) {
@@ -149,6 +212,7 @@ function updateTicketAssignee(id: string, assignee: string) {
       assignee
     }
   })
+  addActivity('manual', 'Ticket assigned', `${id} assigned to ${assignee}.`)
 }
 
 function updateTicketPriority(id: string, priority: SupportTicket['priority']) {
@@ -159,6 +223,7 @@ function updateTicketPriority(id: string, priority: SupportTicket['priority']) {
       priority
     }
   })
+  addActivity('manual', 'Ticket priority updated', `${id} changed to ${priority}.`)
 }
 
 async function submitSupportForm() {
@@ -166,6 +231,7 @@ async function submitSupportForm() {
     toolName: 'create_support_ticket',
     input: {
       subject: supportSubject.value,
+      account: supportAccount.value,
       body: supportBody.value
     }
   })
@@ -182,8 +248,10 @@ function getPlannerContext() {
   }
 }
 
-function createSupportTicket(subject: string, body: string): SupportTicket {
+function createSupportTicket(account: string, subject: string, body: string): SupportTicket {
   const ticket = {
+    account,
+    ageHours: 0,
     id: `ticket_${Date.now()}`,
     subject,
     body,
@@ -192,7 +260,24 @@ function createSupportTicket(subject: string, body: string): SupportTicket {
     assignee: 'Unassigned'
   }
   tickets.value = [ticket, ...tickets.value]
+  addActivity('manual', 'Support ticket created', `${subject} opened for ${account}.`)
   return ticket
+}
+
+function addActivity(kind: DemoActivityItem['kind'], title: string, detail: string) {
+  activityItems.value = [
+    {
+      id: `${Date.now()}-${activityItems.value.length}`,
+      kind,
+      time: new Date().toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit'
+      }),
+      title,
+      detail
+    },
+    ...activityItems.value
+  ].slice(0, 7)
 }
 
 function isTicketStatus(value: unknown): value is SupportTicket['status'] {

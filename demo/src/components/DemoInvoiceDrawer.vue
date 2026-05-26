@@ -10,6 +10,12 @@
         >{{ activeInvoice.status }} · €{{ activeInvoice.amount }} · due
         {{ activeInvoice.dueDate }}</span
       >
+      <small v-if="activeCustomer">
+        {{ activeCustomer.accountTier }} account · {{ activeCustomer.health }} health · €{{
+          activeCustomer.outstandingBalance
+        }}
+        open
+      </small>
     </div>
 
     <form class="invoice-form" @submit.prevent="submitDraft">
@@ -49,9 +55,10 @@
 </template>
 
 <script setup lang="ts">
-import type { Invoice, InvoiceDraft } from '@/interfaces/demo'
+import type { Customer, Invoice, InvoiceDraft } from '@/interfaces/demo'
 
 interface Props {
+  activeCustomer: Customer | undefined
   activeInvoice: Invoice | undefined
   draft: InvoiceDraft
 }
@@ -115,6 +122,11 @@ h2 {
 
 .active-record span {
   color: #9ea8a1;
+}
+
+.active-record small {
+  color: #e8be53;
+  text-transform: capitalize;
 }
 
 .invoice-form {
