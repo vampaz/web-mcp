@@ -145,12 +145,21 @@ export interface PlannerRequest {
   context: PlannerContext
 }
 
+export interface PlannerRunOptions {
+  signal?: AbortSignal
+}
+
 export interface ToolPlanner {
   name: string
   available: boolean
   status: 'ready' | 'downloadable' | 'downloading' | 'unavailable' | 'fallback' | 'needs-key'
   detail: string
-  plan: (message: string, tools: WebMCPTool[], context?: PlannerContext) => Promise<ToolPlan>
+  plan: (
+    message: string,
+    tools: WebMCPTool[],
+    context?: PlannerContext,
+    options?: PlannerRunOptions
+  ) => Promise<ToolPlan>
   dispose?: () => void
 }
 

@@ -2,6 +2,7 @@ import type {
   PlannerAuth,
   PlannerContext,
   PlannerProviderConfig,
+  PlannerRunOptions,
   ToolPlan,
   ToolPlanner,
   WebMCPTool
@@ -91,7 +92,13 @@ export function createHeuristicPlanner(): ToolPlanner {
     status: 'fallback',
     detail:
       'Chrome built-in AI is unavailable, so WebMCP Kit is using deterministic local planning.',
-    async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
+    async plan(
+      message: string,
+      tools: WebMCPTool[],
+      context?: PlannerContext,
+      options?: PlannerRunOptions
+    ) {
+      throwIfAborted(options?.signal)
       return planWithHeuristics(message, tools, context)
     }
   }
@@ -106,7 +113,13 @@ export async function createChromeAIPlanner(strict = false): Promise<ToolPlanner
       available: false,
       status: 'unavailable',
       detail: 'The browser does not expose the Chrome built-in AI LanguageModel API.',
-      async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
+      async plan(
+        message: string,
+        tools: WebMCPTool[],
+        context?: PlannerContext,
+        options?: PlannerRunOptions
+      ) {
+        throwIfAborted(options?.signal)
         if (strict) throw new Error('Chrome built-in AI is unavailable.')
         return planWithHeuristics(message, tools, context)
       }
@@ -202,9 +215,25 @@ export function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner 
     available: true,
     status: 'ready',
     detail: getRemotePlannerDetail(config, auth),
-    async plan(message: string, tools: WebMCPTool[], context: PlannerContext = {}) {
+    async plan(
+      message: string,
+      tools: WebMCPTool[],
+      context: PlannerContext = {},
+      options?: PlannerRunOptions
+    ) {
       try {
-        const plan = await planWithRemoteProvider(config, auth, key, model, message, tools, context)
+        throwIfAborted(options?.signal)
+        const plan = await planWithRemoteProvider(
+          config,
+          auth,
+          key,
+          model,
+          message,
+          tools,
+          context,
+          options
+        )
+        throwIfAborted(options?.signal)
         validateToolPlan(plan, tools)
         return plan
       } catch (error) {
@@ -247,17 +276,18 @@ async function planWithRemoteProvider(
   model: string,
   message: string,
   tools: WebMCPTool[],
-  context: PlannerContext
+  context: PlannerContext,
+  options?: PlannerRunOptions
 ): Promise<ToolPlan> {
   if (auth.mode === 'server') {
-    return planWithServerEndpoint(auth.endpoint, config, model, message, tools, context)
+    return planWithServerEndpoint(auth.endpoint, config, model, message, tools, context, options)
   }
 
   if (config.provider === 'cloudflare-workers-ai') {
-    return planWithCloudflareRest(config, apiKey, model, message, tools, context)
+    return planWithCloudflareRest(config, apiKey, model, message, tools, context, options)
   }
 
-  return planWithOpenAICompatible(config, apiKey, model, message, tools, context)
+  return planWithOpenAICompatible(config, apiKey, model, message, tools, context, options)
 }
 
 async function planWithServerEndpoint(
@@ -266,7 +296,8 @@ async function planWithServerEndpoint(
   model: string,
   message: string,
   tools: WebMCPTool[],
-  context: PlannerContext
+  context: PlannerContext,
+  options?: PlannerRunOptions
 ): Promise<ToolPlan> {
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -280,7 +311,8 @@ async function planWithServerEndpoint(
       tools: createToolCatalog(tools),
       context,
       responseSchema: toolPlanSchema
-    })
+    }),
+    signal: options?.signal
   })
 
   if (!response.ok) {
@@ -296,7 +328,8 @@ async function planWithOpenAICompatible(
   model: string,
   message: string,
   tools: WebMCPTool[],
-  context: PlannerContext
+  context: PlannerContext,
+  options?: PlannerRunOptions
 ): Promise<ToolPlan> {
   const baseUrl = getOpenAICompatibleBaseUrl(config)
   const headers: Record<string, string> = {
@@ -322,7 +355,8 @@ async function planWithOpenAICompatible(
         type: 'json_object'
       },
       temperature: 0
-    })
+    }),
+    signal: options?.signal
   })
 
   if (!response.ok) {
@@ -344,7 +378,8 @@ async function planWithCloudflareRest(
   model: string,
   message: string,
   tools: WebMCPTool[],
-  context: PlannerContext
+  context: PlannerContext,
+  options?: PlannerRunOptions
 ): Promise<ToolPlan> {
   if (!config.accountId) {
     throw new Error('Cloudflare REST planning needs accountId or server endpoint mode')
@@ -365,7 +400,8 @@ async function planWithCloudflareRest(
           json_schema: toolPlanSchema
         },
         temperature: 0
-      })
+      }),
+      signal: options?.signal
     }
   )
 
@@ -915,16 +951,25 @@ function createActiveChromePlanner(
     available: true,
     status,
     detail,
-    async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
+    async plan(
+      message: string,
+      tools: WebMCPTool[],
+      context?: PlannerContext,
+      options?: PlannerRunOptions
+    ) {
       try {
+        throwIfAborted(options?.signal)
         session ??= await createChromeAISession(languageModel)
-        return await planWithChromeAI(session, message, tools, context)
+        const plan = await planWithChromeAI(session, message, tools, context)
+        throwIfAborted(options?.signal)
+        return plan
       } catch (error) {
         if (strict)
           throw new Error(
             `Chrome built-in AI could not plan this command (${getErrorMessage(error)})`
           )
 
+        throwIfAborted(options?.signal)
         return {
           ...planWithHeuristics(message, tools, context),
           reason: `Chrome built-in AI could not plan this command (${getErrorMessage(error)}). Used deterministic fallback.`
@@ -977,7 +1022,13 @@ function createUnavailableChromePlanner(detail: string, strict = false): ToolPla
     available: false,
     status: 'unavailable',
     detail,
-    async plan(message: string, tools: WebMCPTool[], context?: PlannerContext) {
+    async plan(
+      message: string,
+      tools: WebMCPTool[],
+      context?: PlannerContext,
+      options?: PlannerRunOptions
+    ) {
+      throwIfAborted(options?.signal)
       if (strict) throw new Error(detail)
       return planWithHeuristics(message, tools, context)
     }
@@ -1063,4 +1114,9 @@ async function getServerPlannerError(response: Response): Promise<string> {
   }
 
   return `server planner returned ${response.status}`
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (!signal?.aborted) return
+  throw new Error('Planner request was cancelled.')
 }
