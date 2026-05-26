@@ -356,6 +356,51 @@ describe('native WebMCP adapter', () => {
     expect(execute).toHaveBeenCalledWith({ invoiceId: 'inv_1' }, { source: 'native' })
   })
 
+  it('runs native scope and guard checks before execution', async () => {
+    let nativeExecute: ((input: Record<string, unknown>) => unknown) | undefined
+    const execute = vi.fn(function openInvoice(input: Record<string, unknown>) {
+      return input
+    })
+
+    ;(navigator as NavigatorWithModelContext).modelContext = {
+      registerTool: vi.fn(function registerNativeToolMock(nativeTool) {
+        nativeExecute = nativeTool.execute
+        return undefined
+      })
+    }
+
+    registerTool(
+      defineTool({
+        name: 'open_invoice',
+        description: 'Open an invoice row in the visible invoice detail drawer.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' }
+          },
+          required: ['id']
+        },
+        scope() {
+          return {
+            available: true
+          }
+        },
+        guard(input) {
+          return input.id === 'inv_1' || 'Invoice is not visible in the current workspace.'
+        },
+        execute
+      })
+    )
+
+    await expect(nativeExecute?.({ id: 'inv_2' })).rejects.toThrow(
+      'Invoice is not visible in the current workspace.'
+    )
+    expect(execute).not.toHaveBeenCalled()
+
+    await expect(nativeExecute?.({ id: 'inv_1' })).resolves.toEqual({ id: 'inv_1' })
+    expect(execute).toHaveBeenCalledWith({ id: 'inv_1' }, { source: 'native' })
+  })
+
   it('normalizes confirmation handler failures before native execution', async () => {
     let nativeExecute: ((input: Record<string, unknown>) => unknown) | undefined
     const execute = vi.fn(function voidInvoice(input: Record<string, unknown>) {

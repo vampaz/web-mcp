@@ -1,11 +1,5 @@
 import type { APIRoute } from 'astro'
-import {
-  formatJsonValueValidationError,
-  getErrorMessage,
-  normalizeJsonText,
-  type JsonSchema,
-  validateJsonValue
-} from '@webmcp-kit/core'
+import { getErrorMessage, normalizeJsonText, type JsonSchema, validateToolPlan } from 'webmcp-kit'
 
 import type { CloudflareEnv } from '@/interfaces/cloudflare'
 
@@ -388,7 +382,7 @@ function parseAndValidatePlan(
   } catch {
     throw new Error(`${providerLabel} returned invalid JSON`)
   }
-  validatePlan(plan, tools)
+  validateToolPlan(plan, tools ?? [], { messageStyle: 'server' })
 
   return plan
 }
@@ -416,55 +410,6 @@ function extractResponseText(value: unknown): string | undefined {
 function getOpenAIModel(model: string | undefined): string | undefined {
   if (!model || model === openAIApiModel) return openAIApiModel
   return undefined
-}
-
-function validatePlan(plan: ToolPlan, tools: PlannerRequestBody['tools']): void {
-  if (!plan || typeof plan !== 'object') throw new Error('Invalid plan')
-  if (typeof plan.toolName !== 'string') throw new Error('Invalid toolName')
-  if (!plan.input || typeof plan.input !== 'object' || Array.isArray(plan.input))
-    throw new Error('Invalid input')
-  if (typeof plan.confidence !== 'number') throw new Error('Invalid confidence')
-  if (typeof plan.reason !== 'string') throw new Error('Invalid reason')
-  if (plan.steps !== undefined) {
-    validatePlanSequence(plan, tools)
-    return
-  }
-
-  validatePlanStep(plan, tools)
-}
-
-function validatePlanSequence(plan: ToolPlan, tools: PlannerRequestBody['tools']): void {
-  if (plan.toolName !== 'tool_sequence') throw new Error('Invalid tool sequence')
-  if (!Array.isArray(plan.steps) || plan.steps.length === 0)
-    throw new Error('Invalid tool sequence steps')
-  if (plan.steps.length > 5) throw new Error('Tool sequence is too long')
-
-  plan.steps.forEach(function validateSequenceStep(step) {
-    validatePlanStep(step, tools)
-  })
-}
-
-function validatePlanStep(step: ToolPlanStep, tools: PlannerRequestBody['tools']): void {
-  if (!step || typeof step !== 'object') throw new Error('Invalid plan step')
-  if (typeof step.toolName !== 'string') throw new Error('Invalid step toolName')
-  if (!step.input || typeof step.input !== 'object' || Array.isArray(step.input))
-    throw new Error('Invalid step input')
-  if (typeof step.confidence !== 'number') throw new Error('Invalid step confidence')
-  if (typeof step.reason !== 'string') throw new Error('Invalid step reason')
-
-  const selectedTool = tools?.find(function hasSelectedTool(tool) {
-    return tool.name === step.toolName
-  })
-  if (!selectedTool) {
-    throw new Error('Unknown tool')
-  }
-
-  if (!selectedTool.inputSchema) throw new Error('Selected tool has no input schema')
-
-  const inputValidationErrors = validateJsonValue(step.input, selectedTool.inputSchema)
-  if (inputValidationErrors.length > 0) {
-    throw new Error(`Invalid tool input: ${formatJsonValueValidationError(inputValidationErrors)}`)
-  }
 }
 
 async function getCloudflareEnv(locals: App.Locals): Promise<CloudflareEnv> {

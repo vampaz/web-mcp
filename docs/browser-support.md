@@ -3,7 +3,7 @@
 WebMCP Kit detects native browser support at runtime. It does not assume that every Chrome build has WebMCP enabled.
 
 ```ts
-import { getSupportLabel, isWebMCPSupported } from '@webmcp-kit/core'
+import { getSupportLabel, isWebMCPSupported } from 'webmcp-kit'
 
 if (isWebMCPSupported()) {
   console.log('Native WebMCP is available.')
@@ -48,7 +48,7 @@ The demo can configure the command input with an app-owned WebLLM planner that d
 
 ## Inspecting Tools
 
-During development or preview deployments, mount `@webmcp-kit/devtools` to inspect registered tools, warnings, prompt previews, sample inputs, and invocation history. The demo gates the overlay behind `import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIEW === 'true'`.
+During development or preview deployments, mount `webmcp-kit/devtools` to inspect registered tools, warnings, prompt previews, sample inputs, and invocation history. The demo gates the overlay behind `import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIEW === 'true'`.
 
 ## Chrome And Lighthouse Inspection
 

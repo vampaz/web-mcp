@@ -16,7 +16,7 @@ export interface RegisterFormToolFieldOptions {
   description?: string
 }
 
-export type FormInput = Record<string, string | boolean | string[]>
+export type FormInput = Record<string, string | number | boolean | string[]>
 
 export function registerFormTool<TOutput = FormData>(
   options: RegisterFormToolOptions<TOutput>
@@ -33,6 +33,9 @@ export function registerFormTool<TOutput = FormData>(
       confirmation: options.confirmation,
       execute(input) {
         fillForm(options.form, input)
+        if (!options.form.checkValidity()) {
+          throw new Error('Form input does not satisfy native validation constraints.')
+        }
 
         if (options.execute) {
           return options.execute(input, options.form)
@@ -48,12 +51,20 @@ export function inferFormInputSchema(form: HTMLFormElement): JsonSchema {
   const properties: Record<string, JsonSchema> = {}
   const required: string[] = []
   const fields = Array.from(form.elements).filter(isNamedField)
+  const seenNames = new Set<string>()
 
   for (const field of fields) {
     const name = field.name
-    properties[name] = inferFieldSchema(field)
+    if (seenNames.has(name)) continue
+    seenNames.add(name)
 
-    if ('required' in field && field.required) {
+    const namedField = form.elements.namedItem(name)
+    properties[name] =
+      namedField instanceof RadioNodeList
+        ? inferFieldGroupSchema(namedField, field)
+        : inferFieldSchema(field)
+
+    if (isRequiredField(namedField, field)) {
       required.push(name)
     }
   }
@@ -73,6 +84,7 @@ function inferFieldSchema(
   if (field instanceof HTMLInputElement && field.type === 'number') {
     return {
       type: 'number',
+      ...getNumberConstraints(field),
       description: getFieldDescription(field)
     }
   }
@@ -93,6 +105,18 @@ function inferFieldSchema(
         return option.value
       })
 
+    if (field.multiple) {
+      return {
+        type: 'array',
+        items: {
+          type: 'string',
+          ...(options.length > 0 ? { enum: options } : {})
+        },
+        ...(field.required ? { minItems: 1 } : {}),
+        description: getFieldDescription(field)
+      }
+    }
+
     return {
       type: 'string',
       description: getFieldDescription(field),
@@ -104,6 +128,7 @@ function inferFieldSchema(
     return {
       type: 'string',
       format: 'email',
+      ...getStringConstraints(field),
       description: getFieldDescription(field)
     }
   }
@@ -126,7 +151,29 @@ function inferFieldSchema(
 
   return {
     type: 'string',
+    ...getStringConstraints(field),
     description: getFieldDescription(field)
+  }
+}
+
+function inferFieldGroupSchema(
+  field: RadioNodeList,
+  firstField: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+): JsonSchema {
+  const radioOptions = Array.from(field)
+    .filter(function isEnabledRadioOption(element): element is HTMLInputElement {
+      return element instanceof HTMLInputElement && element.type === 'radio' && !element.disabled
+    })
+    .map(function mapRadioOption(element) {
+      return element.value
+    })
+
+  if (radioOptions.length === 0) return inferFieldSchema(firstField)
+
+  return {
+    type: 'string',
+    description: getFieldDescription(firstField),
+    enum: radioOptions
   }
 }
 
@@ -184,10 +231,70 @@ function fillForm(form: HTMLFormElement, input: FormInput): void {
       field instanceof HTMLTextAreaElement ||
       field instanceof HTMLSelectElement
     ) {
+      if (field instanceof HTMLSelectElement && field.multiple && Array.isArray(value)) {
+        const values = new Set(value.map(String))
+        Array.from(field.options).forEach(function syncSelectedOption(option) {
+          option.selected = values.has(option.value)
+        })
+        dispatchFieldEvents(field)
+        continue
+      }
+
       field.value = Array.isArray(value) ? (value[0] ?? '') : String(value)
       dispatchFieldEvents(field)
     }
   }
+}
+
+function getNumberConstraints(field: HTMLInputElement): Pick<JsonSchema, 'minimum' | 'maximum'> {
+  const minimum = getOptionalNumber(field.min)
+  const maximum = getOptionalNumber(field.max)
+
+  return {
+    ...(minimum !== undefined ? { minimum } : {}),
+    ...(maximum !== undefined ? { maximum } : {})
+  }
+}
+
+function getOptionalNumber(value: string): number | undefined {
+  if (!value) return undefined
+  const number = Number(value)
+  return Number.isFinite(number) ? number : undefined
+}
+
+function getStringConstraints(
+  field: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+): Pick<JsonSchema, 'minLength' | 'maxLength' | 'pattern'> {
+  if (field instanceof HTMLSelectElement) return {}
+
+  return {
+    ...(field.minLength >= 0 ? { minLength: field.minLength } : {}),
+    ...(field.maxLength >= 0 ? { maxLength: field.maxLength } : {}),
+    ...(field instanceof HTMLInputElement && field.pattern ? { pattern: field.pattern } : {})
+  }
+}
+
+function isRequiredField(
+  namedField: Element | RadioNodeList | null,
+  fallbackField: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+): boolean {
+  if (namedField instanceof RadioNodeList) {
+    return Array.from(namedField).some(function hasRequiredField(element) {
+      return isFormControl(element) && element.required
+    })
+  }
+
+  return 'required' in fallbackField && fallbackField.required
+}
+
+function isFormControl(
+  element: unknown
+): element is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement {
+  return (
+    element instanceof HTMLInputElement ||
+    element instanceof HTMLTextAreaElement ||
+    element instanceof HTMLSelectElement
+  )
 }
 
 function dispatchRadioGroupEvents(field: RadioNodeList): void {

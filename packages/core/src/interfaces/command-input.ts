@@ -4,6 +4,7 @@ import type {
   PlannerProviderKind,
   ToolInvocationResult,
   ToolPlan,
+  ToolPlanStep,
   ToolPlanner
 } from './tool'
 
@@ -68,7 +69,14 @@ export interface WebMCPCommandInputElement extends HTMLElement {
   provider?: PlannerProviderKind
   showChromeAI?: boolean
   configure: (options: WebMCPCommandInputConfigureOptions) => void
-  run: (message?: string) => Promise<ToolInvocationResult | undefined>
+  run: (
+    message?: string,
+    options?: WebMCPCommandInputRunOptions
+  ) => Promise<ToolInvocationResult | undefined>
+}
+
+export interface WebMCPCommandInputRunOptions {
+  signal?: AbortSignal
 }
 
 export interface WebMCPCommandPlanEventDetail {
@@ -85,6 +93,16 @@ export interface WebMCPCommandResultEventDetail {
   message: string
   plan: ToolPlan
   result: ToolInvocationResult
+}
+
+export interface WebMCPCommandStepEventDetail {
+  message: string
+  phase: 'started' | 'completed'
+  plan: ToolPlan
+  result?: ToolInvocationResult
+  step: ToolPlanStep
+  stepCount: number
+  stepIndex: number
 }
 
 export interface WebMCPCommandErrorEventDetail {

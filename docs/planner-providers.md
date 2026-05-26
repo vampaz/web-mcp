@@ -7,7 +7,7 @@ WebMCP Kit can plan tool calls with different model providers. The app still own
 Use server mode when the key belongs to the app or company.
 
 ```ts
-import { createWebMCPKit } from '@webmcp-kit/core'
+import { createWebMCPKit } from 'webmcp-kit'
 
 const kit = await createWebMCPKit({
   planner: {
@@ -145,10 +145,10 @@ For the separate `cloudflare-workers-ai` REST mode, use the same `.env` values o
 
 ## Web Component Input
 
-`@webmcp-kit/core` also exports a ready-made web component for apps that want a command input without building their own planner UI:
+`webmcp-kit` also exports a ready-made web component for apps that want a command input without building their own planner UI:
 
 ```ts
-import { defineWebMCPCommandInput } from '@webmcp-kit/core'
+import { defineWebMCPCommandInput } from 'webmcp-kit'
 
 defineWebMCPCommandInput()
 ```

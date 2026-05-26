@@ -43,6 +43,8 @@ function validateSchemaNode(schema: unknown, path: string, errors: string[]): vo
   validateEnum(node, path, errors)
   validateNumberKeyword(node.minimum, `${path}.minimum`, errors)
   validateNumberKeyword(node.maximum, `${path}.maximum`, errors)
+  validateIntegerKeyword(node.minItems, `${path}.minItems`, errors)
+  validateIntegerKeyword(node.maxItems, `${path}.maxItems`, errors)
   validateIntegerKeyword(node.minLength, `${path}.minLength`, errors)
   validateIntegerKeyword(node.maxLength, `${path}.maxLength`, errors)
   validatePatternKeyword(node.pattern, `${path}.pattern`, errors)
@@ -138,8 +140,8 @@ function validateEnum(schema: JsonSchema, path: string, errors: string[]): void 
 function validateNumberKeyword(value: unknown, path: string, errors: string[]): void {
   if (value === undefined) return
 
-  if (typeof value !== 'number' || Number.isNaN(value)) {
-    errors.push(`${path} must be a number.`)
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    errors.push(`${path} must be a finite number.`)
   }
 }
 
@@ -273,7 +275,21 @@ function validateArrayValue(
   path: string,
   errors: string[]
 ): void {
-  if (!Array.isArray(value) || !schema.items) return
+  if (!Array.isArray(value)) return
+
+  if (schema.minItems !== undefined && value.length < schema.minItems) {
+    errors.push(
+      `${formatValuePath(path)} expected array length >= ${schema.minItems}, got ${value.length}.`
+    )
+  }
+
+  if (schema.maxItems !== undefined && value.length > schema.maxItems) {
+    errors.push(
+      `${formatValuePath(path)} expected array length <= ${schema.maxItems}, got ${value.length}.`
+    )
+  }
+
+  if (!schema.items) return
 
   value.forEach(function validateArrayItem(item, index) {
     validateValueNode(
@@ -292,6 +308,10 @@ function validateNumberValue(
   errors: string[]
 ): void {
   if (typeof value !== 'number') return
+  if (!Number.isFinite(value)) {
+    errors.push(`${formatValuePath(path)} expected finite number, got ${getJsonValueType(value)}.`)
+    return
+  }
 
   if (schema.minimum !== undefined && value < schema.minimum) {
     errors.push(`${formatValuePath(path)} expected number >= ${schema.minimum}, got ${value}.`)
@@ -339,7 +359,7 @@ function matchesJsonSchemaType(value: unknown, type: string | string[]): boolean
   if (type === 'array') return Array.isArray(value)
   if (type === 'integer') return Number.isInteger(value)
   if (type === 'null') return value === null
-  if (type === 'number') return typeof value === 'number' && !Number.isNaN(value)
+  if (type === 'number') return typeof value === 'number' && Number.isFinite(value)
   if (type === 'object') return isJsonObject(value)
 
   return typeof value === type
@@ -360,6 +380,8 @@ function getJsonValueType(value: unknown): string {
   if (value === null) return 'null'
   if (Number.isInteger(value)) return 'integer'
   if (typeof value === 'number' && Number.isNaN(value)) return 'NaN'
+  if (value === Infinity) return 'Infinity'
+  if (value === -Infinity) return '-Infinity'
 
   return typeof value
 }

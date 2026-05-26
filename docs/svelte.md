@@ -5,8 +5,8 @@ Use `useWebMCPTool` to register a tool while the component is mounted. `when` ca
 ```svelte
 <script lang="ts">
   import { readable } from 'svelte/store'
-  import { defineTool } from '@webmcp-kit/core'
-  import { useWebMCPTool } from '@webmcp-kit/svelte'
+  import { defineTool } from 'webmcp-kit'
+  import { useWebMCPTool } from 'webmcp-kit/svelte'
 
   const isCatalogRoute = readable(window.location.pathname.startsWith('/catalog'))
 

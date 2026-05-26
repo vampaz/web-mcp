@@ -32,22 +32,26 @@ describe('browser local AI planner', () => {
         requestAdapter: async () => ({})
       }
     })
-    const completionCreate = vi.fn(async () => ({
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
-              toolName: 'select_items',
-              input: {
-                ids: ['item_4', 'item_7']
-              },
-              confidence: 0.91,
-              reason: 'Selected French items from current inventory context.'
-            })
+    const completionCreate = vi.fn(async function createCompletion(
+      _request: Record<string, unknown>
+    ) {
+      return {
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                toolName: 'select_items',
+                input: {
+                  ids: ['item_4', 'item_7']
+                },
+                confidence: 0.91,
+                reason: 'Selected French items from current inventory context.'
+              })
+            }
           }
-        }
-      ]
-    }))
+        ]
+      }
+    })
     webLLMMocks.createMLCEngine.mockResolvedValue({
       chat: {
         completions: {
@@ -87,7 +91,7 @@ describe('browser local AI planner', () => {
         { id: 'item_7', name: 'Baguette' }
       ]
     })
-    const request = completionCreate.mock.calls[0][0]
+    const request = completionCreate.mock.calls[0]?.[0] as Record<string, unknown> | undefined
 
     expect(plan).toMatchObject({
       toolName: 'select_items',
@@ -102,6 +106,7 @@ describe('browser local AI planner', () => {
         initProgressCallback: expect.any(Function)
       })
     )
+    if (!request) throw new Error('Expected WebLLM request.')
     expect(request.response_format).toEqual({
       type: 'json_object',
       schema: expect.any(String)

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-import { registerTool, type RegisteredTool, type WebMCPTool } from '@webmcp-kit/core'
+import { registerTool, type RegisteredTool, type WebMCPTool } from 'webmcp-kit'
 
 import type { UseWebMCPToolOptions } from './interfaces/webmcp-tool'
 

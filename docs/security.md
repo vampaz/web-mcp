@@ -24,7 +24,7 @@ confirmation: {
 Configure one app-level confirmation handler so tools can use your modal or approval UI instead of blocking browser prompts:
 
 ```ts
-import { setConfirmationHandler } from '@webmcp-kit/core'
+import { setConfirmationHandler } from 'webmcp-kit'
 
 setConfirmationHandler(async function confirmTool(tool, input, reason) {
   return showConfirmationModal({
@@ -67,7 +67,7 @@ scope() {
 Subscribe to WebMCP Kit events when you need local audit trails or analytics.
 
 ```ts
-import { subscribeWebMCPKitEvents } from '@webmcp-kit/core'
+import { subscribeWebMCPKitEvents } from 'webmcp-kit'
 
 const unsubscribe = subscribeWebMCPKitEvents(function handleEvent(event) {
   console.log(event.type, event.toolName)

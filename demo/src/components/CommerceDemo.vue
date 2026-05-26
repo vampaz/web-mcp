@@ -25,7 +25,7 @@
 </template>
 
 <script setup lang="ts">
-import { defineTool, invokeTool, listTools, registerTool } from '@webmcp-kit/core'
+import { defineTool, invokeTool, listTools, registerTool } from 'webmcp-kit'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 import DemoCartEditor from '@/components/DemoCartEditor.vue'

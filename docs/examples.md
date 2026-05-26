@@ -5,20 +5,18 @@ These examples show the current WebMCP Kit adoption path: expose narrow app acti
 ## Plain TypeScript
 
 ```ts
-import { defineTool, registerTool } from '@webmcp-kit/core'
+import { defineTool, objectInputSchema, registerTool, stringParam } from 'webmcp-kit'
 
 registerTool(
   defineTool({
     name: 'search_products',
     description: 'Search the local product catalog.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: { type: 'string' }
+    inputSchema: objectInputSchema(
+      {
+        query: stringParam({ description: 'Product name or category to search for.' })
       },
-      required: ['query'],
-      additionalProperties: false
-    },
+      { required: ['query'] }
+    ),
     annotations: {
       readOnlyHint: true
     },
@@ -34,8 +32,8 @@ registerTool(
 ```vue
 <script setup lang="ts">
 import { computed } from 'vue'
-import { defineTool } from '@webmcp-kit/core'
-import { useWebMCPTool } from '@webmcp-kit/vue'
+import { defineTool } from 'webmcp-kit'
+import { useWebMCPTool } from 'webmcp-kit/vue'
 
 const isCatalogRoute = computed(function getIsCatalogRoute() {
   return window.location.pathname.startsWith('/catalog')
@@ -70,7 +68,7 @@ useWebMCPTool(
 ## Confirmed Checkout
 
 ```ts
-import { defineTool, registerTool, setConfirmationHandler } from '@webmcp-kit/core'
+import { defineTool, registerTool, setConfirmationHandler } from 'webmcp-kit'
 
 registerTool(
   defineTool({
@@ -111,7 +109,7 @@ setConfirmationHandler(async function confirmTool(tool, input, reason) {
 
 ```ts
 import { expect, test } from '@playwright/test'
-import { invokeWebMCPTool, waitForWebMCPTool } from '@webmcp-kit/testing/playwright'
+import { invokeWebMCPTool, waitForWebMCPTool } from 'webmcp-kit/testing/playwright'
 
 test('selects items through the WebMCP test bridge', async function testSelectItems({ page }) {
   await page.goto('/')
@@ -134,7 +132,7 @@ The test bridge does not let tests bypass confirmation by passing `confirmed: tr
 ## Form Tool
 
 ```ts
-import { registerFormTool } from '@webmcp-kit/core'
+import { registerFormTool } from 'webmcp-kit'
 
 const form = document.querySelector<HTMLFormElement>('form')
 

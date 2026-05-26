@@ -16,7 +16,9 @@ import type {
   WebMCPCommandInputPhase,
   WebMCPCommandPlanEventDetail,
   WebMCPCommandPlannerEventDetail,
-  WebMCPCommandResultEventDetail
+  WebMCPCommandResultEventDetail,
+  WebMCPCommandStepEventDetail,
+  WebMCPCommandInputRunOptions
 } from './interfaces/command-input'
 import { escapeAttribute, escapeHtml } from './command-input-html'
 import { getErrorMessage } from './confirmation'
@@ -346,7 +348,10 @@ export function defineWebMCPCommandInput(
       void this.refreshPlannerStatus()
     }
 
-    async run(message?: string): Promise<ToolInvocationResult | undefined> {
+    async run(
+      message?: string,
+      options: WebMCPCommandInputRunOptions = {}
+    ): Promise<ToolInvocationResult | undefined> {
       if (this.state.floating) {
         this.state.floatingExpanded = true
         this.renderIfConnected()
@@ -369,11 +374,19 @@ export function defineWebMCPCommandInput(
         })
 
         this.setPhase('planning')
-        const plan = await planner.plan(command, tools, this.getPlannerContext())
+        throwIfAborted(options.signal)
+        const plan = await planner.plan(command, tools, this.getPlannerContext(), {
+          signal: options.signal
+        })
         this.dispatchPlanEvent(command, plan, planner)
         this.setPhase('executing')
 
-        const result = await invokePlannedSteps(plan, this.setActiveToolName.bind(this))
+        const result = await invokePlannedSteps(
+          plan,
+          this.setActiveToolName.bind(this),
+          (detail) => this.dispatchStepEvent(command, detail),
+          options.signal
+        )
         this.setPhase(result.status === 'success' ? 'completed' : 'failed')
         this.dispatchResultEvent(command, plan, result)
         return result
@@ -668,6 +681,22 @@ export function defineWebMCPCommandInput(
             message,
             plan,
             result
+          }
+        })
+      )
+    }
+
+    private dispatchStepEvent(
+      message: string,
+      detail: Omit<WebMCPCommandStepEventDetail, 'message'>
+    ) {
+      this.dispatchEvent(
+        new CustomEvent<WebMCPCommandStepEventDetail>('webmcp-command-step', {
+          bubbles: true,
+          composed: true,
+          detail: {
+            message,
+            ...detail
           }
         })
       )
@@ -1101,19 +1130,37 @@ export function defineWebMCPCommandInput(
 
 async function invokePlannedSteps(
   plan: ToolPlan,
-  setActiveToolName: (toolName: string) => void
+  setActiveToolName: (toolName: string) => void,
+  dispatchStepEvent: (detail: Omit<WebMCPCommandStepEventDetail, 'message'>) => void,
+  signal?: AbortSignal
 ): Promise<ToolInvocationResult> {
   const steps = getPlanSteps(plan)
   let result: ToolInvocationResult | undefined
 
   for (const [index, step] of steps.entries()) {
+    throwIfAborted(signal)
     const toolName =
       steps.length > 1 ? `${step.toolName} (${index + 1}/${steps.length})` : step.toolName
     setActiveToolName(toolName)
+    dispatchStepEvent({
+      phase: 'started',
+      plan,
+      step,
+      stepCount: steps.length,
+      stepIndex: index
+    })
     result = await invokeTool({
       toolName: step.toolName,
       input: step.input,
       source: 'planner'
+    })
+    dispatchStepEvent({
+      phase: 'completed',
+      plan,
+      result,
+      step,
+      stepCount: steps.length,
+      stepIndex: index
     })
     if (result.status !== 'success') return result
   }
@@ -1154,4 +1201,9 @@ function assertCustomElementsAvailable() {
       'WebMCP command input can only be defined in a browser custom elements environment.'
     )
   }
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (!signal?.aborted) return
+  throw new Error('Command was cancelled.')
 }

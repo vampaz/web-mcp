@@ -71,6 +71,12 @@ export {
   normalizeJsonText
 } from './planner'
 export {
+  toolPlanSchema,
+  validateToolPlan,
+  type ToolPlanValidationOptions,
+  type ToolPlanValidationTool
+} from './plan-validation'
+export {
   clearToolsForTest,
   getRegistrySnapshot,
   getTool,
@@ -79,6 +85,19 @@ export {
   registerTool
 } from './registry'
 export { formatJsonValueValidationError, validateJsonSchema, validateJsonValue } from './schema'
+export {
+  arrayParam,
+  booleanParam,
+  enumParam,
+  integerParam,
+  numberParam,
+  objectInputSchema,
+  stringParam,
+  type ArrayParamOptions,
+  type NumberParamOptions,
+  type ObjectInputSchemaOptions,
+  type StringParamOptions
+} from './schema-builders'
 export { getSupportLabel, isWebMCPSupported } from './support'
 export { escapeHtml, escapeAttribute } from './command-input-html'
 export {

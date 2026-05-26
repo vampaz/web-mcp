@@ -24,7 +24,7 @@ describe('Svelte useWebMCPTool', () => {
     })
 
     const { useWebMCPTool } = await import('./index')
-    const { defineTool, listTools } = await import('@webmcp-kit/core')
+    const { defineTool, listTools } = await import('webmcp-kit')
 
     useWebMCPTool(
       defineTool({
@@ -69,7 +69,7 @@ describe('Svelte useWebMCPTool', () => {
 
     const available = writable(false)
     const { useWebMCPTool } = await import('./index')
-    const { defineTool, listTools } = await import('@webmcp-kit/core')
+    const { defineTool, listTools } = await import('webmcp-kit')
 
     useWebMCPTool(
       defineTool({

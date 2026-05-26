@@ -52,7 +52,18 @@ describe('planner', () => {
     }
 
     const planner = await createBestPlanner()
-    const plan = await planner.plan('Select all the foods that are French', [])
+    const plan = await planner.plan('Select all the foods that are French', [
+      {
+        name: 'select_items',
+        description: 'Select checklist items by ID.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute() {
+          return []
+        }
+      }
+    ])
 
     expect(planner.available).toBe(true)
     expect(planner.status).toBe('downloadable')
@@ -81,7 +92,18 @@ describe('planner', () => {
     const planner = await createChromeAIPlanner()
     expect(create).not.toHaveBeenCalled()
 
-    const plan = await planner.plan('Find docks', [])
+    const plan = await planner.plan('Find docks', [
+      {
+        name: 'search_products',
+        description: 'Search products.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute() {
+          return []
+        }
+      }
+    ])
 
     expect(planner.available).toBe(true)
     expect(planner.status).toBe('ready')
@@ -141,6 +163,38 @@ describe('planner', () => {
     expect(plan.reason).toContain('Chrome built-in AI returned unparseable JSON')
   })
 
+  it('falls back if Chrome AI chooses an unavailable tool', async () => {
+    ;(window as WindowWithLanguageModel).LanguageModel = {
+      availability: async () => 'available',
+      create: async () => ({
+        prompt: async () =>
+          JSON.stringify({
+            toolName: 'delete_everything',
+            input: {},
+            confidence: 0.9,
+            reason: 'Bad tool choice.'
+          })
+      })
+    }
+
+    const planner = await createChromeAIPlanner()
+    const plan = await planner.plan('Find docks', [
+      {
+        name: 'search_products',
+        description: 'Search products.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute() {
+          return []
+        }
+      }
+    ])
+
+    expect(plan.toolName).toBe('search_products')
+    expect(plan.reason).toContain('provider selected unknown tool "delete_everything"')
+  })
+
   it('disposes Chrome AI sessions when the planner is disposed', async () => {
     const destroy = vi.fn()
     ;(window as WindowWithLanguageModel).LanguageModel = {
@@ -158,7 +212,18 @@ describe('planner', () => {
     }
 
     const planner = await createChromeAIPlanner()
-    await planner.plan('Find docks', [])
+    await planner.plan('Find docks', [
+      {
+        name: 'search_products',
+        description: 'Search products.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute() {
+          return []
+        }
+      }
+    ])
     planner.dispose?.()
 
     expect(destroy).toHaveBeenCalledOnce()
@@ -493,12 +558,27 @@ describe('planner', () => {
     }
 
     const planner = await createChromeAIPlanner()
-    const plan = await planner.plan('Select all the foods that are French', [], {
-      checklistItems: [
-        { id: 'item_4', name: 'Croissant', description: 'French bakery food, pastry' },
-        { id: 'item_7', name: 'Baguette', description: 'French bakery food, bread' }
-      ]
-    })
+    const plan = await planner.plan(
+      'Select all the foods that are French',
+      [
+        {
+          name: 'select_items',
+          description: 'Select checklist items by ID.',
+          inputSchema: {
+            type: 'object'
+          },
+          execute() {
+            return []
+          }
+        }
+      ],
+      {
+        checklistItems: [
+          { id: 'item_4', name: 'Croissant', description: 'French bakery food, pastry' },
+          { id: 'item_7', name: 'Baguette', description: 'French bakery food, bread' }
+        ]
+      }
+    )
 
     expect(promptText).toContain('Current app context')
     expect(promptText).toContain('Croissant')
@@ -719,6 +799,40 @@ describe('planner', () => {
         }
       ])
     ).rejects.toThrow('CLOUDFLARE_ACCOUNT_ID')
+  })
+
+  it('reports cancellation without wrapping it as a provider failure', async () => {
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    const controller = new AbortController()
+    const planner = await createConfiguredPlanner({
+      provider: 'openai',
+      model: 'gpt-5.4-mini',
+      auth: {
+        mode: 'server',
+        endpoint: '/api/webmcp/plan'
+      }
+    })
+    controller.abort()
+
+    await expect(
+      planner.plan(
+        'Find dock products',
+        [
+          {
+            name: 'search_products',
+            description: 'Search products.',
+            inputSchema: {
+              type: 'object'
+            },
+            execute: () => []
+          }
+        ],
+        {},
+        { signal: controller.signal }
+      )
+    ).rejects.toThrow('Planner request was cancelled.')
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   it('plans through a Cloudflare binding server endpoint with the selected model', async () => {

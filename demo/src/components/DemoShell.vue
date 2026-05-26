@@ -41,8 +41,8 @@ import {
   type WebMCPCommandInputEndpointOption,
   type WebMCPCommandInputPlannerOption,
   type WebMCPCommandPlannerEventDetail
-} from '@webmcp-kit/core'
-import { mountDevtoolsOverlay, type DevtoolsOverlay } from '@webmcp-kit/devtools'
+} from 'webmcp-kit'
+import { mountDevtoolsOverlay, type DevtoolsOverlay } from 'webmcp-kit/devtools'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 import DemoRuntimeStatus from '@/components/DemoRuntimeStatus.vue'

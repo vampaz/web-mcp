@@ -3,8 +3,8 @@
 Use `useWebMCPTool` to register a tool while the component is mounted. The hook syncs after renders, so `when` can read current route or component state.
 
 ```tsx
-import { defineTool } from '@webmcp-kit/core'
-import { useWebMCPTool } from '@webmcp-kit/react'
+import { defineTool } from 'webmcp-kit'
+import { useWebMCPTool } from 'webmcp-kit/react'
 
 export function CartTools() {
   useWebMCPTool(

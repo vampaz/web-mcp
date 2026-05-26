@@ -7,9 +7,12 @@ export interface JsonSchema {
   enum?: unknown[]
   minimum?: number
   maximum?: number
+  minItems?: number
+  maxItems?: number
   minLength?: number
   maxLength?: number
   pattern?: string
+  format?: string
   description?: string
   additionalProperties?: boolean | JsonSchema
   [key: string]: unknown
@@ -145,12 +148,21 @@ export interface PlannerRequest {
   context: PlannerContext
 }
 
+export interface PlannerRunOptions {
+  signal?: AbortSignal
+}
+
 export interface ToolPlanner {
   name: string
   available: boolean
   status: 'ready' | 'downloadable' | 'downloading' | 'unavailable' | 'fallback' | 'needs-key'
   detail: string
-  plan: (message: string, tools: WebMCPTool[], context?: PlannerContext) => Promise<ToolPlan>
+  plan: (
+    message: string,
+    tools: WebMCPTool[],
+    context?: PlannerContext,
+    options?: PlannerRunOptions
+  ) => Promise<ToolPlan>
   dispose?: () => void
 }
 

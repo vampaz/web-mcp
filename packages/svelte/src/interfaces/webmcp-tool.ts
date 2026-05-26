@@ -1,6 +1,6 @@
 import type { Readable } from 'svelte/store'
 
-import type { WebMCPTool } from '@webmcp-kit/core'
+import type { WebMCPTool } from 'webmcp-kit'
 
 export interface UseWebMCPToolOptions {
   when?: boolean | (() => boolean) | Readable<boolean>

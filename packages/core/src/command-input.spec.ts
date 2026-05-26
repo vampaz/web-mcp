@@ -5,7 +5,8 @@ import { defineTool } from './define-tool'
 import type {
   WebMCPCommandInputElement,
   WebMCPCommandPlannerEventDetail,
-  WebMCPCommandResultEventDetail
+  WebMCPCommandResultEventDetail,
+  WebMCPCommandStepEventDetail
 } from './interfaces/command-input'
 import type { ToolPlan, ToolPlanner } from './interfaces/tool'
 import { clearToolsForTest, registerTool } from './registry'
@@ -166,6 +167,126 @@ describe('WebMCP command input', () => {
       reason: 'Matched product search.'
     })
     await result
+  })
+
+  it('emits progress events for planned tool sequences', async () => {
+    registerTool(
+      defineTool({
+        name: 'select_items',
+        description: 'Select checklist items.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            ids: {
+              type: 'array',
+              items: { type: 'string' }
+            }
+          },
+          required: ['ids'],
+          additionalProperties: false
+        },
+        execute(input) {
+          return input
+        }
+      })
+    )
+    registerTool(
+      defineTool({
+        name: 'clear_item_selection',
+        description: 'Clear selected checklist items.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          required: [],
+          additionalProperties: false
+        },
+        execute(input) {
+          return input
+        }
+      })
+    )
+
+    const planner: ToolPlanner = {
+      name: 'Sequence planner',
+      available: true,
+      status: 'ready',
+      detail: 'Ready for tests.',
+      async plan() {
+        return {
+          toolName: 'tool_sequence',
+          input: {},
+          confidence: 0.9,
+          reason: 'Select and clear.',
+          steps: [
+            {
+              toolName: 'select_items',
+              input: { ids: ['item_1'] },
+              confidence: 0.9,
+              reason: 'Selected the item.'
+            },
+            {
+              toolName: 'clear_item_selection',
+              input: {},
+              confidence: 0.9,
+              reason: 'Cleared selection.'
+            }
+          ]
+        }
+      }
+    }
+    const element = createCommandInputElement()
+    const steps: WebMCPCommandStepEventDetail[] = []
+    element.planner = planner
+    element.addEventListener('webmcp-command-step', function handleStep(event) {
+      steps.push((event as CustomEvent<WebMCPCommandStepEventDetail>).detail)
+    })
+    document.body.append(element)
+    await Promise.resolve()
+
+    await expect(element.run('Select then clear')).resolves.toMatchObject({
+      status: 'success',
+      toolName: 'clear_item_selection'
+    })
+    expect(
+      steps.map(function mapStep(step) {
+        return `${step.phase}:${step.step.toolName}:${step.stepIndex}/${step.stepCount}`
+      })
+    ).toEqual([
+      'started:select_items:0/2',
+      'completed:select_items:0/2',
+      'started:clear_item_selection:1/2',
+      'completed:clear_item_selection:1/2'
+    ])
+  })
+
+  it('cancels a command before planning starts', async () => {
+    const plan = vi.fn(async function createPlan() {
+      return {
+        toolName: 'search_products',
+        input: { query: 'dock' },
+        confidence: 0.9,
+        reason: 'Should not run.'
+      }
+    })
+    const planner: ToolPlanner = {
+      name: 'Test planner',
+      available: true,
+      status: 'ready',
+      detail: 'Ready for tests.',
+      plan
+    }
+    const controller = new AbortController()
+    const element = createCommandInputElement()
+    element.planner = planner
+    document.body.append(element)
+    await Promise.resolve()
+    controller.abort()
+
+    await expect(element.run('Find docks', { signal: controller.signal })).resolves.toMatchObject({
+      status: 'error',
+      error: 'Command was cancelled.'
+    })
+    expect(plan).not.toHaveBeenCalled()
   })
 
   it('hides provider and model controls when both are initialized by attributes', async () => {

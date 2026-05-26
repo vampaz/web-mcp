@@ -137,7 +137,7 @@ All 10 planned docs exist and are well-written:
 - `docs/security.md` — Untrusted inputs, permissions, confirmations, redaction, audit hooks.
 - `docs/planner-providers.md` — Server mode, user-key mode, Chrome built-in AI, Cloudflare binding, model selection.
 - `docs/vue.md`, `docs/react.md`, `docs/svelte.md`, `docs/astro.md` — Consistent lifecycle-safe registration recipes.
-- `docs/framework-extensions.md` — Deferred framework packages policy.
+- `docs/framework-extensions.md` — Framework subpath policy.
 
 ---
 

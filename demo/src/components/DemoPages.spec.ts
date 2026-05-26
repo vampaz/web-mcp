@@ -6,7 +6,7 @@ import {
   invokeTool,
   listTools,
   type WebMCPCommandInputElement
-} from '@webmcp-kit/core'
+} from 'webmcp-kit'
 
 import CommerceDemo from './CommerceDemo.vue'
 import InventoryDemo from './InventoryDemo.vue'
