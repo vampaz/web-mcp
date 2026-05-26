@@ -237,6 +237,7 @@ export function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner 
         validateToolPlan(plan, tools)
         return plan
       } catch (error) {
+        throwIfAborted(options?.signal)
         throw new Error(`${providerLabel} could not plan this command (${getErrorMessage(error)})`)
       }
     }
@@ -964,12 +965,12 @@ function createActiveChromePlanner(
         throwIfAborted(options?.signal)
         return plan
       } catch (error) {
+        throwIfAborted(options?.signal)
         if (strict)
           throw new Error(
             `Chrome built-in AI could not plan this command (${getErrorMessage(error)})`
           )
 
-        throwIfAborted(options?.signal)
         return {
           ...planWithHeuristics(message, tools, context),
           reason: `Chrome built-in AI could not plan this command (${getErrorMessage(error)}). Used deterministic fallback.`

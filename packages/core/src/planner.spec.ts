@@ -721,6 +721,40 @@ describe('planner', () => {
     ).rejects.toThrow('CLOUDFLARE_ACCOUNT_ID')
   })
 
+  it('reports cancellation without wrapping it as a provider failure', async () => {
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    const controller = new AbortController()
+    const planner = await createConfiguredPlanner({
+      provider: 'openai',
+      model: 'gpt-5.4-mini',
+      auth: {
+        mode: 'server',
+        endpoint: '/api/webmcp/plan'
+      }
+    })
+    controller.abort()
+
+    await expect(
+      planner.plan(
+        'Find dock products',
+        [
+          {
+            name: 'search_products',
+            description: 'Search products.',
+            inputSchema: {
+              type: 'object'
+            },
+            execute: () => []
+          }
+        ],
+        {},
+        { signal: controller.signal }
+      )
+    ).rejects.toThrow('Planner request was cancelled.')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
   it('plans through a Cloudflare binding server endpoint with the selected model', async () => {
     const fetch = vi.fn(async () =>
       Response.json({

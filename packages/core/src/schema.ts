@@ -275,7 +275,7 @@ function validateArrayValue(
   path: string,
   errors: string[]
 ): void {
-  if (!Array.isArray(value) || !schema.items) return
+  if (!Array.isArray(value)) return
 
   if (schema.minItems !== undefined && value.length < schema.minItems) {
     errors.push(
@@ -288,6 +288,8 @@ function validateArrayValue(
       `${formatValuePath(path)} expected array length <= ${schema.maxItems}, got ${value.length}.`
     )
   }
+
+  if (!schema.items) return
 
   value.forEach(function validateArrayItem(item, index) {
     validateValueNode(
