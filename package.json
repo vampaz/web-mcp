@@ -100,20 +100,23 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
-    "@types/react": "^19.2.14",
-    "@types/node": "^25.7.0",
+    "@types/react": "^19.2.15",
+    "@types/node": "^25.9.1",
     "@vue/test-utils": "latest",
     "jsdom": "^29.1.1",
-    "oxfmt": "^0.51.0",
-    "oxlint": "^1.66.0",
+    "oxfmt": "^0.52.0",
+    "oxlint": "^1.67.0",
     "react": "^19.2.6",
-    "svelte": "^5.55.5",
+    "svelte": "^5.55.9",
     "typescript": "^6.0.3",
     "vue": "^3.5.34",
     "zod": "^4.4.3",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.7"
   },
   "engines": {
     "node": ">=24.12.0"
+  },
+  "overrides": {
+    "vite": "^7.3.3"
   }
 }
