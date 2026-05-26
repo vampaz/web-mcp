@@ -23,23 +23,18 @@ npm install @webmcp-kit/devtools
 ## Register A Tool
 
 ```ts
-import { defineTool, registerTool } from '@webmcp-kit/core'
+import { defineTool, objectInputSchema, registerTool, stringParam } from '@webmcp-kit/core'
 
 const registration = registerTool(
   defineTool({
     name: 'search_products',
     description: 'Search the local product catalog for products matching the shopper request.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: {
-          type: 'string',
-          description: 'Product name or category to search for.'
-        }
+    inputSchema: objectInputSchema(
+      {
+        query: stringParam({ description: 'Product name or category to search for.' })
       },
-      required: ['query'],
-      additionalProperties: false
-    },
+      { required: ['query'] }
+    ),
     annotations: {
       readOnlyHint: true
     },

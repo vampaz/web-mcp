@@ -5,20 +5,18 @@ These examples show the current WebMCP Kit adoption path: expose narrow app acti
 ## Plain TypeScript
 
 ```ts
-import { defineTool, registerTool } from '@webmcp-kit/core'
+import { defineTool, objectInputSchema, registerTool, stringParam } from '@webmcp-kit/core'
 
 registerTool(
   defineTool({
     name: 'search_products',
     description: 'Search the local product catalog.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: { type: 'string' }
+    inputSchema: objectInputSchema(
+      {
+        query: stringParam({ description: 'Product name or category to search for.' })
       },
-      required: ['query'],
-      additionalProperties: false
-    },
+      { required: ['query'] }
+    ),
     annotations: {
       readOnlyHint: true
     },
