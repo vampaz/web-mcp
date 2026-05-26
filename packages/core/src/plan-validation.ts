@@ -38,25 +38,28 @@ export const toolPlanSchema = {
 } satisfies JsonSchema
 
 export function validateToolPlan(
-  plan: ToolPlan,
+  plan: unknown,
   tools: ToolPlanValidationTool[],
   options: ToolPlanValidationOptions = {}
 ): void {
   const messages = getValidationMessages(options.messageStyle ?? 'provider')
 
   if (!plan || typeof plan !== 'object') throw new Error(messages.invalidPlan)
-  if (typeof plan.toolName !== 'string') throw new Error(messages.invalidToolName)
-  if (!plan.input || typeof plan.input !== 'object' || Array.isArray(plan.input)) {
+  const typedPlan = plan as Partial<ToolPlan>
+  if (typeof typedPlan.toolName !== 'string') throw new Error(messages.invalidToolName)
+  if (!typedPlan.input || typeof typedPlan.input !== 'object' || Array.isArray(typedPlan.input)) {
     throw new Error(messages.invalidInput)
   }
-  if (typeof plan.confidence !== 'number') throw new Error(messages.invalidConfidence)
-  if (typeof plan.reason !== 'string') throw new Error(messages.invalidReason)
-  if (plan.steps !== undefined) {
-    validateToolPlanSequence(plan, tools, messages)
+  if (typeof typedPlan.confidence !== 'number' || !Number.isFinite(typedPlan.confidence)) {
+    throw new Error(messages.invalidConfidence)
+  }
+  if (typeof typedPlan.reason !== 'string') throw new Error(messages.invalidReason)
+  if (typedPlan.steps !== undefined) {
+    validateToolPlanSequence(typedPlan as ToolPlan, tools, messages)
     return
   }
 
-  validateToolPlanStep(plan, tools, messages)
+  validateToolPlanStep(typedPlan as ToolPlanStep, tools, messages)
 }
 
 function validateToolPlanSequence(
@@ -85,7 +88,9 @@ function validateToolPlanStep(
   if (!step.input || typeof step.input !== 'object' || Array.isArray(step.input)) {
     throw new Error(messages.invalidStepInput)
   }
-  if (typeof step.confidence !== 'number') throw new Error(messages.invalidStepConfidence)
+  if (typeof step.confidence !== 'number' || !Number.isFinite(step.confidence)) {
+    throw new Error(messages.invalidStepConfidence)
+  }
   if (typeof step.reason !== 'string') throw new Error(messages.invalidStepReason)
 
   const selectedTool = tools.find(function findSelectedTool(tool) {
@@ -97,7 +102,10 @@ function validateToolPlanStep(
   const inputValidationErrors = validateJsonValue(step.input, selectedTool.inputSchema)
   if (inputValidationErrors.length > 0) {
     throw new Error(
-      messages.invalidToolInput(step.toolName, formatJsonValueValidationError(inputValidationErrors))
+      messages.invalidToolInput(
+        step.toolName,
+        formatJsonValueValidationError(inputValidationErrors)
+      )
     )
   }
 }

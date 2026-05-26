@@ -57,4 +57,21 @@ describe('schema builders', () => {
       )
     ).toEqual(['/ids is required.', '/extra is not allowed.'])
   })
+
+  it('requires enum values and omits type for mixed enums', () => {
+    expect(function createEmptyEnum() {
+      enumParam([])
+    }).toThrow('enumParam() requires at least one value.')
+
+    expect(enumParam(['draft', 1])).toEqual({
+      enum: ['draft', 1]
+    })
+  })
+
+  it('uses number type for numeric enums with decimal values', () => {
+    expect(enumParam([1, 2.5])).toEqual({
+      type: 'number',
+      enum: [1, 2.5]
+    })
+  })
 })

@@ -247,10 +247,19 @@ function fillForm(form: HTMLFormElement, input: FormInput): void {
 }
 
 function getNumberConstraints(field: HTMLInputElement): Pick<JsonSchema, 'minimum' | 'maximum'> {
+  const minimum = getOptionalNumber(field.min)
+  const maximum = getOptionalNumber(field.max)
+
   return {
-    ...(field.min ? { minimum: Number(field.min) } : {}),
-    ...(field.max ? { maximum: Number(field.max) } : {})
+    ...(minimum !== undefined ? { minimum } : {}),
+    ...(maximum !== undefined ? { maximum } : {})
   }
+}
+
+function getOptionalNumber(value: string): number | undefined {
+  if (!value) return undefined
+  const number = Number(value)
+  return Number.isFinite(number) ? number : undefined
 }
 
 function getStringConstraints(

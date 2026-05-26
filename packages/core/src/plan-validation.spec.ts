@@ -36,6 +36,26 @@ describe('tool plan validation', () => {
     }).toThrow('provider returned invalid input for "select_items"')
   })
 
+  it('accepts unknown values so callers can validate untrusted provider output', () => {
+    expect(function validateUnknownPlan() {
+      validateToolPlan('not a plan', tools)
+    }).toThrow('provider returned an invalid plan')
+  })
+
+  it('rejects non-finite confidence values', () => {
+    expect(function validateInvalidConfidencePlan() {
+      validateToolPlan(
+        {
+          toolName: 'select_items',
+          input: { ids: [] },
+          confidence: Infinity,
+          reason: 'Non-finite confidence.'
+        },
+        tools
+      )
+    }).toThrow('provider returned a plan without numeric confidence')
+  })
+
   it('validates tool sequences with server-style messages', () => {
     expect(function validateInvalidServerPlan() {
       validateToolPlan(

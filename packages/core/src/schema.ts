@@ -140,8 +140,8 @@ function validateEnum(schema: JsonSchema, path: string, errors: string[]): void 
 function validateNumberKeyword(value: unknown, path: string, errors: string[]): void {
   if (value === undefined) return
 
-  if (typeof value !== 'number' || Number.isNaN(value)) {
-    errors.push(`${path} must be a number.`)
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    errors.push(`${path} must be a finite number.`)
   }
 }
 
@@ -308,6 +308,10 @@ function validateNumberValue(
   errors: string[]
 ): void {
   if (typeof value !== 'number') return
+  if (!Number.isFinite(value)) {
+    errors.push(`${formatValuePath(path)} expected finite number, got ${getJsonValueType(value)}.`)
+    return
+  }
 
   if (schema.minimum !== undefined && value < schema.minimum) {
     errors.push(`${formatValuePath(path)} expected number >= ${schema.minimum}, got ${value}.`)
@@ -355,7 +359,7 @@ function matchesJsonSchemaType(value: unknown, type: string | string[]): boolean
   if (type === 'array') return Array.isArray(value)
   if (type === 'integer') return Number.isInteger(value)
   if (type === 'null') return value === null
-  if (type === 'number') return typeof value === 'number' && !Number.isNaN(value)
+  if (type === 'number') return typeof value === 'number' && Number.isFinite(value)
   if (type === 'object') return isJsonObject(value)
 
   return typeof value === type
@@ -376,6 +380,8 @@ function getJsonValueType(value: unknown): string {
   if (value === null) return 'null'
   if (Number.isInteger(value)) return 'integer'
   if (typeof value === 'number' && Number.isNaN(value)) return 'NaN'
+  if (value === Infinity) return 'Infinity'
+  if (value === -Infinity) return '-Infinity'
 
   return typeof value
 }

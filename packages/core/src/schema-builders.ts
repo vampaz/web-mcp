@@ -76,16 +76,35 @@ export function enumParam<TValue extends string | number | boolean>(
   values: readonly TValue[],
   description?: string
 ): JsonSchema {
+  if (values.length === 0) {
+    throw new Error('enumParam() requires at least one value.')
+  }
+
+  const type = getEnumType(values)
   return {
-    type: getEnumType(values),
+    ...(type ? { type } : {}),
     enum: [...values],
     ...(description ? { description } : {})
   }
 }
 
-function getEnumType(values: readonly unknown[]): JsonSchema['type'] {
+function getEnumType(values: readonly unknown[]): JsonSchema['type'] | undefined {
   const firstValue = values[0]
-  if (typeof firstValue === 'number') return Number.isInteger(firstValue) ? 'integer' : 'number'
+  if (
+    !values.every(function hasSameType(value) {
+      return typeof value === typeof firstValue
+    })
+  ) {
+    return undefined
+  }
+
+  if (typeof firstValue === 'number') {
+    return values.every(function isIntegerEnumValue(value) {
+      return Number.isInteger(value)
+    })
+      ? 'integer'
+      : 'number'
+  }
   if (typeof firstValue === 'boolean') return 'boolean'
   return 'string'
 }

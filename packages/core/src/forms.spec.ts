@@ -273,6 +273,22 @@ describe('form helpers', () => {
     })
   })
 
+  it('ignores invalid native number constraints instead of creating invalid schemas', () => {
+    document.body.innerHTML = `
+      <form>
+        <label>Amount <input name="amount" type="number" min="not-a-number" max="Infinity" /></label>
+      </form>
+    `
+
+    const form = document.querySelector('form')
+    if (!form) throw new Error('Expected test form.')
+
+    expect(inferFormInputSchema(form).properties?.amount).toEqual({
+      type: 'number',
+      description: 'Amount'
+    })
+  })
+
   it('fills radio groups through RadioNodeList fields', async () => {
     document.body.innerHTML = `
       <form>

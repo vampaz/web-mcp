@@ -4,9 +4,17 @@
   "description": "Zod schema helper for defining typed WebMCP Kit tools.",
   "type": "module",
   "private": true,
-  "keywords": ["webmcp", "zod", "schema", "tools"],
+  "keywords": [
+    "webmcp",
+    "zod",
+    "schema",
+    "tools"
+  ],
   "sideEffects": false,
-  "files": ["src", "README.md"],
+  "files": [
+    "src",
+    "README.md"
+  ],
   "exports": {
     ".": "./src/index.ts"
   },

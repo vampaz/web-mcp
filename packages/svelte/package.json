@@ -4,9 +4,17 @@
   "description": "Svelte lifecycle helper for registering WebMCP Kit tools.",
   "type": "module",
   "private": true,
-  "keywords": ["webmcp", "svelte", "browser-ai", "tools"],
+  "keywords": [
+    "webmcp",
+    "svelte",
+    "browser-ai",
+    "tools"
+  ],
   "sideEffects": false,
-  "files": ["src", "README.md"],
+  "files": [
+    "src",
+    "README.md"
+  ],
   "exports": {
     ".": "./src/index.ts"
   },

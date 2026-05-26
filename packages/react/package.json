@@ -4,9 +4,17 @@
   "description": "React lifecycle helper for registering WebMCP Kit tools.",
   "type": "module",
   "private": true,
-  "keywords": ["webmcp", "react", "browser-ai", "tools"],
+  "keywords": [
+    "webmcp",
+    "react",
+    "browser-ai",
+    "tools"
+  ],
   "sideEffects": false,
-  "files": ["src", "README.md"],
+  "files": [
+    "src",
+    "README.md"
+  ],
   "exports": {
     ".": "./src/index.ts"
   },

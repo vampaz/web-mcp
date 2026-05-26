@@ -4,9 +4,17 @@
   "description": "Local MCP-style bridge over the active WebMCP Kit fallback registry.",
   "type": "module",
   "private": true,
-  "keywords": ["webmcp", "mcp", "bridge", "tools"],
+  "keywords": [
+    "webmcp",
+    "mcp",
+    "bridge",
+    "tools"
+  ],
   "sideEffects": false,
-  "files": ["src", "README.md"],
+  "files": [
+    "src",
+    "README.md"
+  ],
   "exports": {
     ".": "./src/index.ts"
   },

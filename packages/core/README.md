@@ -18,8 +18,12 @@ registerTool(
       { required: ['query'] }
     ),
     execute(input) {
-      return searchProducts(input.query)
+      return searchProducts(String(input.query))
     }
   })
 )
+
+function searchProducts(query: string) {
+  return [{ query }]
+}
 ```

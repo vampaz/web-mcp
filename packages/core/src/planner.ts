@@ -962,6 +962,7 @@ function createActiveChromePlanner(
         throwIfAborted(options?.signal)
         session ??= await createChromeAISession(languageModel)
         const plan = await planWithChromeAI(session, message, tools, context)
+        validateToolPlan(plan, tools)
         throwIfAborted(options?.signal)
         return plan
       } catch (error) {

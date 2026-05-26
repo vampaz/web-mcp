@@ -80,6 +80,33 @@ describe('schema validation', () => {
     ])
   })
 
+  it('rejects non-finite number constraints and values', () => {
+    expect(
+      validateJsonSchema(
+        {
+          type: 'number',
+          minimum: Infinity
+        },
+        'inputSchema'
+      )
+    ).toEqual(['inputSchema.minimum must be a finite number.'])
+
+    expect(
+      validateJsonValue(
+        {
+          amount: Infinity
+        },
+        {
+          type: 'object',
+          properties: {
+            amount: { type: 'number' }
+          },
+          required: ['amount']
+        }
+      )
+    ).toEqual(['/amount expected number, got Infinity.'])
+  })
+
   it('throws actionable defineTool errors for invalid input schemas', () => {
     expect(function defineInvalidTool() {
       defineTool({
