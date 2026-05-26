@@ -183,6 +183,18 @@ describe('schema validation', () => {
     ).toEqual(['/lineItems/1/quantity expected integer, got number.'])
   })
 
+  it('validates array length constraints', () => {
+    expect(
+      validateJsonValue([], {
+        type: 'array',
+        items: {
+          type: 'string'
+        },
+        minItems: 1
+      })
+    ).toEqual(['/ expected array length >= 1, got 0.'])
+  })
+
   it('validates values against anyOf schemas', () => {
     const schema = {
       type: 'object',

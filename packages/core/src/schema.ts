@@ -43,6 +43,8 @@ function validateSchemaNode(schema: unknown, path: string, errors: string[]): vo
   validateEnum(node, path, errors)
   validateNumberKeyword(node.minimum, `${path}.minimum`, errors)
   validateNumberKeyword(node.maximum, `${path}.maximum`, errors)
+  validateIntegerKeyword(node.minItems, `${path}.minItems`, errors)
+  validateIntegerKeyword(node.maxItems, `${path}.maxItems`, errors)
   validateIntegerKeyword(node.minLength, `${path}.minLength`, errors)
   validateIntegerKeyword(node.maxLength, `${path}.maxLength`, errors)
   validatePatternKeyword(node.pattern, `${path}.pattern`, errors)
@@ -274,6 +276,18 @@ function validateArrayValue(
   errors: string[]
 ): void {
   if (!Array.isArray(value) || !schema.items) return
+
+  if (schema.minItems !== undefined && value.length < schema.minItems) {
+    errors.push(
+      `${formatValuePath(path)} expected array length >= ${schema.minItems}, got ${value.length}.`
+    )
+  }
+
+  if (schema.maxItems !== undefined && value.length > schema.maxItems) {
+    errors.push(
+      `${formatValuePath(path)} expected array length <= ${schema.maxItems}, got ${value.length}.`
+    )
+  }
 
   value.forEach(function validateArrayItem(item, index) {
     validateValueNode(

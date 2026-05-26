@@ -224,6 +224,55 @@ describe('form helpers', () => {
     })
   })
 
+  it('infers native constraints and multi-select fields', () => {
+    document.body.innerHTML = `
+      <form>
+        <label>Subject <input name="subject" minlength="4" maxlength="40" pattern="[A-Za-z ]+" /></label>
+        <label>Amount <input name="amount" type="number" min="1" max="500" /></label>
+        <label>Tags
+          <select name="tags" multiple required>
+            <option value="billing">Billing</option>
+            <option value="access">Access</option>
+          </select>
+        </label>
+      </form>
+    `
+
+    const form = document.querySelector('form')
+    if (!form) throw new Error('Expected test form.')
+
+    expect(inferFormInputSchema(form)).toEqual({
+      type: 'object',
+      properties: {
+        subject: {
+          type: 'string',
+          minLength: 4,
+          maxLength: 40,
+          pattern: '[A-Za-z ]+',
+          description: 'Subject'
+        },
+        amount: {
+          type: 'number',
+          minimum: 1,
+          maximum: 500,
+          description: 'Amount'
+        },
+        tags: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['billing', 'access']
+          },
+          minItems: 1,
+          description: 'Tags'
+        }
+      },
+      required: ['tags'],
+      additionalProperties: false,
+      'x-webmcp-source': 'form'
+    })
+  })
+
   it('fills radio groups through RadioNodeList fields', async () => {
     document.body.innerHTML = `
       <form>
@@ -251,6 +300,38 @@ describe('form helpers', () => {
     const priority = form.elements.namedItem('priority')
     expect(priority).toBeInstanceOf(RadioNodeList)
     expect((priority as RadioNodeList).value).toBe('high')
+  })
+
+  it('blocks form execution when native validity fails after filling', async () => {
+    document.body.innerHTML = `
+      <form>
+        <label>Email <input name="email" type="email" required /></label>
+      </form>
+    `
+
+    const form = document.querySelector('form')
+    if (!form) throw new Error('Expected test form.')
+
+    registerFormTool({
+      form,
+      name: 'send_support_reply',
+      description: 'Send a support reply to the visible customer email address.',
+      execute(input) {
+        return input
+      }
+    })
+
+    await expect(
+      invokeTool({
+        toolName: 'send_support_reply',
+        input: {
+          email: 'not-an-email'
+        }
+      })
+    ).resolves.toMatchObject({
+      status: 'error',
+      error: 'Form input does not satisfy native validation constraints.'
+    })
   })
 
   it('dispatches input and change events when filling fields', async () => {

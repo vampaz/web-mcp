@@ -7,9 +7,12 @@ export interface JsonSchema {
   enum?: unknown[]
   minimum?: number
   maximum?: number
+  minItems?: number
+  maxItems?: number
   minLength?: number
   maxLength?: number
   pattern?: string
+  format?: string
   description?: string
   additionalProperties?: boolean | JsonSchema
   [key: string]: unknown
