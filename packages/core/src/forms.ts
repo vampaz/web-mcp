@@ -16,7 +16,7 @@ export interface RegisterFormToolFieldOptions {
   description?: string
 }
 
-export type FormInput = Record<string, string | boolean | string[]>
+export type FormInput = Record<string, string | number | boolean | string[]>
 
 export function registerFormTool<TOutput = FormData>(
   options: RegisterFormToolOptions<TOutput>

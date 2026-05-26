@@ -1,6 +1,6 @@
 import type { MaybeRefOrGetter } from 'vue'
 
-import type { RegisteredTool, WebMCPTool } from '@webmcp-kit/core'
+import type { RegisteredTool, WebMCPTool } from 'webmcp-kit'
 
 export interface UseWebMCPToolOptions {
   when?: MaybeRefOrGetter<boolean>

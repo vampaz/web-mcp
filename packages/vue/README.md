@@ -1,10 +1,10 @@
-# @webmcp-kit/vue
+# webmcp-kit/vue
 
 Vue lifecycle helper for registering a WebMCP Kit tool while the current effect scope is active.
 
 ```ts
-import { defineTool, objectInputSchema, stringParam } from '@webmcp-kit/core'
-import { useWebMCPTool } from '@webmcp-kit/vue'
+import { defineTool, objectInputSchema, stringParam } from 'webmcp-kit'
+import { useWebMCPTool } from 'webmcp-kit/vue'
 
 useWebMCPTool(
   defineTool({

@@ -2,7 +2,7 @@ export interface BrowserLocalAIPlannerOptions {
   model: string
 }
 
-export interface NavigatorWithGpu extends Navigator {
+export interface NavigatorWithGpu {
   gpu?: {
     requestAdapter: () => Promise<unknown>
   }

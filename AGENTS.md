@@ -35,7 +35,7 @@ WebMCP Kit is an ESM-only TypeScript npm workspace for exposing app actions as W
 
 - TypeScript strict mode, ESM imports/exports, single quotes.
 - Prefer function declarations over function expressions assigned to `const`/`let`.
-- Use workspace imports such as `@webmcp-kit/core`; use `@/` only inside `demo/src`.
+- Use workspace imports such as `webmcp-kit`; use `@/` only inside `demo/src`.
 - Shared demo interfaces go in `demo/src/interfaces`; package-local shared interfaces go in `packages/<name>/src/interfaces`.
 - Vue SFC order is `template`, then `<script setup lang="ts">`, then `style`.
 - Use `withDefaults()` with `defineProps<>()` for Vue props.
@@ -55,7 +55,7 @@ WebMCP Kit is an ESM-only TypeScript npm workspace for exposing app actions as W
 
 ## Framework Helpers
 
-- Keep Vue/React/Svelte packages thin. They register via `@webmcp-kit/core`, unregister on component unmount/dispose, and do not duplicate registry behavior.
+- Keep Vue/React/Svelte packages thin. They register via `webmcp-kit`, unregister on component unmount/dispose, and do not duplicate registry behavior.
 - Vue `useWebMCPTool()` registers in the current effect scope and supports reactive `when`.
 - React `useWebMCPTool()` syncs from effects and cleans up registrations.
 - Svelte `useWebMCPTool()` registers in `onMount`; preserve readable-store `when` support.

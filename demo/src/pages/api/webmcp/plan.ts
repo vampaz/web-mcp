@@ -1,10 +1,5 @@
 import type { APIRoute } from 'astro'
-import {
-  getErrorMessage,
-  normalizeJsonText,
-  type JsonSchema,
-  validateToolPlan
-} from '@webmcp-kit/core'
+import { getErrorMessage, normalizeJsonText, type JsonSchema, validateToolPlan } from 'webmcp-kit'
 
 import type { CloudflareEnv } from '@/interfaces/cloudflare'
 

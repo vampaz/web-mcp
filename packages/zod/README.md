@@ -1,10 +1,10 @@
-# @webmcp-kit/zod
+# webmcp-kit/zod
 
 Zod helper for defining WebMCP Kit tools from a Zod input schema. Runtime parsing still happens before the tool execute callback.
 
 ```ts
 import { z } from 'zod'
-import { defineZodTool } from '@webmcp-kit/zod'
+import { defineZodTool } from 'webmcp-kit/zod'
 
 defineZodTool({
   name: 'search_products',

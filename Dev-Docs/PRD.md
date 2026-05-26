@@ -217,7 +217,7 @@ function hasNativeWebMCP(): boolean {
 ```mermaid
 flowchart LR
     App[Web App]
-    Core[@webmcp-kit/core]
+    Core[webmcp-kit]
     Native[Native WebMCP API]
     Fallback[Fallback Registry]
     Devtools[Dev Overlay]
@@ -239,7 +239,7 @@ flowchart LR
 ## 10. Example API
 
 ```typescript
-import { defineTool, registerTool } from '@webmcp-kit/core'
+import { defineTool, registerTool } from 'webmcp-kit'
 
 const createInvoiceTool = defineTool({
   name: 'create_invoice',

@@ -281,7 +281,7 @@ Rate limits are per-account, identified by the API token. The `429` response inc
 
 Rate limiting uses Cloudflare Rate Limiting rules on the Worker route, with a KV-backed counter for per-account tracking.
 
-## Client-Side Changes in `@webmcp-kit/core`
+## Client-Side Changes in `webmcp-kit`
 
 ### New Provider Kind
 
@@ -331,7 +331,7 @@ This preserves the existing graceful degradation pattern — the app works, just
 Optionally, the kit can expose a server-side `getTokenBalance()` helper that calls `GET https://api.webmcpkit.com/balance` with the account token. Browser UIs should call their own app endpoint for balance display.
 
 ```ts
-import { getTokenBalance } from '@webmcp-kit/core'
+import { getTokenBalance } from 'webmcp-kit'
 
 const balance = await getTokenBalance('wk_live_abc123')
 // { tokens: 8432, plan: 'starter', nextReset: null }
@@ -409,7 +409,7 @@ Initial infrastructure cost is near zero. Costs scale linearly with usage, and t
 
 | Step | Deliverable                                                                                               | Dependencies                     |
 | ---- | --------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| 1    | Add `webmcp-cloud` provider kind, command-input support, and `402` fallback to `@webmcp-kit/core`         | None                             |
+| 1    | Add `webmcp-cloud` provider kind, command-input support, and `402` fallback to `webmcp-kit`               | None                             |
 | 2    | Build `api.webmcpkit.com/plan` Worker with atomic token ledger, model routing, and account-scoped caching | D1 schema, KV namespace          |
 | 3    | Build dashboard (sign-up, tokens, usage, purchase)                                                        | Stripe account, Cloudflare Pages |
 | 4    | Add `getTokenBalance()` to core                                                                           | API Worker running               |

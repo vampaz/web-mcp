@@ -16,7 +16,7 @@
 - [x] Phase 3: Document The Integration Path
   - [x] Step 3.1: Document the health-check API and Cloudflare deploy command
     - Files: `README.md`, `docs/astro.md`, `docs/planner-providers.md`
-    - Test: `npm --workspace @webmcp-kit/demo exec tsc -- --noEmit`
+    - Test: `npm --workspace webmcp-kit-demo exec tsc -- --noEmit`
 
 - [x] Phase 4: Add README Access To The Demo
   - [x] Step 4.1: Render the repository README as a demo Astro page

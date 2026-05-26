@@ -1,10 +1,6 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
-import type { WebMCPCommandInputElement } from '@webmcp-kit/core'
-import {
-  invokeWebMCPTool,
-  listWebMCPTools,
-  waitForWebMCPTool
-} from '@webmcp-kit/testing/playwright'
+import type { WebMCPCommandInputElement } from 'webmcp-kit'
+import { invokeWebMCPTool, listWebMCPTools, waitForWebMCPTool } from 'webmcp-kit/testing/playwright'
 
 type LanguageModelAvailability = 'available' | 'downloadable' | 'downloading' | 'unavailable'
 
@@ -682,10 +678,13 @@ async function selectPlannerProvider(
         if (!commandInput) throw new Error('Expected WebMCP command input.')
 
         commandInput.planner = undefined
+        const provider = options.provider.startsWith('planner:')
+          ? undefined
+          : (options.provider as WebMCPCommandInputElement['provider'])
         commandInput.configure({
           endpoint: options.endpoint,
           model: options.model,
-          provider: options.provider.startsWith('planner:') ? undefined : options.provider
+          provider
         })
       },
       {

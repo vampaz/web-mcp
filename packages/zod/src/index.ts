@@ -1,4 +1,4 @@
-import { defineTool, type JsonSchema } from '@webmcp-kit/core'
+import { defineTool, type JsonSchema } from 'webmcp-kit'
 import { toJSONSchema } from 'zod'
 import type * as z from 'zod'
 

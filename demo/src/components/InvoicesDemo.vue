@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { defineTool, listTools, registerTool } from '@webmcp-kit/core'
+import { defineTool, listTools, registerTool } from 'webmcp-kit'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 import DemoInvoiceDrawer from '@/components/DemoInvoiceDrawer.vue'

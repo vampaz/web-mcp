@@ -4,7 +4,7 @@ import {
   type JsonSchema,
   type RegisteredTool,
   type ToolInvocationResult
-} from '@webmcp-kit/core'
+} from 'webmcp-kit'
 
 export interface MCPBridgeTool {
   name: string

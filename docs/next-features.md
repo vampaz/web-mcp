@@ -61,7 +61,7 @@ const createInvoiceTool = defineZodTool({
 })
 ```
 
-This would dramatically reduce boilerplate and eliminate a class of bugs. Ship it as `@webmcp-kit/zod` or in core behind an optional peer dependency.
+This would dramatically reduce boilerplate and eliminate a class of bugs. Ship it as `webmcp-kit/zod` or in core behind an optional peer dependency.
 
 ### 3. Reactive Framework Composables
 
@@ -71,7 +71,7 @@ This would dramatically reduce boilerplate and eliminate a class of bugs. Ship i
 
 ```ts
 // Vue composable example
-import { useWebMCPTool } from '@webmcp-kit/vue'
+import { useWebMCPTool } from 'webmcp-kit/vue'
 
 useWebMCPTool(createInvoiceTool, {
   // Tool auto-registers only when on /invoices route
@@ -81,7 +81,7 @@ useWebMCPTool(createInvoiceTool, {
 
 ```tsx
 // React hook example
-import { useWebMCPTool } from '@webmcp-kit/react'
+import { useWebMCPTool } from 'webmcp-kit/react'
 
 useWebMCPTool(createInvoiceTool, {
   when: () => router.pathname.startsWith('/invoices')
@@ -97,7 +97,7 @@ This is the feature that makes the framework story feel real instead of "here's 
 **Needed**: A confirmation provider that the app configures once, globally.
 
 ```ts
-import { createWebMCPKit, setConfirmationHandler } from '@webmcp-kit/core'
+import { createWebMCPKit, setConfirmationHandler } from 'webmcp-kit'
 
 setConfirmationHandler(async function onConfirm(tool, input, reason) {
   // Plug in your own modal, toast, or whatever
@@ -227,7 +227,7 @@ Planners can use error codes to decide whether to retry, ask for clarification, 
 **Needed**: An observability helper that turns the event stream into actionable data.
 
 ```ts
-import { createToolMetrics } from '@webmcp-kit/core'
+import { createToolMetrics } from 'webmcp-kit'
 
 const metrics = createToolMetrics()
 // metrics.invocations.create_invoice.count — total calls

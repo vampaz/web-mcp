@@ -19,7 +19,7 @@ describe('React useWebMCPTool', () => {
     })
 
     const { useWebMCPTool } = await import('./index')
-    const { defineTool, listTools } = await import('@webmcp-kit/core')
+    const { defineTool, listTools } = await import('webmcp-kit')
     const tool = defineTool({
       name: 'create_ticket',
       description: 'Create a support ticket from the current React screen.',
@@ -58,7 +58,7 @@ describe('React useWebMCPTool', () => {
     })
 
     const { useWebMCPTool } = await import('./index')
-    const { defineTool, listTools } = await import('@webmcp-kit/core')
+    const { defineTool, listTools } = await import('webmcp-kit')
 
     runtime.render(function renderHook() {
       useWebMCPTool(

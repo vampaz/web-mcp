@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { z } from 'zod'
 
-import { clearToolsForTest, invokeTool, registerTool } from '@webmcp-kit/core'
+import { clearToolsForTest, invokeTool, registerTool } from 'webmcp-kit'
 
 import { defineZodTool } from './index'
 

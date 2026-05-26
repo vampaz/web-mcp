@@ -50,7 +50,7 @@ await createWebMCPKit({
 
 Changes needed:
 
-- Add `webmcp-cloud` as a built-in planner provider in `@webmcp-kit/core`
+- Add `webmcp-cloud` as a built-in planner provider in `webmcp-kit`
 - App-server integration docs for proxying to WebMCP Cloud with `Authorization: Bearer wk_live_*`
 - Token-resolved billing middleware on the Workers API with atomic balance debit
 - `402` response handling in the kit planner client (fall back to local planner gracefully)
@@ -108,13 +108,13 @@ Each recipe package includes the tool definition, schema, guard logic, confirmat
 
 ## Recommended Sequence
 
-| Phase                  | Action                                     | Product                                              |
-| ---------------------- | ------------------------------------------ | ---------------------------------------------------- |
-| Now                    | Publish free SDK packages, build community | `@webmcp-kit/core` + framework helpers               |
-| V1                     | Launch token-billed hosted planner API     | `webmcp-cloud` provider + dashboard                  |
-| Post-revenue           | Launch Devtools Pro                        | Paid devtools tier (flat sub or bundled with tokens) |
-| Post-adoption          | Enterprise analytics dashboard             | Hosted observability                                 |
-| Ongoing                | Consulting and integration services        | Services revenue                                     |
-| When ecosystem matures | Recipe marketplace                         | Verified recipe packs                                |
+| Phase                  | Action                                        | Product                                              |
+| ---------------------- | --------------------------------------------- | ---------------------------------------------------- |
+| Now                    | Publish the free SDK package, build community | `webmcp-kit` + framework helpers                     |
+| V1                     | Launch token-billed hosted planner API        | `webmcp-cloud` provider + dashboard                  |
+| Post-revenue           | Launch Devtools Pro                           | Paid devtools tier (flat sub or bundled with tokens) |
+| Post-adoption          | Enterprise analytics dashboard                | Hosted observability                                 |
+| Ongoing                | Consulting and integration services           | Services revenue                                     |
+| When ecosystem matures | Recipe marketplace                            | Verified recipe packs                                |
 
 The core principle: free SDK drives adoption, tokens monetize the planner immediately, Devtools Pro monetizes the developer experience next.

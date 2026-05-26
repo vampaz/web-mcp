@@ -1,9 +1,9 @@
-# @webmcp-kit/testing
+# webmcp-kit/testing
 
-Playwright helpers for apps that install `installWebMCPKitTestBridge()` from `@webmcp-kit/core`.
+Playwright helpers for apps that install `installWebMCPKitTestBridge()` from `webmcp-kit`.
 
 ```ts
-import { invokeWebMCPTool, waitForWebMCPTool } from '@webmcp-kit/testing/playwright'
+import { invokeWebMCPTool, waitForWebMCPTool } from 'webmcp-kit/testing/playwright'
 
 await waitForWebMCPTool(page, 'select_items')
 await invokeWebMCPTool(page, {

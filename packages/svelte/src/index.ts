@@ -1,7 +1,7 @@
 import { onMount } from 'svelte'
 import type { Readable, Unsubscriber } from 'svelte/store'
 
-import { registerTool, type RegisteredTool, type WebMCPTool } from '@webmcp-kit/core'
+import { registerTool, type RegisteredTool, type WebMCPTool } from 'webmcp-kit'
 
 import type { UseWebMCPToolOptions } from './interfaces/webmcp-tool'
 

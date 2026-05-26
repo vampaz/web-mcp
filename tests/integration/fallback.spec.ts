@@ -6,7 +6,7 @@ import {
   getRegistrySnapshot,
   installWebMCPKitTestBridge,
   registerTool
-} from '@webmcp-kit/core'
+} from 'webmcp-kit'
 
 describe('fallback integration', () => {
   beforeEach(() => {

@@ -82,6 +82,42 @@ describe('form helpers', () => {
     })
   })
 
+  it('passes numeric form input through to custom execute handlers', async () => {
+    document.body.innerHTML = `
+      <form>
+        <label>Amount <input name="amount" type="number" /></label>
+      </form>
+    `
+
+    const form = document.querySelector('form')
+    if (!form) throw new Error('Expected test form.')
+
+    registerFormTool({
+      form,
+      name: 'create_invoice',
+      description: 'Create an invoice from the visible form fields.',
+      execute(input) {
+        return {
+          amount: input.amount
+        }
+      }
+    })
+
+    await expect(
+      invokeTool({
+        toolName: 'create_invoice',
+        input: {
+          amount: 42
+        }
+      })
+    ).resolves.toMatchObject({
+      status: 'success',
+      output: {
+        amount: 42
+      }
+    })
+  })
+
   it('warns on risky form-backed tools', () => {
     document.body.innerHTML = `
       <form>

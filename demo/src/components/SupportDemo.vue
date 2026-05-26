@@ -28,7 +28,7 @@
 </template>
 
 <script setup lang="ts">
-import { defineTool, invokeTool, listTools, registerFormTool, registerTool } from '@webmcp-kit/core'
+import { defineTool, invokeTool, listTools, registerFormTool, registerTool } from 'webmcp-kit'
 import { onMounted, onUnmounted, ref } from 'vue'
 
 import DemoShell from '@/components/DemoShell.vue'

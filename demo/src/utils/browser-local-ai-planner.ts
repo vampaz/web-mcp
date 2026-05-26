@@ -8,7 +8,7 @@ import {
   type ToolPlan,
   type ToolPlanner,
   type WebMCPTool
-} from '@webmcp-kit/core'
+} from 'webmcp-kit'
 
 import type {
   BrowserLocalAIPlannerOptions,
@@ -105,7 +105,7 @@ async function assertWebGPUAvailable(): Promise<void> {
 async function createWebLLMEngine(model: string, planner: ToolPlanner): Promise<WebLLMEngine> {
   planner.status = 'downloading'
   planner.detail = `Browser local AI is loading ${model}.`
-  const webllm = (await import('@mlc-ai/web-llm')) as WebLLMModule
+  const webllm = (await import('@mlc-ai/web-llm')) as unknown as WebLLMModule
   const createdEngine = await webllm.CreateMLCEngine(model, {
     initProgressCallback(report) {
       planner.status = 'downloading'

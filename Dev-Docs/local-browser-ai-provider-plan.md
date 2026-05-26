@@ -14,7 +14,7 @@
 
 ## Recommendation
 
-Use `@mlc-ai/web-llm` for the first demo-owned local planner. Do not add a WebLLM provider kind to `@webmcp-kit/core`; the demo should create a `ToolPlanner` and pass it to the command input with `configure({ planner })`.
+Use `@mlc-ai/web-llm` for the first demo-owned local planner. Do not add a WebLLM provider kind to `webmcp-kit`; the demo should create a `ToolPlanner` and pass it to the command input with `configure({ planner })`.
 
 Default model: `Llama-3.2-1B-Instruct-q4f16_1-MLC`.
 
@@ -48,31 +48,31 @@ Avoid making Transformers.js the first planner provider. It is excellent for the
 ## Implementation Checklist
 
 - [x] Phase 1: Keep core provider-agnostic
-  - [x] Step 1.1: Leave `@webmcp-kit/core` provider types, command input provider options, and planner factory unchanged
+  - [x] Step 1.1: Leave `webmcp-kit` provider types, command input provider options, and planner factory unchanged
     - Files: `packages/core/src/interfaces/tool.ts`, `packages/core/src/command-input-options.ts`, `packages/core/src/planner.ts`
     - Test: `npm run test -- packages/core/src/planner.spec.ts`
 
 - [x] Phase 2: Add a demo-owned WebLLM planner
   - [x] Step 2.1: Add WebLLM only to the demo package
     - Files: `demo/package.json`, `package-lock.json`
-    - Test: `npm --workspace @webmcp-kit/demo run test -- src/utils/browser-local-ai-planner.spec.ts`
+    - Test: `npm --workspace webmcp-kit-demo run test -- src/utils/browser-local-ai-planner.spec.ts`
   - [x] Step 2.2: Implement the local model planner as a demo utility that satisfies `ToolPlanner`
     - Files: `demo/src/utils/browser-local-ai-planner.ts`, `demo/src/interfaces/browser-local-ai.ts`
-    - Test: `npm --workspace @webmcp-kit/demo run test -- src/utils/browser-local-ai-planner.spec.ts`
+    - Test: `npm --workspace webmcp-kit-demo run test -- src/utils/browser-local-ai-planner.spec.ts`
   - [x] Step 2.3: Pass the demo-owned planner directly to the WebMCP command input
     - Files: `demo/src/components/DemoShell.vue`
-    - Test: `npm --workspace @webmcp-kit/demo run test -- src/components/DemoPages.spec.ts`
+    - Test: `npm --workspace webmcp-kit-demo run test -- src/components/DemoPages.spec.ts`
 
 - [x] Phase 3: Verification and docs
   - [x] Step 3.1: Document provider tradeoffs and browser requirements
     - Files: `docs/planner-providers.md`, `docs/browser-support.md`
-    - Test: `npm --workspace @webmcp-kit/demo run test -- src/utils/browser-local-ai-planner.spec.ts`
+    - Test: `npm --workspace webmcp-kit-demo run test -- src/utils/browser-local-ai-planner.spec.ts`
   - [x] Step 3.2: Run typecheck after dependency and type changes
     - Files: `demo/package.json`, `package-lock.json`
     - Test: `npm exec tsc -- --noEmit`
 
 ## Open Questions Before Implementation
 
-- Should the dependency live in `@webmcp-kit/core` or only in `@webmcp-kit/demo` with a custom `ToolPlanner` passed into the command input? Resolved: demo-only.
+- Should the dependency live in `webmcp-kit` or only in `webmcp-kit-demo` with a custom `ToolPlanner` passed into the command input? Resolved: demo-only.
 - Should the provider be called `WebLLM`, `Browser local AI`, or `Local model` in UI? Resolved: `Browser local AI`.
 - Do we want a model lease helper in this repo now, or wait until there are multiple local model features? Resolved: not yet; only one local model feature exists.

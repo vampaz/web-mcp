@@ -8,7 +8,7 @@ This is not a new protocol. It is an adoption layer for WebMCP.
 
 ## Current Implementation Status
 
-- `packages/core`, `packages/testing`, `packages/devtools`, and `packages/mcp-bridge` are implemented as local npm workspace packages and covered by tests.
+- The root `webmcp-kit` package exposes the library API and subpaths from the `packages/*` source folders; the demo is the only local npm workspace package.
 - The devtools overlay lives in `packages/devtools`; core remains framework-agnostic.
 - The active demo is the Astro app in `demo/src/pages/index.astro` and `demo/src/components/DemoShell.vue`.
 - Planner providers now support Chrome built-in AI, deterministic fallback, server endpoints, user-provided OpenAI-compatible keys, Cloudflare REST, and Cloudflare binding mode.
@@ -18,11 +18,11 @@ This is not a new protocol. It is an adoption layer for WebMCP.
 ---
 
 - [x] Phase 1: Package Foundation
-  - [x] Step 1.1: Initialize monorepo with npm workspaces
+  - [x] Step 1.1: Initialize repository with the demo as the only npm workspace
     - Files: `package.json`, `package-lock.json`, `.npmrc`
     - Verify: `npm install` succeeds
-  - [x] Step 1.2: Create framework-agnostic workspace package structure
-    - Files: `packages/core/package.json`, `packages/testing/package.json`, `packages/devtools/package.json`, `packages/mcp-bridge/package.json`
+  - [x] Step 1.2: Create framework-agnostic source folder structure
+    - Files: `packages/core`, `packages/testing`, `packages/devtools`, `packages/mcp-bridge`
     - Verify: workspace package discovery works
   - [x] Step 1.3: Add strict TypeScript and test setup
     - Files: `vitest.config.ts`, `packages/*/tsconfig.json`
@@ -201,7 +201,7 @@ This is not a new protocol. It is an adoption layer for WebMCP.
     - Verify: recipe registers and unregisters using framework-agnostic core APIs
   - [x] Step 12.4: Consider thin optional wrapper packages only after core adoption
     - Files: `docs/framework-extensions.md`
-    - Verify: decision keeps framework packages deferred and requires any future wrapper to delegate behavior to `@webmcp-kit/core`
+    - Verify: decision keeps framework subpaths thin and requires any future wrapper to delegate behavior to `webmcp-kit`
 
 ---
 
@@ -216,7 +216,7 @@ This is not a new protocol. It is an adoption layer for WebMCP.
 │     └───────────┴──────────────┴─────────────┴────────────┘   │
 │                              │                                │
 │                              ▼                                │
-│                    @webmcp-kit/core                           │
+│                    webmcp-kit                           │
 │                                                               │
 │   defineTool()  registerTool()  guards  scopes  confirmations │
 │                              │                                │
@@ -235,7 +235,7 @@ This is not a new protocol. It is an adoption layer for WebMCP.
 ## The Core API
 
 ```typescript
-import { defineTool, registerTool } from '@webmcp-kit/core'
+import { defineTool, registerTool } from 'webmcp-kit'
 
 const tool = defineTool({
   name: 'create_invoice',
@@ -282,7 +282,7 @@ registerTool(tool)
 Native WebMCP support is detected at runtime. WebMCP Kit should not assume `navigator.modelContext.registerTool` exists in every Chrome install.
 
 ```typescript
-import { isWebMCPSupported } from '@webmcp-kit/core'
+import { isWebMCPSupported } from 'webmcp-kit'
 
 if (isWebMCPSupported()) {
   console.log('Native WebMCP registration is available.')
@@ -330,7 +330,7 @@ Fallback mode is useful for development, QA, demos, docs, and adapters. It is no
 - [x] Native WebMCP registration is used when `navigator.modelContext.registerTool` is available.
 - [x] Unsupported browsers use fallback mode without breaking the app.
 - [x] Devtools lists registered tools, schemas, warnings, availability, and invocation history.
-- [x] Vue, React, and Svelte recipes show lifecycle-safe registration without requiring framework packages.
+- [x] Vue, React, and Svelte recipes show lifecycle-safe registration through framework subpaths.
 - [x] Declarative form helpers add WebMCP metadata to forms.
 - [x] Sensitive/destructive tools warn when explicit confirmation metadata is missing.
 - [x] Registered sensitive/destructive tools can enforce confirmation before execution.
