@@ -1,6 +1,5 @@
-import { requestToolConfirmation } from './confirmation'
 import type { WebMCPTool } from './interfaces/tool'
-import { formatJsonValueValidationError, validateJsonValue } from './schema'
+import { invokeToolPipeline } from './invocation'
 import { isWebMCPSupported } from './support'
 
 interface NavigatorWithModelContext extends Navigator {
@@ -38,19 +37,15 @@ export function registerNativeTool<TInput = Record<string, unknown>, TOutput = u
         inputSchema: tool.inputSchema,
         annotations: tool.annotations,
         async execute(input: TInput) {
-          const inputValidationErrors = validateJsonValue(input, tool.inputSchema)
-          if (inputValidationErrors.length > 0) {
-            throw new Error(formatJsonValueValidationError(inputValidationErrors))
+          const result = await invokeToolPipeline(tool, {
+            input,
+            source: 'native'
+          })
+          if (result.status !== 'success') {
+            throw new Error(result.error ?? `Tool invocation ${result.status}.`)
           }
 
-          if (tool.confirmation?.required) {
-            const confirmed = await requestToolConfirmation(tool, input)
-            if (!confirmed) {
-              throw new Error(tool.confirmation.reason)
-            }
-          }
-
-          return tool.execute(input, { source: 'native' })
+          return result.output
         }
       },
       { signal: abortController.signal }

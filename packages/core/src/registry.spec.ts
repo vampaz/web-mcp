@@ -213,6 +213,9 @@ describe('registry', () => {
     const confirm = vi.fn(function confirmInvocation() {
       return true
     })
+    const scope = vi.fn(function getAvailability() {
+      return { available: true }
+    })
     const guard = vi.fn(function allowInvocation() {
       return true
     })
@@ -238,6 +241,7 @@ describe('registry', () => {
           required: true,
           reason: 'Creates a billable invoice.'
         },
+        scope,
         guard,
         execute
       })
@@ -253,8 +257,41 @@ describe('registry', () => {
     expect(result.error).toBe(
       'input validation failed: /customerName expected string, got integer. /amount expected number, got string.'
     )
+    expect(scope).not.toHaveBeenCalled()
     expect(confirm).not.toHaveBeenCalled()
     expect(guard).not.toHaveBeenCalled()
     expect(execute).not.toHaveBeenCalled()
+  })
+
+  it('returns an error when scope or guard throws', async () => {
+    registerTool(
+      defineTool({
+        name: 'open_invoice',
+        description: 'Open an invoice row in the visible invoice detail drawer.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' }
+          },
+          required: ['id']
+        },
+        scope() {
+          throw new Error('workspace state missing')
+        },
+        execute(input) {
+          return input
+        }
+      })
+    )
+
+    await expect(
+      invokeTool({
+        toolName: 'open_invoice',
+        input: { id: 'inv_1' }
+      })
+    ).resolves.toMatchObject({
+      status: 'error',
+      error: 'workspace state missing'
+    })
   })
 })
