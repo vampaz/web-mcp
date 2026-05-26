@@ -1,8 +1,12 @@
 {
   "name": "@webmcp-kit/testing",
   "version": "0.0.0",
+  "description": "Testing helpers for inspecting and invoking WebMCP Kit tools from Playwright.",
   "type": "module",
   "private": true,
+  "keywords": ["webmcp", "playwright", "testing", "browser-ai"],
+  "sideEffects": false,
+  "files": ["src", "README.md"],
   "exports": {
     ".": "./src/index.ts",
     "./playwright": "./src/playwright.ts"

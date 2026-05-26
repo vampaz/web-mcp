@@ -1,8 +1,12 @@
 {
   "name": "@webmcp-kit/core",
   "version": "0.0.0",
+  "description": "Core WebMCP tool registration, fallback invocation, planners, diagnostics, and browser command input.",
   "type": "module",
   "private": true,
+  "keywords": ["webmcp", "mcp", "browser-ai", "tools", "agents"],
+  "sideEffects": false,
+  "files": ["src", "README.md"],
   "exports": {
     ".": "./src/index.ts"
   },

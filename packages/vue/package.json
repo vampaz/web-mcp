@@ -1,8 +1,12 @@
 {
   "name": "@webmcp-kit/vue",
   "version": "0.0.0",
+  "description": "Vue lifecycle helper for registering WebMCP Kit tools.",
   "type": "module",
   "private": true,
+  "keywords": ["webmcp", "vue", "browser-ai", "tools"],
+  "sideEffects": false,
+  "files": ["src", "README.md"],
   "exports": {
     ".": "./src/index.ts"
   },

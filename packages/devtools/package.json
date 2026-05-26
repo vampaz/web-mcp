@@ -1,8 +1,12 @@
 {
   "name": "@webmcp-kit/devtools",
   "version": "0.0.0",
+  "description": "In-page developer overlay for inspecting and invoking WebMCP Kit tools.",
   "type": "module",
   "private": true,
+  "keywords": ["webmcp", "devtools", "browser-ai", "tools"],
+  "sideEffects": false,
+  "files": ["src", "README.md"],
   "exports": {
     ".": "./src/index.ts"
   },

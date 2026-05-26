@@ -15,8 +15,8 @@ WebMCP Kit is still an MVP workspace. Packages should stay private until the pub
 
 Before publishing, each package should have:
 
-- A clear package description and keywords.
-- A package-level README or a root docs section that covers its public API.
+- A clear package description and keywords. Initial metadata is present in each package.
+- A package-level README or a root docs section that covers its public API. Initial package READMEs are present.
 - Stable exports that do not depend on source-file imports for consumers.
 - Tests for package-specific behavior.
 - A documented browser/runtime support policy.
