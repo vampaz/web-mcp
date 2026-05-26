@@ -485,6 +485,23 @@ function planWithHeuristics(
     }
   }
 
+  if (normalizedMessage.includes('sort') && hasTool(tools, 'sort_inventory')) {
+    return {
+      toolName: 'sort_inventory',
+      input: {
+        sortBy: getInventorySortKeyFromMessage(normalizedMessage),
+        direction:
+          normalizedMessage.includes('desc') ||
+          normalizedMessage.includes('highest') ||
+          normalizedMessage.includes('most')
+            ? 'desc'
+            : 'asc'
+      },
+      confidence: 0.7,
+      reason: 'Matched inventory table sorting wording.'
+    }
+  }
+
   if (
     normalizedMessage.includes('invoice') &&
     normalizedMessage.includes('open') &&
@@ -803,6 +820,16 @@ function getInvoiceStatusFromMessage(normalizedMessage: string): string {
   if (normalizedMessage.includes('draft')) return 'draft'
   if (normalizedMessage.includes('void')) return 'void'
   return 'all'
+}
+
+function getInventorySortKeyFromMessage(normalizedMessage: string): string {
+  if (normalizedMessage.includes('stock') || normalizedMessage.includes('unit')) return 'stock'
+  if (normalizedMessage.includes('margin')) return 'margin'
+  if (normalizedMessage.includes('supplier')) return 'supplier'
+  if (normalizedMessage.includes('demand')) return 'demand'
+  if (normalizedMessage.includes('aisle')) return 'aisle'
+
+  return 'name'
 }
 
 function messageRequestsUnpaid(normalizedMessage: string): boolean {

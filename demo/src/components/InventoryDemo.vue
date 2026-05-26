@@ -34,6 +34,9 @@ import DemoShell from '@/components/DemoShell.vue'
 import type { DemoActivityItem, DemoMetric, SelectableItem } from '@/interfaces/demo'
 import { getInitialDemoSettings, getInitialSelectableItems } from '@/utils/demo-data'
 
+type InventorySortKey = 'aisle' | 'demand' | 'margin' | 'name' | 'stock' | 'supplier'
+type InventorySortDirection = 'asc' | 'desc'
+
 const selectableItems = ref<SelectableItem[]>(getInitialSelectableItems())
 const settings = ref(getInitialDemoSettings())
 const registeredToolsCount = ref(0)
@@ -153,6 +156,39 @@ function registerInventoryTools() {
       })
     ).unregister
   )
+
+  unregisterCallbacks.push(
+    registerTool(
+      defineTool({
+        name: 'sort_inventory',
+        description: 'Sort the visible inventory table by a supported column.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            sortBy: {
+              type: 'string',
+              enum: ['aisle', 'demand', 'margin', 'name', 'stock', 'supplier']
+            },
+            direction: {
+              type: 'string',
+              enum: ['asc', 'desc']
+            }
+          },
+          required: ['sortBy'],
+          additionalProperties: false
+        },
+        execute(input) {
+          const sortBy = isInventorySortKey(input.sortBy) ? input.sortBy : 'name'
+          const direction = input.direction === 'desc' ? 'desc' : 'asc'
+          selectableItems.value = [...selectableItems.value].sort(function sortItems(left, right) {
+            return compareInventoryItems(left, right, sortBy, direction)
+          })
+          addActivity('ai', 'Inventory table sorted', `Sorted by ${sortBy}.`)
+          return selectableItems.value
+        }
+      })
+    ).unregister
+  )
 }
 
 function setItemSelected(id: string, selected: boolean) {
@@ -195,6 +231,51 @@ function clearItemSelection() {
     }
   })
   addActivity('manual', 'Selection cleared', 'All visible inventory selections were cleared.')
+}
+
+function compareInventoryItems(
+  left: SelectableItem,
+  right: SelectableItem,
+  sortBy: InventorySortKey,
+  direction: InventorySortDirection
+): number {
+  const multiplier = direction === 'asc' ? 1 : -1
+  const comparison = compareInventorySortValues(
+    getInventorySortValue(left, sortBy),
+    getInventorySortValue(right, sortBy)
+  )
+
+  return comparison * multiplier
+}
+
+function compareInventorySortValues(left: number | string, right: number | string): number {
+  if (typeof left === 'number' && typeof right === 'number') return left - right
+
+  return String(left).localeCompare(String(right))
+}
+
+function getInventorySortValue(item: SelectableItem, sortBy: InventorySortKey): number | string {
+  if (sortBy === 'demand') return getInventoryDemandRank(item.demand)
+
+  return item[sortBy]
+}
+
+function getInventoryDemandRank(demand: SelectableItem['demand']): number {
+  if (demand === 'low') return 0
+  if (demand === 'normal') return 1
+
+  return 2
+}
+
+function isInventorySortKey(value: unknown): value is InventorySortKey {
+  return (
+    value === 'aisle' ||
+    value === 'demand' ||
+    value === 'margin' ||
+    value === 'name' ||
+    value === 'stock' ||
+    value === 'supplier'
+  )
 }
 
 function refreshTools() {

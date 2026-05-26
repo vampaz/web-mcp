@@ -369,6 +369,30 @@ describe('planner', () => {
     })
   })
 
+  it('plans inventory table sorting from column wording', async () => {
+    const planner = createHeuristicPlanner()
+    const plan = await planner.plan('Sort inventory by stock highest first', [
+      {
+        name: 'sort_inventory',
+        description: 'Sort the visible inventory table by a supported column.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute() {
+          return []
+        }
+      }
+    ])
+
+    expect(plan).toMatchObject({
+      toolName: 'sort_inventory',
+      input: {
+        direction: 'desc',
+        sortBy: 'stock'
+      }
+    })
+  })
+
   it('plans invoice selection from business state and amount wording', async () => {
     const planner = createHeuristicPlanner()
     const plan = await planner.plan(

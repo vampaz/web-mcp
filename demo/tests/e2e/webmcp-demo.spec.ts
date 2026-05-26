@@ -360,7 +360,7 @@ test('exposes only page-specific tools on each demo route', async function testR
     {
       path: '/',
       readyTool: 'select_items',
-      tools: ['clear_item_selection', 'select_items']
+      tools: ['clear_item_selection', 'select_items', 'sort_inventory']
     },
     {
       path: '/invoices/',

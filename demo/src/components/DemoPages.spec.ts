@@ -58,6 +58,12 @@ describe('demo pages', () => {
     expect(diagnosticsRow).toBeInstanceOf(HTMLDetailsElement)
     expect(diagnosticsSlot?.assignedElements()[0]?.getAttribute('data-webmcp-diagnostics')).toBe('')
     expect(wrapper.find('details.diagnostics-panel').exists()).toBe(false)
+    const inventoryTable = wrapper.get('table[aria-label="Selectable inventory items"]')
+    expect(
+      inventoryTable.findAll('thead th').map(function mapHeader(header) {
+        return header.text()
+      })
+    ).toEqual(['Select', '#', 'Item', 'Aisle', 'Stock', 'Supplier', 'Demand', 'Margin'])
 
     await commandInput.run('Select all French items')
     await flushPromises()
@@ -116,6 +122,22 @@ describe('demo pages', () => {
 
     expect(wrapper.text()).toContain('2 selected')
     expect(wrapper.text()).toContain('Croissant')
+  })
+
+  it('sorts inventory through the registered tool', async () => {
+    const wrapper = mountWithDeps(InventoryDemo, { attachTo: document.body })
+    await flushPromises()
+
+    await invokeTool({
+      toolName: 'sort_inventory',
+      input: {
+        direction: 'desc',
+        sortBy: 'stock'
+      }
+    })
+    await flushPromises()
+
+    expect(wrapper.get('tbody tr').text()).toContain('Water')
   })
 
   it('executes chained invoice plans in order', async () => {
@@ -233,7 +255,11 @@ describe('demo pages', () => {
     mountWithDeps(InventoryDemo, { attachTo: document.body })
     await flushPromises()
 
-    expect(getRegisteredToolNames()).toEqual(['clear_item_selection', 'select_items'])
+    expect(getRegisteredToolNames()).toEqual([
+      'clear_item_selection',
+      'select_items',
+      'sort_inventory'
+    ])
   })
 
   it('registers only invoice tools on the invoices page', async () => {
