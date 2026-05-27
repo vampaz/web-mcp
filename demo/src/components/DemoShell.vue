@@ -203,7 +203,6 @@ interface LatestPlanSummary {
 
 const showDevtools = import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIEW === 'true'
 const shouldInstallTestBridge = import.meta.env.DEV || import.meta.env.MODE === 'test'
-const plannerControlsStorageKey = 'webmcp:admin'
 const cloudflareBindingModels = getCloudflareBindingModels()
 const openAIPlannerEndpoints = getOpenAIPlannerEndpoints()
 const openRouterPlannerEndpoints = getOpenRouterPlannerEndpoints()
@@ -338,27 +337,16 @@ function configureCommandInput() {
     return
   }
 
-  if (shouldShowPlannerControls()) {
-    commandInput.value?.configure({
-      context: props.getContext,
-      endpoint: plannerEndpoint,
-      endpointOptions: plannerEndpointOptions,
-      initialModel: defaultPlannerModel,
-      initialProvider: defaultPlannerProvider,
-      plannerOptions
-    })
-    applyBrowserLocalDefault()
-    return
-  }
-
   commandInput.value?.configure({
     context: props.getContext,
     endpoint: plannerEndpoint,
     endpointOptions: plannerEndpointOptions,
-    model: defaultPlannerModel,
-    plannerOptions,
-    provider: defaultPlannerProvider
+    initialModel: defaultPlannerModel,
+    initialProvider: defaultPlannerProvider,
+    plannerOptions
   })
+
+  applyBrowserLocalDefault()
 }
 
 function applyBrowserLocalDefault() {
@@ -377,16 +365,6 @@ function applyBrowserLocalDefault() {
 
   settingsControl.open = false
   settingsControl.dispatchEvent(new Event('toggle'))
-}
-
-function shouldShowPlannerControls(): boolean {
-  if (import.meta.env.MODE === 'test') return false
-  if (import.meta.env.DEV) return true
-  try {
-    return localStorage.getItem(plannerControlsStorageKey) === 'true'
-  } catch {
-    return false
-  }
 }
 
 function handleCommandPlanner(event: Event) {
