@@ -5,15 +5,14 @@
     :eyebrow="`${tickets.length} tickets`"
     :get-context="getPlannerContext"
     :metrics="metrics"
-    placeholder="Try: Mark billing access as resolved"
+    :placeholder="story.placeholder"
+    :proof-description="story.proofDescription"
+    :proof-points="story.proofPoints"
+    :proof-title="story.proofTitle"
     :registered-tools-count="registeredToolsCount"
-    description="Triage account-linked tickets with SLA age, priority, assignee, and status context in one queue."
-    :suggestions="[
-      'Mark billing access as resolved',
-      'Assign urgent Northwind tickets to Sofia',
-      'Create a support ticket for Stark Industries'
-    ]"
-    title="Support"
+    :description="story.description"
+    :suggestions="story.suggestions"
+    :title="story.title"
   >
     <section class="demo-page-content demo-page-content--support">
       <DemoSupportTicketPanel
@@ -45,9 +44,10 @@ import DemoShell from '@/components/DemoShell.vue'
 import DemoSupportTicketPanel from '@/components/DemoSupportTicketPanel.vue'
 import DemoTicketBoard from '@/components/DemoTicketBoard.vue'
 import type { DemoActivityItem, DemoMetric, SupportTicket } from '@/interfaces/demo'
-import { getInitialDemoSettings, getInitialTickets } from '@/utils/demo-data'
+import { getDemoRouteStory, getInitialDemoSettings, getInitialTickets } from '@/utils/demo-data'
 
 const tickets = ref<SupportTicket[]>(getInitialTickets())
+const story = getDemoRouteStory('support')
 const settings = ref(getInitialDemoSettings())
 const registeredToolsCount = ref(0)
 const supportTicketPanel = ref<{ supportForm: HTMLFormElement | null } | null>(null)

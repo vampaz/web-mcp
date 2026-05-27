@@ -72,6 +72,30 @@ export interface DemoMetric {
   value: string
 }
 
+export type DemoRouteId = 'commerce' | 'inventory' | 'invoices' | 'support'
+
+export interface DemoProofPoint {
+  label: string
+  value: string
+}
+
+export interface DemoRouteStory {
+  buyerTakeaway: string
+  description: string
+  expectedToolCall: string
+  guideCommand: string
+  id: DemoRouteId
+  navLabel: string
+  path: string
+  placeholder: string
+  proofDescription: string
+  proofPoints: DemoProofPoint[]
+  proofTitle: string
+  safety: string
+  suggestions: string[]
+  title: string
+}
+
 export interface DemoConfirmationRequest {
   approve: () => void
   deny: () => void

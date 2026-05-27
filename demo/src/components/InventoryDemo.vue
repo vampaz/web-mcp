@@ -5,15 +5,14 @@
     :eyebrow="`${selectableItems.length} selectable items`"
     :get-context="getPlannerContext"
     :metrics="metrics"
-    placeholder="Try: Select all French items"
+    :placeholder="story.placeholder"
+    :proof-description="story.proofDescription"
+    :proof-points="story.proofPoints"
+    :proof-title="story.proofTitle"
     :registered-tools-count="registeredToolsCount"
-    description="Curate sellable stock from a live merchandising context: stock, aisle, supplier, margin, and demand all travel with each selectable item."
-    :suggestions="[
-      'Select all French items',
-      'Select all high demand bakery items',
-      'Clear the current selection'
-    ]"
-    title="Inventory"
+    :description="story.description"
+    :suggestions="story.suggestions"
+    :title="story.title"
   >
     <DemoSemanticInventory
       :items="selectableItems"
@@ -32,12 +31,17 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import DemoSemanticInventory from '@/components/DemoSemanticInventory.vue'
 import DemoShell from '@/components/DemoShell.vue'
 import type { DemoActivityItem, DemoMetric, SelectableItem } from '@/interfaces/demo'
-import { getInitialDemoSettings, getInitialSelectableItems } from '@/utils/demo-data'
+import {
+  getDemoRouteStory,
+  getInitialDemoSettings,
+  getInitialSelectableItems
+} from '@/utils/demo-data'
 
 type InventorySortKey = 'aisle' | 'demand' | 'margin' | 'name' | 'stock' | 'supplier'
 type InventorySortDirection = 'asc' | 'desc'
 
 const selectableItems = ref<SelectableItem[]>(getInitialSelectableItems())
+const story = getDemoRouteStory('inventory')
 const settings = ref(getInitialDemoSettings())
 const registeredToolsCount = ref(0)
 const activityItems = ref<DemoActivityItem[]>([

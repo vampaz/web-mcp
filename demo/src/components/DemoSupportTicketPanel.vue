@@ -10,7 +10,6 @@
         <select
           :value="account"
           name="account"
-          required
           toolparamdescription="Customer account connected to this ticket."
           @change="updateAccount"
         >

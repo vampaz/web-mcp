@@ -1,0 +1,78 @@
+# Plan: Brutally Clear WebMCP Demo
+
+- [x] Phase 1: Define the first 60 seconds
+  - [x] Step 1.1: Add a demo story brief that makes the value proposition explicit
+    - Objective: Define the demo's narrative contract: "turn a natural-language request into a safe, typed app action." Capture the primary audience, first-run path, and the proof points each route should demonstrate.
+    - Files: [`Dev-Docs/brutally-clear-demo-plan.md`], new `Dev-Docs/brutally-clear-demo-story.md`
+    - Test: `npm run test:demo -- src/components/DemoPages.spec.ts`
+  - [x] Step 1.2: Convert the generic route set into an opinionated demo journey
+    - Objective: Decide the default guided path: Inventory for read/write selection, Invoices for chained plans and confirmation, Commerce for guards and checkout approval, Support for form-tool registration. Keep all existing routes, but make their role obvious.
+    - Files: [`demo/src/layouts/DemoLayout.astro`], [`demo/src/components/DemoShell.vue`]
+    - Test: `npm run test:demo -- src/components/DemoPages.spec.ts`
+
+- [x] Phase 2: Make the shell explain what just happened
+  - [x] Step 2.1: Add a compact "How this page is wired" panel to `DemoShell`
+    - Objective: Show the current page's WebMCP contract in plain language: registered tools, planner context, validation, confirmation, and result. This should be visible without opening diagnostics and should not read like marketing copy.
+    - Files: [`demo/src/components/DemoShell.vue`], [`demo/src/interfaces/demo.ts`]
+    - Test: `npm run test:demo -- src/components/DemoPages.spec.ts`
+  - [x] Step 2.2: Show the latest plan as tool name plus planned input
+    - Objective: After a command runs, surface the selected tool, step count, confidence/reason when available, and the exact planned input. This is the fastest way to prove "natural language became a typed tool call."
+    - Files: [`demo/src/components/DemoShell.vue`], [`demo/src/interfaces/demo.ts`]
+    - Test: `npm run test:demo -- src/components/DemoPages.spec.ts`
+  - [x] Step 2.3: Make confirmation state impossible to miss
+    - Objective: For mutating flows, show the confirmation boundary as a product feature, not an interruption. The modal should clearly separate requested action, validated input, and approve/deny decision.
+    - Files: [`demo/src/components/DemoShell.vue`]
+    - Test: `npm run test:demo -- src/components/DemoPages.spec.ts`
+
+- [x] Phase 3: Make every demo route prove one buyer concern
+  - [x] Step 3.1: Inventory proves app-owned context and safe selection
+    - Objective: Tune Inventory copy and suggestions so a first-time viewer understands the planner sees only the current inventory context and calls narrow tools like `select_items` and `sort_inventory`.
+    - Files: [`demo/src/components/InventoryDemo.vue`], [`demo/src/components/DemoSemanticInventory.vue`]
+    - Test: `npm run test:demo -- src/components/DemoPages.spec.ts`
+  - [x] Step 3.2: Invoices proves chained plans and confirmation for business mutations
+    - Objective: Make the Stark Industries flow the canonical "select then update status" example and expose why approval is required before mutating invoice records.
+    - Files: [`demo/src/components/InvoicesDemo.vue`], [`demo/src/components/DemoInvoiceTable.vue`], [`demo/src/components/DemoInvoiceDrawer.vue`]
+    - Test: `npm run test:demo -- src/components/DemoPages.spec.ts`
+  - [x] Step 3.3: Commerce proves guardrails before purchase
+    - Objective: Make stock-aware cart updates and checkout confirmation the main story. Include one suggested command that intentionally hits a guard so users see blocked actions as part of the product.
+    - Files: [`demo/src/components/CommerceDemo.vue`], [`demo/src/components/DemoCartEditor.vue`]
+    - Test: `npm run test:demo -- src/components/DemoPages.spec.ts`
+  - [x] Step 3.4: Support proves form registration and operational workflows
+    - Objective: Clarify that a visible form can become a tool and that ticket updates remain constrained to the current board.
+    - Files: [`demo/src/components/SupportDemo.vue`], [`demo/src/components/DemoSupportTicketPanel.vue`], [`demo/src/components/DemoTicketBoard.vue`]
+    - Test: `npm run test:demo -- src/components/DemoPages.spec.ts`
+
+- [x] Phase 4: Replace passive README viewing with a buyer-ready demo guide
+  - [x] Step 4.1: Add a concise demo guide page
+    - Objective: Replace or precede the rendered README with a short "Try these four flows" guide: command, expected tool call, safety mechanism, and buyer takeaway. Keep the README available, but do not make it the main explanatory surface.
+    - Files: [`demo/src/pages/readme.astro`], new `demo/src/pages/guide.astro`
+    - Test: `npm run test:demo -- src/components/DemoPages.spec.ts`
+  - [x] Step 4.2: Add route-level metadata for demo proof points
+    - Objective: Move repeated page story data into typed metadata so shell copy, suggestions, and guide content stay aligned.
+    - Files: [`demo/src/interfaces/demo.ts`], [`demo/src/utils/demo-data.ts`], route components under `demo/src/components/*Demo.vue`
+    - Test: `npm run test:demo -- src/components/DemoPages.spec.ts`
+
+- [x] Phase 5: Tighten visual hierarchy without redesigning the product
+  - [x] Step 5.1: Make command input, suggested commands, and latest result the visual center
+    - Objective: Keep the operational UI dense, but make the command-to-tool-result loop visually dominant on desktop and mobile.
+    - Files: [`demo/src/components/DemoShell.vue`], [`demo/src/styles/global.css`]
+    - Test: `npm run test:demo -- src/components/DemoPages.spec.ts`
+  - [x] Step 5.2: Improve responsive behavior for first-run comprehension
+    - Objective: Ensure mobile and narrow desktop views show page title, suggested command, result, and primary table/form controls without overlap or hidden explanatory state.
+    - Files: [`demo/src/components/DemoShell.vue`], [`demo/src/components/DemoRuntimeStatus.vue`], [`demo/src/styles/global.css`]
+    - Test: `npm run test:e2e`
+
+- [x] Phase 6: Verify the demo as a product narrative
+  - [x] Step 6.1: Add unit coverage for the explanatory surfaces
+    - Objective: Assert page-specific story text, suggestions, latest plan summary, and confirmation copy so future changes do not make the demo vague again.
+    - Files: [`demo/src/components/DemoPages.spec.ts`]
+    - Test: `npm run test:demo -- src/components/DemoPages.spec.ts`
+  - [x] Step 6.2: Add e2e coverage for the canonical guided path
+    - Objective: Verify the first-run journey across Inventory, Invoices, Commerce, and Support, including one successful command, one chained command, one blocked guard, and one approved confirmation.
+    - Files: [`demo/tests/e2e/webmcp-demo.spec.ts`]
+    - Test: `npm run test:e2e`
+  - [x] Step 6.3: Browser-check the demo manually in the in-app browser
+    - Objective: Start the dev server, open the demo, run the four canonical suggested commands, and check that the visible narrative matches the actual app behavior.
+    - Files: [`demo/src/components/DemoShell.vue`], [`demo/src/components/DemoSupportTicketPanel.vue`], [`demo/src/components/DemoPages.spec.ts`]
+    - Test: `npm run dev`
+    - Note: Verified the guide, Inventory, Invoices, Commerce, and Support flows in the in-app browser. The browser pass found and fixed the Support form validation path. Production defaults to OpenAI; development defaults to the browser-local AI planner, with deterministic planning still available from Options.

@@ -1,5 +1,6 @@
 ---
 import '@/styles/global.css'
+import { getDemoRouteStories } from '@/utils/demo-data'
 
 interface Props {
   description?: string
@@ -12,6 +13,7 @@ const {
 } = Astro.props
 const currentPath = Astro.url.pathname
 const isInventoryPage = currentPath === '/'
+const demoRoutes = getDemoRouteStories()
 
 function getIsActive(path: string): boolean {
   return path === '/'
@@ -39,10 +41,16 @@ function getIsActive(path: string): boolean {
     <header class="demo-topbar">
       <a class="demo-brand" href="/">WebMCP Kit</a>
       <nav class="demo-nav" aria-label="Demo sections">
-        <a href="/" aria-current={getIsActive('/') ? 'page' : undefined}>Inventory</a>
-        <a href="/invoices/" aria-current={getIsActive('/invoices/') ? 'page' : undefined}>Invoices</a>
-        <a href="/commerce/" aria-current={getIsActive('/commerce/') ? 'page' : undefined}>Commerce</a>
-        <a href="/support/" aria-current={getIsActive('/support/') ? 'page' : undefined}>Support</a>
+        <a href="/guide/" aria-current={getIsActive('/guide/') ? 'page' : undefined}>Guide</a>
+        {
+          demoRoutes.map(function renderDemoRoute(route) {
+            return (
+              <a href={route.path} aria-current={getIsActive(route.path) ? 'page' : undefined}>
+                {route.navLabel}
+              </a>
+            )
+          })
+        }
         <a href="/readme/" aria-current={getIsActive('/readme/') ? 'page' : undefined}>README</a>
       </nav>
     </header>

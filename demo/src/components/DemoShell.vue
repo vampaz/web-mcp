@@ -49,6 +49,26 @@
       </div>
     </section>
 
+    <section class="demo-wire-panel" :class="wirePanelState" aria-label="How this page is wired">
+      <div class="wire-copy">
+        <span>How this page is wired</span>
+        <strong>{{ proofTitle }}</strong>
+        <p>{{ proofDescription }}</p>
+      </div>
+      <dl class="wire-points">
+        <div v-for="point in proofPoints" :key="point.label">
+          <dt>{{ point.label }}</dt>
+          <dd>{{ point.value }}</dd>
+        </div>
+      </dl>
+      <div class="latest-plan" :class="latestPlanStatus">
+        <span>Planned input</span>
+        <strong>{{ latestPlanTitle }}</strong>
+        <p>{{ latestPlanDetail }}</p>
+        <pre v-if="latestPlanInput">{{ latestPlanInput }}</pre>
+      </div>
+    </section>
+
     <slot />
 
     <section v-if="activityItems.length > 0" class="activity-rail" aria-label="Recent activity">
@@ -79,12 +99,14 @@
         class="confirmation-dialog"
         role="dialog"
       >
-        <span>Review required</span>
+        <span>Approval boundary</span>
         <h2 id="confirmation-title">{{ pendingConfirmation.reason }}</h2>
         <p>
-          {{ pendingConfirmation.toolName }} will update this workspace. Review the exact input
-          before approving.
+          The planner selected <strong>{{ pendingConfirmation.toolName }}</strong
+          >, but this app still owns the final decision. Review the validated input before
+          approving.
         </p>
+        <span class="confirmation-input-label">Validated input</span>
         <pre>{{ formatConfirmationInput(pendingConfirmation.input) }}</pre>
         <div>
           <button type="button" @click="denyPendingConfirmation">Deny</button>
@@ -125,7 +147,12 @@ import {
   createBrowserLocalAIPlanner,
   defaultBrowserLocalAIModel
 } from '@/utils/browser-local-ai-planner'
-import type { DemoActivityItem, DemoConfirmationRequest, DemoMetric } from '@/interfaces/demo'
+import type {
+  DemoActivityItem,
+  DemoConfirmationRequest,
+  DemoMetric,
+  DemoProofPoint
+} from '@/interfaces/demo'
 
 interface Props {
   activityItems?: DemoActivityItem[]
@@ -135,6 +162,9 @@ interface Props {
   getContext: () => unknown
   metrics?: DemoMetric[]
   placeholder: string
+  proofDescription?: string
+  proofPoints?: DemoProofPoint[]
+  proofTitle?: string
   registeredToolsCount: number
   suggestions?: string[]
   title: string
@@ -145,11 +175,34 @@ const props = withDefaults(defineProps<Props>(), {
   confirmationsEnabled: true,
   description: '',
   metrics: () => [],
+  proofDescription:
+    'The app registers typed tools, validates planner input, and keeps ownership of execution.',
+  proofPoints: () => [
+    {
+      label: 'Tools',
+      value: 'Registered by the current page.'
+    },
+    {
+      label: 'Validation',
+      value: 'JSON Schema runs before execution.'
+    },
+    {
+      label: 'Execution',
+      value: 'The app updates its own state.'
+    }
+  ],
+  proofTitle: 'Typed app actions',
   suggestions: () => []
 })
+interface LatestPlanSummary {
+  detail: string
+  input: string
+  status: 'blocked' | 'idle' | 'success'
+  title: string
+}
+
 const showDevtools = import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIEW === 'true'
 const shouldInstallTestBridge = import.meta.env.DEV || import.meta.env.MODE === 'test'
-const shouldDefaultToCloudflareBinding = import.meta.env.MODE !== 'test'
 const plannerControlsStorageKey = 'webmcp:admin'
 const cloudflareBindingModels = getCloudflareBindingModels()
 const openAIPlannerEndpoints = getOpenAIPlannerEndpoints()
@@ -204,29 +257,48 @@ const plannerOptions: WebMCPCommandInputPlannerOption[] = [
   }
 ]
 const plannerName = ref('Loading')
+const shouldDefaultToBrowserLocalAI = import.meta.env.DEV && !import.meta.env.PROD
 const plannerDetail = ref(
-  shouldDefaultToCloudflareBinding
-    ? 'Using the Cloudflare AI binding planner endpoint.'
-    : 'Checking Chrome built-in AI availability.'
+  shouldDefaultToBrowserLocalAI
+    ? 'Using the browser-local AI planner.'
+    : 'Using the OpenAI planner endpoint.'
 )
-const defaultPlannerProvider: PlannerProviderKind = shouldDefaultToCloudflareBinding
-  ? 'cloudflare-binding'
-  : 'auto'
-const defaultPlannerModel = shouldDefaultToCloudflareBinding
-  ? cloudflareBindingModels[0].id
-  : openRouterPlannerEndpoints[0].id
+const defaultPlannerProvider: PlannerProviderKind = 'openai'
+const defaultPlannerModel = openAIPlannerEndpoints[0]?.id
+const defaultPlannerOptionId = shouldDefaultToBrowserLocalAI ? 'browser-local-ai' : undefined
 const plannerEndpoint = '/api/webmcp/plan'
 const unregisterCallbacks: Array<() => void> = []
 const commandInput = ref<WebMCPCommandInputElement | null>(null)
 const runtimeStatusPanel = ref<{ devtoolsHost: HTMLElement | null } | null>(null)
 const pendingConfirmation = ref<DemoConfirmationRequest | null>(null)
 const latestCommandStatus = ref('Ready for natural-language operations.')
+const latestPlan = ref<LatestPlanSummary>({
+  detail: 'Run a suggested command to see the selected tool and exact planned input.',
+  input: '',
+  status: 'idle',
+  title: 'No command run yet'
+})
 let devtoolsOverlay: DevtoolsOverlay | undefined
 const supportLabel = computed(function getCurrentSupportLabel() {
   return getSupportLabel()
 })
 const commandStatusTitle = computed(function getCommandStatusTitle() {
   return latestCommandStatus.value
+})
+const latestPlanTitle = computed(function getLatestPlanTitle() {
+  return latestPlan.value.title
+})
+const latestPlanDetail = computed(function getLatestPlanDetail() {
+  return latestPlan.value.detail
+})
+const latestPlanInput = computed(function getLatestPlanInput() {
+  return latestPlan.value.input
+})
+const latestPlanStatus = computed(function getLatestPlanStatus() {
+  return `latest-plan--${latestPlan.value.status}`
+})
+const wirePanelState = computed(function getWirePanelState() {
+  return latestPlan.value.status === 'idle' ? '' : 'demo-wire-panel--active'
 })
 
 if (typeof customElements !== 'undefined') {
@@ -271,10 +343,11 @@ function configureCommandInput() {
       context: props.getContext,
       endpoint: plannerEndpoint,
       endpointOptions: plannerEndpointOptions,
-      initialModel: shouldDefaultToCloudflareBinding ? defaultPlannerModel : undefined,
-      initialProvider: shouldDefaultToCloudflareBinding ? defaultPlannerProvider : undefined,
+      initialModel: defaultPlannerModel,
+      initialProvider: defaultPlannerProvider,
       plannerOptions
     })
+    applyBrowserLocalDefault()
     return
   }
 
@@ -286,6 +359,24 @@ function configureCommandInput() {
     plannerOptions,
     provider: defaultPlannerProvider
   })
+}
+
+function applyBrowserLocalDefault() {
+  if (!defaultPlannerOptionId) return
+
+  const providerControl =
+    commandInput.value?.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
+  if (!providerControl) return
+
+  providerControl.value = `planner:${defaultPlannerOptionId}`
+  providerControl.dispatchEvent(new Event('change', { bubbles: true }))
+
+  const settingsControl =
+    commandInput.value?.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-settings')
+  if (!settingsControl) return
+
+  settingsControl.open = false
+  settingsControl.dispatchEvent(new Event('toggle'))
 }
 
 function shouldShowPlannerControls(): boolean {
@@ -312,11 +403,26 @@ function handleCommandResult(event: Event) {
     detail.result.status === 'success'
       ? `Completed "${detail.message}" across ${stepCount} ${stepCount === 1 ? 'step' : 'steps'}.`
       : `Blocked "${detail.message}": ${detail.result.error ?? 'workspace rules stopped the action'}.`
+  latestPlan.value = {
+    detail:
+      detail.result.status === 'success'
+        ? detail.plan.reason
+        : (detail.result.error ?? 'The app blocked this planner-selected action.'),
+    input: formatPlanInput(detail.plan),
+    status: detail.result.status === 'success' ? 'success' : 'blocked',
+    title: formatPlanTitle(detail.plan)
+  }
 }
 
 function handleCommandError(event: Event) {
   const detail = (event as CustomEvent<WebMCPCommandErrorEventDetail>).detail
   latestCommandStatus.value = `Could not run "${detail.message}": ${detail.error}.`
+  latestPlan.value = {
+    detail: detail.error,
+    input: '',
+    status: 'blocked',
+    title: 'Planner error'
+  }
 }
 
 async function confirmToolInvocation(
@@ -358,6 +464,31 @@ function denyPendingConfirmation() {
 
 function formatConfirmationInput(input: unknown): string {
   return JSON.stringify(input, null, 2)
+}
+
+function formatPlanTitle(plan: ToolPlan): string {
+  if (!plan.steps?.length) return plan.toolName
+
+  return plan.steps
+    .map(function getStepToolName(step) {
+      return step.toolName
+    })
+    .join(' -> ')
+}
+
+function formatPlanInput(plan: ToolPlan): string {
+  if (!plan.steps?.length) return JSON.stringify(plan.input, null, 2)
+
+  return JSON.stringify(
+    plan.steps.map(function mapStep(step) {
+      return {
+        toolName: step.toolName,
+        input: step.input
+      }
+    }),
+    null,
+    2
+  )
 }
 
 async function runSuggestion(suggestion: string) {
@@ -509,6 +640,102 @@ webmcp-command-input:not(:defined) {
   line-height: 1.35;
 }
 
+.demo-wire-panel {
+  display: grid;
+  grid-template-columns: minmax(18rem, 0.36fr) minmax(16rem, 0.32fr) minmax(18rem, 0.32fr);
+  gap: 1px;
+  border: 1px solid rgba(244, 240, 232, 0.13);
+  background: rgba(244, 240, 232, 0.12);
+}
+
+.demo-wire-panel > * {
+  min-width: 0;
+  background: rgba(9, 14, 13, 0.94);
+  padding: 0.8rem;
+}
+
+.demo-wire-panel--active {
+  grid-template-columns: minmax(16rem, 0.42fr) minmax(18rem, 0.58fr);
+}
+
+.demo-wire-panel--active .wire-points {
+  display: none;
+}
+
+.wire-copy span,
+.latest-plan span,
+.confirmation-input-label {
+  display: block;
+  color: #8fa098;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.wire-copy strong,
+.latest-plan strong {
+  display: block;
+  margin-top: 0.25rem;
+  color: #f4f0e8;
+  line-height: 1.3;
+}
+
+.wire-copy p,
+.latest-plan p {
+  margin: 0.35rem 0 0;
+  color: #aeb9b3;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.wire-points {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.wire-points div {
+  min-width: 0;
+}
+
+.wire-points dt {
+  color: #8fa098;
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.wire-points dd {
+  margin: 0.18rem 0 0;
+  color: #e0e7e2;
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.latest-plan {
+  box-shadow: inset 3px 0 0 #8fa098;
+}
+
+.latest-plan--success {
+  box-shadow: inset 3px 0 0 #30a779;
+}
+
+.latest-plan--blocked {
+  box-shadow: inset 3px 0 0 #f39a8d;
+}
+
+.latest-plan pre {
+  overflow: auto;
+  max-height: 10rem;
+  margin: 0.7rem 0 0;
+  border: 1px solid rgba(244, 240, 232, 0.12);
+  background: rgba(0, 0, 0, 0.24);
+  color: #e9f0ec;
+  padding: 0.65rem;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+}
+
 .suggestion-strip {
   display: flex;
   flex-wrap: wrap;
@@ -620,6 +847,10 @@ webmcp-command-input:not(:defined) {
   line-height: 1.45;
 }
 
+.confirmation-dialog p strong {
+  color: #f4f0e8;
+}
+
 .confirmation-dialog pre {
   overflow: auto;
   max-height: 15rem;
@@ -659,7 +890,8 @@ webmcp-command-input:not(:defined) {
   }
 
   .demo-metrics,
-  .demo-command-brief {
+  .demo-command-brief,
+  .demo-wire-panel {
     grid-template-columns: 1fr;
   }
 
