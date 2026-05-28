@@ -1,5 +1,7 @@
 import type {
   Customer,
+  DemoRouteId,
+  DemoRouteStory,
   DemoSettings,
   Invoice,
   InvoiceDraft,
@@ -8,6 +10,167 @@ import type {
   SelectableItem,
   SupportTicket
 } from '@/interfaces/demo'
+
+const keyboardKitAvailable =
+  getInitialProducts().find(function findKeyboardKit(product) {
+    return product.id === 'kbd-01'
+  })?.available ?? 18
+const blockedKeyboardKitQuantity = keyboardKitAvailable + 2
+
+const demoRouteStories: Record<DemoRouteId, DemoRouteStory> = {
+  inventory: {
+    id: 'inventory',
+    path: '/',
+    navLabel: 'Inventory',
+    title: 'Inventory',
+    description:
+      'A planner reads the current merchandising table and can only call narrow selection and sorting tools owned by the app.',
+    placeholder: 'Try: Select all French items',
+    suggestions: [
+      'Select all French items',
+      'Sort inventory by lowest stock',
+      'Clear the current selection'
+    ],
+    proofTitle: 'Context-scoped selection',
+    proofDescription:
+      'The command sees visible inventory metadata, returns stable item IDs, and updates the same checkboxes a user can control manually.',
+    proofPoints: [
+      {
+        label: 'Planner context',
+        value: 'Visible stock, aisle, supplier, demand, and margin only.'
+      },
+      {
+        label: 'Callable tools',
+        value: 'select_items, sort_inventory, clear_item_selection.'
+      },
+      {
+        label: 'Safety boundary',
+        value: 'The app owns IDs, schema validation, and table state.'
+      }
+    ],
+    guideCommand: 'Select all French items',
+    expectedToolCall: 'select_items({ ids: [...] })',
+    safety: 'The planner cannot invent invoice, cart, or ticket actions on this route.',
+    buyerTakeaway:
+      'A SaaS page can expose useful AI actions without handing over global app control.'
+  },
+  invoices: {
+    id: 'invoices',
+    path: '/invoices/',
+    navLabel: 'Invoices',
+    title: 'Invoices',
+    description:
+      'A planner can chain account-receivable actions, but invoice mutations require explicit confirmation before records change.',
+    placeholder: 'Try: Mark Stark Industries invoices as paid',
+    suggestions: [
+      'Open the Stark invoice',
+      'Mark Stark Industries invoices as paid',
+      'Show overdue invoices over 900 euros'
+    ],
+    proofTitle: 'Chained business mutation',
+    proofDescription:
+      'The Stark flow selects matching invoices, proposes a status update, and stops at a review dialog before changing business records.',
+    proofPoints: [
+      {
+        label: 'Planner context',
+        value: 'Visible invoice rows, customer health, owners, due dates, and risk.'
+      },
+      {
+        label: 'Callable tools',
+        value: 'select_invoices followed by update_selected_invoice_status.'
+      },
+      {
+        label: 'Safety boundary',
+        value: 'Paid-status changes require approval with exact validated input.'
+      }
+    ],
+    guideCommand: 'Mark Stark Industries invoices as paid',
+    expectedToolCall: 'select_invoices(...) -> update_selected_invoice_status({ status: "paid" })',
+    safety: 'Confirmation is enforced per mutating tool, including inside chained plans.',
+    buyerTakeaway:
+      'Agentic workflows can be useful while still respecting approval gates for sensitive records.'
+  },
+  commerce: {
+    id: 'commerce',
+    path: '/commerce/',
+    navLabel: 'Commerce',
+    title: 'Commerce',
+    description:
+      'A planner can search products and edit a cart, while stock guards and checkout confirmation prevent unsafe purchases.',
+    placeholder: 'Try: Add two keyboard kits to the cart',
+    suggestions: [
+      'Add two keyboard kits to the cart',
+      'Apply a 10 percent discount',
+      `Add ${blockedKeyboardKitQuantity} keyboard kits to the cart`
+    ],
+    proofTitle: 'Guarded purchase flow',
+    proofDescription:
+      'Cart tools validate product IDs and quantities before execution, and checkout cannot proceed without approval.',
+    proofPoints: [
+      {
+        label: 'Planner context',
+        value: 'Catalog records, availability, current cart lines, and discount.'
+      },
+      {
+        label: 'Callable tools',
+        value: 'search_products, add_to_cart, apply_cart_discount, checkout_cart.'
+      },
+      {
+        label: 'Safety boundary',
+        value: 'Stock guards block impossible quantities before execution.'
+      }
+    ],
+    guideCommand: `Add ${blockedKeyboardKitQuantity} keyboard kits to the cart`,
+    expectedToolCall: `add_to_cart({ productId: "kbd-01", quantity: ${blockedKeyboardKitQuantity} })`,
+    safety: `The guard blocks the action because only ${keyboardKitAvailable} keyboard kits are available.`,
+    buyerTakeaway: 'The demo shows blocked actions as a feature: app rules remain authoritative.'
+  },
+  support: {
+    id: 'support',
+    path: '/support/',
+    navLabel: 'Support',
+    title: 'Support',
+    description:
+      'A visible support form becomes a tool, and ticket updates stay constrained to the current board and schema.',
+    placeholder: 'Try: Create a support ticket',
+    suggestions: ['Create a support ticket', 'Open a support ticket', 'File a support ticket'],
+    proofTitle: 'Form-backed operations',
+    proofDescription:
+      'The form registration turns existing fields into a create-ticket tool while board updates remain scoped to visible tickets.',
+    proofPoints: [
+      {
+        label: 'Planner context',
+        value: 'Form fields, account, ticket status, SLA age, priority, and assignee.'
+      },
+      {
+        label: 'Callable tools',
+        value: 'create_support_ticket and update_ticket.'
+      },
+      {
+        label: 'Safety boundary',
+        value: 'The update guard rejects tickets not visible in the current board.'
+      }
+    ],
+    guideCommand: 'Create a support ticket',
+    expectedToolCall: 'create_support_ticket({ subject, body })',
+    safety: 'The app owns the form fields, validation, and created ticket record.',
+    buyerTakeaway:
+      'Teams can make ordinary forms and queues agent-callable without rebuilding the product.'
+  }
+}
+
+export function getDemoRouteStory(id: DemoRouteId): DemoRouteStory {
+  return demoRouteStories[id]
+}
+
+export function getDemoRouteStories(): DemoRouteStory[] {
+  return [
+    demoRouteStories.inventory,
+    demoRouteStories.invoices,
+    demoRouteStories.commerce,
+    demoRouteStories.support
+  ]
+}
 
 export function getCloudflareBindingModels(): PlannerModelOption[] {
   return [

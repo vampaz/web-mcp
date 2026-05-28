@@ -42,6 +42,8 @@ describe('demo pages', () => {
 
     expect(wrapper.text()).toContain('Inventory')
     expect(wrapper.text()).not.toContain('Invoices')
+    expect(wrapper.text()).toContain('Context-scoped selection')
+    expect(wrapper.text()).toContain('Planner context')
 
     const commandInput = await getCommandInput(wrapper)
     const commandTextInput = getCommandTextInput(commandInput)
@@ -71,6 +73,8 @@ describe('demo pages', () => {
     expect(wrapper.text()).toContain('5 selected')
     expect(wrapper.text()).toContain('Croissant')
     expect(wrapper.text()).toContain('Pain au chocolat')
+    expect(wrapper.text()).toContain('select_items')
+    expect(wrapper.text()).toContain('"ids"')
     expect(window.confirm).not.toHaveBeenCalled()
   })
 
@@ -91,7 +95,7 @@ describe('demo pages', () => {
     await expectCommandPlaceholder(InventoryDemo, 'Try: Select all French items')
     await expectCommandPlaceholder(InvoicesDemo, 'Try: Mark Stark Industries invoices as paid')
     await expectCommandPlaceholder(CommerceDemo, 'Try: Add two keyboard kits to the cart')
-    await expectCommandPlaceholder(SupportDemo, 'Try: Mark billing access as resolved')
+    await expectCommandPlaceholder(SupportDemo, 'Try: Create a support ticket')
   })
 
   it('operates visible controls from AI-chosen context IDs', async () => {
@@ -153,7 +157,25 @@ describe('demo pages', () => {
     })
     expect(starkInvoiceRow?.text()).toContain('paid')
     expect(starkInvoiceRow?.classes()).toContain('selected')
+    expect(wrapper.text()).toContain('select_invoices -> update_selected_invoice_status')
+    expect(wrapper.text()).toContain('"status": "paid"')
     expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('"status": "paid"'))
+  })
+
+  it('shows blocked planner results as part of the commerce safety story', async () => {
+    const wrapper = mountWithDeps(CommerceDemo, { attachTo: document.body })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Guarded purchase flow')
+
+    const commandInput = await getCommandInput(wrapper)
+    await commandInput.run('Add 20 keyboard kits to the cart')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Blocked "Add 20 keyboard kits to the cart"')
+    expect(wrapper.text()).toContain('Requested quantity exceeds available stock.')
+    expect(wrapper.text()).toContain('add_to_cart')
+    expect(wrapper.text()).toContain('"quantity": 20')
   })
 
   it('guards and confirms cart checkout', async () => {
@@ -206,6 +228,21 @@ describe('demo pages', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('No cart lines yet.')
+  })
+
+  it('creates support tickets from the page suggestion', async () => {
+    const wrapper = mountWithDeps(SupportDemo, { attachTo: document.body })
+    await flushPromises()
+
+    const commandInput = await getCommandInput(wrapper)
+    await commandInput.run('Create a support ticket')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('4 tickets')
+    expect(wrapper.text()).toContain('Support ticket created')
+    expect(wrapper.text()).toContain('Help request opened for Northwind.')
+    expect(wrapper.text()).toContain('create_support_ticket')
+    expect(wrapper.text()).toContain('"subject": "Help request"')
   })
 
   it('blocks commerce cart quantities beyond available stock', async () => {

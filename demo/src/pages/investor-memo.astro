@@ -1,0 +1,250 @@
+---
+import DemoLayout from '@/layouts/DemoLayout.astro'
+---
+
+<DemoLayout
+  title="WebMCP Kit Investor Memo"
+  description="Investor memo for WebMCP Kit"
+  robots="noindex,nofollow"
+>
+  <section class="memo-shell">
+    <header class="memo-hero">
+      <p>Investor memo</p>
+      <h1>Safe, typed app actions for browser agents.</h1>
+      <span>
+        WebMCP Kit is an open-source adoption wedge for making existing web apps agent-operable
+        without giving agents raw browser control.
+      </span>
+    </header>
+
+    <section class="memo-grid" aria-label="Investor memo sections">
+      <article class="memo-lead">
+        <span>Thesis</span>
+        <h2>Agents need app-owned tools, not brittle UI automation.</h2>
+        <p>
+          Browser agents can click around, but production software needs typed actions, schema
+          validation, guards, confirmation, audit trails, and app-owned execution. WebMCP Kit
+          packages that contract for modern web apps.
+        </p>
+      </article>
+
+      <article>
+        <span>Wedge</span>
+        <h2>Free SDK distribution</h2>
+        <p>
+          Developers adopt the kit to expose route-scoped tools from existing apps. The demo proves
+          the core loop: natural language becomes a planned tool call, then the app validates and
+          executes it.
+        </p>
+      </article>
+
+      <article>
+        <span>Monetization</span>
+        <h2>Hosted planner tokens first</h2>
+        <p>
+          Keep the SDK free. Charge for a hosted planner API that handles provider keys, model
+          routing, retries, caching, schema prompting, and usage metering.
+        </p>
+      </article>
+
+      <article>
+        <span>Expansion</span>
+        <h2>Devtools, audit, recipes</h2>
+        <p>
+          Once teams register tools across routes, they need replay history, tool diffs, coverage,
+          confirmation analytics, policy checks, and verified recipes for common workflows.
+        </p>
+      </article>
+
+      <article>
+        <span>First buyer</span>
+        <h2>AI-forward SaaS teams</h2>
+        <p>
+          The first customer is a technical team that already wants agents inside its product but
+          does not want unsafe browser automation, custom planner prompts, or unreviewable actions.
+        </p>
+      </article>
+    </section>
+
+    <section class="memo-band" aria-label="Business model">
+      <div>
+        <span>Business model</span>
+        <strong>Free SDK plus paid hosted planning</strong>
+      </div>
+      <dl>
+        <div>
+          <dt>Free</dt>
+          <dd>Core kit, framework helpers, local fallback planner, demo, docs.</dd>
+        </div>
+        <div>
+          <dt>Paid first</dt>
+          <dd>Hosted planner token packs with usage-based pricing.</dd>
+        </div>
+        <div>
+          <dt>Paid later</dt>
+          <dd>Devtools Pro, enterprise audit, analytics, verified recipes.</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="memo-grid memo-grid--compact" aria-label="Execution plan">
+      <article>
+        <span>Now</span>
+        <h2>Make the demo convert</h2>
+        <p>
+          Lead with four proof flows: scoped context, chained confirmation, guard blocks, and
+          form-backed tools.
+        </p>
+      </article>
+
+      <article>
+        <span>Next</span>
+        <h2>Build hosted planner MVP</h2>
+        <p>
+          One account token, one `/plan` endpoint, successful-plan debit, basic usage logs, and
+          app-server integration docs.
+        </p>
+      </article>
+
+      <article>
+        <span>Validation</span>
+        <h2>Find five design partners</h2>
+        <p>
+          Target teams already prototyping browser agents inside SaaS products. Sell the safety and
+          observability layer before selling scale.
+        </p>
+      </article>
+    </section>
+  </section>
+</DemoLayout>
+
+<style>
+  .memo-shell {
+    display: grid;
+    gap: clamp(1rem, 2vw, 1.5rem);
+    width: min(1180px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 24px 0 80px;
+  }
+
+  .memo-hero {
+    display: grid;
+    gap: 0.7rem;
+    border-bottom: 1px solid rgba(244, 240, 232, 0.14);
+    padding-bottom: clamp(1rem, 2vw, 1.4rem);
+  }
+
+  .memo-hero p,
+  .memo-hero h1,
+  .memo-hero span,
+  .memo-grid h2,
+  .memo-grid p,
+  .memo-band dl {
+    margin: 0;
+  }
+
+  .memo-hero p,
+  .memo-grid article > span,
+  .memo-band span {
+    color: #e8be53;
+    font-size: 0.74rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .memo-hero h1 {
+    max-width: 56rem;
+    color: #f4f0e8;
+    font-size: clamp(2.15rem, 5vw, 4.7rem);
+    line-height: 0.98;
+  }
+
+  .memo-hero span {
+    max-width: 62rem;
+    color: #aeb9b3;
+    font-size: clamp(1rem, 1.5vw, 1.18rem);
+    line-height: 1.55;
+  }
+
+  .memo-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    border: 1px solid rgba(244, 240, 232, 0.13);
+    background: rgba(244, 240, 232, 0.12);
+  }
+
+  .memo-grid article,
+  .memo-band {
+    display: grid;
+    min-width: 0;
+    gap: 0.75rem;
+    align-content: start;
+    background: rgba(9, 14, 13, 0.95);
+    padding: clamp(1rem, 2vw, 1.35rem);
+  }
+
+  .memo-grid .memo-lead {
+    grid-column: 1 / -1;
+  }
+
+  .memo-grid h2 {
+    color: #f4f0e8;
+    font-size: clamp(1.35rem, 2.3vw, 2rem);
+    line-height: 1.08;
+  }
+
+  .memo-grid p,
+  .memo-band dd {
+    color: #aeb9b3;
+    line-height: 1.5;
+  }
+
+  .memo-band {
+    grid-template-columns: minmax(14rem, 0.28fr) minmax(0, 1fr);
+    border: 1px solid rgba(244, 240, 232, 0.13);
+  }
+
+  .memo-band strong {
+    display: block;
+    margin-top: 0.25rem;
+    color: #f4f0e8;
+    font-size: clamp(1.25rem, 2vw, 1.85rem);
+    line-height: 1.1;
+  }
+
+  .memo-band dl {
+    display: grid;
+    gap: 0.85rem;
+  }
+
+  .memo-band dt {
+    color: #8fa098;
+    font-size: 0.72rem;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .memo-band dd {
+    margin: 0.16rem 0 0;
+  }
+
+  .memo-grid--compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  @media (max-width: 760px) {
+    .memo-shell {
+      width: min(100% - 20px, 1180px);
+      padding-top: 16px;
+      padding-bottom: 48px;
+    }
+
+    .memo-grid,
+    .memo-grid--compact,
+    .memo-band {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

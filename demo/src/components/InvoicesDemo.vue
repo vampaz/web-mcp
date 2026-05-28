@@ -5,15 +5,14 @@
     :eyebrow="`${visibleInvoices.length} visible records`"
     :get-context="getPlannerContext"
     :metrics="metrics"
-    placeholder="Try: Mark Stark Industries invoices as paid"
+    :placeholder="story.placeholder"
+    :proof-description="story.proofDescription"
+    :proof-points="story.proofPoints"
+    :proof-title="story.proofTitle"
     :registered-tools-count="registeredToolsCount"
-    description="Manage accounts receivable with customer health, invoice risk, bulk updates, and a visible audit trail for AI-assisted changes."
-    :suggestions="[
-      'Open the Stark invoice',
-      'Mark Stark Industries invoices as paid',
-      'Show overdue invoices over 900 euros'
-    ]"
-    title="Invoices"
+    :description="story.description"
+    :suggestions="story.suggestions"
+    :title="story.title"
   >
     <section class="demo-page-content demo-page-content--invoices">
       <DemoInvoiceTable
@@ -64,6 +63,7 @@ import type {
   InvoiceFilters
 } from '@/interfaces/demo'
 import {
+  getDemoRouteStory,
   getInitialCustomers,
   getInitialDemoSettings,
   getInitialInvoiceDraft,
@@ -72,6 +72,7 @@ import {
 
 const customers = ref<Customer[]>(getInitialCustomers())
 const invoices = ref<Invoice[]>(getInitialInvoices())
+const story = getDemoRouteStory('invoices')
 const invoiceFilters = ref<InvoiceFilters>({
   query: '',
   status: 'all'

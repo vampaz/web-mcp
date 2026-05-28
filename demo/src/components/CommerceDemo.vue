@@ -5,15 +5,14 @@
     :eyebrow="`${cart.length} cart lines`"
     :get-context="getPlannerContext"
     :metrics="metrics"
-    placeholder="Try: Add two keyboard kits to the cart"
+    :placeholder="story.placeholder"
+    :proof-description="story.proofDescription"
+    :proof-points="story.proofPoints"
+    :proof-title="story.proofTitle"
     :registered-tools-count="registeredToolsCount"
-    description="Simulate assisted ordering with catalog search, stock-aware cart edits, discount controls, purchase confirmation, and receipt feedback."
-    :suggestions="[
-      'Add two keyboard kits to the cart',
-      'Apply a 10 percent discount',
-      'Checkout the current cart'
-    ]"
-    title="Commerce"
+    :description="story.description"
+    :suggestions="story.suggestions"
+    :title="story.title"
   >
     <section class="demo-page-content demo-page-content--commerce">
       <DemoCartEditor
@@ -42,9 +41,10 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import DemoCartEditor from '@/components/DemoCartEditor.vue'
 import DemoShell from '@/components/DemoShell.vue'
 import type { CartLine, DemoActivityItem, DemoMetric, Product } from '@/interfaces/demo'
-import { getInitialDemoSettings, getInitialProducts } from '@/utils/demo-data'
+import { getDemoRouteStory, getInitialDemoSettings, getInitialProducts } from '@/utils/demo-data'
 
 const products = ref<Product[]>(getInitialProducts())
+const story = getDemoRouteStory('commerce')
 const cart = ref<CartLine[]>([])
 const selectedProductId = ref(products.value[0]?.id ?? '')
 const cartQuantity = ref(1)
