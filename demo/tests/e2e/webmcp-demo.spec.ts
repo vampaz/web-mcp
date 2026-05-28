@@ -96,6 +96,25 @@ test('renders the guided demo proof points', async function testDemoGuide({ page
   )
 })
 
+test('serves the investor memo only as a direct route', async function testInvestorMemoRoute({
+  page
+}) {
+  await page.goto('/investor-memo/')
+
+  await expect(
+    page.getByRole('heading', { name: 'Safe, typed app actions for browser agents.' })
+  ).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Hosted planner tokens first' })).toBeVisible()
+  await expect(
+    page.getByRole('navigation', { name: 'Demo sections' }).getByRole('link', {
+      name: 'Investor memo'
+    })
+  ).toHaveCount(0)
+
+  const robots = await page.locator('meta[name="robots"]').getAttribute('content')
+  expect(robots).toBe('noindex,nofollow')
+})
+
 test('shows browser local AI as a selectable demo provider', async function testBrowserLocalProviderOption({
   page
 }) {

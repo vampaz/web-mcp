@@ -4,11 +4,13 @@ import { getDemoRouteStories } from '@/utils/demo-data'
 
 interface Props {
   description?: string
+  robots?: string
   title?: string
 }
 
 const {
   description = 'Local WebMCP Kit demo',
+  robots,
   title = 'WebMCP Kit'
 } = Astro.props
 const currentPath = Astro.url.pathname
@@ -27,6 +29,7 @@ function getIsActive(path: string): boolean {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
+    {robots && <meta name="robots" content={robots} />}
     <meta name="theme-color" content="#090b0b" />
     <link rel="icon" href="/webmcp-circuit.svg" type="image/svg+xml" />
     <title>{title}</title>
