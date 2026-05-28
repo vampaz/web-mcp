@@ -104,6 +104,29 @@ export interface DemoConfirmationRequest {
   toolName: string
 }
 
+export interface DemoShellProps {
+  activityItems?: DemoActivityItem[]
+  confirmationsEnabled?: boolean
+  description?: string
+  eyebrow: string
+  getContext: () => unknown
+  metrics?: DemoMetric[]
+  placeholder: string
+  proofDescription?: string
+  proofPoints?: DemoProofPoint[]
+  proofTitle?: string
+  registeredToolsCount: number
+  suggestions?: string[]
+  title: string
+}
+
+export interface LatestPlanSummary {
+  detail: string
+  input: string
+  status: 'blocked' | 'idle' | 'success'
+  title: string
+}
+
 export interface PlannerModelOption {
   id: string
   label: string

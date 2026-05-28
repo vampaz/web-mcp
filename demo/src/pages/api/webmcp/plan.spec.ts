@@ -449,6 +449,21 @@ describe('/api/webmcp/plan', () => {
     expect(run).not.toHaveBeenCalled()
   })
 
+  it('rejects malformed JSON before planning', async () => {
+    const run = vi.fn()
+    env.AI = {
+      run
+    } as unknown as typeof env.AI
+
+    const response = await POST(createRawContext('{'))
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({
+      error: 'Planner request body must be valid JSON.'
+    })
+    expect(run).not.toHaveBeenCalled()
+  })
+
   it('rejects plans whose input does not match the selected tool schema', async () => {
     vi.spyOn(console, 'error').mockImplementation(function ignoreErrorLog() {})
     env.AI = {
@@ -579,6 +594,19 @@ function createContext(body: unknown) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(body)
+    }),
+    locals: {}
+  } as unknown as Parameters<typeof POST>[0]
+}
+
+function createRawContext(body: string) {
+  return {
+    request: new Request('http://localhost/api/webmcp/plan', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body
     }),
     locals: {}
   } as unknown as Parameters<typeof POST>[0]

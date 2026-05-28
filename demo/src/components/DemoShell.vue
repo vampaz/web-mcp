@@ -141,8 +141,6 @@ import {
   type ToolPlanner,
   type WebMCPCommandErrorEventDetail,
   type WebMCPCommandInputElement,
-  type WebMCPCommandInputEndpointOption,
-  type WebMCPCommandInputPlannerOption,
   type WebMCPCommandPanelToggleEventDetail,
   type WebMCPCommandPlannerEventDetail,
   type WebMCPCommandResultEventDetail
@@ -151,39 +149,15 @@ import { mountDevtoolsOverlay, type DevtoolsOverlay } from 'webmcp-kit/devtools'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 import DemoRuntimeStatus from '@/components/DemoRuntimeStatus.vue'
+import { createDemoHeuristicPlanner } from '@/utils/demo-heuristic-planner'
 import {
-  getCloudflareBindingModels,
-  getOpenAIPlannerEndpoints,
-  getOpenRouterPlannerEndpoints
-} from '@/utils/demo-data'
-import {
-  createBrowserLocalAIPlanner,
-  defaultBrowserLocalAIModel
-} from '@/utils/browser-local-ai-planner'
-import type {
-  DemoActivityItem,
-  DemoConfirmationRequest,
-  DemoMetric,
-  DemoProofPoint
-} from '@/interfaces/demo'
+  defaultPlannerModel,
+  plannerEndpointOptions,
+  plannerOptions
+} from '@/utils/demo-planner-options'
+import type { DemoConfirmationRequest, DemoShellProps, LatestPlanSummary } from '@/interfaces/demo'
 
-interface Props {
-  activityItems?: DemoActivityItem[]
-  confirmationsEnabled?: boolean
-  description?: string
-  eyebrow: string
-  getContext: () => unknown
-  metrics?: DemoMetric[]
-  placeholder: string
-  proofDescription?: string
-  proofPoints?: DemoProofPoint[]
-  proofTitle?: string
-  registeredToolsCount: number
-  suggestions?: string[]
-  title: string
-}
-
-const props = withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<DemoShellProps>(), {
   activityItems: () => [],
   confirmationsEnabled: true,
   description: '',
@@ -207,67 +181,9 @@ const props = withDefaults(defineProps<Props>(), {
   proofTitle: 'Typed app actions',
   suggestions: () => []
 })
-interface LatestPlanSummary {
-  detail: string
-  input: string
-  status: 'blocked' | 'idle' | 'success'
-  title: string
-}
 
 const showDevtools = import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIEW === 'true'
 const shouldInstallTestBridge = import.meta.env.DEV || import.meta.env.MODE === 'test'
-const cloudflareBindingModels = getCloudflareBindingModels()
-const openAIPlannerEndpoints = getOpenAIPlannerEndpoints()
-const openRouterPlannerEndpoints = getOpenRouterPlannerEndpoints()
-const plannerEndpointOptions: WebMCPCommandInputEndpointOption[] = [
-  ...cloudflareBindingModels.flatMap(function mapCloudflareEndpoint(model) {
-    return [
-      {
-        label: model.label,
-        model: model.id,
-        provider: 'cloudflare-binding' as const
-      },
-      {
-        label: model.label,
-        model: model.id,
-        provider: 'cloudflare-workers-ai' as const
-      }
-    ]
-  }),
-  ...openRouterPlannerEndpoints.map(function mapOpenRouterEndpoint(model) {
-    return {
-      label: model.label,
-      model: model.id,
-      provider: 'openrouter' as const
-    }
-  }),
-  ...openAIPlannerEndpoints.map(function mapOpenAIEndpoint(model) {
-    return {
-      label: model.label,
-      model: model.id,
-      provider: 'openai' as const
-    }
-  }),
-  {
-    label: 'Auto',
-    provider: 'auto'
-  },
-  {
-    label: 'Local deterministic',
-    provider: 'local'
-  }
-]
-const plannerOptions: WebMCPCommandInputPlannerOption[] = [
-  {
-    id: 'browser-local-ai',
-    label: `Browser local AI · ${defaultBrowserLocalAIModel}`,
-    createPlanner() {
-      return createBrowserLocalAIPlanner({
-        model: defaultBrowserLocalAIModel
-      })
-    }
-  }
-]
 const plannerName = ref('Loading')
 const shouldDefaultToBrowserLocalAI = import.meta.env.DEV && !import.meta.env.PROD
 const plannerDetail = ref(
@@ -276,7 +192,6 @@ const plannerDetail = ref(
     : 'Using the OpenAI planner endpoint.'
 )
 const defaultPlannerProvider: PlannerProviderKind = 'openai'
-const defaultPlannerModel = openAIPlannerEndpoints[0]?.id
 const defaultPlannerOptionId = shouldDefaultToBrowserLocalAI ? 'browser-local-ai' : undefined
 const plannerEndpoint = '/api/webmcp/plan'
 const unregisterCallbacks: Array<() => void> = []
@@ -349,8 +264,16 @@ onUnmounted(function handleUnmounted() {
 function configureCommandInput() {
   const element = getCommandInputElement()
   if (import.meta.env.MODE === 'test') {
+    if (typeof window !== 'undefined' && 'LanguageModel' in window) {
+      element?.configure({
+        context: props.getContext
+      })
+      return
+    }
+
     element?.configure({
-      context: props.getContext
+      context: props.getContext,
+      planner: createDemoHeuristicPlanner()
     })
     return
   }

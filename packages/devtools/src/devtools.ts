@@ -369,6 +369,7 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
   let nextHistoryId = 1
   const history: HistoryItem[] = []
   const pendingInvocations = new Map<string, ToolInvocation>()
+  const draftInputs = new Map<string, string>()
 
   const unsubscribe = subscribeWebMCPKitEvents(function handleEvent(event) {
     if (event.type === 'invoked') {
@@ -413,7 +414,13 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
         (item) => item.tool.name === targetElement.dataset.toolName
       )
       if (textarea && registration) {
-        textarea.value = JSON.stringify(createSampleInput(registration.tool.inputSchema), null, 2)
+        const sampleInput = JSON.stringify(
+          createSampleInput(registration.tool.inputSchema),
+          null,
+          2
+        )
+        textarea.value = sampleInput
+        draftInputs.set(registration.tool.name, sampleInput)
       }
       return
     }
@@ -433,6 +440,15 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
     }
   })
 
+  root.addEventListener('input', function handleInput(event) {
+    const targetElement = event.target
+    if (!(targetElement instanceof HTMLTextAreaElement)) return
+    const toolName = targetElement.dataset.toolName
+    if (!toolName) return
+
+    draftInputs.set(toolName, targetElement.value)
+  })
+
   render()
 
   return {
@@ -447,6 +463,7 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
   function render() {
     const registrations = listTools()
     const healthReport = getIntegrationHealthReport()
+    pruneDraftInputs(registrations)
     root.innerHTML = `
       <button class="wmk-devtools__toggle" type="button" data-action="toggle">
         ${open ? 'Hide inspector' : 'Show inspector'} · ${registrations.length} tools
@@ -491,7 +508,7 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
               <summary>Prompt preview</summary>
               <pre>${escapeHtml(createPromptPreview(registration.tool.name, registration.tool.description, registration.tool.inputSchema))}</pre>
             </details>
-            <textarea data-tool-name="${escapeAttribute(registration.tool.name)}">${escapeHtml(JSON.stringify(createSampleInput(registration.tool.inputSchema), null, 2))}</textarea>
+            <textarea data-tool-name="${escapeAttribute(registration.tool.name)}">${escapeHtml(getDraftInput(registration.tool))}</textarea>
             <div class="wmk-devtools__actions">
               <button type="button" data-action="invoke" data-tool-name="${escapeAttribute(registration.tool.name)}">Invoke</button>
               <button type="button" data-action="sample" data-tool-name="${escapeAttribute(registration.tool.name)}">Sample</button>
@@ -526,6 +543,7 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
     const textarea = root.querySelector<HTMLTextAreaElement>(
       `textarea[data-tool-name="${toolName}"]`
     )
+    if (textarea) draftInputs.set(toolName, textarea.value)
     const parsedInput = replayInput
       ? ({ ok: true, input: replayInput } as const)
       : parseInput(toolName, textarea?.value ?? '')
@@ -585,6 +603,23 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
     nextHistoryId += 1
     history.splice(5)
     render()
+  }
+
+  function getDraftInput(tool: WebMCPTool): string {
+    return (
+      draftInputs.get(tool.name) ?? JSON.stringify(createSampleInput(tool.inputSchema), null, 2)
+    )
+  }
+
+  function pruneDraftInputs(registrations: ReturnType<typeof listTools>): void {
+    const registeredToolNames = new Set(
+      registrations.map(function mapRegistration(registration) {
+        return registration.tool.name
+      })
+    )
+    for (const toolName of draftInputs.keys()) {
+      if (!registeredToolNames.has(toolName)) draftInputs.delete(toolName)
+    }
   }
 }
 

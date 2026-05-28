@@ -32,7 +32,7 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 
 **Points to address:**
 
-1. **`planner.ts` is the largest core module** — it handles Chrome AI sessions, OpenAI-compatible chat, Cloudflare REST, server endpoints, heuristic keyword matching, and plan validation. Consider splitting into `planner/heuristic.ts`, `planner/chrome-ai.ts`, `planner/remote.ts`, and `planner/validate.ts` when it grows further. Not a blocker for this MVP.
+1. **Planner provider code remains the largest core area** — `planner.ts` still owns Chrome AI sessions, OpenAI-compatible chat, Cloudflare REST, server endpoints, and plan validation. The deterministic fallback now lives in `heuristic-planner.ts`; consider splitting Chrome AI and remote-provider code only when those paths grow further.
 
 2. **Demo pages are split by workflow** — Inventory, Invoices, Commerce, and Support now own their page-specific tools while sharing `DemoShell.vue`. Keep future changes in those page components instead of rebuilding a single large demo component.
 
@@ -56,25 +56,25 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 
 - **`devtools.ts`**: A self-contained vanilla-TS overlay with its own CSS. Subscribes to kit events, renders tool cards with prompt previews, sample generation, invocation history with replay. The `invocationId` tracking correctly correlates concurrent calls. Clean use of event delegation.
 
-- **`planner.ts`**: Robust. Handles Chrome AI session lifecycle (availability → create → prompt), with graceful fallback to heuristics on any failure. Remote planners validate responses before returning. `validateRemotePlan` checks structure and confirms the tool exists in the registry. Server endpoint errors are surfaced in fallback reasons.
+- **`planner.ts` / `heuristic-planner.ts`**: Robust. Handles Chrome AI session lifecycle (availability → create → prompt), with graceful fallback to generic schema/context heuristics on any failure. Remote planners validate responses before returning. Server endpoint errors are surfaced in fallback reasons.
 
 - **`mcp-bridge/index.ts`**: Proper JSON-RPC 2.0 implementation with `tools/list` and `tools/call`. Confirmation is passed through as a param. Good.
 
 - **`testing/playwright.ts`**: Thin, correct Playwright helpers using `page.evaluate()` to reach the test bridge. `waitForWebMCPTool` uses `page.waitForFunction` with a proper predicate.
 
-- **Server endpoint (`demo/src/pages/api/webmcp/plan.ts`)**: Handles both Cloudflare binding and REST modes. Whitelists approved models, strips code fences from AI responses (common with smaller models), uses `getLegacyRuntimeEnv` for compatibility.
+- **Server endpoint (`demo/src/pages/api/webmcp/plan.ts`)**: Handles both Cloudflare binding and REST modes. Whitelists approved models, strips code fences from AI responses (common with smaller models), rejects malformed JSON explicitly, and uses `getLegacyRuntimeEnv` for compatibility.
 
 ### Issues & Recommendations
 
-1. **`devtools.ts` — `innerHTML`-based rendering**: The entire overlay DOM is rebuilt via `root.innerHTML = ...` on every render. This means textarea content is lost on external render triggers (e.g., events from other tools being invoked). You already handle this for concurrent invocations (the `pendingInvocations` map), but if someone types in a textarea and another tool fires in the background, their input is lost. **Recommendation**: Use targeted DOM updates or a diff-based approach in a follow-up. Low priority for a devtool.
+1. **`devtools.ts` — full overlay re-rendering**: The overlay still rebuilds markup for each render, but edited textarea drafts are now preserved across unrelated event-triggered renders. A targeted DOM update approach remains optional polish, not correctness debt.
 
 2. **`devtools.ts` — `escapeHtml` uses `replaceAll`**: This requires ES2021+. The codebase targets modern Chrome (WebMCP is Chrome-only), so this is fine, but worth noting.
 
-3. **Heuristic planner has hardcoded product IDs** (`planner.ts`): demo product IDs are hardcoded in `planWithHeuristics`. These match the demo but not real apps. The heuristic planner is explicitly a fallback, and its `reason` field explains what it did, so this is acceptable for MVP.
+3. **Demo semantic heuristics are demo-owned**: Core fallback planning is now generic and schema/context-driven. Demo-specific semantic inventory grouping lives in `demo/src/utils/demo-heuristic-planner.ts`, where it can evolve with demo data.
 
 4. **`native-adapter.spec.ts` — test pollution risk**: `clearToolsForTest()` is called in `beforeEach`/`afterEach`, but `navigator.modelContext` is directly mutated without restoration of the original value. Since the tests delete `modelContext` in teardown, this works, but if another test file runs in the same vm context, it could leak. Acceptable.
 
-5. **`plan.ts` — `getLegacyRuntimeEnv` try/catch is broad**: `catch { return {} }` in `getLegacyRuntimeEnv` silently swallows syntax errors in the `locals.runtime.env` getter. Not a realistic scenario, but worth being aware of.
+5. **`plan.ts` — legacy env fallback is narrow**: `getLegacyRuntimeEnv` no longer swallows arbitrary getter errors; unsupported `cloudflare:workers` imports still fall back to Astro locals.
 
 ---
 
@@ -157,9 +157,9 @@ All 10 planned docs exist and are well-written:
 
 | Priority     | Issue                                                                                             | File                  |
 | ------------ | ------------------------------------------------------------------------------------------------- | --------------------- |
-| Nice to have | Targeted DOM updates instead of full innerHTML re-render                                          | `devtools.ts`         |
+| Nice to have | Targeted DOM updates instead of full overlay re-render                                            | `devtools.ts`         |
 | Nice to have | Direct tests for `events.ts` and `support.ts`                                                     | New test files        |
-| Not blocking | Split `planner.ts` into multiple modules                                                          | `planner.ts`          |
+| Not blocking | Split Chrome AI and remote-provider planner code if those paths grow further                      | `planner.ts`          |
 | Not blocking | Keep splitting shared demo behavior only when repeated page code proves it is actually duplicated | `demo/src/components` |
 
 ---

@@ -1,5 +1,4 @@
 import {
-  createHeuristicPlanner,
   getErrorMessage,
   normalizeJsonText,
   toolPlanSchema,
@@ -17,6 +16,7 @@ import type {
   WebLLMInitProgressReport,
   WebLLMModule
 } from '@/interfaces/browser-local-ai'
+import { createDemoHeuristicPlanner } from '@/utils/demo-heuristic-planner'
 
 export const defaultBrowserLocalAIModel = 'Qwen3.5-2B-q4f16_1-MLC'
 
@@ -76,7 +76,7 @@ async function repairBrowserLocalAIPlan(
   }
 
   try {
-    const groundedPlan = await createHeuristicPlanner().plan(message, tools, context)
+    const groundedPlan = await createDemoHeuristicPlanner().plan(message, tools, context)
     if (groundedPlan.toolName !== 'select_items') return plan
     if (!Array.isArray(groundedPlan.input.ids) || groundedPlan.input.ids.length === 0) return plan
 

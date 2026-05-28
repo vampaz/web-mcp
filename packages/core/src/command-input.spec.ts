@@ -906,6 +906,29 @@ describe('WebMCP command input', () => {
     expect(element.shadowRoot?.querySelector('[data-model]')).toBeNull()
   })
 
+  it('preserves prompt focus and selection across configuration renders', async () => {
+    const element = createCommandInputElement()
+    document.body.append(element)
+    await Promise.resolve()
+
+    const input = getPromptInput(element)
+    input.value = 'Find docks'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.focus()
+    input.setSelectionRange(5, 10)
+
+    element.configure({
+      placeholder: 'Try a command'
+    })
+    await Promise.resolve()
+
+    const renderedInput = getPromptInput(element)
+    expect(element.shadowRoot?.activeElement).toBe(renderedInput)
+    expect(renderedInput.value).toBe('Find docks')
+    expect(renderedInput.selectionStart).toBe(5)
+    expect(renderedInput.selectionEnd).toBe(10)
+  })
+
   it('emits planner status when the selected provider changes', async () => {
     const element = createCommandInputElement()
     element.configure({
@@ -972,7 +995,7 @@ describe('WebMCP command input', () => {
       status: 'success',
       toolName: 'add_to_cart',
       output: {
-        productId: 'kbd-01',
+        productId: 'Add ten keyboards to the cart.',
         quantity: 10
       }
     })

@@ -91,7 +91,9 @@ describe('browser local AI planner', () => {
         { id: 'item_7', name: 'Baguette' }
       ]
     })
-    const request = completionCreate.mock.calls[0]?.[0] as Record<string, unknown> | undefined
+    const request = (
+      completionCreate.mock.calls as unknown as Array<[Record<string, unknown>]>
+    )[0]?.[0]
 
     expect(plan).toMatchObject({
       toolName: 'select_items',
@@ -199,23 +201,27 @@ describe('browser local AI planner', () => {
         requestAdapter: async () => ({})
       }
     })
-    const completionCreate = vi.fn(async () => ({
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
-              toolName: 'sort_inventory',
-              input: {
-                direction: 'asc',
-                sortBy: 'demand'
-              },
-              confidence: 0.9,
-              reason: 'Sorted inventory by demand.'
-            })
+    const completionCreate = vi.fn(async function createCompletion(
+      _request: Record<string, unknown>
+    ) {
+      return {
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                toolName: 'sort_inventory',
+                input: {
+                  direction: 'asc',
+                  sortBy: 'demand'
+                },
+                confidence: 0.9,
+                reason: 'Sorted inventory by demand.'
+              })
+            }
           }
-        }
-      ]
-    }))
+        ]
+      }
+    })
     webLLMMocks.createMLCEngine.mockResolvedValue({
       chat: {
         completions: {
@@ -262,7 +268,7 @@ describe('browser local AI planner', () => {
       }
     )
 
-    const request = completionCreate.mock.calls[0]?.[0] as Record<string, unknown> | undefined
+    const request = completionCreate.mock.calls[0]?.[0]
     if (!request) throw new Error('Expected WebLLM request.')
     const promptText = JSON.stringify(request.messages)
     expect(promptText).toContain('\\"checklistItems\\": 2')

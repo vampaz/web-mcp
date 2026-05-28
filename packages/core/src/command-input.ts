@@ -4,7 +4,6 @@ import type {
   PlannerProviderKind,
   ToolInvocationResult,
   ToolPlan,
-  ToolPlanStep,
   ToolPlanner
 } from './interfaces/tool'
 import type {
@@ -22,6 +21,7 @@ import type {
   WebMCPCommandInputRunOptions
 } from './interfaces/command-input'
 import { escapeAttribute, escapeHtml } from './command-input-html'
+import { invokePlannedSteps, throwIfAborted } from './command-input-runner'
 import { getErrorMessage } from './confirmation'
 import {
   createCommandInputPlanner,
@@ -42,7 +42,7 @@ import {
 } from './command-input-options'
 import { getStyles } from './command-input-styles'
 import { createChromeAIPlanner } from './planner'
-import { invokeTool, listTools } from './registry'
+import { listTools } from './registry'
 
 type CommandInputConstructor = CustomElementConstructor & {
   observedAttributes: string[]
@@ -788,6 +788,10 @@ export function defineWebMCPCommandInput(
 
     private render() {
       if (!this.shadowRoot) return
+      const previousInput = this.getPromptInput()
+      const shouldRestorePromptFocus = this.shadowRoot.activeElement === previousInput
+      const selectionStart = previousInput?.selectionStart
+      const selectionEnd = previousInput?.selectionEnd
 
       const plannerOption = this.getSelectedPlannerOption()
       const provider =
@@ -910,6 +914,12 @@ export function defineWebMCPCommandInput(
       providerControl?.addEventListener('change', this.handleProviderChanged.bind(this))
       modelControl?.addEventListener('input', this.handleModelChanged.bind(this))
       modelControl?.addEventListener('change', this.handleModelChanged.bind(this))
+      if (shouldRestorePromptFocus) {
+        input?.focus({ preventScroll: true })
+        if (selectionStart !== null && selectionEnd !== null) {
+          input?.setSelectionRange(selectionStart ?? 0, selectionEnd ?? selectionStart ?? 0)
+        }
+      }
     }
 
     private getSelectedPlannerOption(): WebMCPCommandInputPlannerOption | undefined {
@@ -940,66 +950,6 @@ export function defineWebMCPCommandInput(
   return WebMCPCommandInput
 }
 
-async function invokePlannedSteps(
-  plan: ToolPlan,
-  setActiveToolName: (toolName: string) => void,
-  dispatchStepEvent: (detail: Omit<WebMCPCommandStepEventDetail, 'message'>) => void,
-  signal?: AbortSignal
-): Promise<ToolInvocationResult> {
-  const steps = getPlanSteps(plan)
-  let result: ToolInvocationResult | undefined
-
-  for (const [index, step] of steps.entries()) {
-    throwIfAborted(signal)
-    const toolName =
-      steps.length > 1 ? `${step.toolName} (${index + 1}/${steps.length})` : step.toolName
-    setActiveToolName(toolName)
-    dispatchStepEvent({
-      phase: 'started',
-      plan,
-      step,
-      stepCount: steps.length,
-      stepIndex: index
-    })
-    result = await invokeTool({
-      toolName: step.toolName,
-      input: step.input,
-      source: 'planner'
-    })
-    dispatchStepEvent({
-      phase: 'completed',
-      plan,
-      result,
-      step,
-      stepCount: steps.length,
-      stepIndex: index
-    })
-    if (result.status !== 'success') return result
-  }
-
-  return (
-    result ?? {
-      toolName: plan.toolName,
-      status: 'error',
-      error: 'Planner returned no executable steps.',
-      durationMs: 0
-    }
-  )
-}
-
-function getPlanSteps(plan: ToolPlan): ToolPlanStep[] {
-  if (Array.isArray(plan.steps)) return plan.steps
-
-  return [
-    {
-      toolName: plan.toolName,
-      input: plan.input,
-      confidence: plan.confidence,
-      reason: plan.reason
-    }
-  ]
-}
-
 function getStatusLabel(phase: WebMCPCommandInputPhase): string {
   if (phase === 'preparing') return 'Preparing...'
   if (phase === 'planning') return 'Planning...'
@@ -1013,9 +963,4 @@ function assertCustomElementsAvailable() {
       'WebMCP command input can only be defined in a browser custom elements environment.'
     )
   }
-}
-
-function throwIfAborted(signal: AbortSignal | undefined): void {
-  if (!signal?.aborted) return
-  throw new Error('Command was cancelled.')
 }

@@ -107,6 +107,66 @@ describe('devtools overlay', () => {
     overlay.destroy()
   })
 
+  it('preserves edited tool input across unrelated overlay renders', async () => {
+    registerTool(
+      defineTool({
+        name: 'create_invoice',
+        description: 'Create a draft invoice.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            amount: { type: 'number' }
+          },
+          additionalProperties: false
+        },
+        execute(input) {
+          return input
+        }
+      })
+    )
+    registerTool(
+      defineTool({
+        name: 'search_products',
+        description: 'Search products.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string' }
+          },
+          additionalProperties: false
+        },
+        execute(input) {
+          return input
+        }
+      })
+    )
+
+    const overlay = mountDevtoolsOverlay()
+    const invoiceInput = document.querySelector<HTMLTextAreaElement>(
+      'textarea[data-tool-name="create_invoice"]'
+    )
+    const searchInput = document.querySelector<HTMLTextAreaElement>(
+      'textarea[data-tool-name="search_products"]'
+    )
+    const searchButton = document.querySelector<HTMLButtonElement>(
+      'button[data-action="invoke"][data-tool-name="search_products"]'
+    )
+    if (!invoiceInput || !searchInput || !searchButton) throw new Error('Expected devtools inputs.')
+
+    invoiceInput.value = JSON.stringify({ amount: 42 })
+    invoiceInput.dispatchEvent(new Event('input', { bubbles: true }))
+    searchInput.value = JSON.stringify({ query: 'dock' })
+    searchButton.click()
+    await flushPromises()
+
+    expect(
+      document.querySelector<HTMLTextAreaElement>('textarea[data-tool-name="create_invoice"]')
+        ?.value
+    ).toBe(JSON.stringify({ amount: 42 }))
+
+    overlay.destroy()
+  })
+
   it('shows read-only hints for annotated tools', () => {
     registerTool(
       defineTool({

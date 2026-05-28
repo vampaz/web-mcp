@@ -6,6 +6,7 @@ import {
   createConfiguredPlanner,
   createHeuristicPlanner
 } from './planner'
+import type { JsonSchema, WebMCPTool } from './interfaces/tool'
 
 interface WindowWithLanguageModel extends Window {
   LanguageModel?: {
@@ -29,7 +30,17 @@ describe('planner', () => {
 
   it('uses a deterministic fallback planner without Chrome built-in AI', async () => {
     const planner = await createBestPlanner()
-    const plan = await planner.plan('Create an invoice for Acme for 250 euros', [])
+    const plan = await planner.plan('Create an invoice for Acme for 250 euros', [
+      createTool('create_invoice', 'Create a draft invoice for a customer.', {
+        type: 'object',
+        properties: {
+          customerName: { type: 'string' },
+          amount: { type: 'number' }
+        },
+        required: ['customerName', 'amount'],
+        additionalProperties: false
+      })
+    ])
 
     expect(planner.status).toBe('fallback')
     expect(plan.toolName).toBe('create_invoice')
@@ -120,7 +131,7 @@ describe('planner', () => {
     }
 
     const planner = await createChromeAIPlanner()
-    const plan = await planner.plan('Add ten keyboards to the cart.', [])
+    const plan = await planner.plan('Add ten keyboards to the cart.', [createCartTool()])
 
     expect(planner.available).toBe(true)
     expect(plan.toolName).toBe('add_to_cart')
@@ -157,7 +168,16 @@ describe('planner', () => {
     }
 
     const planner = await createChromeAIPlanner()
-    const plan = await planner.plan('Find docks', [])
+    const plan = await planner.plan('Find docks', [
+      createTool('search_products', 'Search products.', {
+        type: 'object',
+        properties: {
+          query: { type: 'string' }
+        },
+        required: ['query'],
+        additionalProperties: false
+      })
+    ])
 
     expect(plan.toolName).toBe('search_products')
     expect(plan.reason).toContain('Chrome built-in AI returned unparseable JSON')
@@ -238,29 +258,45 @@ describe('planner', () => {
 
   it('extracts word quantities for cart commands', async () => {
     const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Add ten keyboards to the card.', [])
+    const plan = await planner.plan('Add ten keyboards to the cart.', [createCartTool()], {
+      products: [{ id: 'product_keyboard', name: 'Keyboard kit' }]
+    })
 
     expect(plan.toolName).toBe('add_to_cart')
     expect(plan.input).toEqual({
-      productId: 'kbd-01',
+      productId: 'product_keyboard',
       quantity: 10
+    })
+  })
+
+  it('does not match number words inside larger words', async () => {
+    const planner = createHeuristicPlanner()
+    const plan = await planner.plan('Add stone keyboards to the cart.', [createCartTool()], {
+      products: [{ id: 'product_keyboard', name: 'Keyboard kit' }]
+    })
+
+    expect(plan.input).toEqual({
+      productId: 'product_keyboard',
+      quantity: 1
     })
   })
 
   it('extracts numeric quantities for cart commands', async () => {
     const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Add 12 docks to the cart.', [])
+    const plan = await planner.plan('Add 12 docks to the cart.', [createCartTool()], {
+      products: [{ id: 'product_dock', name: 'Dock' }]
+    })
 
     expect(plan.toolName).toBe('add_to_cart')
     expect(plan.input).toEqual({
-      productId: 'dock-02',
+      productId: 'product_dock',
       quantity: 12
     })
   })
 
   it('routes checkout commands to the confirmed checkout tool', async () => {
     const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Checkout the cart.', [])
+    const plan = await planner.plan('Checkout the cart.', [createCheckoutTool()])
 
     expect(plan.toolName).toBe('checkout_cart')
     expect(plan.input).toEqual({})
@@ -268,7 +304,7 @@ describe('planner', () => {
 
   it('plans positional checklist selection', async () => {
     const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Select the first five items', [], {
+    const plan = await planner.plan('Select the first five items', [createSelectItemsTool()], {
       checklistItems: [
         { id: 'item_1' },
         { id: 'item_2' },
@@ -287,27 +323,14 @@ describe('planner', () => {
 
   it('plans checklist selection from visible item names in current app context', async () => {
     const planner = createHeuristicPlanner()
-    const plan = await planner.plan(
-      'Select all items with water',
-      [
-        {
-          name: 'select_items',
-          description: 'Select checklist items by ID.',
-          inputSchema: {
-            type: 'object'
-          },
-          execute: () => []
-        }
-      ],
-      {
-        checklistItems: [
-          { id: 'item_1', name: 'Apple' },
-          { id: 'item_8', name: 'Water' },
-          { id: 'item_16', name: 'Sparkling water' },
-          { id: 'item_20', name: 'Tea' }
-        ]
-      }
-    )
+    const plan = await planner.plan('Select all items with water', [createSelectItemsTool()], {
+      checklistItems: [
+        { id: 'item_1', name: 'Apple' },
+        { id: 'item_8', name: 'Water' },
+        { id: 'item_16', name: 'Sparkling water' },
+        { id: 'item_20', name: 'Tea' }
+      ]
+    })
 
     expect(plan.toolName).toBe('select_items')
     expect(plan.input).toEqual({
@@ -317,29 +340,20 @@ describe('planner', () => {
 
   it('infers semantic checklist groups from visible item names', async () => {
     const planner = createHeuristicPlanner()
-    const tools = [
-      {
-        name: 'select_items',
-        description: 'Select checklist items by ID.',
-        inputSchema: {
-          type: 'object'
-        },
-        execute: () => []
-      }
-    ]
+    const tools = [createSelectItemsTool()]
     const context = {
       checklistItems: [
         { id: 'item_1', name: 'Apple' },
-        { id: 'item_4', name: 'Croissant' },
-        { id: 'item_7', name: 'Baguette' },
+        { id: 'item_4', name: 'French croissant' },
+        { id: 'item_7', name: 'French baguette' },
         { id: 'item_8', name: 'Water' },
         { id: 'item_10', name: 'Coffee' },
-        { id: 'item_13', name: 'Brie' },
+        { id: 'item_13', name: 'French brie' },
         { id: 'item_16', name: 'Sparkling water' },
-        { id: 'item_18', name: 'Pain au chocolat' },
+        { id: 'item_18', name: 'French pain au chocolat' },
         { id: 'item_20', name: 'Tea' },
-        { id: 'item_22', name: 'Quiche' },
-        { id: 'item_23', name: 'Rice' }
+        { id: 'item_22', name: 'French quiche' },
+        { id: 'item_23', name: 'Pantry rice' }
       ]
     }
 
@@ -349,13 +363,13 @@ describe('planner', () => {
         ids: ['item_4', 'item_7', 'item_13', 'item_18', 'item_22']
       }
     })
-    await expect(planner.plan('Select all liquids', tools, context)).resolves.toMatchObject({
+    await expect(planner.plan('Select all water items', tools, context)).resolves.toMatchObject({
       toolName: 'select_items',
       input: {
-        ids: ['item_8', 'item_10', 'item_16', 'item_20']
+        ids: ['item_8', 'item_16']
       }
     })
-    await expect(planner.plan('Select all fruits', tools, context)).resolves.toMatchObject({
+    await expect(planner.plan('Select all apple items', tools, context)).resolves.toMatchObject({
       toolName: 'select_items',
       input: {
         ids: ['item_1']
@@ -376,7 +390,13 @@ describe('planner', () => {
         name: 'sort_inventory',
         description: 'Sort the visible inventory table by a supported column.',
         inputSchema: {
-          type: 'object'
+          type: 'object',
+          properties: {
+            sortBy: { type: 'string', enum: ['name', 'stock'] },
+            direction: { type: 'string', enum: ['asc', 'desc'] }
+          },
+          required: ['sortBy'],
+          additionalProperties: false
         },
         execute() {
           return []
@@ -393,16 +413,42 @@ describe('planner', () => {
     })
   })
 
-  it('plans invoice selection from business state and amount wording', async () => {
+  it('uses the schema default when direction enum values are not asc or desc', async () => {
+    const planner = createHeuristicPlanner()
+    const plan = await planner.plan('Sort by stock descending', [
+      createTool('sort_inventory', 'Sort inventory.', {
+        type: 'object',
+        properties: {
+          direction: { type: 'string', enum: ['up', 'down'] }
+        },
+        required: ['direction'],
+        additionalProperties: false
+      })
+    ])
+
+    expect(plan.input).toEqual({
+      direction: 'up'
+    })
+  })
+
+  it('plans invoice selection from visible customer wording', async () => {
     const planner = createHeuristicPlanner()
     const plan = await planner.plan(
-      'Select unpaid invoices over 500',
+      'Select Globex invoices',
       [
         {
           name: 'select_invoices',
           description: 'Select invoice rows by ID.',
           inputSchema: {
-            type: 'object'
+            type: 'object',
+            properties: {
+              ids: {
+                type: 'array',
+                items: { type: 'string' }
+              }
+            },
+            required: ['ids'],
+            additionalProperties: false
           },
           execute: () => []
         }
@@ -419,7 +465,7 @@ describe('planner', () => {
 
     expect(plan.toolName).toBe('select_invoices')
     expect(plan.input).toEqual({
-      ids: ['inv_1', 'inv_3']
+      ids: ['inv_4']
     })
   })
 
@@ -432,7 +478,12 @@ describe('planner', () => {
           name: 'open_invoice',
           description: 'Open invoice detail.',
           inputSchema: {
-            type: 'object'
+            type: 'object',
+            properties: {
+              id: { type: 'string' }
+            },
+            required: ['id'],
+            additionalProperties: false
           },
           execute: () => []
         }
@@ -451,7 +502,7 @@ describe('planner', () => {
     })
   })
 
-  it('plans invoice status changes as a tool sequence when rows must be selected first', async () => {
+  it('plans invoice status changes from matching schema enum values', async () => {
     const planner = createHeuristicPlanner()
     const plan = await planner.plan(
       'Mark Stark Industries invoices as paid',
@@ -460,7 +511,15 @@ describe('planner', () => {
           name: 'select_invoices',
           description: 'Select invoice rows by ID.',
           inputSchema: {
-            type: 'object'
+            type: 'object',
+            properties: {
+              ids: {
+                type: 'array',
+                items: { type: 'string' }
+              }
+            },
+            required: ['ids'],
+            additionalProperties: false
           },
           execute: () => []
         },
@@ -468,7 +527,15 @@ describe('planner', () => {
           name: 'update_selected_invoice_status',
           description: 'Update selected invoice statuses.',
           inputSchema: {
-            type: 'object'
+            type: 'object',
+            properties: {
+              status: {
+                type: 'string',
+                enum: ['draft', 'sent', 'overdue', 'paid', 'void']
+              }
+            },
+            required: ['status'],
+            additionalProperties: false
           },
           execute: () => []
         }
@@ -482,26 +549,14 @@ describe('planner', () => {
     )
 
     expect(plan).toMatchObject({
-      toolName: 'tool_sequence',
-      input: {},
-      steps: [
-        {
-          toolName: 'select_invoices',
-          input: {
-            ids: ['inv_2']
-          }
-        },
-        {
-          toolName: 'update_selected_invoice_status',
-          input: {
-            status: 'paid'
-          }
-        }
-      ]
+      toolName: 'update_selected_invoice_status',
+      input: {
+        status: 'paid'
+      }
     })
   })
 
-  it('does not chain broad invoice status changes without a row target', async () => {
+  it('keeps single-step invoice status changes single-step', async () => {
     const planner = createHeuristicPlanner()
     const plan = await planner.plan(
       'Mark invoices as paid',
@@ -510,7 +565,15 @@ describe('planner', () => {
           name: 'select_invoices',
           description: 'Select invoice rows by ID.',
           inputSchema: {
-            type: 'object'
+            type: 'object',
+            properties: {
+              ids: {
+                type: 'array',
+                items: { type: 'string' }
+              }
+            },
+            required: ['ids'],
+            additionalProperties: false
           },
           execute: () => []
         },
@@ -518,7 +581,15 @@ describe('planner', () => {
           name: 'update_selected_invoice_status',
           description: 'Update selected invoice statuses.',
           inputSchema: {
-            type: 'object'
+            type: 'object',
+            properties: {
+              status: {
+                type: 'string',
+                enum: ['draft', 'sent', 'overdue', 'paid', 'void']
+              }
+            },
+            required: ['status'],
+            additionalProperties: false
           },
           execute: () => []
         }
@@ -540,28 +611,26 @@ describe('planner', () => {
     expect(plan.steps).toBeUndefined()
   })
 
-  it('does not pretend to understand unmatched semantic checklist selection in fallback mode', async () => {
+  it('returns empty IDs when context cannot ground a selection request', async () => {
     const planner = createHeuristicPlanner()
-    await expect(
-      planner.plan('Select all the items that are French food.', [
-        {
-          name: 'select_items',
-          description: 'Select checklist items by ID.',
-          inputSchema: {
-            type: 'object'
-          },
-          execute: () => []
+    const plan = await planner.plan('Select all the items that are French food.', [
+      createSelectItemsTool(),
+      createTool('search_products', 'Search products.', {
+        type: 'object',
+        properties: {
+          query: { type: 'string' }
         },
-        {
-          name: 'search_products',
-          description: 'Search products.',
-          inputSchema: {
-            type: 'object'
-          },
-          execute: () => []
-        }
-      ])
-    ).rejects.toThrow('Semantic checklist selection needs an AI planner')
+        required: ['query'],
+        additionalProperties: false
+      })
+    ])
+
+    expect(plan).toMatchObject({
+      toolName: 'select_items',
+      input: {
+        ids: []
+      }
+    })
   })
 
   it('passes app context to Chrome AI for semantic selection', async () => {
@@ -614,7 +683,14 @@ describe('planner', () => {
 
   it('plans checklist selection clearing', async () => {
     const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Clear the selection', [])
+    const plan = await planner.plan('Clear the selection', [
+      createTool('clear_item_selection', 'Clear the current item selection.', {
+        type: 'object',
+        properties: {},
+        required: [],
+        additionalProperties: false
+      })
+    ])
 
     expect(plan.toolName).toBe('clear_item_selection')
     expect(plan.input).toEqual({})
@@ -964,3 +1040,49 @@ describe('planner', () => {
     expect(planner.detail).toContain('server endpoint mode')
   })
 })
+
+function createTool(name: string, description: string, inputSchema: JsonSchema): WebMCPTool {
+  return {
+    name,
+    description,
+    inputSchema,
+    execute() {
+      return []
+    }
+  }
+}
+
+function createCartTool(): WebMCPTool {
+  return createTool('add_to_cart', 'Add a known product to the cart.', {
+    type: 'object',
+    properties: {
+      productId: { type: 'string' },
+      quantity: { type: 'integer' }
+    },
+    required: ['productId', 'quantity'],
+    additionalProperties: false
+  })
+}
+
+function createCheckoutTool(): WebMCPTool {
+  return createTool('checkout_cart', 'Checkout the current cart.', {
+    type: 'object',
+    properties: {},
+    required: [],
+    additionalProperties: false
+  })
+}
+
+function createSelectItemsTool(): WebMCPTool {
+  return createTool('select_items', 'Select visible items by stable IDs.', {
+    type: 'object',
+    properties: {
+      ids: {
+        type: 'array',
+        items: { type: 'string' }
+      }
+    },
+    required: ['ids'],
+    additionalProperties: false
+  })
+}

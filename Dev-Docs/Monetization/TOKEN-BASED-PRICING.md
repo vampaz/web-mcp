@@ -316,8 +316,11 @@ Client-side changes:
 
 ```ts
 if (response.status === 402) {
+  const fallbackPlanner = createHeuristicPlanner()
+  const fallbackPlan = await fallbackPlanner.plan(message, tools, context)
+
   return {
-    ...planWithHeuristics(message, tools, context),
+    ...fallbackPlan,
     reason: 'WebMCP Cloud tokens exhausted. Using local planner fallback.',
     _fallbackReason: 'insufficient_tokens'
   }

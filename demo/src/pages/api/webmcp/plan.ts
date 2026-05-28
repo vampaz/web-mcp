@@ -95,9 +95,9 @@ export const POST: APIRoute = async function planWithServerProvider({ request, l
   const body = requestBody.body
   if (!body.message || !Array.isArray(body.tools))
     return json({ error: 'Invalid planner request' }, 400)
-  const env = await getCloudflareEnv(locals)
-
   try {
+    const env = await getCloudflareEnv(locals)
+
     if (body.provider === 'cloudflare-binding') {
       if (!body.model || !allowedCloudflareModels.has(body.model))
         return json({ error: 'Unsupported Cloudflare model' }, 400)
@@ -280,21 +280,30 @@ async function readPlannerRequest(request: Request): Promise<PlannerRequestReadR
     }
   }
 
+  let text: string
   try {
-    const text = await request.text()
-    if (text.length > maxPlannerRequestBytes) {
-      return {
-        error: 'Planner request is too large.',
-        status: 413
-      }
+    text = await request.text()
+  } catch {
+    return {
+      error: 'Planner request body could not be read.',
+      status: 400
     }
+  }
+  if (text.length > maxPlannerRequestBytes) {
+    return {
+      error: 'Planner request is too large.',
+      status: 413
+    }
+  }
 
+  try {
     return {
       body: JSON.parse(text) as PlannerRequestBody
     }
   } catch {
     return {
-      body: {}
+      error: 'Planner request body must be valid JSON.',
+      status: 400
     }
   }
 }
@@ -422,11 +431,7 @@ async function getCloudflareEnv(locals: App.Locals): Promise<CloudflareEnv> {
 }
 
 function getLegacyRuntimeEnv(locals: App.Locals): CloudflareEnv {
-  try {
-    return locals.runtime?.env ?? {}
-  } catch {
-    return {}
-  }
+  return locals.runtime?.env ?? {}
 }
 
 function json(body: unknown, status = 200): Response {

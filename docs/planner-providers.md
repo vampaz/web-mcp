@@ -210,7 +210,7 @@ commandInput.configure({
 })
 ```
 
-`endpointOptions` lets the app provide the concrete planner endpoints it has tested and allows through its server route. Provider-only options such as `auto` and `local` can omit `model`. The command input only renders those choices; it does not own the demo's OpenRouter, OpenAI, Cloudflare, or local planner curation.
+`endpointOptions` lets the app provide the concrete planner endpoints it has tested and allows through its server route. Provider-only options such as `auto` and `local` can omit `model`. The command input only renders those choices; it does not own the demo's OpenRouter, OpenAI, Cloudflare, or app-specific planner curation. Use `plannerOptions` for app-owned local planners such as the demo's deterministic planner.
 
 For preview or production, pass the selected planner config when the app should own those choices and hide them from users.
 
