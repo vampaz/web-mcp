@@ -91,6 +91,35 @@ describe('demo pages', () => {
     expect(commandInput.shadowRoot?.querySelector('[data-model]')).toBeNull()
   })
 
+  it('opens and focuses the command input with command k', async () => {
+    const wrapper = mountWithDeps(InventoryDemo, { attachTo: document.body })
+    await flushPromises()
+
+    const commandInput = await getCommandInput(wrapper)
+    const event = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'k',
+      metaKey: true
+    })
+
+    window.dispatchEvent(event)
+    await flushPromises()
+
+    expect(event.defaultPrevented).toBe(true)
+    expect(commandInput.panelOpen).toBe(true)
+    expect(commandInput.shadowRoot?.activeElement).toBe(getCommandTextInput(commandInput))
+    expect(wrapper.get('button.webmcp-command-launcher').attributes('aria-expanded')).toBe('true')
+
+    getCommandTextInput(commandInput).dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' })
+    )
+    await flushPromises()
+
+    expect(commandInput.panelOpen).toBe(false)
+    expect(wrapper.get('button.webmcp-command-launcher').attributes('aria-expanded')).toBe('false')
+  })
+
   it('uses page-specific command examples', async () => {
     await expectCommandPlaceholder(InventoryDemo, 'Try: Select all French items')
     await expectCommandPlaceholder(InvoicesDemo, 'Try: Mark Stark Industries invoices as paid')

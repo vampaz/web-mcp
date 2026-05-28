@@ -14,6 +14,7 @@ import type {
   WebMCPCommandInputEndpointOption,
   WebMCPCommandInputPlannerOption,
   WebMCPCommandInputPhase,
+  WebMCPCommandPanelToggleEventDetail,
   WebMCPCommandPlanEventDetail,
   WebMCPCommandPlannerEventDetail,
   WebMCPCommandResultEventDetail,
@@ -67,18 +68,6 @@ type CommandInputRuntimeState = {
   settingsOpen: boolean
 }
 
-type FloatingDragState = {
-  hasMoved: boolean
-  offsetX: number
-  offsetY: number
-  pointerId: number
-}
-
-type FloatingPlacement = {
-  horizontal: 'left' | 'right'
-  vertical: 'down' | 'up'
-}
-
 const defaultPlaceholder = 'Tell this app what to do'
 const defaultButtonLabel = 'Run'
 const supersededPlannerRefreshMessage = 'Planner refresh was superseded.'
@@ -119,26 +108,6 @@ export function defineWebMCPCommandInput(
     showChromeAI = true
     private chromeAIAvailable = false
     private chromeAILoadId = 0
-    private floatingDragState?: FloatingDragState
-    private floatingPanelBottom = 'auto'
-    private floatingPanelLeft = '8px'
-    private floatingPanelMaxHeight = 'calc(100vh - 16px)'
-    private floatingPanelTop = '8px'
-    private floatingPinnedBottom = true
-    private floatingPinnedRight = true
-    private floatingPlacement: FloatingPlacement = {
-      horizontal: 'right',
-      vertical: 'down'
-    }
-    private floatingPosition = {
-      x: 24,
-      y: 96
-    }
-    private floatingViewport = {
-      height: 0,
-      width: 0
-    }
-    private floatingWasPositioned = false
     private currentPlanner?: ToolPlanner
     private currentPlannerSignature = ''
     private currentPlannerWasCreated = false
@@ -177,9 +146,8 @@ export function defineWebMCPCommandInput(
       this.syncAttributes()
       this.syncDiagnosticsContent()
       this.observeLightDom()
-      this.floatingViewport = this.getViewportSize()
       this.render()
-      window.addEventListener('resize', this.handleViewportChanged)
+      if (this.state.floatingExpanded) this.focusPromptInput()
       void this.refreshChromeAIAvailability()
       void this.refreshPlannerStatus()
     }
@@ -188,10 +156,6 @@ export function defineWebMCPCommandInput(
       this.isConnectedToDom = false
       this.lightDomObserver?.disconnect()
       this.lightDomObserver = undefined
-      window.removeEventListener('resize', this.handleViewportChanged)
-      window.removeEventListener('pointermove', this.handleFloatingDragged)
-      window.removeEventListener('pointerup', this.handleFloatingDragEnded)
-      window.removeEventListener('pointercancel', this.handleFloatingDragEnded)
       this.invalidatePlanner()
     }
 
@@ -232,6 +196,14 @@ export function defineWebMCPCommandInput(
       this.state.floating = value
       if (!value) this.state.floatingExpanded = false
       this.renderIfConnected()
+    }
+
+    get panelOpen(): boolean {
+      return this.state.floatingExpanded
+    }
+
+    set panelOpen(value: boolean) {
+      this.setPanelOpen(value)
     }
 
     get model(): string | undefined {
@@ -348,14 +320,24 @@ export function defineWebMCPCommandInput(
       void this.refreshPlannerStatus()
     }
 
+    openPanel() {
+      this.setPanelOpen(true)
+    }
+
+    closePanel() {
+      this.setPanelOpen(false)
+    }
+
+    togglePanel() {
+      this.setPanelOpen(!this.state.floatingExpanded)
+    }
+
     async run(
       message?: string,
       options: WebMCPCommandInputRunOptions = {}
     ): Promise<ToolInvocationResult | undefined> {
       if (this.state.floating) {
-        this.state.floatingExpanded = true
-        this.renderIfConnected()
-        this.updateFloatingPlacement()
+        this.openPanel()
       }
 
       const input = this.getPromptInput()
@@ -753,14 +735,45 @@ export function defineWebMCPCommandInput(
       const target = event.target
       if (!(target instanceof HTMLDetailsElement)) return
       this.state.settingsOpen = target.open
-      this.updateFloatingPlacement()
     }
 
     private handleDiagnosticsToggled(event: Event) {
       const target = event.target
       if (!(target instanceof HTMLDetailsElement)) return
       this.state.diagnosticsOpen = target.open
-      this.updateFloatingPlacement()
+    }
+
+    private handlePanelKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape' || !this.state.floatingExpanded) return
+      event.preventDefault()
+      this.closePanel()
+    }
+
+    private setPanelOpen(value: boolean) {
+      if (this.state.floatingExpanded === value) {
+        if (value) this.focusPromptInput()
+        return
+      }
+      this.state.floatingExpanded = value
+      this.renderIfConnected()
+      this.dispatchPanelToggleEvent(value)
+      if (value) this.focusPromptInput()
+    }
+
+    private focusPromptInput() {
+      this.getPromptInput()?.focus()
+    }
+
+    private dispatchPanelToggleEvent(open: boolean) {
+      this.dispatchEvent(
+        new CustomEvent<WebMCPCommandPanelToggleEventDetail>('webmcp-command-panel-toggle', {
+          bubbles: true,
+          composed: true,
+          detail: {
+            open
+          }
+        })
+      )
     }
 
     private handlePromptChanged(event: Event) {
@@ -864,18 +877,8 @@ export function defineWebMCPCommandInput(
       this.shadowRoot.innerHTML = this.state.floating
         ? `
         <style>${getStyles()}</style>
-        <button
-          class="webmcp-floating-trigger"
-          type="button"
-          aria-label="Open WebMCP command input"
-          aria-expanded="${String(this.state.floatingExpanded)}"
-        >
-          <span>WEB</span>
-          <span>MCP</span>
-        </button>
         <section
-          class="webmcp-floating-panel webmcp-floating-panel--${this.floatingPlacement.vertical} webmcp-floating-panel--${this.floatingPlacement.horizontal}"
-          style="left: ${escapeAttribute(this.floatingPanelLeft)}; top: ${escapeAttribute(this.floatingPanelTop)}; bottom: ${escapeAttribute(this.floatingPanelBottom)}; --webmcp-floating-panel-max-height: ${escapeAttribute(this.floatingPanelMaxHeight)}"
+          class="webmcp-floating-panel"
           ${this.state.floatingExpanded ? '' : 'hidden'}
         >
           ${commandMarkup}
@@ -888,9 +891,7 @@ export function defineWebMCPCommandInput(
 
       const form = this.shadowRoot.querySelector<HTMLFormElement>('form')
       const input = this.shadowRoot.querySelector<HTMLInputElement>('[data-command-input]')
-      const floatingTrigger = this.shadowRoot.querySelector<HTMLButtonElement>(
-        '.webmcp-floating-trigger'
-      )
+      const floatingPanel = this.shadowRoot.querySelector<HTMLElement>('.webmcp-floating-panel')
       const settingsControl = this.shadowRoot.querySelector<HTMLDetailsElement>('.webmcp-settings')
       const diagnosticsControl =
         this.shadowRoot.querySelector<HTMLDetailsElement>('.webmcp-diagnostics')
@@ -903,14 +904,12 @@ export function defineWebMCPCommandInput(
 
       form?.addEventListener('submit', this.handleSubmit.bind(this))
       input?.addEventListener('input', this.handlePromptChanged.bind(this))
-      floatingTrigger?.addEventListener('click', this.handleFloatingTriggerClicked)
-      floatingTrigger?.addEventListener('pointerdown', this.handleFloatingDragStarted)
+      floatingPanel?.addEventListener('keydown', this.handlePanelKeyDown.bind(this))
       settingsControl?.addEventListener('toggle', this.handleSettingsToggled.bind(this))
       diagnosticsControl?.addEventListener('toggle', this.handleDiagnosticsToggled.bind(this))
       providerControl?.addEventListener('change', this.handleProviderChanged.bind(this))
       modelControl?.addEventListener('input', this.handleModelChanged.bind(this))
       modelControl?.addEventListener('change', this.handleModelChanged.bind(this))
-      this.updateFloatingPlacement()
     }
 
     private getSelectedPlannerOption(): WebMCPCommandInputPlannerOption | undefined {
@@ -920,78 +919,6 @@ export function defineWebMCPCommandInput(
       return this.plannerOptions?.find(function findPlannerOption(option) {
         return option.id === plannerOptionId
       })
-    }
-
-    private readonly handleFloatingTriggerClicked = () => {
-      if (this.floatingDragState?.hasMoved) return
-      this.state.floatingExpanded = !this.state.floatingExpanded
-      this.renderIfConnected()
-      this.updateFloatingPlacement()
-    }
-
-    private readonly handleFloatingDragStarted = (event: PointerEvent) => {
-      if (!(event.currentTarget instanceof HTMLElement)) return
-      const rect = event.currentTarget.getBoundingClientRect()
-      this.floatingDragState = {
-        hasMoved: false,
-        offsetX: event.clientX - rect.left,
-        offsetY: event.clientY - rect.top,
-        pointerId: event.pointerId
-      }
-      event.currentTarget.setPointerCapture(event.pointerId)
-      window.addEventListener('pointermove', this.handleFloatingDragged)
-      window.addEventListener('pointerup', this.handleFloatingDragEnded)
-      window.addEventListener('pointercancel', this.handleFloatingDragEnded)
-    }
-
-    private readonly handleFloatingDragged = (event: PointerEvent) => {
-      if (!this.floatingDragState || event.pointerId !== this.floatingDragState.pointerId) return
-      const nextX = event.clientX - this.floatingDragState.offsetX
-      const nextY = event.clientY - this.floatingDragState.offsetY
-      const deltaX = Math.abs(nextX - this.floatingPosition.x)
-      const deltaY = Math.abs(nextY - this.floatingPosition.y)
-      const nextPosition = this.clampFloatingPosition(nextX, nextY)
-      const bounds = this.getFloatingBounds()
-
-      if (deltaX > 3 || deltaY > 3) this.floatingDragState.hasMoved = true
-      this.floatingPosition = nextPosition
-      this.floatingPinnedRight = Math.abs(nextPosition.x - bounds.maxX) <= 2
-      this.floatingPinnedBottom = Math.abs(nextPosition.y - bounds.maxY) <= 2
-      this.syncFloatingHost()
-      this.updateFloatingPlacement()
-    }
-
-    private readonly handleFloatingDragEnded = (event: PointerEvent) => {
-      if (!this.floatingDragState || event.pointerId !== this.floatingDragState.pointerId) return
-      window.removeEventListener('pointermove', this.handleFloatingDragged)
-      window.removeEventListener('pointerup', this.handleFloatingDragEnded)
-      window.removeEventListener('pointercancel', this.handleFloatingDragEnded)
-      window.setTimeout(() => {
-        this.floatingDragState = undefined
-      }, 0)
-    }
-
-    private readonly handleViewportChanged = () => {
-      if (!this.state.floating) return
-      const triggerWidth = this.getFloatingTriggerWidth()
-      const triggerHeight = this.getFloatingTriggerHeight()
-      const previousMaxX = Math.max(8, this.floatingViewport.width - triggerWidth - 8)
-      const previousMaxY = Math.max(8, this.floatingViewport.height - triggerHeight - 8)
-      const wasPinnedRight =
-        this.floatingPinnedRight || Math.abs(this.floatingPosition.x - previousMaxX) <= 2
-      const wasPinnedBottom =
-        this.floatingPinnedBottom || Math.abs(this.floatingPosition.y - previousMaxY) <= 2
-      this.floatingViewport = this.getViewportSize()
-      const nextMaxX = Math.max(8, this.floatingViewport.width - triggerWidth - 8)
-      const nextMaxY = Math.max(8, this.floatingViewport.height - triggerHeight - 8)
-      const nextX = wasPinnedRight ? nextMaxX : this.floatingPosition.x
-      const nextY = wasPinnedBottom ? nextMaxY : this.floatingPosition.y
-
-      this.floatingPinnedRight = wasPinnedRight
-      this.floatingPinnedBottom = wasPinnedBottom
-      this.floatingPosition = this.clampFloatingPosition(nextX, nextY)
-      this.syncFloatingHost()
-      this.updateFloatingPlacement()
     }
 
     private syncFloatingHost() {
@@ -1005,122 +932,7 @@ export function defineWebMCPCommandInput(
         this.style.removeProperty('top')
         this.style.removeProperty('right')
         this.style.removeProperty('bottom')
-        return
       }
-
-      if (!this.floatingWasPositioned) this.setInitialFloatingPosition()
-      if (this.floatingPinnedRight) {
-        this.style.removeProperty('left')
-        this.style.right = '8px'
-      } else {
-        this.style.left = `${this.floatingPosition.x}px`
-        this.style.removeProperty('right')
-      }
-
-      if (this.floatingPinnedBottom) {
-        this.style.removeProperty('top')
-        this.style.bottom = '8px'
-      } else {
-        this.style.top = `${this.floatingPosition.y}px`
-        this.style.removeProperty('bottom')
-      }
-    }
-
-    private setInitialFloatingPosition() {
-      const bounds = this.getFloatingBounds()
-      this.floatingPosition = {
-        x: bounds.maxX,
-        y: bounds.maxY
-      }
-      this.floatingPinnedRight = true
-      this.floatingPinnedBottom = true
-      this.floatingViewport = this.getViewportSize()
-      this.floatingWasPositioned = true
-    }
-
-    private clampFloatingPosition(x: number, y: number): { x: number; y: number } {
-      const { maxX, maxY } = this.getFloatingBounds()
-
-      return {
-        x: Math.min(Math.max(8, x), maxX),
-        y: Math.min(Math.max(8, y), maxY)
-      }
-    }
-
-    private getFloatingTriggerWidth(): number {
-      return (
-        this.shadowRoot?.querySelector<HTMLElement>('.webmcp-floating-trigger')?.offsetWidth || 0
-      )
-    }
-
-    private getFloatingTriggerHeight(): number {
-      return (
-        this.shadowRoot?.querySelector<HTMLElement>('.webmcp-floating-trigger')?.offsetHeight || 0
-      )
-    }
-
-    private getFloatingBounds(): { maxX: number; maxY: number } {
-      const viewport = this.getViewportSize()
-      const width = this.getFloatingTriggerWidth()
-      const height = this.getFloatingTriggerHeight()
-
-      return {
-        maxX: Math.max(8, viewport.width - width - 8),
-        maxY: Math.max(8, viewport.height - height - 8)
-      }
-    }
-
-    private getViewportSize(): { height: number; width: number } {
-      return {
-        height: window.innerHeight,
-        width: window.innerWidth
-      }
-    }
-
-    private updateFloatingPlacement() {
-      if (!this.state.floating || !this.state.floatingExpanded) return
-      const trigger = this.shadowRoot?.querySelector<HTMLElement>('.webmcp-floating-trigger')
-      const panel = this.shadowRoot?.querySelector<HTMLElement>('.webmcp-floating-panel')
-      if (!trigger || !panel) return
-
-      const triggerRect = trigger.getBoundingClientRect()
-      const panelWidth = Math.min(panel.scrollWidth || 920, window.innerWidth - 16)
-      const panelHeight = Math.min(panel.scrollHeight || 320, window.innerHeight - 16)
-      const spaceAbove = triggerRect.top - 8
-      const spaceBelow = window.innerHeight - triggerRect.bottom - 8
-      const spaceLeft = triggerRect.right - 8
-      const spaceRight = window.innerWidth - triggerRect.left - 8
-      const vertical = spaceBelow >= panelHeight || spaceBelow >= spaceAbove ? 'down' : 'up'
-      const horizontal = spaceRight >= panelWidth || spaceRight >= spaceLeft ? 'right' : 'left'
-      const maxHeight = Math.max(0, vertical === 'down' ? spaceBelow - 8 : spaceAbove - 8)
-      const panelLeft =
-        horizontal === 'right'
-          ? Math.min(triggerRect.left, window.innerWidth - panelWidth - 8)
-          : Math.max(8, triggerRect.right - panelWidth)
-      const panelTop =
-        vertical === 'down'
-          ? `${Math.min(triggerRect.bottom + 8, window.innerHeight - panelHeight - 8)}px`
-          : 'auto'
-      const panelBottom =
-        vertical === 'up' ? `${Math.max(8, window.innerHeight - triggerRect.top + 8)}px` : 'auto'
-
-      if (
-        this.floatingPlacement.vertical === vertical &&
-        this.floatingPlacement.horizontal === horizontal &&
-        this.floatingPanelMaxHeight === `${maxHeight}px` &&
-        this.floatingPanelLeft === `${panelLeft}px` &&
-        this.floatingPanelTop === panelTop &&
-        this.floatingPanelBottom === panelBottom
-      ) {
-        return
-      }
-
-      this.floatingPlacement = { horizontal, vertical }
-      this.floatingPanelLeft = `${panelLeft}px`
-      this.floatingPanelMaxHeight = `${maxHeight}px`
-      this.floatingPanelTop = panelTop
-      this.floatingPanelBottom = panelBottom
-      this.renderIfConnected()
     }
   }
 

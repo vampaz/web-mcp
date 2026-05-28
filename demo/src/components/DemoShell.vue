@@ -1,9 +1,21 @@
 <template>
+  <button
+    class="webmcp-command-launcher"
+    type="button"
+    aria-label="Open WebMCP command input"
+    :aria-expanded="String(commandPanelOpen)"
+    @click="toggleCommandPanel"
+  >
+    <span>WEB</span>
+    <span>MCP</span>
+  </button>
+
   <webmcp-command-input
     ref="commandInput"
     floating
     :placeholder="placeholder"
     @webmcp-command-error="handleCommandError"
+    @webmcp-command-panel-toggle="handleCommandPanelToggle"
     @webmcp-command-planner="handleCommandPlanner"
     @webmcp-command-result="handleCommandResult"
   >
@@ -131,6 +143,7 @@ import {
   type WebMCPCommandInputElement,
   type WebMCPCommandInputEndpointOption,
   type WebMCPCommandInputPlannerOption,
+  type WebMCPCommandPanelToggleEventDetail,
   type WebMCPCommandPlannerEventDetail,
   type WebMCPCommandResultEventDetail
 } from 'webmcp-kit'
@@ -268,6 +281,7 @@ const defaultPlannerOptionId = shouldDefaultToBrowserLocalAI ? 'browser-local-ai
 const plannerEndpoint = '/api/webmcp/plan'
 const unregisterCallbacks: Array<() => void> = []
 const commandInput = ref<WebMCPCommandInputElement | null>(null)
+const commandPanelOpen = ref(false)
 const runtimeStatusPanel = ref<{ devtoolsHost: HTMLElement | null } | null>(null)
 const pendingConfirmation = ref<DemoConfirmationRequest | null>(null)
 const latestCommandStatus = ref('Ready for natural-language operations.')
@@ -306,6 +320,7 @@ if (typeof customElements !== 'undefined') {
 
 onMounted(async function handleMounted() {
   setConfirmationHandler(confirmToolInvocation)
+  window.addEventListener('keydown', handleCommandShortcut)
   if (shouldInstallTestBridge) {
     unregisterCallbacks.push(installWebMCPKitTestBridge())
   }
@@ -318,9 +333,11 @@ onMounted(async function handleMounted() {
   }
 
   configureCommandInput()
+  syncCommandPanelState()
 })
 
 onUnmounted(function handleUnmounted() {
+  window.removeEventListener('keydown', handleCommandShortcut)
   pendingConfirmation.value?.deny()
   for (const unregister of unregisterCallbacks) {
     unregister()
@@ -330,14 +347,15 @@ onUnmounted(function handleUnmounted() {
 })
 
 function configureCommandInput() {
+  const element = getCommandInputElement()
   if (import.meta.env.MODE === 'test') {
-    commandInput.value?.configure({
+    element?.configure({
       context: props.getContext
     })
     return
   }
 
-  commandInput.value?.configure({
+  element?.configure({
     context: props.getContext,
     endpoint: plannerEndpoint,
     endpointOptions: plannerEndpointOptions,
@@ -353,14 +371,14 @@ function applyBrowserLocalDefault() {
   if (!defaultPlannerOptionId) return
 
   const providerControl =
-    commandInput.value?.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
+    getCommandInputElement()?.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
   if (!providerControl) return
 
   providerControl.value = `planner:${defaultPlannerOptionId}`
   providerControl.dispatchEvent(new Event('change', { bubbles: true }))
 
   const settingsControl =
-    commandInput.value?.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-settings')
+    getCommandInputElement()?.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-settings')
   if (!settingsControl) return
 
   settingsControl.open = false
@@ -470,7 +488,40 @@ function formatPlanInput(plan: ToolPlan): string {
 }
 
 async function runSuggestion(suggestion: string) {
-  await commandInput.value?.run(suggestion)
+  openCommandPanel()
+  await getCommandInputElement()?.run(suggestion)
+  syncCommandPanelState()
+}
+
+function toggleCommandPanel() {
+  getCommandInputElement()?.togglePanel()
+  syncCommandPanelState()
+}
+
+function openCommandPanel() {
+  getCommandInputElement()?.openPanel()
+  syncCommandPanelState()
+}
+
+function syncCommandPanelState() {
+  commandPanelOpen.value = getCommandInputElement()?.panelOpen ?? false
+}
+
+function handleCommandPanelToggle(event: Event) {
+  commandPanelOpen.value = (event as CustomEvent<WebMCPCommandPanelToggleEventDetail>).detail.open
+}
+
+function handleCommandShortcut(event: KeyboardEvent) {
+  if (!event.metaKey || event.key.toLowerCase() !== 'k') return
+
+  event.preventDefault()
+  openCommandPanel()
+}
+
+function getCommandInputElement(): WebMCPCommandInputElement | null {
+  return (
+    commandInput.value ?? document.querySelector<WebMCPCommandInputElement>('webmcp-command-input')
+  )
 }
 
 declare global {
@@ -499,12 +550,50 @@ declare global {
 
 webmcp-command-input[data-floating] {
   position: fixed;
+  right: 0.5rem;
+  bottom: 4rem;
   z-index: 1000;
-  width: auto;
+  width: min(920px, calc(100vw - 1rem));
+  --webmcp-floating-panel-max-height: calc(100vh - 5rem);
 }
 
 webmcp-command-input:not(:defined) {
   display: none;
+}
+
+.webmcp-command-launcher {
+  position: fixed;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 1001;
+  display: grid;
+  place-items: center;
+  min-width: auto;
+  min-height: auto;
+  padding: 0.18em 0.36em;
+  border: 2px solid #0f1512;
+  background: #e8be53;
+  color: #0c1110;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 950;
+  line-height: 0.9;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.34);
+}
+
+.webmcp-command-launcher:hover {
+  background: #f1cd70;
+}
+
+.webmcp-command-launcher:focus-visible {
+  outline: 2px solid #e8be53;
+  outline-offset: 3px;
+}
+
+.webmcp-command-launcher span {
+  display: block;
 }
 
 .demo-page-header {
@@ -881,14 +970,7 @@ webmcp-command-input:not(:defined) {
 
 @media (max-width: 44rem) {
   webmcp-command-input[data-floating] {
-    position: sticky !important;
-    top: 0.65rem !important;
-    right: auto !important;
-    bottom: auto !important;
-    left: auto !important;
-    display: block;
-    width: fit-content;
-    margin: 0.65rem 0 0 0.65rem;
+    width: calc(100vw - 1rem);
   }
 
   .demo-app-page {

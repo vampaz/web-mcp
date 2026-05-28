@@ -722,48 +722,60 @@ describe('WebMCP command input', () => {
     expect(status).toBeNull()
   })
 
-  it('renders floating mode with a stacked trigger and expandable panel', async () => {
+  it('renders floating mode as a panel controlled through the element API', async () => {
     const element = createCommandInputElement()
     element.setAttribute('floating', '')
+    const panelToggleEvents: boolean[] = []
+    element.addEventListener('webmcp-command-panel-toggle', function trackPanelToggle(event) {
+      panelToggleEvents.push((event as CustomEvent<{ open: boolean }>).detail.open)
+    })
 
     document.body.append(element)
     await Promise.resolve()
 
-    const trigger = element.shadowRoot?.querySelector<HTMLButtonElement>('.webmcp-floating-trigger')
-    const triggerWords = Array.from(trigger?.querySelectorAll('span') ?? []).map(
-      function mapWord(word) {
-        return word.textContent
-      }
-    )
     const panel = element.shadowRoot?.querySelector<HTMLElement>('.webmcp-floating-panel')
-    expect(trigger).toBeInstanceOf(HTMLButtonElement)
-    expect(triggerWords).toEqual(['WEB', 'MCP'])
-    expect(trigger?.getAttribute('aria-expanded')).toBe('false')
+    expect(element.shadowRoot?.querySelector('.webmcp-floating-trigger')).toBeNull()
+    expect(element.panelOpen).toBe(false)
     expect(panel?.hidden).toBe(true)
     expect(window.getComputedStyle(panel as Element).display).toBe('none')
 
-    trigger?.click()
+    element.openPanel()
 
-    const expandedTrigger = element.shadowRoot?.querySelector<HTMLButtonElement>(
-      '.webmcp-floating-trigger'
-    )
     const expandedPanel = element.shadowRoot?.querySelector<HTMLElement>('.webmcp-floating-panel')
-    expect(expandedTrigger?.getAttribute('aria-expanded')).toBe('true')
+    const commandInput = getPromptInput(element)
+    expect(element.panelOpen).toBe(true)
+    expect(element.getAttribute('data-floating-expanded')).toBe('')
     expect(expandedPanel?.hidden).toBe(false)
     expect(window.getComputedStyle(expandedPanel as Element).display).not.toBe('none')
+    expect(element.shadowRoot?.activeElement).toBe(commandInput)
 
-    expandedTrigger?.click()
+    commandInput.blur()
+    element.openPanel()
 
-    const collapsedTrigger = element.shadowRoot?.querySelector<HTMLButtonElement>(
-      '.webmcp-floating-trigger'
-    )
+    expect(element.shadowRoot?.activeElement).toBe(commandInput)
+
+    commandInput.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))
+
+    const escapeClosedPanel =
+      element.shadowRoot?.querySelector<HTMLElement>('.webmcp-floating-panel')
+    expect(element.panelOpen).toBe(false)
+    expect(element.hasAttribute('data-floating-expanded')).toBe(false)
+    expect(escapeClosedPanel?.hidden).toBe(true)
+    expect(panelToggleEvents).toEqual([true, false])
+
+    element.openPanel()
+
+    element.togglePanel()
+
     const collapsedPanel = element.shadowRoot?.querySelector<HTMLElement>('.webmcp-floating-panel')
-    expect(collapsedTrigger?.getAttribute('aria-expanded')).toBe('false')
+    expect(element.panelOpen).toBe(false)
+    expect(element.hasAttribute('data-floating-expanded')).toBe(false)
     expect(collapsedPanel?.hidden).toBe(true)
     expect(window.getComputedStyle(collapsedPanel as Element).display).toBe('none')
+    expect(panelToggleEvents).toEqual([true, false, true, false])
   })
 
-  it('updates floating placement after expanding panel disclosures', async () => {
+  it('keeps floating panel controls usable without a built-in trigger', async () => {
     const element = createCommandInputElement()
     element.configure({
       endpointOptions: [
@@ -787,50 +799,71 @@ describe('WebMCP command input', () => {
 
     document.body.append(element)
     await Promise.resolve()
+    element.openPanel()
 
-    const trigger = element.shadowRoot?.querySelector<HTMLButtonElement>('.webmcp-floating-trigger')
-    trigger?.click()
-
-    const placementController = element as unknown as { updateFloatingPlacement: () => void }
-    const updateFloatingPlacement = vi.spyOn(placementController, 'updateFloatingPlacement')
     const settings = element.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-settings')
     const diagnosticsRow =
       element.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-diagnostics')
 
+    expect(element.shadowRoot?.querySelector('.webmcp-floating-trigger')).toBeNull()
+    expect(settings).toBeInstanceOf(HTMLDetailsElement)
+    expect(diagnosticsRow).toBeInstanceOf(HTMLDetailsElement)
+
     settings?.dispatchEvent(new Event('toggle'))
     diagnosticsRow?.dispatchEvent(new Event('toggle'))
 
-    expect(updateFloatingPlacement).toHaveBeenCalledTimes(2)
+    expect(element.panelOpen).toBe(true)
   })
 
-  it('keeps the floating trigger pinned to the viewport edge when resizing back up', async () => {
+  it('opens the floating panel when a command is run programmatically', async () => {
     setViewportSize(1200, 900)
     const element = createCommandInputElement()
+    element.planner = {
+      name: 'Test planner',
+      available: true,
+      status: 'ready',
+      detail: 'Ready for tests.',
+      async plan() {
+        return {
+          toolName: 'search_products',
+          input: {
+            query: 'dock'
+          },
+          confidence: 0.9,
+          reason: 'Matched product search.'
+        }
+      }
+    }
+    registerTool(
+      defineTool({
+        name: 'search_products',
+        description: 'Search visible products.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string' }
+          },
+          required: ['query'],
+          additionalProperties: false
+        },
+        execute(input) {
+          return input
+        }
+      })
+    )
     element.setAttribute('floating', '')
 
     document.body.append(element)
     await Promise.resolve()
 
-    expect(element.style.left).toBe('')
-    expect(element.style.top).toBe('')
-    expect(element.style.right).toBe('8px')
-    expect(element.style.bottom).toBe('8px')
+    expect(element.panelOpen).toBe(false)
 
-    setViewportSize(640, 500)
-    window.dispatchEvent(new Event('resize'))
+    await element.run('Find docks')
 
-    expect(element.style.left).toBe('')
-    expect(element.style.top).toBe('')
-    expect(element.style.right).toBe('8px')
-    expect(element.style.bottom).toBe('8px')
-
-    setViewportSize(1200, 900)
-    window.dispatchEvent(new Event('resize'))
-
-    expect(element.style.left).toBe('')
-    expect(element.style.top).toBe('')
-    expect(element.style.right).toBe('8px')
-    expect(element.style.bottom).toBe('8px')
+    expect(element.panelOpen).toBe(true)
+    expect(element.shadowRoot?.querySelector<HTMLElement>('.webmcp-floating-panel')?.hidden).toBe(
+      false
+    )
   })
 
   it('uses initial planner choices without locking the controls', async () => {

@@ -62,17 +62,21 @@ export interface WebMCPCommandInputElement extends HTMLElement {
   endpointOptions?: WebMCPCommandInputEndpointOption[]
   floating: boolean
   model?: string
+  panelOpen: boolean
   placeholder: string
   planner?: ToolPlanner
   plannerConfig?: PlannerProviderConfig
   plannerOptions?: WebMCPCommandInputPlannerOption[]
   provider?: PlannerProviderKind
   showChromeAI?: boolean
+  closePanel: () => void
   configure: (options: WebMCPCommandInputConfigureOptions) => void
+  openPanel: () => void
   run: (
     message?: string,
     options?: WebMCPCommandInputRunOptions
   ) => Promise<ToolInvocationResult | undefined>
+  togglePanel: () => void
 }
 
 export interface WebMCPCommandInputRunOptions {
@@ -93,6 +97,10 @@ export interface WebMCPCommandResultEventDetail {
   message: string
   plan: ToolPlan
   result: ToolInvocationResult
+}
+
+export interface WebMCPCommandPanelToggleEventDetail {
+  open: boolean
 }
 
 export interface WebMCPCommandStepEventDetail {

@@ -17,6 +17,8 @@ export function getStyles(): string {
 
     :host([data-floating]) {
       position: fixed;
+      right: 8px;
+      bottom: 8px;
       z-index: 1000;
       width: auto;
       max-width: min(920px, calc(100vw - 16px));
@@ -119,34 +121,8 @@ export function getStyles(): string {
       outline-offset: 2px;
     }
 
-    .webmcp-floating-trigger {
-      display: grid;
-      place-items: center;
-      min-width: auto;
-      min-height: auto;
-      padding: 0.18em 0.36em;
-      border: 2px solid #0f1512;
-      background: #e8be53;
-      color: #0c1110;
-      font-size: 0.88em;
-      font-weight: 950;
-      line-height: 0.9;
-      text-align: center;
-      touch-action: none;
-      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.34);
-    }
-
-    .webmcp-floating-trigger span {
-      display: block;
-    }
-
-    .webmcp-floating-trigger:hover:not(:disabled) {
-      border-color: #0f1512;
-      background: #f1cd70;
-    }
-
     .webmcp-floating-panel {
-      position: fixed;
+      position: static;
       display: flex;
       flex-direction: column;
       width: min(920px, calc(100vw - 16px));
