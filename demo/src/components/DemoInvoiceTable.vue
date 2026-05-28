@@ -277,6 +277,12 @@ select {
   color: #0c1110;
 }
 
+input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+}
+
 button {
   padding: 7px 10px;
   background: rgba(244, 240, 232, 0.06);
@@ -398,6 +404,12 @@ td span {
 }
 
 @media (max-width: 620px) {
+  input:not([type='checkbox']),
+  select,
+  button {
+    min-height: 40px;
+  }
+
   table {
     min-width: 0;
     table-layout: fixed;

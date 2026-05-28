@@ -618,24 +618,88 @@ test('keeps demo pages responsive without forcing cramped columns', async functi
   page
 }) {
   const viewports = [
+    { width: 320, height: 700 },
     { width: 390, height: 840 },
     { width: 768, height: 900 },
     { width: 1154, height: 900 },
     { width: 1440, height: 1000 }
   ]
-  const paths = ['/', '/invoices/', '/commerce/', '/support/']
+  const paths = ['/', '/invoices/', '/commerce/', '/support/', '/guide/', '/readme/']
 
   for (const viewport of viewports) {
     await page.setViewportSize(viewport)
 
     for (const path of paths) {
       await page.goto(path)
-      await expect(page.locator('.demo-page-header')).toBeVisible()
+      await expect(page.locator('main')).toBeVisible()
+      if (path === '/readme/') {
+        await expect(page.locator('.readme-document')).toBeVisible()
+      } else if (path === '/guide/') {
+        await expect(page.locator('.guide-header')).toBeVisible()
+      } else {
+        await expect(page.locator('.demo-page-header')).toBeVisible()
+      }
 
       const hasHorizontalOverflow = await page.evaluate(function hasHorizontalPageOverflow() {
         return document.documentElement.scrollWidth > document.documentElement.clientWidth
       })
       expect(hasHorizontalOverflow).toBe(false)
+    }
+
+    await page.goto('/')
+    await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible()
+    const inventoryRow = page.getByRole('row', { name: /Apple/ })
+    await inventoryRow.scrollIntoViewIfNeeded()
+    await expect(inventoryRow).toBeVisible()
+
+    await page.goto('/invoices/')
+    await expect(page.getByRole('heading', { name: 'Invoices', exact: true })).toBeVisible()
+    await expect(page.locator('.table-controls select[value="all"]')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Select visible' })).toBeVisible()
+
+    await openWebMCPInput(page)
+    const commandPanelLayout = await page.evaluate(function getCommandPanelLayout() {
+      const commandInput = document.querySelector('webmcp-command-input')
+      const panel = commandInput?.shadowRoot?.querySelector('.webmcp-floating-panel')
+      const diagnostics =
+        commandInput?.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-diagnostics')
+      diagnostics?.setAttribute('open', '')
+      diagnostics?.dispatchEvent(new Event('toggle'))
+      document.querySelector<HTMLButtonElement>('.wmk-devtools__toggle')?.click()
+
+      const diagnosticsContent = commandInput?.shadowRoot?.querySelector(
+        '.webmcp-diagnostics-content'
+      )
+      const devtoolsPanel = document.querySelector('.wmk-devtools__panel')
+
+      return {
+        diagnosticsContent: getElementBounds(diagnosticsContent),
+        devtoolsPanel: getElementBounds(devtoolsPanel),
+        panel: getElementBounds(panel)
+      }
+
+      function getElementBounds(element: Element | null | undefined) {
+        if (!element) return undefined
+        const box = element.getBoundingClientRect()
+        return {
+          bottom: Math.round(box.bottom),
+          height: Math.round(box.height),
+          right: Math.round(box.right),
+          width: Math.round(box.width)
+        }
+      }
+    })
+
+    expect(commandPanelLayout.panel).toBeDefined()
+    expect(commandPanelLayout.diagnosticsContent).toBeDefined()
+    expect(commandPanelLayout.devtoolsPanel).toBeDefined()
+    expect(commandPanelLayout.panel!.right).toBeLessThanOrEqual(viewport.width)
+    expect(commandPanelLayout.panel!.bottom).toBeLessThanOrEqual(viewport.height)
+    expect(commandPanelLayout.diagnosticsContent!.bottom).toBeLessThanOrEqual(viewport.height)
+    if (viewport.width <= 768) {
+      expect(commandPanelLayout.devtoolsPanel!.height).toBeLessThanOrEqual(
+        commandPanelLayout.diagnosticsContent!.height
+      )
     }
 
     await page.goto('/invoices/')

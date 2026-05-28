@@ -250,5 +250,11 @@ button:disabled {
   .cart-line {
     grid-template-columns: 1fr;
   }
+
+  input,
+  select,
+  button {
+    min-height: 40px;
+  }
 }
 </style>

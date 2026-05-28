@@ -568,8 +568,8 @@ webmcp-command-input:not(:defined) {
   z-index: 1001;
   display: grid;
   place-items: center;
-  min-width: auto;
-  min-height: auto;
+  min-width: 48px;
+  min-height: 44px;
   padding: 0.18em 0.36em;
   border: 2px solid #0f1512;
   background: #e8be53;
@@ -971,14 +971,88 @@ webmcp-command-input:not(:defined) {
 @media (max-width: 44rem) {
   webmcp-command-input[data-floating] {
     width: calc(100vw - 1rem);
+    --webmcp-floating-panel-max-height: min(34rem, calc(100svh - 6rem));
   }
 
   .demo-app-page {
-    padding-bottom: 3rem;
+    gap: 0.65rem;
+    padding-bottom: 4rem;
+  }
+
+  .demo-page-header {
+    gap: 0.65rem;
+    padding-block: 0 0.55rem;
+  }
+
+  .demo-page-header span {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    line-height: 1.35;
   }
 
   .demo-metrics {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .demo-metrics div,
+  .demo-command-brief > div,
+  .demo-wire-panel > * {
+    padding: 0.6rem;
+  }
+
+  .demo-metrics dt {
+    font-size: 0.62rem;
+    line-height: 1.15;
+  }
+
+  .demo-metrics dd {
+    font-size: 0.95rem;
+  }
+
+  .suggestion-strip {
+    flex-wrap: nowrap;
+    align-items: stretch;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding-bottom: 0.15rem;
+  }
+
+  .suggestion-strip button {
+    flex: 0 0 auto;
+    max-width: min(18rem, 82vw);
+    min-height: 2.5rem;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .demo-wire-panel .wire-points {
+    display: none;
+  }
+
+  .wire-copy p,
+  .latest-plan p {
+    font-size: 0.82rem;
+  }
+
+  .latest-plan pre {
+    max-height: 7rem;
+  }
+
+  .activity-rail {
+    padding: 0.75rem;
+  }
+
+  .confirmation-dialog {
+    max-height: calc(100svh - 2rem);
+    overflow: auto;
+  }
+
+  .confirmation-dialog div {
+    flex-direction: column-reverse;
+  }
+
+  .confirmation-dialog button {
+    width: 100%;
   }
 }
 </style>

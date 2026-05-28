@@ -179,7 +179,7 @@ h3 {
 
 select {
   min-width: 0;
-  min-height: 34px;
+  min-height: 40px;
   padding: 6px 8px;
   border: 1px solid rgba(244, 240, 232, 0.18);
   background: #f4f0e8;

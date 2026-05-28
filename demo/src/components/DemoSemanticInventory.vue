@@ -194,8 +194,8 @@ tbody tr.selected:hover {
 }
 
 input {
-  width: 15px;
-  height: 15px;
+  width: 20px;
+  height: 20px;
   margin: 0;
 }
 
@@ -253,8 +253,11 @@ tbody th strong {
 
 @media (max-width: 620px) {
   .semantic-inventory {
-    max-height: max(26rem, calc(100svh - 16rem));
     padding: 12px;
+  }
+
+  button {
+    min-height: 40px;
   }
 
   table {

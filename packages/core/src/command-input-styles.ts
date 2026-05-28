@@ -126,7 +126,7 @@ export function getStyles(): string {
       display: flex;
       flex-direction: column;
       width: min(920px, calc(100vw - 16px));
-      max-height: var(--webmcp-floating-panel-max-height, calc(100vh - 16px));
+      max-height: var(--webmcp-floating-panel-max-height, calc(100svh - 16px));
       overflow: hidden;
       box-shadow: 0 24px 80px rgba(0, 0, 0, 0.48);
     }
@@ -227,7 +227,7 @@ export function getStyles(): string {
       top: 100%;
       right: 0;
       left: 0;
-      max-height: min(40rem, 68vh);
+      max-height: min(40rem, 68svh);
       overflow: auto;
       border: 1px solid rgba(224, 234, 229, 0.18);
       border-top: 0;
@@ -248,14 +248,14 @@ export function getStyles(): string {
       flex: 0 1 auto;
       height: auto;
       min-height: 0;
-      max-height: calc(var(--webmcp-floating-panel-max-height, calc(100vh - 16px)) - 9.25rem);
+      max-height: calc(var(--webmcp-floating-panel-max-height, calc(100svh - 16px)) - 9.25rem);
       border-inline: 0;
       box-shadow: none;
       overscroll-behavior: contain;
     }
 
     .webmcp-floating-panel .webmcp-settings[open] ~ .webmcp-diagnostics .webmcp-diagnostics-content {
-      max-height: calc(var(--webmcp-floating-panel-max-height, calc(100vh - 16px)) - 14.5rem);
+      max-height: calc(var(--webmcp-floating-panel-max-height, calc(100svh - 16px)) - 14.5rem);
     }
 
     .webmcp-status {

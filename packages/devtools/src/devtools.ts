@@ -308,6 +308,49 @@ const overlayStyles = `
 .wmk-devtools__history-item button {
   justify-self: start;
 }
+@media (max-width: 48rem) {
+  .wmk-devtools {
+    right: 8px;
+    bottom: 8px;
+    width: calc(100vw - 16px);
+  }
+
+  .wmk-devtools__panel {
+    gap: 10px;
+    max-height: min(34rem, calc(100svh - 5rem));
+    padding: 10px;
+  }
+
+  .wmk-devtools--inline .wmk-devtools__panel {
+    max-height: min(24rem, calc(100svh - 19rem));
+    overflow: auto;
+  }
+
+  .wmk-devtools__header,
+  .wmk-devtools__health-header {
+    display: grid;
+    gap: 8px;
+  }
+
+  .wmk-devtools__status {
+    text-align: left;
+  }
+
+  .wmk-devtools__tool {
+    padding: 10px;
+  }
+
+  .wmk-devtools__tool-badge {
+    width: auto;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .wmk-devtools__actions button,
+  .wmk-devtools__history-item button {
+    min-height: 40px;
+  }
+}
 `
 
 export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): DevtoolsOverlay {

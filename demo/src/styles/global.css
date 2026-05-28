@@ -75,6 +75,9 @@ button:hover:not(:disabled) {
 }
 
 .demo-brand {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
   font-weight: 900;
   letter-spacing: 0;
 }
@@ -84,6 +87,7 @@ button:hover:not(:disabled) {
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
+  min-width: 0;
 }
 
 .demo-nav a {
@@ -109,37 +113,6 @@ button:hover:not(:disabled) {
   padding: 18px 0 96px;
 }
 
-body:has(.demo-shell--fixed) {
-  display: flex;
-  flex-direction: column;
-  height: 100svh;
-  min-height: 100svh;
-  overflow: hidden;
-}
-
-body:has(.demo-shell--fixed) .demo-topbar {
-  flex: 0 0 auto;
-}
-
-.demo-shell--fixed {
-  flex: 1 1 auto;
-  min-height: 0;
-  padding-bottom: 18px;
-  overflow: hidden;
-}
-
-.demo-shell.demo-shell--fixed .demo-app-page {
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-  padding-bottom: 0;
-}
-
-.demo-shell.demo-shell--fixed .activity-rail {
-  display: none;
-}
-
 @media (max-width: 620px) {
   .demo-topbar {
     align-items: stretch;
@@ -147,11 +120,18 @@ body:has(.demo-shell--fixed) .demo-topbar {
   }
 
   .demo-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding-bottom: 2px;
     width: 100%;
   }
 
   .demo-nav a {
-    flex: 1 1 auto;
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    min-height: 40px;
     text-align: center;
   }
 
@@ -159,5 +139,38 @@ body:has(.demo-shell--fixed) .demo-topbar {
     width: min(100% - 20px, 1440px);
     padding-top: 12px;
     padding-bottom: 48px;
+  }
+}
+
+@media (min-width: 70rem) {
+  body:has(.demo-shell--fixed) {
+    display: flex;
+    flex-direction: column;
+    height: 100svh;
+    min-height: 100svh;
+    overflow: hidden;
+  }
+
+  body:has(.demo-shell--fixed) .demo-topbar {
+    flex: 0 0 auto;
+  }
+
+  .demo-shell--fixed {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding-bottom: 18px;
+    overflow: hidden;
+  }
+
+  .demo-shell.demo-shell--fixed .demo-app-page {
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    padding-bottom: 0;
+  }
+
+  .demo-shell.demo-shell--fixed .activity-rail {
+    display: none;
   }
 }
