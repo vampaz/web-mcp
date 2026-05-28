@@ -77,7 +77,6 @@
             <th class="col-amount" scope="col">Amount</th>
             <th class="col-due" scope="col">Due</th>
             <th class="col-owner" scope="col">Owner</th>
-            <th class="col-open" scope="col">Open</th>
           </tr>
         </thead>
         <tbody>
@@ -109,11 +108,6 @@
             <td class="col-amount">€{{ invoice.amount }}</td>
             <td class="col-due">{{ invoice.dueDate }}</td>
             <td class="col-owner">{{ invoice.owner }}</td>
-            <td class="col-open">
-              <button type="button" @click.stop="openInvoice(invoice.id)">
-                {{ invoice.id === activeInvoiceId ? 'Viewing' : 'View' }}
-              </button>
-            </td>
           </tr>
         </tbody>
       </table>
@@ -315,7 +309,7 @@ button:disabled {
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 880px;
+  min-width: 780px;
 }
 
 th,
@@ -432,10 +426,6 @@ td span {
   .col-due,
   .col-owner {
     display: none;
-  }
-
-  .col-open {
-    width: 66px;
   }
 }
 </style>
