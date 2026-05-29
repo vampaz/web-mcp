@@ -86,13 +86,13 @@ await createWebMCPKit({
 })
 ```
 
-Cloudflare Workers AI through the Astro Cloudflare adapter:
+Cloudflare Workers AI through the Astro Cloudflare adapter binding:
 
 ```ts
 await createWebMCPKit({
   planner: {
-    provider: 'cloudflare-workers-ai',
-    model: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
+    provider: 'cloudflare-binding',
+    model: '@cf/zai-org/glm-4.7-flash',
     auth: {
       mode: 'server',
       endpoint: '/api/webmcp/plan'
@@ -101,7 +101,7 @@ await createWebMCPKit({
 })
 ```
 
-The demo includes `/api/webmcp/plan` for server planning. For `provider: 'cloudflare-workers-ai'`, that route uses `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` from the server environment. For `provider: 'cloudflare-binding'`, it uses the Astro Cloudflare adapter and expects a Cloudflare runtime with `env.AI`. For `provider: 'openrouter'`, it uses `OPENROUTER_API_KEY` from the server environment when OpenRouter is selected.
+The demo includes `/api/webmcp/plan` for server planning. For `provider: 'cloudflare-binding'`, it uses the Astro Cloudflare adapter and expects a Cloudflare runtime with `env.AI`. For `provider: 'openrouter'`, it uses `OPENROUTER_API_KEY` from the server environment when OpenRouter is selected.
 For `provider: 'openai'`, it uses `OPENAI_API_KEY` from the server environment when OpenAI is selected.
 
 For local development, keep Wrangler authentication in an ignored project `.env` file instead of relying on the global interactive OAuth refresh token:
@@ -140,8 +140,6 @@ npm run dev
 When a provider is explicitly selected, WebMCP Kit uses that provider. It does not silently switch the command to deterministic local planning.
 
 Pass the selected planner to `getIntegrationHealthReport({ planner })` during development to expose provider readiness in the same diagnostics used by the devtools overlay.
-
-For the separate `cloudflare-workers-ai` REST mode, use the same `.env` values or another server environment that provides `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`.
 
 ## Web Component Input
 

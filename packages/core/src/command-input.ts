@@ -73,7 +73,6 @@ const defaultButtonLabel = 'Run'
 const supersededPlannerRefreshMessage = 'Planner refresh was superseded.'
 const webMCPCommandInputTagName = 'webmcp-command-input'
 const observedAttributes = [
-  'account-id',
   'api-key',
   'auth-mode',
   'base-url',
@@ -98,7 +97,6 @@ export function defineWebMCPCommandInput(
     static observedAttributes = observedAttributes
 
     apiKey?: string
-    accountId?: string
     authMode?: 'none' | 'server' | 'user-key'
     baseUrl?: string
     context?: PlannerContext | (() => PlannerContext)
@@ -265,7 +263,6 @@ export function defineWebMCPCommandInput(
 
     configure(options: WebMCPCommandInputConfigureOptions) {
       this.apiKey = options.apiKey ?? this.apiKey
-      this.accountId = options.accountId ?? this.accountId
       this.authMode = options.authMode ?? this.authMode
       this.baseUrl = options.baseUrl ?? this.baseUrl
       this.context = options.context ?? this.context
@@ -424,7 +421,6 @@ export function defineWebMCPCommandInput(
     }
 
     private applyAttribute(name: string, value: string | null) {
-      if (name === 'account-id') this.accountId = value ?? undefined
       if (name === 'api-key') this.apiKey = value ?? undefined
       if (name === 'auth-mode') this.authMode = isAuthMode(value) ? value : undefined
       if (name === 'base-url') this.baseUrl = value ?? undefined
@@ -523,7 +519,6 @@ export function defineWebMCPCommandInput(
         provider,
         model: model || undefined,
         baseUrl: this.baseUrl || undefined,
-        accountId: this.accountId || undefined,
         auth:
           authMode === 'server'
             ? {

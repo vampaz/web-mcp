@@ -127,7 +127,6 @@ export type PlannerProviderKind =
   | 'openrouter'
   | 'openai-compatible'
   | 'cloudflare-binding'
-  | 'cloudflare-workers-ai'
 
 export type PlannerAuth =
   | { mode: 'none' }
@@ -138,7 +137,6 @@ export interface PlannerProviderConfig {
   provider: PlannerProviderKind
   model?: string
   baseUrl?: string
-  accountId?: string
   auth?: PlannerAuth
 }
 

@@ -113,7 +113,6 @@ export function getProviderOptionCount(
 
 export function isPlannerAttribute(name: string): boolean {
   return (
-    name === 'account-id' ||
     name === 'api-key' ||
     name === 'auth-mode' ||
     name === 'base-url' ||
@@ -135,8 +134,7 @@ export function isPlannerProviderKind(value: unknown): value is PlannerProviderK
     value === 'openai' ||
     value === 'openrouter' ||
     value === 'openai-compatible' ||
-    value === 'cloudflare-binding' ||
-    value === 'cloudflare-workers-ai'
+    value === 'cloudflare-binding'
   )
 }
 
@@ -170,7 +168,6 @@ function getProviderLabel(provider: PlannerProviderKind): string {
   if (provider === 'openai') return 'OpenAI'
   if (provider === 'openai-compatible') return 'OpenAI-compatible'
   if (provider === 'cloudflare-binding') return 'Cloudflare binding'
-  if (provider === 'cloudflare-workers-ai') return 'Cloudflare Workers AI'
   return provider
 }
 

@@ -869,8 +869,7 @@ describe('planner', () => {
       vi.fn(async () =>
         Response.json(
           {
-            error:
-              'Cloudflare Workers AI server mode needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN on the server, or a custom planner endpoint.'
+            error: 'OpenAI server mode needs OPENAI_API_KEY on the server.'
           },
           {
             status: 502
@@ -880,8 +879,8 @@ describe('planner', () => {
     )
 
     const planner = await createConfiguredPlanner({
-      provider: 'cloudflare-workers-ai',
-      model: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
+      provider: 'openai',
+      model: 'gpt-5.4-mini',
       auth: {
         mode: 'server',
         endpoint: '/api/webmcp/plan'
@@ -898,7 +897,7 @@ describe('planner', () => {
           execute: () => []
         }
       ])
-    ).rejects.toThrow('CLOUDFLARE_ACCOUNT_ID')
+    ).rejects.toThrow('OPENAI_API_KEY')
   })
 
   it('reports cancellation without wrapping it as a provider failure', async () => {
@@ -977,54 +976,6 @@ describe('planner', () => {
     )
     const fetchOptions = (fetch.mock.calls as unknown as Array<[string, RequestInit]>)[0]?.[1]
     expect(String(fetchOptions?.body)).toContain('"model":"@cf/qwen/qwq-32b"')
-  })
-
-  it('plans through Cloudflare Workers AI REST with a user key', async () => {
-    const fetch = vi.fn(async () =>
-      Response.json({
-        result: {
-          response: JSON.stringify({
-            toolName: 'select_items',
-            input: { ids: ['item_8'] },
-            confidence: 0.87,
-            reason: 'Cloudflare REST selected liquids.'
-          })
-        }
-      })
-    )
-    vi.stubGlobal('fetch', fetch)
-
-    const planner = await createConfiguredPlanner({
-      provider: 'cloudflare-workers-ai',
-      accountId: 'account-123',
-      model: '@cf/google/gemma-4-26b-a4b-it',
-      auth: {
-        mode: 'user-key',
-        apiKey: 'cf-token'
-      }
-    })
-    const plan = await planner.plan('Select all liquids', [
-      {
-        name: 'select_items',
-        description: 'Select checklist items by ID.',
-        inputSchema: {
-          type: 'object'
-        },
-        execute: () => []
-      }
-    ])
-
-    expect(plan.input).toEqual({
-      ids: ['item_8']
-    })
-    expect(fetch).toHaveBeenCalledWith(
-      'https://api.cloudflare.com/client/v4/accounts/account-123/ai/run/@cf/google/gemma-4-26b-a4b-it',
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: 'Bearer cf-token'
-        })
-      })
-    )
   })
 
   it('does not allow Cloudflare binding mode without a server endpoint', async () => {

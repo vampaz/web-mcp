@@ -296,7 +296,6 @@ export type PlannerProviderKind =
   | 'openrouter'
   | 'openai-compatible'
   | 'cloudflare-binding'
-  | 'cloudflare-workers-ai'
   | 'webmcp-cloud'
 ```
 

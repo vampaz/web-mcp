@@ -32,7 +32,7 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 
 **Points to address:**
 
-1. **Planner provider code remains the largest core area** — `planner.ts` still owns Chrome AI sessions, OpenAI-compatible chat, Cloudflare REST, server endpoints, and plan validation. The deterministic fallback now lives in `heuristic-planner.ts`; consider splitting Chrome AI and remote-provider code only when those paths grow further.
+1. **Planner provider code remains the largest core area** — `planner.ts` still owns Chrome AI sessions, OpenAI-compatible chat, server endpoints, and plan validation. The deterministic fallback now lives in `heuristic-planner.ts`; consider splitting Chrome AI and remote-provider code only when those paths grow further.
 
 2. **Demo pages are split by workflow** — Inventory, Invoices, Commerce, and Support now own their page-specific tools while sharing `DemoShell.vue`. Keep future changes in those page components instead of rebuilding a single large demo component.
 
@@ -62,7 +62,7 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 
 - **`testing/playwright.ts`**: Thin, correct Playwright helpers using `page.evaluate()` to reach the test bridge. `waitForWebMCPTool` uses `page.waitForFunction` with a proper predicate.
 
-- **Server endpoint (`demo/src/pages/api/webmcp/plan.ts`)**: Handles both Cloudflare binding and REST modes. Whitelists approved models, strips code fences from AI responses (common with smaller models), rejects malformed JSON explicitly, and uses `getLegacyRuntimeEnv` for compatibility.
+- **Server endpoint (`demo/src/pages/api/webmcp/plan.ts`)**: Handles Cloudflare binding mode. Whitelists approved models, strips code fences from AI responses (common with smaller models), rejects malformed JSON explicitly, and uses `getLegacyRuntimeEnv` for compatibility.
 
 ### Issues & Recommendations
 
@@ -100,7 +100,6 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 
 1. **No direct test for `events.ts`**: The pub/sub system is exercised indirectly through registry tests but has no direct tests.
 2. **No direct test for `support.ts`**: `isWebMCPSupported()` and `getSupportLabel()` are tested only indirectly through native-adapter specs.
-3. **No test for `planner.ts` Cloudflare REST direct mode**: Only the server-endpoint path for `cloudflare-workers-ai` is tested; the browser-direct REST path is not.
 
 ---
 

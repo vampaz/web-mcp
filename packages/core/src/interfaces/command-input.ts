@@ -30,7 +30,6 @@ export interface WebMCPCommandInputPlannerOption {
 
 export interface WebMCPCommandInputConfigureOptions {
   apiKey?: string
-  accountId?: string
   authMode?: 'none' | 'server' | 'user-key'
   baseUrl?: string
   buttonLabel?: string
@@ -52,7 +51,6 @@ export interface WebMCPCommandInputConfigureOptions {
 
 export interface WebMCPCommandInputElement extends HTMLElement {
   apiKey?: string
-  accountId?: string
   authMode?: 'none' | 'server' | 'user-key'
   baseUrl?: string
   buttonLabel?: string

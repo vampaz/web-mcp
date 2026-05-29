@@ -104,12 +104,6 @@ export const POST: APIRoute = async function planWithServerProvider({ request, l
       return json(await planWithCloudflareBinding(body, env))
     }
 
-    if (body.provider === 'cloudflare-workers-ai') {
-      if (!body.model || !allowedCloudflareModels.has(body.model))
-        return json({ error: 'Unsupported Cloudflare model' }, 400)
-      return json(await planWithCloudflareRest(body, env))
-    }
-
     if (body.provider === 'openai') {
       const model = getOpenAIModel(body.model)
       if (!model) return json({ error: 'Unsupported OpenAI model' }, 400)
@@ -150,36 +144,6 @@ async function planWithCloudflareBinding(
   const result = await runCloudflareBindingPlanner(body, ai)
 
   return parseAndValidatePlan(extractResponseText(result), body.tools)
-}
-
-async function planWithCloudflareRest(
-  body: PlannerRequestBody,
-  env: CloudflareEnv
-): Promise<ToolPlan> {
-  const accountId = env.CLOUDFLARE_ACCOUNT_ID ?? import.meta.env.CLOUDFLARE_ACCOUNT_ID
-  const apiToken = env.CLOUDFLARE_API_TOKEN ?? import.meta.env.CLOUDFLARE_API_TOKEN
-  if (!accountId || !apiToken) {
-    throw new Error(
-      'Cloudflare Workers AI server mode needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN on the server, or a custom planner endpoint.'
-    )
-  }
-
-  const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${body.model}`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(createCloudflarePlannerInput(body, true))
-    }
-  )
-
-  if (!response.ok) throw await createAiEndpointError('Cloudflare Workers AI', response)
-
-  const payload = (await response.json()) as { result?: { response?: string } }
-  return parseAndValidatePlan(payload.result?.response?.trim(), body.tools)
 }
 
 async function planWithOpenAI(
@@ -522,10 +486,6 @@ function getPublicErrorMessage(error: unknown): string {
 
   if (message.includes('Binding AI needs to be run remotely')) {
     return 'Cloudflare AI binding is not connected to remote Workers AI in this dev session.'
-  }
-
-  if (message.includes('CLOUDFLARE_ACCOUNT_ID') || message.includes('CLOUDFLARE_API_TOKEN')) {
-    return 'Cloudflare Workers AI server mode needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN on the server, or a custom planner endpoint.'
   }
 
   if (message.includes('OPENAI_API_KEY')) {

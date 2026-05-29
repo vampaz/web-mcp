@@ -7,8 +7,6 @@ import { POST } from './plan'
 describe('/api/webmcp/plan', () => {
   afterEach(() => {
     delete env.AI
-    delete env.CLOUDFLARE_ACCOUNT_ID
-    delete env.CLOUDFLARE_API_TOKEN
     delete env.OPENAI_API_KEY
     delete env.OPENROUTER_API_KEY
     vi.restoreAllMocks()
@@ -59,32 +57,6 @@ describe('/api/webmcp/plan', () => {
         temperature: 0
       })
     )
-  })
-
-  it('returns a clear error when Cloudflare Workers AI server env is missing', async () => {
-    vi.spyOn(console, 'error').mockImplementation(function ignoreErrorLog() {})
-
-    const response = await POST(
-      createContext({
-        provider: 'cloudflare-workers-ai',
-        model: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
-        message: 'Select all items with water',
-        tools: [
-          {
-            name: 'select_items',
-            description: 'Select checklist items.',
-            inputSchema: { type: 'object' }
-          }
-        ],
-        context: {}
-      })
-    )
-
-    expect(response.status).toBe(502)
-    expect(await response.json()).toEqual({
-      error:
-        'Cloudflare Workers AI server mode needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN on the server, or a custom planner endpoint.'
-    })
   })
 
   it('plans through OpenAI using GPT-5.4 mini', async () => {

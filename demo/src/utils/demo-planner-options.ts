@@ -16,19 +16,12 @@ const openAIPlannerEndpoints = getOpenAIPlannerEndpoints()
 const openRouterPlannerEndpoints = getOpenRouterPlannerEndpoints()
 
 export const plannerEndpointOptions: WebMCPCommandInputEndpointOption[] = [
-  ...cloudflareBindingModels.flatMap(function mapCloudflareEndpoint(model) {
-    return [
-      {
-        label: model.label,
-        model: model.id,
-        provider: 'cloudflare-binding' as const
-      },
-      {
-        label: model.label,
-        model: model.id,
-        provider: 'cloudflare-workers-ai' as const
-      }
-    ]
+  ...cloudflareBindingModels.map(function mapCloudflareEndpoint(model) {
+    return {
+      label: model.label,
+      model: model.id,
+      provider: 'cloudflare-binding' as const
+    }
   }),
   ...openRouterPlannerEndpoints.map(function mapOpenRouterEndpoint(model) {
     return {

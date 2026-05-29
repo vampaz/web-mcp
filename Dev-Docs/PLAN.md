@@ -11,7 +11,7 @@ This is not a new protocol. It is an adoption layer for WebMCP.
 - The root `webmcp-kit` package exposes the library API and subpaths from the `packages/*` source folders; the demo is the only local npm workspace package.
 - The devtools overlay lives in `packages/devtools`; core remains framework-agnostic.
 - The active demo is the Astro app in `demo/src/pages/index.astro` and `demo/src/components/DemoShell.vue`.
-- Planner providers now support Chrome built-in AI, deterministic fallback, server endpoints, user-provided OpenAI-compatible keys, Cloudflare REST, and Cloudflare binding mode.
+- Planner providers now support Chrome built-in AI, deterministic fallback, server endpoints, user-provided OpenAI-compatible keys, and Cloudflare binding mode.
 - Cloudflare binding mode is wired through the Astro Cloudflare adapter, `demo/wrangler.toml`, and `demo/src/pages/api/webmcp/plan.ts`.
 - `demo/wrangler.toml` is already configured for the existing Cloudflare project/Worker named `web-mcp`.
 
@@ -309,20 +309,20 @@ Fallback mode is useful for development, QA, demos, docs, and adapters. It is no
 
 ## Tech Stack
 
-| Layer              | Technology                                                                                      |
-| ------------------ | ----------------------------------------------------------------------------------------------- |
-| Language           | TypeScript 5.x, ESM                                                                             |
-| Core               | Vanilla TypeScript                                                                              |
-| Schemas            | JSON Schema first, optional Zod adapter                                                         |
-| Native Target      | WebMCP browser APIs                                                                             |
-| Devtools           | Vanilla TypeScript + CSS                                                                        |
-| Frameworks         | Framework-agnostic core, optional recipes/extensions later                                      |
-| Testing            | Vitest, Playwright helpers                                                                      |
-| Monorepo           | npm workspaces                                                                                  |
-| Demo Runtime       | Astro server demo with Cloudflare Workers adapter                                               |
-| Cloudflare Project | Existing Worker project `web-mcp`                                                               |
-| Local HTTPS        | Caddy TLS plugin for `*.localtest.me` development                                               |
-| AI Providers       | Chrome built-in AI, OpenAI-compatible APIs, Cloudflare Workers AI REST, Cloudflare `AI` binding |
+| Layer              | Technology                                                          |
+| ------------------ | ------------------------------------------------------------------- |
+| Language           | TypeScript 5.x, ESM                                                 |
+| Core               | Vanilla TypeScript                                                  |
+| Schemas            | JSON Schema first, optional Zod adapter                             |
+| Native Target      | WebMCP browser APIs                                                 |
+| Devtools           | Vanilla TypeScript + CSS                                            |
+| Frameworks         | Framework-agnostic core, optional recipes/extensions later          |
+| Testing            | Vitest, Playwright helpers                                          |
+| Monorepo           | npm workspaces                                                      |
+| Demo Runtime       | Astro server demo with Cloudflare Workers adapter                   |
+| Cloudflare Project | Existing Worker project `web-mcp`                                   |
+| Local HTTPS        | Caddy TLS plugin for `*.localtest.me` development                   |
+| AI Providers       | Chrome built-in AI, OpenAI-compatible APIs, Cloudflare `AI` binding |
 
 ## Success Criteria
 

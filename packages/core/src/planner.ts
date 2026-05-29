@@ -262,10 +262,6 @@ async function planWithRemoteProvider(
     return planWithServerEndpoint(auth.endpoint, config, model, message, tools, context, options)
   }
 
-  if (config.provider === 'cloudflare-workers-ai') {
-    return planWithCloudflareRest(config, apiKey, model, message, tools, context, options)
-  }
-
   return planWithOpenAICompatible(config, apiKey, model, message, tools, context, options)
 }
 
@@ -349,50 +345,6 @@ async function planWithOpenAICompatible(
   if (!content) throw new Error('provider returned no message content')
 
   return parseToolPlanJson(content, getProviderLabel(config))
-}
-
-async function planWithCloudflareRest(
-  config: PlannerProviderConfig,
-  apiKey: string | undefined,
-  model: string,
-  message: string,
-  tools: WebMCPTool[],
-  context: PlannerContext,
-  options?: PlannerRunOptions
-): Promise<ToolPlan> {
-  if (!config.accountId) {
-    throw new Error('Cloudflare REST planning needs accountId or server endpoint mode')
-  }
-
-  const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/ai/run/${model}`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        messages: createPlannerMessages(message, tools, context),
-        response_format: {
-          type: 'json_schema',
-          json_schema: toolPlanSchema
-        },
-        temperature: 0
-      }),
-      signal: options?.signal
-    }
-  )
-
-  if (!response.ok) {
-    throw new Error(`Cloudflare Workers AI returned ${response.status}`)
-  }
-
-  const payload = (await response.json()) as { result?: { response?: string } }
-  const content = payload.result?.response
-  if (!content) throw new Error('Cloudflare returned no response content')
-
-  return parseToolPlanJson(content, 'Cloudflare Workers AI')
 }
 
 function createPlannerMessages(message: string, tools: WebMCPTool[], context: PlannerContext) {
@@ -584,8 +536,6 @@ function getDefaultModel(config: PlannerProviderConfig): string {
   if (config.provider === 'openrouter') return 'openrouter/auto'
   if (config.provider === 'openai') return 'gpt-5.4-mini'
   if (config.provider === 'cloudflare-binding') return '@cf/zai-org/glm-4.7-flash'
-  if (config.provider === 'cloudflare-workers-ai')
-    return '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b'
 
   return 'default'
 }
@@ -595,7 +545,6 @@ function getProviderLabel(config: PlannerProviderConfig): string {
   if (config.provider === 'openai') return 'OpenAI'
   if (config.provider === 'openai-compatible') return 'OpenAI-compatible provider'
   if (config.provider === 'cloudflare-binding') return 'Cloudflare binding'
-  if (config.provider === 'cloudflare-workers-ai') return 'Cloudflare Workers AI'
   if (config.provider === 'chrome-built-in') return 'Chrome built-in AI'
   if (config.provider === 'local') return 'Local heuristic planner'
 

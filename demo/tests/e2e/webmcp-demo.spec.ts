@@ -153,12 +153,11 @@ test('exposes the full demo provider and model matrix', async function testProvi
   await expect(providerSelect.locator('option')).toHaveText([
     'Chrome built-in AI',
     'Browser local AI · Qwen3.5-2B-q4f16_1-MLC',
+    'Demo deterministic',
     'Cloudflare binding',
-    'Cloudflare Workers AI',
     'OpenRouter',
     'OpenAI',
-    'Auto',
-    'Local deterministic'
+    'Auto'
   ])
 
   await providerSelect.selectOption('cloudflare-binding')
@@ -571,42 +570,6 @@ test('plans through the dev Cloudflare binding provider', async function testClo
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible()
   await selectPlannerProvider(page, 'cloudflare-binding', 'select_items', '@cf/qwen/qwq-32b')
-  await getCommandTextbox(page).fill('Select all French items')
-  await page.getByRole('button', { name: 'Run' }).click()
-
-  await expect(getItemInput(page, 'Croissant')).toBeChecked()
-  await expect(getItemInput(page, 'Quiche')).toBeChecked()
-})
-
-test('plans through the dev Cloudflare Workers AI server provider', async function testCloudflareWorkersAIProviderSelection({
-  page
-}) {
-  await page.route('**/api/webmcp/plan', async function fulfillCloudflareWorkersAI(route, request) {
-    expect(request.postDataJSON()).toMatchObject({
-      provider: 'cloudflare-workers-ai',
-      model: '@cf/openai/gpt-oss-20b',
-      message: 'Select all French items'
-    })
-
-    await route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({
-        toolName: 'select_items',
-        input: { ids: ['item_4', 'item_7', 'item_13', 'item_18', 'item_22'] },
-        confidence: 0.92,
-        reason: 'Cloudflare Workers AI selected French items from current inventory context.'
-      })
-    })
-  })
-
-  await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible()
-  await selectPlannerProvider(
-    page,
-    'cloudflare-workers-ai',
-    'select_items',
-    '@cf/openai/gpt-oss-20b'
-  )
   await getCommandTextbox(page).fill('Select all French items')
   await page.getByRole('button', { name: 'Run' }).click()
 
