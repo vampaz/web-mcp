@@ -122,15 +122,15 @@ import DemoLayout from '@/layouts/DemoLayout.astro'
   .memo-shell {
     display: grid;
     gap: clamp(1rem, 2vw, 1.5rem);
-    width: min(1180px, calc(100% - 32px));
+    width: min(73.75rem, calc(100% - clamp(1.25rem, 4vw, 2rem)));
     margin: 0 auto;
-    padding: 24px 0 80px;
+    padding: clamp(1rem, 3vw, 1.5rem) 0 clamp(3rem, 8vw, 5rem);
   }
 
   .memo-hero {
     display: grid;
     gap: 0.7rem;
-    border-bottom: 1px solid rgba(244, 240, 232, 0.14);
+    border-bottom: 2px solid var(--demo-ink);
     padding-bottom: clamp(1rem, 2vw, 1.4rem);
   }
 
@@ -146,7 +146,7 @@ import DemoLayout from '@/layouts/DemoLayout.astro'
   .memo-hero p,
   .memo-grid article > span,
   .memo-band span {
-    color: #e8be53;
+    color: var(--demo-blue);
     font-size: 0.74rem;
     font-weight: 900;
     letter-spacing: 0.08em;
@@ -154,25 +154,30 @@ import DemoLayout from '@/layouts/DemoLayout.astro'
   }
 
   .memo-hero h1 {
-    max-width: 56rem;
-    color: #f4f0e8;
+    color: var(--demo-blue);
+    font-family: var(--demo-font-mono);
     font-size: clamp(2.15rem, 5vw, 4.7rem);
-    line-height: 0.98;
+    line-height: 0.92;
+    max-inline-size: 25ch;
+    text-wrap: balance;
+    text-transform: uppercase;
   }
 
   .memo-hero span {
-    max-width: 62rem;
-    color: #aeb9b3;
+    max-inline-size: 62rem;
+    color: var(--demo-muted);
+    font-family: var(--demo-font-sans);
     font-size: clamp(1rem, 1.5vw, 1.18rem);
     line-height: 1.55;
+    text-wrap: pretty;
   }
 
   .memo-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1px;
-    border: 1px solid rgba(244, 240, 232, 0.13);
-    background: rgba(244, 240, 232, 0.12);
+    border: 1px solid var(--demo-rule-strong);
+    background: var(--demo-rule-strong);
   }
 
   .memo-grid article,
@@ -181,7 +186,7 @@ import DemoLayout from '@/layouts/DemoLayout.astro'
     min-width: 0;
     gap: 0.75rem;
     align-content: start;
-    background: rgba(9, 14, 13, 0.95);
+    background: var(--demo-paper-wash);
     padding: clamp(1rem, 2vw, 1.35rem);
   }
 
@@ -190,26 +195,27 @@ import DemoLayout from '@/layouts/DemoLayout.astro'
   }
 
   .memo-grid h2 {
-    color: #f4f0e8;
+    color: var(--demo-ink);
     font-size: clamp(1.35rem, 2.3vw, 2rem);
     line-height: 1.08;
+    text-wrap: balance;
   }
 
   .memo-grid p,
   .memo-band dd {
-    color: #aeb9b3;
+    color: var(--demo-muted);
     line-height: 1.5;
   }
 
   .memo-band {
-    grid-template-columns: minmax(14rem, 0.28fr) minmax(0, 1fr);
-    border: 1px solid rgba(244, 240, 232, 0.13);
+    grid-template-columns: minmax(min(100%, 14rem), 0.28fr) minmax(0, 1fr);
+    border: 1px solid var(--demo-rule-strong);
   }
 
   .memo-band strong {
     display: block;
     margin-top: 0.25rem;
-    color: #f4f0e8;
+    color: var(--demo-ink);
     font-size: clamp(1.25rem, 2vw, 1.85rem);
     line-height: 1.1;
   }
@@ -220,7 +226,7 @@ import DemoLayout from '@/layouts/DemoLayout.astro'
   }
 
   .memo-band dt {
-    color: #8fa098;
+    color: var(--demo-muted);
     font-size: 0.72rem;
     font-weight: 900;
     text-transform: uppercase;
@@ -236,9 +242,7 @@ import DemoLayout from '@/layouts/DemoLayout.astro'
 
   @media (max-width: 760px) {
     .memo-shell {
-      width: min(100% - 20px, 1180px);
-      padding-top: 16px;
-      padding-bottom: 48px;
+      width: min(100% - 1.25rem, 73.75rem);
     }
 
     .memo-grid,

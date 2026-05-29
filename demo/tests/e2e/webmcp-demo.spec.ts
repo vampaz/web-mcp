@@ -803,8 +803,9 @@ async function selectPlannerProvider(
     return
   }
 
-  await providerSelect.selectOption(provider)
-  await expect(providerSelect).toHaveValue(provider)
+  const visibleProvider = provider === 'local' ? 'planner:demo-deterministic' : provider
+  await providerSelect.selectOption(visibleProvider)
+  await expect(providerSelect).toHaveValue(visibleProvider)
   if (model) {
     const modelSelect = page.getByLabel('Model')
     await expect(modelSelect).toBeVisible()

@@ -195,9 +195,8 @@ function getInputValue(event: Event): string {
   min-width: 0;
   overflow: hidden;
   padding: clamp(0.9rem, 1.8vw, 1.25rem);
-  border: 1px solid rgba(244, 240, 232, 0.12);
-  background: rgba(12, 17, 16, 0.82);
-  backdrop-filter: blur(18px);
+  border: 1px solid var(--demo-rule-strong);
+  background: var(--demo-paper-wash);
 }
 
 .workspace-header,
@@ -227,11 +226,11 @@ h2 {
 }
 
 .workspace-summary strong {
-  color: #30a779;
+  color: var(--demo-blue);
 }
 
 .workspace-summary span {
-  color: #9ea8a1;
+  color: var(--demo-muted);
 }
 
 .table-controls {
@@ -246,12 +245,12 @@ h2 {
   display: grid;
   gap: 5px;
   min-width: 0;
-  color: #c9d1cb;
+  color: var(--demo-muted);
   font-size: 0.84rem;
 }
 
 .sort-controls {
-  grid-template-columns: minmax(0, 1fr) 42px;
+  grid-template-columns: minmax(0, 1fr) minmax(2.65rem, max-content);
   align-items: end;
 }
 
@@ -264,35 +263,34 @@ h2 {
 input,
 select,
 button {
-  min-height: 36px;
-  border: 1px solid rgba(244, 240, 232, 0.18);
+  min-block-size: 2.25rem;
+  border: 1px solid var(--demo-rule-strong);
   font: inherit;
 }
 
 input,
 select {
   min-width: 0;
-  padding: 7px 9px;
-  background: #f4f0e8;
-  color: #0c1110;
+  padding: 0.44rem 0.56rem;
+  background: var(--demo-paper);
+  color: var(--demo-ink);
 }
 
 input[type='checkbox'] {
-  width: 20px;
-  height: 20px;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
   padding: 0;
 }
 
 button {
-  padding: 7px 10px;
-  background: rgba(244, 240, 232, 0.06);
-  color: #f4f0e8;
+  padding: 0.44rem 0.62rem;
+  background: transparent;
+  color: var(--demo-blue);
 }
 
 .sort-direction {
   display: grid;
-  width: 42px;
-  min-width: 42px;
+  min-inline-size: 2.65rem;
   padding: 0;
   place-items: center;
   font-size: 1rem;
@@ -308,33 +306,33 @@ button:disabled {
   min-width: 0;
   max-width: 100%;
   overflow: auto;
-  border: 1px solid rgba(244, 240, 232, 0.12);
-  background: rgba(244, 240, 232, 0.025);
+  border: 1px solid var(--demo-blue-rule);
+  background: rgba(36, 88, 255, 0.035);
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 780px;
+  min-inline-size: min(100%, 48.75rem);
 }
 
 th,
 td {
-  padding: 10px;
-  border-bottom: 1px solid rgba(244, 240, 232, 0.1);
+  padding: 0.62rem;
+  border-bottom: 1px solid var(--demo-rule);
   text-align: left;
   vertical-align: middle;
 }
 
 th {
-  color: #9ea8a1;
+  color: var(--demo-muted);
   font-size: 0.74rem;
   text-transform: uppercase;
 }
 
 tr.selected,
 tr.active {
-  background: rgba(48, 167, 121, 0.13);
+  background: var(--demo-blue-soft);
 }
 
 tbody tr {
@@ -345,21 +343,21 @@ tbody tr {
 }
 
 tbody tr:hover {
-  background: rgba(244, 240, 232, 0.055);
+  background: var(--demo-blue-wash);
 }
 
 tbody tr.active,
 tbody tr.active:hover {
-  background: rgba(48, 167, 121, 0.13);
+  background: var(--demo-blue-soft);
 }
 
 tbody tr:focus-visible {
-  outline: 2px solid #e8be53;
+  outline: 2px solid var(--demo-blue);
   outline-offset: -2px;
 }
 
 tbody tr.active {
-  box-shadow: inset 3px 0 0 #30a779;
+  box-shadow: inset 3px 0 0 var(--demo-blue);
 }
 
 td strong,
@@ -368,29 +366,29 @@ td span {
 }
 
 td span {
-  color: #9ea8a1;
+  color: var(--demo-muted);
   font-size: 0.78rem;
 }
 
 .status {
   display: inline-block;
-  padding: 2px 6px;
-  border: 1px solid rgba(244, 240, 232, 0.16);
-  color: #f4f0e8;
+  padding: 0.12rem 0.38rem;
+  border: 1px solid var(--demo-rule-strong);
+  color: var(--demo-ink);
   text-transform: uppercase;
 }
 
 .status.overdue {
-  color: #f39a8d;
+  color: var(--demo-danger);
 }
 
 .status.paid {
-  color: #30a779;
+  color: var(--demo-good);
 }
 
 .compact th,
 .compact td {
-  padding: 7px 9px;
+  padding: 0.44rem 0.56rem;
 }
 
 @media (max-width: 980px) {
@@ -399,7 +397,7 @@ td span {
   }
 
   .sort-controls {
-    grid-template-columns: minmax(0, 1fr) 42px;
+    grid-template-columns: minmax(0, 1fr) minmax(2.65rem, max-content);
   }
 }
 
@@ -407,7 +405,7 @@ td span {
   input:not([type='checkbox']),
   select,
   button {
-    min-height: 40px;
+    min-block-size: 2.5rem;
   }
 
   table {
@@ -418,21 +416,21 @@ td span {
   th,
   td {
     overflow: hidden;
-    padding: 8px 6px;
+    padding: 0.5rem 0.38rem;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .col-select {
-    width: 40px;
+    inline-size: 2.5rem;
   }
 
   .col-status {
-    width: 82px;
+    inline-size: 8ch;
   }
 
   .col-amount {
-    width: 74px;
+    inline-size: 8ch;
   }
 
   .col-due,

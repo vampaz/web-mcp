@@ -40,7 +40,7 @@ defineExpose({
 
 <style scoped>
 .diagnostics-content {
-  background: #09110e;
+  background: var(--demo-paper-wash);
 }
 
 .status-strip {
@@ -48,19 +48,19 @@ defineExpose({
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
   width: 100%;
-  border-top: 1px solid rgba(224, 234, 229, 0.12);
-  border-bottom: 1px solid rgba(224, 234, 229, 0.1);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015));
+  border-top: 1px solid var(--demo-rule);
+  border-bottom: 1px solid var(--demo-rule);
+  background: var(--demo-paper);
 }
 
 .status-strip div {
   display: flex;
   min-width: 0;
-  gap: 10px;
+  gap: 0.62rem;
   align-items: center;
   overflow: hidden;
-  padding: 10px 12px;
-  border-right: 1px solid rgba(224, 234, 229, 0.1);
+  padding: 0.62rem 0.75rem;
+  border-right: 1px solid var(--demo-rule);
 }
 
 .status-strip div:last-child {
@@ -69,7 +69,7 @@ defineExpose({
 
 .status-strip span,
 .status-strip small {
-  color: #9aa8a1;
+  color: var(--demo-muted);
   font-size: 0.78rem;
 }
 
@@ -79,7 +79,7 @@ defineExpose({
 }
 
 .status-strip strong {
-  color: #f7faf8;
+  color: var(--demo-ink);
   min-width: 0;
   font-size: 0.92rem;
   overflow: hidden;
@@ -95,7 +95,7 @@ defineExpose({
 }
 
 .devtools-host {
-  border-top: 1px solid rgba(224, 234, 229, 0.08);
+  border-top: 1px solid var(--demo-rule);
 }
 
 @media (max-width: 980px) {
@@ -105,7 +105,7 @@ defineExpose({
 
   .status-strip div {
     border-right: 0;
-    border-bottom: 1px solid rgba(224, 234, 229, 0.1);
+    border-bottom: 1px solid var(--demo-rule);
   }
 
   .status-strip div:last-child {

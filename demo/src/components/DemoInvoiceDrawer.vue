@@ -94,14 +94,13 @@ function getInputValue(event: Event): string {
   gap: clamp(0.75rem, 1.5vw, 1rem);
   height: 100%;
   padding: clamp(0.9rem, 1.8vw, 1.25rem);
-  border: 1px solid rgba(244, 240, 232, 0.12);
-  background: rgba(12, 17, 16, 0.82);
-  backdrop-filter: blur(18px);
+  border: 1px solid var(--demo-rule-strong);
+  background: var(--demo-paper-wash);
 }
 
 .panel-heading {
   display: grid;
-  gap: 8px;
+  gap: 0.5rem;
   min-block-size: 2.35rem;
   align-items: center;
 }
@@ -114,53 +113,53 @@ h2 {
 
 .active-record {
   display: grid;
-  gap: 4px;
-  padding: 10px;
-  border: 1px solid rgba(48, 167, 121, 0.34);
-  background: rgba(48, 167, 121, 0.12);
+  gap: 0.25rem;
+  padding: 0.62rem;
+  border: 1px solid var(--demo-blue);
+  background: var(--demo-blue-soft);
 }
 
 .active-record span {
-  color: #9ea8a1;
+  color: var(--demo-muted);
 }
 
 .active-record small {
-  color: #e8be53;
+  color: var(--demo-blue);
   text-transform: capitalize;
 }
 
 .invoice-form {
   display: grid;
-  gap: 10px;
+  gap: 0.62rem;
 }
 
 label {
   display: grid;
-  gap: 5px;
-  color: #c9d1cb;
+  gap: 0.32rem;
+  color: var(--demo-muted);
   font-size: 0.88rem;
 }
 
 input,
 select,
 button {
-  min-height: 38px;
-  border: 1px solid rgba(244, 240, 232, 0.18);
+  min-block-size: 2.38rem;
+  border: 1px solid var(--demo-rule-strong);
   font: inherit;
 }
 
 input,
 select {
   min-width: 0;
-  padding: 8px 10px;
-  background: #f4f0e8;
-  color: #0c1110;
+  padding: 0.5rem 0.62rem;
+  background: var(--demo-paper);
+  color: var(--demo-ink);
 }
 
 button {
-  border-color: #e8be53;
-  background: #e8be53;
-  color: #0c1110;
+  border-color: var(--demo-blue);
+  background: var(--demo-blue);
+  color: var(--demo-paper-wash);
   font-weight: 900;
 }
 </style>

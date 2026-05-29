@@ -100,14 +100,13 @@ function getInputValue(event: Event): string {
 <style scoped>
 .tools-panel {
   padding: clamp(0.9rem, 1.8vw, 1.25rem);
-  border: 1px solid rgba(244, 240, 232, 0.12);
-  background: rgba(12, 17, 16, 0.82);
-  backdrop-filter: blur(18px);
+  border: 1px solid var(--demo-rule-strong);
+  background: var(--demo-paper-wash);
 }
 
 .panel-heading {
   display: grid;
-  gap: 8px;
+  gap: 0.5rem;
   min-block-size: 2.35rem;
   align-items: center;
   margin-bottom: clamp(0.75rem, 1.5vw, 1rem);
@@ -121,13 +120,13 @@ h2 {
 
 .support-form {
   display: grid;
-  gap: 12px;
+  gap: 0.75rem;
 }
 
 .support-form label {
   display: grid;
-  gap: 8px;
-  color: #c9d1cb;
+  gap: 0.5rem;
+  color: var(--demo-muted);
   font-size: 0.92rem;
 }
 
@@ -135,42 +134,42 @@ h2 {
 .support-form select,
 textarea {
   width: 100%;
-  border: 1px solid rgba(244, 240, 232, 0.2);
+  border: 1px solid var(--demo-rule-strong);
   outline: none;
-  background: #f4f0e8;
-  color: #0c1110;
+  background: var(--demo-paper);
+  color: var(--demo-ink);
   font: inherit;
 }
 
 .support-form input {
-  min-height: 46px;
-  padding: 12px;
+  min-block-size: 2.88rem;
+  padding: 0.75rem;
 }
 
 .support-form select {
-  min-height: 46px;
-  padding: 0 12px;
+  min-block-size: 2.88rem;
+  padding: 0 0.75rem;
 }
 
 textarea {
   resize: vertical;
-  min-height: 132px;
-  padding: 12px;
+  min-block-size: 8.25rem;
+  padding: 0.75rem;
   line-height: 1.5;
 }
 
 .support-form input:focus,
 textarea:focus {
-  border-color: #e8be53;
-  box-shadow: 0 0 0 4px rgba(232, 190, 83, 0.2);
+  border-color: var(--demo-blue);
+  box-shadow: 0 0 0 4px var(--demo-blue-soft);
 }
 
 .primary-action {
   width: 100%;
-  padding: 9px 12px;
-  border: 1px solid #e8be53;
-  background: #e8be53;
-  color: #0c1110;
+  padding: 0.56rem 0.75rem;
+  border: 1px solid var(--demo-blue);
+  background: var(--demo-blue);
+  color: var(--demo-paper-wash);
   font: inherit;
   font-weight: 900;
 }

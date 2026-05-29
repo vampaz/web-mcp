@@ -146,9 +146,8 @@ function getInputValue(event: Event): string {
   display: grid;
   gap: clamp(0.75rem, 1.5vw, 1rem);
   padding: clamp(0.9rem, 1.8vw, 1.25rem);
-  border: 1px solid rgba(244, 240, 232, 0.12);
-  background: rgba(12, 17, 16, 0.82);
-  backdrop-filter: blur(18px);
+  border: 1px solid var(--demo-rule-strong);
+  background: var(--demo-paper-wash);
 }
 
 .panel-heading {
@@ -176,39 +175,39 @@ h2 {
 }
 
 .cart-line {
-  grid-template-columns: minmax(0, 1fr) 76px auto auto;
+  grid-template-columns: minmax(0, 1fr) minmax(5.5ch, 0.16fr) auto auto;
   align-items: center;
-  padding: 8px 0;
-  border-top: 1px solid rgba(244, 240, 232, 0.1);
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--demo-rule);
 }
 
 label {
   display: grid;
   gap: 5px;
-  color: #c9d1cb;
+  color: var(--demo-muted);
   font-size: 0.88rem;
 }
 
 input,
 select,
 button {
-  min-height: 38px;
-  border: 1px solid rgba(244, 240, 232, 0.18);
+  min-block-size: 2.38rem;
+  border: 1px solid var(--demo-rule-strong);
   font: inherit;
 }
 
 input,
 select {
   min-width: 0;
-  padding: 8px 10px;
-  background: #f4f0e8;
-  color: #0c1110;
+  padding: 0.5rem 0.62rem;
+  background: var(--demo-paper);
+  color: var(--demo-ink);
 }
 
 button {
-  padding: 8px 10px;
-  background: rgba(244, 240, 232, 0.06);
-  color: #f4f0e8;
+  padding: 0.5rem 0.62rem;
+  background: transparent;
+  color: var(--demo-blue);
   white-space: nowrap;
 }
 
@@ -221,7 +220,7 @@ button:disabled {
   grid-template-columns: minmax(7rem, 9rem) minmax(0, 1fr) auto;
   align-items: end;
   padding-top: 0.75rem;
-  border-top: 1px solid rgba(244, 240, 232, 0.1);
+  border-top: 1px solid var(--demo-rule);
 }
 
 .product-picker label:first-child {
@@ -235,13 +234,13 @@ button:disabled {
 }
 
 .cart-total strong {
-  color: #f4f0e8;
+  color: var(--demo-ink);
   font-size: 1.18rem;
 }
 
 .cart-footer span,
 .empty-state {
-  color: #9ea8a1;
+  color: var(--demo-muted);
 }
 
 @media (max-width: 760px) {
@@ -254,7 +253,7 @@ button:disabled {
   input,
   select,
   button {
-    min-height: 40px;
+    min-block-size: 2.5rem;
   }
 }
 </style>

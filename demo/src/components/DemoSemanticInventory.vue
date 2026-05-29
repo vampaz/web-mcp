@@ -91,13 +91,12 @@ function toggleItem(id: string, event: Event) {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: clamp(0.75rem, 1.5vw, 1rem);
-  max-height: max(24rem, calc(100svh - 19rem));
+  max-block-size: max(24rem, calc(100svh - 19rem));
   min-width: 0;
   overflow: hidden;
   padding: clamp(0.9rem, 1.8vw, 1.25rem);
-  border: 1px solid rgba(244, 240, 232, 0.12);
-  background: rgba(12, 17, 16, 0.82);
-  backdrop-filter: blur(18px);
+  border: 1px solid var(--demo-rule-strong);
+  background: var(--demo-paper-wash);
 }
 
 .inventory-header,
@@ -120,17 +119,17 @@ h2 {
 }
 
 .inventory-header p {
-  max-width: 42rem;
+  max-inline-size: 42rem;
   margin: 0.35rem 0 0;
-  color: #9ea8a1;
+  color: var(--demo-muted);
 }
 
 .inventory-summary strong {
-  color: #30a779;
+  color: var(--demo-blue);
 }
 
 .inventory-summary span {
-  color: #9ea8a1;
+  color: var(--demo-muted);
 }
 
 .inventory-actions {
@@ -138,11 +137,11 @@ h2 {
 }
 
 button {
-  min-height: 34px;
-  padding: 6px 10px;
-  border: 1px solid rgba(244, 240, 232, 0.18);
-  background: rgba(244, 240, 232, 0.06);
-  color: #f4f0e8;
+  min-block-size: 2.12rem;
+  padding: 0.38rem 0.62rem;
+  border: 1px solid var(--demo-blue);
+  background: transparent;
+  color: var(--demo-blue);
   font: inherit;
 }
 
@@ -151,20 +150,20 @@ button {
   min-height: 0;
   max-width: 100%;
   overflow: auto;
-  border: 1px solid rgba(244, 240, 232, 0.12);
-  background: rgba(244, 240, 232, 0.025);
+  border: 1px solid var(--demo-blue-rule);
+  background: rgba(36, 88, 255, 0.035);
 }
 
 table {
   width: 100%;
-  min-width: 820px;
+  min-inline-size: min(100%, 51.25rem);
   border-collapse: collapse;
 }
 
 th,
 td {
-  padding: 10px;
-  border-bottom: 1px solid rgba(244, 240, 232, 0.1);
+  padding: 0.62rem;
+  border-bottom: 1px solid var(--demo-rule);
   text-align: left;
   vertical-align: middle;
 }
@@ -173,8 +172,8 @@ thead th {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: #131816;
-  color: #9ea8a1;
+  background: var(--demo-paper-deep);
+  color: var(--demo-muted);
   font-size: 0.74rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -185,17 +184,17 @@ tbody tr {
 }
 
 tbody tr:hover {
-  background: rgba(244, 240, 232, 0.055);
+  background: var(--demo-blue-wash);
 }
 
 tbody tr.selected,
 tbody tr.selected:hover {
-  background: rgba(48, 167, 121, 0.13);
+  background: var(--demo-blue-soft);
 }
 
 input {
-  width: 20px;
-  height: 20px;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
   margin: 0;
 }
 
@@ -207,7 +206,7 @@ tbody th strong {
   display: block;
   min-width: 0;
   overflow-wrap: anywhere;
-  color: #f4f0e8;
+  color: var(--demo-ink);
   font-size: 0.98rem;
   font-weight: 500;
 }
@@ -225,7 +224,7 @@ tbody th strong {
 }
 
 .col-position {
-  color: #8fa098;
+  color: var(--demo-muted);
   text-align: right;
 }
 
@@ -236,28 +235,28 @@ tbody th strong {
 
 .demand {
   display: inline-block;
-  padding: 2px 6px;
-  border: 1px solid rgba(244, 240, 232, 0.16);
-  color: #c9d1cb;
+  padding: 0.12rem 0.38rem;
+  border: 1px solid var(--demo-rule-strong);
+  color: var(--demo-muted);
   font-size: 0.73rem;
   text-transform: uppercase;
 }
 
 .demand.high {
-  color: #30a779;
+  color: var(--demo-good);
 }
 
 .demand.low {
-  color: #e8be53;
+  color: var(--demo-warn);
 }
 
 @media (max-width: 620px) {
   .semantic-inventory {
-    padding: 12px;
+    padding: 0.75rem;
   }
 
   button {
-    min-height: 40px;
+    min-block-size: 2.5rem;
   }
 
   table {
@@ -268,29 +267,29 @@ tbody th strong {
   th,
   td {
     overflow: hidden;
-    padding: 8px 6px;
+    padding: 0.5rem 0.38rem;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .col-select {
-    width: 44px;
+    inline-size: 2.75rem;
   }
 
   .col-position {
-    width: 36px;
+    inline-size: 4ch;
   }
 
   .col-stock {
-    width: 74px;
+    inline-size: 7ch;
   }
 
   .col-demand {
-    width: 76px;
+    inline-size: 8ch;
   }
 
   .col-margin {
-    width: 64px;
+    inline-size: 7ch;
   }
 
   .col-supplier,

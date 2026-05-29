@@ -1,13 +1,25 @@
 :root {
-  color-scheme: dark;
-  font-family:
-    Avenir Next,
-    Avenir,
-    Corbel,
-    Segoe UI,
-    sans-serif;
-  background: #090b0b;
-  color: #f4f0e8;
+  color-scheme: light;
+  --demo-paper: #f7f3ec;
+  --demo-paper-deep: #ece6dc;
+  --demo-paper-wash: #fffaf1;
+  --demo-ink: #141414;
+  --demo-muted: #5d5d58;
+  --demo-faint: #868680;
+  --demo-blue: #2458ff;
+  --demo-blue-soft: #dfe6ff;
+  --demo-blue-wash: rgba(36, 88, 255, 0.075);
+  --demo-blue-rule: rgba(36, 88, 255, 0.22);
+  --demo-rule: rgba(20, 20, 20, 0.14);
+  --demo-rule-strong: rgba(20, 20, 20, 0.28);
+  --demo-danger: #c74b42;
+  --demo-font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+  --demo-font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --demo-good: #087d57;
+  --demo-warn: #a35c00;
+  font-family: var(--demo-font-sans);
+  background: var(--demo-paper);
+  color: var(--demo-ink);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -17,20 +29,9 @@
 }
 
 body {
-  min-width: 320px;
   min-height: 100vh;
   margin: 0;
-  background:
-    linear-gradient(120deg, rgba(232, 190, 83, 0.06), transparent 28rem),
-    linear-gradient(180deg, rgba(48, 167, 121, 0.055), transparent 22rem),
-    repeating-linear-gradient(
-      90deg,
-      rgba(244, 240, 232, 0.018) 0,
-      rgba(244, 240, 232, 0.018) 1px,
-      transparent 1px,
-      transparent 64px
-    ),
-    #070a09;
+  background-color: var(--demo-paper);
 }
 
 button,
@@ -59,27 +60,32 @@ button:hover:not(:disabled) {
   z-index: 900;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 18px;
+  gap: 8px 20px;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(244, 240, 232, 0.14);
-  background: rgba(7, 10, 9, 0.9);
-  padding: 10px max(16px, calc((100vw - 1440px) / 2 + 16px));
-  backdrop-filter: blur(18px);
+  border-bottom: 2px solid var(--demo-ink);
+  background: rgba(247, 243, 236, 0.9);
+  padding: clamp(0.65rem, 1.5vw, 0.85rem)
+    max(clamp(0.75rem, 2vw, 1rem), calc((100vw - 90rem) / 2 + 1rem));
+  backdrop-filter: blur(12px);
 }
 
 .demo-brand,
 .demo-nav a {
-  color: #f4f0e8;
+  color: var(--demo-ink);
   text-decoration: none;
 }
 
 .demo-brand {
   display: flex;
   align-items: center;
-  min-height: 40px;
+  min-block-size: 2.5rem;
+  color: var(--demo-blue);
+  font-family: var(--demo-font-mono);
+  font-size: clamp(1.05rem, 2vw, 1.65rem);
   font-weight: 900;
   letter-spacing: 0;
+  text-transform: uppercase;
 }
 
 .demo-nav {
@@ -91,10 +97,9 @@ button:hover:not(:disabled) {
 }
 
 .demo-nav a {
-  border: 1px solid rgba(244, 240, 232, 0.18);
-  border-radius: 4px;
-  padding: 6px 10px;
-  color: #c9d1cb;
+  border: 1px solid var(--demo-rule);
+  padding: 0.45rem 0.62rem;
+  color: var(--demo-muted);
   font-size: 0.78rem;
   font-weight: 900;
   text-transform: uppercase;
@@ -103,42 +108,39 @@ button:hover:not(:disabled) {
 .demo-nav a:hover,
 .demo-nav a:focus-visible,
 .demo-nav a[aria-current='page'] {
-  border-color: #e8be53;
-  color: #e8be53;
+  border-color: var(--demo-blue);
+  background: var(--demo-blue);
+  color: var(--demo-paper-wash);
 }
 
 .demo-shell {
-  width: min(1440px, calc(100% - 32px));
+  width: min(90rem, calc(100% - clamp(1.25rem, 4vw, 2rem)));
   margin: 0 auto;
-  padding: 18px 0 96px;
+  padding: clamp(0.75rem, 2vw, 1.12rem) 0 clamp(3rem, 8vw, 6rem);
 }
 
 @media (max-width: 620px) {
   .demo-topbar {
     align-items: stretch;
-    padding: 10px;
   }
 
   .demo-nav {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    padding-bottom: 2px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 6.25rem), 1fr));
+    overflow: visible;
     width: 100%;
   }
 
   .demo-nav a {
     display: flex;
-    flex: 0 0 auto;
     align-items: center;
-    min-height: 40px;
+    justify-content: center;
+    min-block-size: 2.5rem;
     text-align: center;
   }
 
   .demo-shell {
-    width: min(100% - 20px, 1440px);
-    padding-top: 12px;
-    padding-bottom: 48px;
+    width: min(100% - 1.25rem, 90rem);
   }
 }
 
@@ -158,7 +160,7 @@ button:hover:not(:disabled) {
   .demo-shell--fixed {
     flex: 1 1 auto;
     min-height: 0;
-    padding-bottom: 18px;
+    padding-bottom: 1.12rem;
     overflow: hidden;
   }
 

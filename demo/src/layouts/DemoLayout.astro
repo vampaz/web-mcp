@@ -30,13 +30,19 @@ function getIsActive(path: string): boolean {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
     {robots && <meta name="robots" content={robots} />}
-    <meta name="theme-color" content="#090b0b" />
+    <meta name="theme-color" content="#f7f3ec" />
     <link rel="icon" href="/webmcp-circuit.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap"
+      rel="stylesheet"
+    />
     <title>{title}</title>
     <style is:inline>
       html,
       body {
-        background: #090b0b;
+        background: #f7f3ec;
       }
     </style>
   </head>

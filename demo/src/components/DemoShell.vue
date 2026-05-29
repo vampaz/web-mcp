@@ -31,10 +31,28 @@
 
   <section class="demo-app-page">
     <header class="demo-page-header">
-      <div>
+      <div class="demo-header-copy">
         <p>{{ eyebrow }}</p>
         <h1>{{ title }}</h1>
         <span v-if="description">{{ description }}</span>
+      </div>
+      <div class="demo-header-diagram" aria-hidden="true">
+        <svg viewBox="0 0 420 230" role="img">
+          <path
+            class="diagram-grid"
+            d="M28 34H392M28 86H392M28 138H392M28 190H392M68 16V214M150 16V214M232 16V214M314 16V214"
+          />
+          <path class="diagram-wire" d="M72 74h84c18 0 28 10 28 28v12c0 18 10 28 28 28h58" />
+          <path class="diagram-wire" d="M72 158h74c20 0 32-12 32-32v-4c0-20 12-32 32-32h114" />
+          <path class="diagram-wire diagram-wire--faint" d="M260 58h44c22 0 40 18 40 40v54" />
+          <rect x="42" y="48" width="72" height="52" />
+          <rect x="270" y="116" width="96" height="62" />
+          <circle cx="184" cy="114" r="30" />
+          <circle cx="344" cy="98" r="17" />
+          <text x="44" y="38">SCOPE</text>
+          <text x="154" y="202">PLAN</text>
+          <text x="278" y="108">EXECUTE</text>
+        </svg>
       </div>
       <dl v-if="metrics.length > 0" class="demo-metrics" aria-label="Workspace metrics">
         <div v-for="metric in metrics" :key="metric.label" :class="metric.tone">
@@ -476,8 +494,16 @@ webmcp-command-input[data-floating] {
   right: 0.5rem;
   bottom: 4rem;
   z-index: 1000;
-  width: min(920px, calc(100vw - 1rem));
+  width: min(57.5rem, calc(100vw - 1rem));
+  --webmcp-accent: var(--demo-blue);
+  --webmcp-accent-dark: var(--demo-ink);
+  --webmcp-dark: var(--demo-ink);
+  --webmcp-field: var(--demo-paper);
   --webmcp-floating-panel-max-height: calc(100vh - 5rem);
+  --webmcp-ink: var(--demo-ink);
+  --webmcp-line: var(--demo-rule-strong);
+  --webmcp-muted: var(--demo-muted);
+  --webmcp-paper: var(--demo-paper-wash);
 }
 
 webmcp-command-input:not(:defined) {
@@ -491,27 +517,27 @@ webmcp-command-input:not(:defined) {
   z-index: 1001;
   display: grid;
   place-items: center;
-  min-width: 48px;
-  min-height: 44px;
+  min-inline-size: 3rem;
+  min-block-size: 2.75rem;
   padding: 0.18em 0.36em;
-  border: 2px solid #0f1512;
-  background: #e8be53;
-  color: #0c1110;
+  border: 2px solid var(--demo-blue);
+  background: var(--demo-blue);
+  color: var(--demo-paper-wash);
   font: inherit;
   font-size: 0.88rem;
   font-weight: 950;
   line-height: 0.9;
   text-align: center;
   cursor: pointer;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.34);
+  box-shadow: 0 14px 0 rgba(36, 88, 255, 0.14);
 }
 
 .webmcp-command-launcher:hover {
-  background: #f1cd70;
+  background: var(--demo-ink);
 }
 
 .webmcp-command-launcher:focus-visible {
-  outline: 2px solid #e8be53;
+  outline: 2px solid var(--demo-blue);
   outline-offset: 3px;
 }
 
@@ -521,11 +547,13 @@ webmcp-command-input:not(:defined) {
 
 .demo-page-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(18rem, 34rem);
+  grid-template-columns:
+    minmax(min(100%, 22rem), 0.84fr) minmax(min(100%, 16rem), 0.48fr)
+    minmax(min(100%, 18rem), 0.48fr);
   gap: clamp(1rem, 2vw, 2rem);
-  align-items: end;
-  padding-block: clamp(0.25rem, 1vw, 0.7rem) clamp(0.65rem, 1.4vw, 1rem);
-  border-bottom: 1px solid rgba(244, 240, 232, 0.12);
+  align-items: stretch;
+  padding-block: clamp(1rem, 2.8vw, 2.2rem) clamp(0.8rem, 1.6vw, 1.2rem);
+  border-bottom: 2px solid var(--demo-ink);
 }
 
 .demo-page-header p,
@@ -535,7 +563,7 @@ webmcp-command-input:not(:defined) {
 }
 
 .demo-page-header p {
-  color: #8fa098;
+  color: var(--demo-muted);
   font-size: 0.76rem;
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -543,19 +571,68 @@ webmcp-command-input:not(:defined) {
 }
 
 .demo-page-header h1 {
-  margin-top: 0.2rem;
-  color: #f4f0e8;
-  font-size: clamp(1.55rem, 3.6vw, 2.55rem);
-  line-height: 1;
+  margin-top: 0.35rem;
+  color: var(--demo-blue);
+  font-family: var(--demo-font-mono);
+  font-size: clamp(2.4rem, 7vw, 5.4rem);
+  font-weight: 900;
+  line-height: 0.88;
+  max-inline-size: 9ch;
+  text-wrap: balance;
+  text-transform: uppercase;
 }
 
 .demo-page-header span {
   display: block;
-  max-width: 62rem;
-  margin-top: 0.7rem;
-  color: #aeb9b3;
-  font-size: clamp(0.95rem, 1.4vw, 1.08rem);
-  line-height: 1.5;
+  max-inline-size: 62rem;
+  margin-top: 1rem;
+  color: var(--demo-ink);
+  font-family: var(--demo-font-sans);
+  font-size: clamp(1rem, 1.35vw, 1.18rem);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.demo-header-copy {
+  display: grid;
+  align-content: end;
+}
+
+.demo-header-diagram {
+  display: grid;
+  aspect-ratio: 21 / 11.5;
+  border-inline: 1px solid var(--demo-blue-rule);
+}
+
+.demo-header-diagram svg {
+  width: 100%;
+  height: 100%;
+}
+
+.demo-header-diagram path,
+.demo-header-diagram rect,
+.demo-header-diagram circle {
+  fill: none;
+  stroke: var(--demo-blue);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.demo-header-diagram .diagram-grid,
+.demo-header-diagram .diagram-wire--faint {
+  opacity: 0.24;
+}
+
+.demo-header-diagram .diagram-wire {
+  stroke-width: 2.4;
+}
+
+.demo-header-diagram text {
+  fill: var(--demo-blue);
+  font-family: var(--demo-font-mono);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0;
 }
 
 .demo-metrics {
@@ -563,18 +640,18 @@ webmcp-command-input:not(:defined) {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1px;
   margin: 0;
-  border: 1px solid rgba(244, 240, 232, 0.13);
-  background: rgba(244, 240, 232, 0.12);
+  border: 1px solid var(--demo-rule-strong);
+  background: var(--demo-rule-strong);
 }
 
 .demo-metrics div {
   min-width: 0;
   padding: 0.8rem;
-  background: rgba(9, 14, 13, 0.94);
+  background: var(--demo-paper-wash);
 }
 
 .demo-metrics dt {
-  color: #899891;
+  color: var(--demo-muted);
   font-size: 0.7rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -582,42 +659,42 @@ webmcp-command-input:not(:defined) {
 
 .demo-metrics dd {
   margin: 0.18rem 0 0;
-  color: #f4f0e8;
+  color: var(--demo-ink);
   font-size: 1.15rem;
   font-weight: 900;
 }
 
 .demo-metrics .good dd {
-  color: #30a779;
+  color: var(--demo-good);
 }
 
 .demo-metrics .warn dd {
-  color: #e8be53;
+  color: var(--demo-warn);
 }
 
 .demo-metrics .danger dd {
-  color: #f39a8d;
+  color: var(--demo-danger);
 }
 
 .demo-command-brief {
   display: grid;
-  grid-template-columns: minmax(16rem, 0.42fr) minmax(0, 1fr);
+  grid-template-columns: minmax(min(100%, 16rem), 0.42fr) minmax(0, 1fr);
   gap: 1px;
-  border: 1px solid rgba(244, 240, 232, 0.13);
-  background: rgba(244, 240, 232, 0.12);
+  border: 1px solid var(--demo-rule-strong);
+  background: var(--demo-rule-strong);
 }
 
 .demo-command-brief > div {
   min-width: 0;
   padding: 0.8rem;
-  background: linear-gradient(135deg, rgba(18, 27, 24, 0.96), rgba(8, 12, 11, 0.96));
+  background: var(--demo-paper-wash);
 }
 
 .demo-command-brief span,
 .activity-heading span,
 .confirmation-dialog > span {
   display: block;
-  color: #8fa098;
+  color: var(--demo-muted);
   font-size: 0.72rem;
   font-weight: 900;
   text-transform: uppercase;
@@ -626,26 +703,28 @@ webmcp-command-input:not(:defined) {
 .demo-command-brief strong {
   display: block;
   margin-top: 0.25rem;
-  color: #f4f0e8;
+  color: var(--demo-ink);
   line-height: 1.35;
 }
 
 .demo-wire-panel {
   display: grid;
-  grid-template-columns: minmax(18rem, 0.36fr) minmax(16rem, 0.32fr) minmax(18rem, 0.32fr);
+  grid-template-columns:
+    minmax(min(100%, 18rem), 0.36fr) minmax(min(100%, 16rem), 0.32fr)
+    minmax(min(100%, 18rem), 0.32fr);
   gap: 1px;
-  border: 1px solid rgba(244, 240, 232, 0.13);
-  background: rgba(244, 240, 232, 0.12);
+  border: 1px solid var(--demo-rule-strong);
+  background: var(--demo-rule-strong);
 }
 
 .demo-wire-panel > * {
   min-width: 0;
-  background: rgba(9, 14, 13, 0.94);
+  background: var(--demo-paper-wash);
   padding: 0.8rem;
 }
 
 .demo-wire-panel--active {
-  grid-template-columns: minmax(16rem, 0.42fr) minmax(18rem, 0.58fr);
+  grid-template-columns: minmax(min(100%, 16rem), 0.42fr) minmax(min(100%, 18rem), 0.58fr);
 }
 
 .demo-wire-panel--active .wire-points {
@@ -656,7 +735,7 @@ webmcp-command-input:not(:defined) {
 .latest-plan span,
 .confirmation-input-label {
   display: block;
-  color: #8fa098;
+  color: var(--demo-muted);
   font-size: 0.72rem;
   font-weight: 900;
   text-transform: uppercase;
@@ -666,14 +745,14 @@ webmcp-command-input:not(:defined) {
 .latest-plan strong {
   display: block;
   margin-top: 0.25rem;
-  color: #f4f0e8;
+  color: var(--demo-ink);
   line-height: 1.3;
 }
 
 .wire-copy p,
 .latest-plan p {
   margin: 0.35rem 0 0;
-  color: #aeb9b3;
+  color: var(--demo-muted);
   font-size: 0.88rem;
   line-height: 1.45;
 }
@@ -689,7 +768,7 @@ webmcp-command-input:not(:defined) {
 }
 
 .wire-points dt {
-  color: #8fa098;
+  color: var(--demo-muted);
   font-size: 0.7rem;
   font-weight: 900;
   text-transform: uppercase;
@@ -697,30 +776,30 @@ webmcp-command-input:not(:defined) {
 
 .wire-points dd {
   margin: 0.18rem 0 0;
-  color: #e0e7e2;
+  color: var(--demo-ink);
   font-size: 0.86rem;
   line-height: 1.35;
 }
 
 .latest-plan {
-  box-shadow: inset 3px 0 0 #8fa098;
+  box-shadow: inset 3px 0 0 var(--demo-blue-rule);
 }
 
 .latest-plan--success {
-  box-shadow: inset 3px 0 0 #30a779;
+  box-shadow: inset 3px 0 0 var(--demo-good);
 }
 
 .latest-plan--blocked {
-  box-shadow: inset 3px 0 0 #f39a8d;
+  box-shadow: inset 3px 0 0 var(--demo-danger);
 }
 
 .latest-plan pre {
   overflow: auto;
   max-height: 10rem;
   margin: 0.7rem 0 0;
-  border: 1px solid rgba(244, 240, 232, 0.12);
-  background: rgba(0, 0, 0, 0.24);
-  color: #e9f0ec;
+  border: 1px solid var(--demo-blue-rule);
+  background: rgba(36, 88, 255, 0.045);
+  color: var(--demo-ink);
   padding: 0.65rem;
   font-size: 0.78rem;
   white-space: pre-wrap;
@@ -735,9 +814,9 @@ webmcp-command-input:not(:defined) {
 
 .suggestion-strip button {
   min-height: 2.15rem;
-  border: 1px solid rgba(232, 190, 83, 0.34);
-  background: rgba(232, 190, 83, 0.08);
-  color: #f4f0e8;
+  border: 1px solid var(--demo-blue);
+  background: transparent;
+  color: var(--demo-blue);
   font: inherit;
   font-size: 0.86rem;
 }
@@ -746,8 +825,8 @@ webmcp-command-input:not(:defined) {
   display: grid;
   gap: 0.85rem;
   padding: clamp(0.9rem, 1.8vw, 1.25rem);
-  border: 1px solid rgba(244, 240, 232, 0.12);
-  background: rgba(12, 17, 16, 0.82);
+  border: 1px solid var(--demo-rule-strong);
+  background: var(--demo-paper-wash);
 }
 
 .activity-heading {
@@ -757,7 +836,7 @@ webmcp-command-input:not(:defined) {
 }
 
 .activity-heading strong {
-  color: #e8be53;
+  color: var(--demo-blue);
 }
 
 .activity-rail ol {
@@ -766,38 +845,38 @@ webmcp-command-input:not(:defined) {
   margin: 0;
   padding: 0;
   list-style: none;
-  background: rgba(244, 240, 232, 0.1);
+  background: var(--demo-rule-strong);
 }
 
 .activity-rail li {
   display: grid;
-  grid-template-columns: 5rem minmax(10rem, 0.28fr) minmax(0, 1fr);
+  grid-template-columns: max-content minmax(min(100%, 10rem), 0.28fr) minmax(0, 1fr);
   gap: 0.75rem;
   align-items: baseline;
   padding: 0.75rem;
-  background: rgba(9, 14, 13, 0.94);
+  background: var(--demo-paper);
 }
 
 .activity-rail li.ai {
-  box-shadow: inset 3px 0 0 #30a779;
+  box-shadow: inset 3px 0 0 var(--demo-good);
 }
 
 .activity-rail li.system {
-  box-shadow: inset 3px 0 0 #e8be53;
+  box-shadow: inset 3px 0 0 var(--demo-blue);
 }
 
 .activity-rail li.manual {
-  box-shadow: inset 3px 0 0 #8fa098;
+  box-shadow: inset 3px 0 0 var(--demo-muted);
 }
 
 .activity-rail li span,
 .activity-rail li p {
   margin: 0;
-  color: #9ea8a1;
+  color: var(--demo-muted);
 }
 
 .activity-rail li strong {
-  color: #f4f0e8;
+  color: var(--demo-ink);
 }
 
 .confirmation-backdrop {
@@ -807,7 +886,7 @@ webmcp-command-input:not(:defined) {
   display: grid;
   place-items: center;
   padding: 1rem;
-  background: rgba(2, 5, 4, 0.72);
+  background: rgba(247, 243, 236, 0.72);
   backdrop-filter: blur(14px);
 }
 
@@ -815,8 +894,8 @@ webmcp-command-input:not(:defined) {
   display: grid;
   gap: 1rem;
   width: min(34rem, 100%);
-  border: 1px solid rgba(232, 190, 83, 0.44);
-  background: #0b100e;
+  border: 2px solid var(--demo-blue);
+  background: var(--demo-paper-wash);
   padding: clamp(1rem, 2vw, 1.35rem);
   box-shadow: 0 32px 90px rgba(0, 0, 0, 0.58);
 }
@@ -827,18 +906,19 @@ webmcp-command-input:not(:defined) {
 }
 
 .confirmation-dialog h2 {
-  color: #f4f0e8;
+  color: var(--demo-ink);
   font-size: 1.35rem;
   line-height: 1.18;
+  text-wrap: balance;
 }
 
 .confirmation-dialog p {
-  color: #aeb9b3;
+  color: var(--demo-muted);
   line-height: 1.45;
 }
 
 .confirmation-dialog p strong {
-  color: #f4f0e8;
+  color: var(--demo-ink);
 }
 
 .confirmation-dialog pre {
@@ -846,9 +926,9 @@ webmcp-command-input:not(:defined) {
   max-height: 15rem;
   margin: 0;
   padding: 0.85rem;
-  border: 1px solid rgba(244, 240, 232, 0.12);
-  background: rgba(0, 0, 0, 0.28);
-  color: #e9f0ec;
+  border: 1px solid var(--demo-blue-rule);
+  background: rgba(36, 88, 255, 0.045);
+  color: var(--demo-ink);
   white-space: pre-wrap;
 }
 
@@ -860,17 +940,17 @@ webmcp-command-input:not(:defined) {
 
 .confirmation-dialog button {
   min-height: 2.5rem;
-  border: 1px solid rgba(244, 240, 232, 0.18);
-  background: rgba(244, 240, 232, 0.06);
-  color: #f4f0e8;
+  border: 1px solid var(--demo-rule-strong);
+  background: transparent;
+  color: var(--demo-ink);
   font: inherit;
   font-weight: 800;
 }
 
 .confirmation-dialog button:last-child {
-  border-color: #e8be53;
-  background: #e8be53;
-  color: #0c1110;
+  border-color: var(--demo-blue);
+  background: var(--demo-blue);
+  color: var(--demo-paper-wash);
 }
 
 @media (max-width: 62rem) {
@@ -933,16 +1013,15 @@ webmcp-command-input:not(:defined) {
   }
 
   .suggestion-strip {
-    flex-wrap: nowrap;
+    display: grid;
+    grid-template-columns: 1fr;
     align-items: stretch;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    padding-bottom: 0.15rem;
+    overflow: visible;
+    padding-bottom: 0;
   }
 
   .suggestion-strip button {
-    flex: 0 0 auto;
-    max-width: min(18rem, 82vw);
+    width: 100%;
     min-height: 2.5rem;
     text-align: left;
     white-space: normal;

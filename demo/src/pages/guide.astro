@@ -54,15 +54,15 @@ const stories = getDemoRouteStories()
   .guide-shell {
     display: grid;
     gap: clamp(1rem, 2vw, 1.5rem);
-    width: min(1180px, calc(100% - 32px));
+    width: min(73.75rem, calc(100% - clamp(1.25rem, 4vw, 2rem)));
     margin: 0 auto;
-    padding: 24px 0 80px;
+    padding: clamp(1rem, 3vw, 1.5rem) 0 clamp(3rem, 8vw, 5rem);
   }
 
   .guide-header {
     display: grid;
     gap: 0.65rem;
-    border-bottom: 1px solid rgba(244, 240, 232, 0.14);
+    border-bottom: 2px solid var(--demo-ink);
     padding-bottom: clamp(1rem, 2vw, 1.4rem);
   }
 
@@ -73,7 +73,7 @@ const stories = getDemoRouteStories()
   }
 
   .guide-header p {
-    color: #e8be53;
+    color: var(--demo-blue);
     font-size: 0.76rem;
     font-weight: 900;
     letter-spacing: 0.08em;
@@ -81,25 +81,30 @@ const stories = getDemoRouteStories()
   }
 
   .guide-header h1 {
-    max-width: 54rem;
-    color: #f4f0e8;
+    color: var(--demo-blue);
+    font-family: var(--demo-font-mono);
     font-size: clamp(2rem, 5vw, 4.4rem);
-    line-height: 0.98;
+    line-height: 0.92;
+    max-inline-size: 25ch;
+    text-wrap: balance;
+    text-transform: uppercase;
   }
 
   .guide-header span {
-    max-width: 60rem;
-    color: #aeb9b3;
+    max-inline-size: 60rem;
+    color: var(--demo-muted);
+    font-family: var(--demo-font-sans);
     font-size: clamp(1rem, 1.5vw, 1.18rem);
     line-height: 1.55;
+    text-wrap: pretty;
   }
 
   .guide-flow {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1px;
-    border: 1px solid rgba(244, 240, 232, 0.13);
-    background: rgba(244, 240, 232, 0.12);
+    border: 1px solid var(--demo-rule-strong);
+    background: var(--demo-rule-strong);
   }
 
   .guide-flow article {
@@ -107,12 +112,12 @@ const stories = getDemoRouteStories()
     min-width: 0;
     gap: 0.85rem;
     align-content: start;
-    background: rgba(9, 14, 13, 0.95);
+    background: var(--demo-paper-wash);
     padding: clamp(1rem, 2vw, 1.35rem);
   }
 
   .guide-flow article > span {
-    color: #e8be53;
+    color: var(--demo-blue);
     font-size: 0.76rem;
     font-weight: 900;
   }
@@ -124,13 +129,14 @@ const stories = getDemoRouteStories()
   }
 
   .guide-flow h2 {
-    color: #f4f0e8;
+    color: var(--demo-ink);
     font-size: clamp(1.4rem, 2.4vw, 2rem);
     line-height: 1.05;
+    text-wrap: balance;
   }
 
   .guide-flow p {
-    color: #aeb9b3;
+    color: var(--demo-muted);
     line-height: 1.45;
   }
 
@@ -140,7 +146,7 @@ const stories = getDemoRouteStories()
   }
 
   .guide-flow dt {
-    color: #8fa098;
+    color: var(--demo-muted);
     font-size: 0.7rem;
     font-weight: 900;
     text-transform: uppercase;
@@ -148,29 +154,27 @@ const stories = getDemoRouteStories()
 
   .guide-flow dd {
     margin: 0.16rem 0 0;
-    color: #e0e7e2;
+    color: var(--demo-ink);
     line-height: 1.4;
   }
 
   .guide-flow a {
     justify-self: start;
-    border: 1px solid rgba(232, 190, 83, 0.44);
-    color: #f4f0e8;
+    border: 1px solid var(--demo-blue);
+    color: var(--demo-blue);
     padding: 0.55rem 0.7rem;
     text-decoration: none;
   }
 
   .guide-flow a:hover,
   .guide-flow a:focus-visible {
-    border-color: #e8be53;
-    color: #e8be53;
+    background: var(--demo-blue);
+    color: var(--demo-paper-wash);
   }
 
   @media (max-width: 760px) {
     .guide-shell {
-      width: min(100% - 20px, 1180px);
-      padding-top: 16px;
-      padding-bottom: 48px;
+      width: min(100% - 1.25rem, 73.75rem);
     }
 
     .guide-flow {

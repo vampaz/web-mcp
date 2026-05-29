@@ -110,14 +110,13 @@ function getInputValue(event: Event): string {
   display: grid;
   gap: clamp(0.75rem, 1.5vw, 1rem);
   padding: clamp(0.9rem, 1.8vw, 1.25rem);
-  border: 1px solid rgba(244, 240, 232, 0.12);
-  background: rgba(12, 17, 16, 0.82);
-  backdrop-filter: blur(18px);
+  border: 1px solid var(--demo-rule-strong);
+  background: var(--demo-paper-wash);
 }
 
 .panel-heading {
   display: grid;
-  gap: 8px;
+  gap: 0.5rem;
   min-block-size: 2.35rem;
   align-items: center;
 }
@@ -132,7 +131,7 @@ h2 {
 }
 
 h3 {
-  color: #c9d1cb;
+  color: var(--demo-muted);
   font-size: 0.86rem;
   text-transform: uppercase;
 }
@@ -140,50 +139,50 @@ h3 {
 .board-columns {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
-  gap: 10px;
+  gap: 0.62rem;
   min-width: 0;
 }
 
 .board-column {
   display: grid;
   align-content: start;
-  gap: 10px;
-  padding: 10px;
-  border: 1px solid rgba(244, 240, 232, 0.12);
-  background: rgba(244, 240, 232, 0.04);
+  gap: 0.62rem;
+  padding: 0.62rem;
+  border: 1px solid var(--demo-blue-rule);
+  background: rgba(36, 88, 255, 0.035);
 }
 
 .ticket-card {
   display: grid;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid rgba(244, 240, 232, 0.12);
-  background: rgba(0, 0, 0, 0.16);
+  gap: 0.5rem;
+  padding: 0.62rem;
+  border: 1px solid var(--demo-rule);
+  background: var(--demo-paper);
 }
 
 .ticket-card span,
 .ticket-card p {
   margin: 0;
-  color: #9ea8a1;
+  color: var(--demo-muted);
 }
 
 .ticket-card span {
-  color: #e8be53;
+  color: var(--demo-blue);
   font-size: 0.8rem;
 }
 
 .ticket-controls {
   display: grid;
-  gap: 6px;
+  gap: 0.38rem;
 }
 
 select {
   min-width: 0;
-  min-height: 40px;
-  padding: 6px 8px;
-  border: 1px solid rgba(244, 240, 232, 0.18);
-  background: #f4f0e8;
-  color: #0c1110;
+  min-block-size: 2.5rem;
+  padding: 0.38rem 0.5rem;
+  border: 1px solid var(--demo-rule-strong);
+  background: var(--demo-paper);
+  color: var(--demo-ink);
   font: inherit;
 }
 </style>
