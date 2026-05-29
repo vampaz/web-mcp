@@ -12,7 +12,7 @@ export function getStyles(): string {
       display: block;
       position: relative;
       color: var(--webmcp-ink);
-      font: 500 0.95rem/1.4 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font: 500 1rem/1.4 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
     :host([data-floating]) {
@@ -78,6 +78,7 @@ export function getStyles(): string {
       outline: 0;
       background: transparent;
       color: var(--webmcp-ink);
+      font-size: 1rem;
     }
 
     select,

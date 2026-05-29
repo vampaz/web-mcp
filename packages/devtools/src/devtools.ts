@@ -53,6 +53,9 @@ const overlayStyles = `
 .wmk-devtools textarea {
   font: inherit;
 }
+.wmk-devtools textarea {
+  font-size: 1rem;
+}
 .wmk-devtools button:focus-visible,
 .wmk-devtools textarea:focus-visible,
 .wmk-devtools summary:focus-visible {

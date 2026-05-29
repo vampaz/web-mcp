@@ -41,6 +41,12 @@ select {
   font: inherit;
 }
 
+input:not([type='checkbox']),
+select,
+textarea {
+  font-size: 1rem;
+}
+
 button {
   cursor: pointer;
   transition:

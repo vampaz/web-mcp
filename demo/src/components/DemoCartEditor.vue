@@ -202,6 +202,7 @@ select {
   padding: 0.5rem 0.62rem;
   background: var(--demo-paper);
   color: var(--demo-ink);
+  font-size: 1rem;
 }
 
 button {

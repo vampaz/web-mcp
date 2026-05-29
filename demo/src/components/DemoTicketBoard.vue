@@ -184,5 +184,6 @@ select {
   background: var(--demo-paper);
   color: var(--demo-ink);
   font: inherit;
+  font-size: 1rem;
 }
 </style>

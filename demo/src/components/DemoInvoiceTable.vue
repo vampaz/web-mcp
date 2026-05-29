@@ -274,6 +274,7 @@ select {
   padding: 0.44rem 0.56rem;
   background: var(--demo-paper);
   color: var(--demo-ink);
+  font-size: 1rem;
 }
 
 input[type='checkbox'] {
