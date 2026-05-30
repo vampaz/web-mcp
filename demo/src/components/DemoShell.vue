@@ -1,13 +1,17 @@
 <template>
   <button
     class="webmcp-command-launcher"
+    :class="{ 'webmcp-command-launcher--open': commandPanelOpen }"
     type="button"
-    aria-label="Open WebMCP command input"
+    :aria-label="commandPanelOpen ? 'Close WebMCP command input' : 'Open WebMCP command input'"
     :aria-expanded="String(commandPanelOpen)"
     @click="toggleCommandPanel"
   >
-    <span>WEB</span>
-    <span>MCP</span>
+    <span v-if="commandPanelOpen">X</span>
+    <template v-else>
+      <span>WEB</span>
+      <span>MCP</span>
+    </template>
   </button>
 
   <webmcp-command-input
@@ -545,6 +549,10 @@ webmcp-command-input:not(:defined) {
   display: block;
 }
 
+.webmcp-command-launcher--open {
+  box-shadow: none;
+}
+
 .demo-page-header {
   display: grid;
   grid-template-columns:
@@ -973,8 +981,37 @@ webmcp-command-input:not(:defined) {
 
 @media (max-width: 44rem) {
   webmcp-command-input[data-floating] {
-    width: calc(100vw - 1rem);
-    --webmcp-floating-panel-max-height: min(34rem, calc(100svh - 6rem));
+    top: max(0.5rem, env(safe-area-inset-top));
+    right: 3.8rem;
+    bottom: auto;
+    left: 0.5rem;
+    width: auto;
+    --webmcp-floating-panel-max-height: min(22rem, calc(100dvh - 1rem));
+  }
+
+  webmcp-command-input[data-floating]:not([data-floating-expanded]) {
+    top: auto;
+    right: 0.5rem;
+    bottom: 4rem;
+    left: auto;
+    width: min(57.5rem, calc(100vw - 1rem));
+  }
+
+  .webmcp-command-launcher--open {
+    top: max(0.9rem, calc(env(safe-area-inset-top) + 0.5rem));
+    right: 0.9rem;
+    bottom: auto;
+    min-inline-size: 2.5rem;
+    min-block-size: 2.5rem;
+    padding: 0;
+    background: var(--demo-ink);
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  .webmcp-command-launcher:not(.webmcp-command-launcher--open) {
+    right: 0.9rem;
+    bottom: max(0.9rem, calc(100vh - 100dvh + env(safe-area-inset-bottom) + 0.9rem));
   }
 
   .demo-app-page {
@@ -1045,7 +1082,7 @@ webmcp-command-input:not(:defined) {
   }
 
   .confirmation-dialog {
-    max-height: calc(100svh - 2rem);
+    max-height: calc(100dvh - 2rem);
     overflow: auto;
   }
 

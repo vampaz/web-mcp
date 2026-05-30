@@ -141,7 +141,7 @@ export function getStyles(): string {
       padding: 0;
       border-inline: 1px solid var(--webmcp-line);
       border-bottom: 1px solid var(--webmcp-line);
-      background: rgba(255, 255, 255, 0.96);
+      background: var(--webmcp-paper);
     }
 
     .webmcp-diagnostics {
@@ -302,13 +302,52 @@ export function getStyles(): string {
     }
 
     @media (max-width: 36rem) {
-      .webmcp-command,
       .webmcp-settings-grid {
         grid-template-columns: 1fr;
       }
 
+      :host([data-floating]) {
+        right: 0.5rem;
+        left: 0.5rem;
+        width: auto;
+        max-width: none;
+      }
+
+      .webmcp-floating-panel {
+        width: 100%;
+      }
+
+      .webmcp-command {
+        grid-template-columns: 1fr;
+        gap: 0.45rem;
+        padding: 0.45rem;
+      }
+
+      .webmcp-input-shell {
+        gap: 0.45rem;
+        padding: 0 0.62rem;
+      }
+
+      .webmcp-input-shell span {
+        font-size: 0.68rem;
+      }
+
       button {
         width: 100%;
+      }
+
+      .webmcp-run-button {
+        padding-inline: 0.85rem;
+      }
+
+      .webmcp-settings-summary,
+      .webmcp-disclosure-summary {
+        min-height: 2.2rem;
+        padding-inline: 0.65rem;
+      }
+
+      .webmcp-status {
+        display: none;
       }
     }
   `
