@@ -169,9 +169,9 @@ const overlayStyles = `
   color: var(--wmk-devtools-accent-text);
 }
 .wmk-devtools__badge--warning {
-  border-color: rgba(232, 190, 83, 0.48);
-  background: rgba(232, 190, 83, 0.12);
-  color: #f2cc6b;
+  border-color: var(--wmk-devtools-accent-rule);
+  background: var(--wmk-devtools-accent-soft);
+  color: var(--wmk-devtools-accent-text);
 }
 .wmk-devtools__badge--error {
   border-color: rgba(243, 154, 141, 0.48);
@@ -210,7 +210,7 @@ const overlayStyles = `
   font-size: 12px;
 }
 .wmk-devtools__diagnostic--warning {
-  border-left-color: #e8be53;
+  border-left-color: var(--wmk-devtools-accent-text);
 }
 .wmk-devtools__diagnostic--error {
   border-left-color: #f39a8d;
@@ -278,7 +278,7 @@ const overlayStyles = `
   font-weight: 800;
 }
 .wmk-devtools__warning {
-  border-left: 3px solid #e8be53;
+  border-left: 3px solid var(--wmk-devtools-accent-text);
   padding-left: 8px;
 }
 .wmk-devtools__error {

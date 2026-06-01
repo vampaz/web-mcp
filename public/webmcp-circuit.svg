@@ -1,16 +1,16 @@
 <svg width="960" height="540" viewBox="0 0 960 540" fill="none" xmlns="http://www.w3.org/2000/svg">
   <rect width="960" height="540" rx="28" fill="#0C1110"/>
-  <path d="M76 126H254C283 126 306 149 306 178V248C306 277 329 300 358 300H509" stroke="#E8BE53" stroke-width="8" stroke-linecap="round"/>
+  <path d="M76 126H254C283 126 306 149 306 178V248C306 277 329 300 358 300H509" stroke="#2458FF" stroke-width="8" stroke-linecap="round"/>
   <path d="M76 414H216C245 414 268 391 268 362V317C268 288 291 265 320 265H508" stroke="#2458FF" stroke-width="8" stroke-linecap="round"/>
-  <path d="M513 147H678C707 147 730 170 730 199V228C730 257 753 280 782 280H887" stroke="#D85D3F" stroke-width="8" stroke-linecap="round"/>
+  <path d="M513 147H678C707 147 730 170 730 199V228C730 257 753 280 782 280H887" stroke="#C74B42" stroke-width="8" stroke-linecap="round"/>
   <path d="M513 372H652C681 372 704 349 704 320V312C704 283 727 260 756 260H887" stroke="#F4F0E8" stroke-width="8" stroke-linecap="round"/>
-  <circle cx="74" cy="126" r="24" fill="#E8BE53"/>
+  <circle cx="74" cy="126" r="24" fill="#2458FF"/>
   <circle cx="74" cy="414" r="24" fill="#2458FF"/>
-  <circle cx="512" cy="300" r="38" fill="#111D19" stroke="#E8BE53" stroke-width="8"/>
+  <circle cx="512" cy="300" r="38" fill="#111D19" stroke="#2458FF" stroke-width="8"/>
   <circle cx="512" cy="265" r="38" fill="#111D19" stroke="#2458FF" stroke-width="8"/>
-  <circle cx="512" cy="147" r="24" fill="#D85D3F"/>
+  <circle cx="512" cy="147" r="24" fill="#C74B42"/>
   <circle cx="512" cy="372" r="24" fill="#F4F0E8"/>
-  <circle cx="887" cy="280" r="24" fill="#D85D3F"/>
+  <circle cx="887" cy="280" r="24" fill="#C74B42"/>
   <circle cx="887" cy="260" r="24" fill="#F4F0E8"/>
   <text x="82" y="68" fill="#F4F0E8" font-family="Avenir Next, sans-serif" font-size="34" font-weight="700">WEBMCP KIT</text>
   <text x="82" y="482" fill="#9EA8A1" font-family="Avenir Next, sans-serif" font-size="22">tools -> browser agent -> app state</text>
