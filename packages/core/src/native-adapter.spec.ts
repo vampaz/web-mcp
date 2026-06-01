@@ -11,16 +11,24 @@ interface NavigatorWithModelContext extends Navigator {
   }
 }
 
+interface DocumentWithModelContext extends Document {
+  modelContext?: {
+    registerTool?: ReturnType<typeof vi.fn>
+  }
+}
+
 describe('native WebMCP adapter', () => {
   beforeEach(() => {
     clearToolsForTest()
     setConfirmationHandler(undefined)
+    delete (document as DocumentWithModelContext).modelContext
     delete (navigator as NavigatorWithModelContext).modelContext
   })
 
   afterEach(() => {
     clearToolsForTest()
     setConfirmationHandler(undefined)
+    delete (document as DocumentWithModelContext).modelContext
     delete (navigator as NavigatorWithModelContext).modelContext
   })
 
@@ -28,12 +36,12 @@ describe('native WebMCP adapter', () => {
     expect(isWebMCPSupported()).toBe(false)
   })
 
-  it('registers with native WebMCP when the browser API exists', () => {
+  it('registers with native WebMCP when document modelContext exists', () => {
     const unregister = vi.fn()
     const registerNativeTool = vi.fn(function registerNativeToolMock() {
       return { unregister }
     })
-    ;(navigator as NavigatorWithModelContext).modelContext = {
+    ;(document as DocumentWithModelContext).modelContext = {
       registerTool: registerNativeTool
     }
 
@@ -245,7 +253,7 @@ describe('native WebMCP adapter', () => {
 
   it('executes native calls with native source context', async () => {
     let nativeExecute: ((input: Record<string, unknown>) => unknown) | undefined
-    ;(navigator as NavigatorWithModelContext).modelContext = {
+    ;(document as DocumentWithModelContext).modelContext = {
       registerTool: vi.fn(function registerNativeToolMock(nativeTool) {
         nativeExecute = nativeTool.execute
         return undefined

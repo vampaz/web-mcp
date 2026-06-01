@@ -1,14 +1,31 @@
+export interface WebMCPModelContext {
+  registerTool?: (...args: unknown[]) => unknown
+}
+
+interface DocumentWithModelContext extends Document {
+  modelContext?: WebMCPModelContext
+}
+
 interface NavigatorWithModelContext extends Navigator {
-  modelContext?: {
-    registerTool?: (...args: unknown[]) => unknown
-  }
+  modelContext?: WebMCPModelContext
 }
 
 export function isWebMCPSupported(): boolean {
-  if (typeof navigator === 'undefined') return false
+  return getWebMCPModelContext() !== undefined
+}
 
-  const modelContext = (navigator as NavigatorWithModelContext).modelContext
-  return typeof modelContext?.registerTool === 'function'
+export function getWebMCPModelContext(): WebMCPModelContext | undefined {
+  if (typeof document !== 'undefined') {
+    const modelContext = (document as DocumentWithModelContext).modelContext
+    if (typeof modelContext?.registerTool === 'function') return modelContext
+  }
+
+  if (typeof navigator !== 'undefined') {
+    const modelContext = (navigator as NavigatorWithModelContext).modelContext
+    if (typeof modelContext?.registerTool === 'function') return modelContext
+  }
+
+  return undefined
 }
 
 export function getSupportLabel(): string {

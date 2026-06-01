@@ -1,12 +1,6 @@
 import type { WebMCPTool } from './interfaces/tool'
 import { invokeToolPipeline } from './invocation'
-import { isWebMCPSupported } from './support'
-
-interface NavigatorWithModelContext extends Navigator {
-  modelContext?: {
-    registerTool?: (...args: unknown[]) => unknown
-  }
-}
+import { getWebMCPModelContext } from './support'
 
 interface NativeRegistrationHandle {
   unregister?: () => void
@@ -21,16 +15,15 @@ export interface NativeToolRegistration {
 export function registerNativeTool<TInput = Record<string, unknown>, TOutput = unknown>(
   tool: WebMCPTool<TInput, TOutput>
 ): NativeToolRegistration | undefined {
-  if (!isWebMCPSupported()) return undefined
-
-  const registerTool = (navigator as NavigatorWithModelContext).modelContext?.registerTool
+  const modelContext = getWebMCPModelContext()
+  const registerTool = modelContext?.registerTool
   if (!registerTool) return undefined
 
   const abortController = new AbortController()
 
   try {
     const handle = registerTool.call(
-      (navigator as NavigatorWithModelContext).modelContext,
+      modelContext,
       {
         name: tool.name,
         description: tool.description,

@@ -6,7 +6,7 @@ WebMCP Kit is a local-first TypeScript toolkit for exposing real web app actions
 
 This repository is an early MVP. Chrome WebMCP and Chrome built-in AI are emerging browser capabilities, so the kit is designed as progressive enhancement:
 
-1. Use native WebMCP when `navigator.modelContext.registerTool` is available.
+1. Use native WebMCP when `document.modelContext.registerTool` is available.
 2. Keep a fallback registry for unsupported browsers, tests, demos, and devtools.
 3. Use Chrome built-in AI planning when `LanguageModel` is available.
 4. Fall back to deterministic local planning when browser AI is unavailable.
@@ -39,7 +39,7 @@ flowchart TB
   Providers["Provider APIs<br/>OpenAI / OpenRouter / Workers AI"]
   Plan["Validated tool plan"]
   Registry["WebMCP tool registry<br/>native adapter + fallback"]
-  Native["Optional integrations<br/>navigator.modelContext, devtools, tests, MCP bridge"]
+  Native["Optional integrations<br/>document.modelContext, devtools, tests, MCP bridge"]
   Tools["Consumer tools execute<br/>guards, confirmations, app state updates"]
 
   User --> Command

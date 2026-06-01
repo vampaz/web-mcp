@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { getSupportLabel, isWebMCPSupported } from './support'
+import { getSupportLabel, getWebMCPModelContext, isWebMCPSupported } from './support'
 
 interface NavigatorWithModelContext extends Navigator {
   modelContext?: {
@@ -8,12 +8,20 @@ interface NavigatorWithModelContext extends Navigator {
   }
 }
 
+interface DocumentWithModelContext extends Document {
+  modelContext?: {
+    registerTool?: unknown
+  }
+}
+
 describe('WebMCP support detection', () => {
   beforeEach(() => {
+    delete (document as DocumentWithModelContext).modelContext
     delete (navigator as NavigatorWithModelContext).modelContext
   })
 
   afterEach(() => {
+    delete (document as DocumentWithModelContext).modelContext
     delete (navigator as NavigatorWithModelContext).modelContext
   })
 
@@ -22,7 +30,18 @@ describe('WebMCP support detection', () => {
     expect(getSupportLabel()).toBe('Fallback registry active')
   })
 
-  it('reports native mode when registerTool is available', () => {
+  it('reports native mode when document registerTool is available', () => {
+    ;(document as DocumentWithModelContext).modelContext = {
+      registerTool() {
+        return undefined
+      }
+    }
+
+    expect(isWebMCPSupported()).toBe(true)
+    expect(getSupportLabel()).toBe('Native WebMCP available')
+  })
+
+  it('reports native mode for the legacy navigator registerTool fallback', () => {
     ;(navigator as NavigatorWithModelContext).modelContext = {
       registerTool() {
         return undefined
@@ -31,5 +50,23 @@ describe('WebMCP support detection', () => {
 
     expect(isWebMCPSupported()).toBe(true)
     expect(getSupportLabel()).toBe('Native WebMCP available')
+  })
+
+  it('prefers document modelContext over the legacy navigator fallback', () => {
+    const documentContext = {
+      registerTool() {
+        return undefined
+      }
+    }
+    const navigatorContext = {
+      registerTool() {
+        return undefined
+      }
+    }
+
+    ;(document as DocumentWithModelContext).modelContext = documentContext
+    ;(navigator as NavigatorWithModelContext).modelContext = navigatorContext
+
+    expect(getWebMCPModelContext()).toBe(documentContext)
   })
 })

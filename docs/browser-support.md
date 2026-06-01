@@ -14,11 +14,11 @@ if (isWebMCPSupported()) {
 
 ## Native Mode
 
-When `navigator.modelContext.registerTool` exists, WebMCP Kit registers tools with the browser native API and also keeps a fallback copy for local inspection and tests.
+When `document.modelContext.registerTool` exists, WebMCP Kit registers tools with the browser native API and also keeps a fallback copy for local inspection and tests. Older `navigator.modelContext.registerTool` builds are still supported as a legacy fallback.
 
 Native registration follows the current Chrome WebMCP shape:
 
-- Tool `annotations`, including `readOnlyHint` and `untrustedContentHint`, are passed to `navigator.modelContext.registerTool`.
+- Tool `annotations`, including `readOnlyHint` and `untrustedContentHint`, are passed to `document.modelContext.registerTool`.
 - Native cleanup uses `AbortSignal` when available, matching Chrome's documented unregister path.
 - Returned native `unregister()` or `dispose()` handles are still honored for compatibility.
 
