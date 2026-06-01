@@ -27,12 +27,16 @@ import {
   createCommandInputPlanner,
   defaultEndpoint,
   defaultModel,
-  getDefaultProvider,
   getDefaultModelForProvider,
+  getDefaultModelForPlannerOption,
+  getDefaultProvider,
   getModelControlMarkup,
   getModelOptionCount,
   getOptionsStatusText,
+  getPlannerOptionModelControlMarkup,
+  getPlannerOptionModelOptionCount,
   getPlannerOptionId,
+  getPlannerOptionStatusText,
   getPlannerOptionValue,
   getProviderControlMarkup,
   getProviderOptionCount,
@@ -454,7 +458,11 @@ export function defineWebMCPCommandInput(
 
       const plannerOption = this.getSelectedPlannerOption()
       if (plannerOption) {
-        const plannerSignature = JSON.stringify({ plannerOption: plannerOption.id })
+        const plannerModel = this.state.fixedModel ?? this.state.model
+        const plannerSignature = JSON.stringify({
+          plannerOption: plannerOption.id,
+          model: plannerModel || undefined
+        })
         if (this.currentPlanner && this.currentPlannerSignature === plannerSignature)
           return this.currentPlanner
 
@@ -462,7 +470,9 @@ export function defineWebMCPCommandInput(
         const loadId = this.plannerLoadId + 1
         this.plannerLoadId = loadId
         const revision = this.plannerRevision
-        const planner = await plannerOption.createPlanner()
+        const planner = await plannerOption.createPlanner({
+          model: plannerModel || undefined
+        })
         if (revision !== this.plannerRevision || loadId !== this.plannerLoadId) {
           planner.dispose?.()
           throw new Error(supersededPlannerRefreshMessage)
@@ -710,7 +720,7 @@ export function defineWebMCPCommandInput(
       this.state.plannerOptionId = plannerOptionId
       this.state.provider = provider
       this.state.model = plannerOptionId
-        ? ''
+        ? getDefaultModelForPlannerOption(this.getPlannerOptionById(plannerOptionId))
         : getDefaultModelForProvider(provider, this.endpointOptions)
       this.state.settingsOpen = true
       this.invalidatePlanner()
@@ -802,16 +812,17 @@ export function defineWebMCPCommandInput(
         !this.state.fixedProvider &&
         getProviderOptionCount(this.endpointOptions, showChromeAIOption, this.plannerOptions) > 1
       const showModelControl =
-        !plannerOption &&
         !this.planner &&
         !this.plannerConfig &&
         !this.state.fixedModel &&
-        getModelOptionCount(provider, this.endpointOptions) > 1
+        (plannerOption
+          ? getPlannerOptionModelOptionCount(plannerOption) > 1
+          : getModelOptionCount(provider, this.endpointOptions) > 1)
       const showDiagnostics = this.state.hasDiagnostics
       const optionsStatus = this.planner
         ? this.state.plannerName
         : plannerOption
-          ? plannerOption.label
+          ? getPlannerOptionStatusText(plannerOption, model)
           : getOptionsStatusText(provider, model, this.endpointOptions)
       const statusLabel = getStatusLabel(this.state.phase)
       const buttonLabel = this.running ? statusLabel : this.state.buttonLabel
@@ -851,7 +862,7 @@ export function defineWebMCPCommandInput(
             </summary>
             <div class="webmcp-settings-grid">
               ${showProviderControl ? getProviderControlMarkup(providerControlValue, this.endpointOptions, showChromeAIOption, this.plannerOptions) : ''}
-              ${showModelControl ? getModelControlMarkup(provider, model, this.endpointOptions) : ''}
+              ${showModelControl ? (plannerOption ? getPlannerOptionModelControlMarkup(plannerOption, model) : getModelControlMarkup(provider, model, this.endpointOptions)) : ''}
             </div>
           </details>
         `
@@ -921,6 +932,12 @@ export function defineWebMCPCommandInput(
       const plannerOptionId = this.state.plannerOptionId
       if (!plannerOptionId) return undefined
 
+      return this.getPlannerOptionById(plannerOptionId)
+    }
+
+    private getPlannerOptionById(
+      plannerOptionId: string
+    ): WebMCPCommandInputPlannerOption | undefined {
       return this.plannerOptions?.find(function findPlannerOption(option) {
         return option.id === plannerOptionId
       })

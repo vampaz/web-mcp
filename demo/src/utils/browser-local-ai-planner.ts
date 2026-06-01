@@ -16,9 +16,10 @@ import type {
   WebLLMInitProgressReport,
   WebLLMModule
 } from '@/interfaces/browser-local-ai'
-import { createDemoHeuristicPlanner } from '@/utils/demo-heuristic-planner'
+import { planWithDemoHeuristics } from '@/utils/demo-heuristic-planner'
 
-export const defaultBrowserLocalAIModel = 'Qwen3.5-2B-q4f16_1-MLC'
+export const defaultBrowserLocalAIModel = 'Hermes-3-Llama-3.1-8B-q4f16_1-MLC'
+export const qwenBrowserLocalAIModel = 'Qwen3.5-2B-q4f16_1-MLC'
 
 export function createBrowserLocalAIPlanner(
   options: BrowserLocalAIPlannerOptions = { model: defaultBrowserLocalAIModel }
@@ -35,7 +36,13 @@ export function createBrowserLocalAIPlanner(
         await assertWebGPUAvailable()
         enginePromise ??= createWebLLMEngine(options.model, planner)
         engine ??= await enginePromise
-        const modelPlan = await planWithWebLLM(engine, options.model, message, tools, context)
+        const modelPlan = await planWithWebLLMOrFallback(
+          engine,
+          options.model,
+          message,
+          tools,
+          context
+        )
         const plan = await repairBrowserLocalAIPlan(modelPlan, message, tools, context)
         validateToolPlan(plan, tools)
         planner.status = 'ready'
@@ -61,33 +68,90 @@ export function createBrowserLocalAIPlanner(
   return planner
 }
 
+async function planWithWebLLMOrFallback(
+  engine: WebLLMEngine,
+  model: string,
+  message: string,
+  tools: WebMCPTool[],
+  context: PlannerContext
+): Promise<ToolPlan> {
+  try {
+    return await planWithWebLLM(engine, model, message, tools, context)
+  } catch (error) {
+    const fallbackPlan = getDemoFallbackPlan(message, tools, context)
+    if (!fallbackPlan || !isBrowserLocalAIOutputError(error)) throw error
+
+    return {
+      ...fallbackPlan,
+      reason: `Browser local AI returned unparseable output, so deterministic demo planning handled this command. ${fallbackPlan.reason}`
+    }
+  }
+}
+
 async function repairBrowserLocalAIPlan(
   plan: ToolPlan,
   message: string,
   tools: WebMCPTool[],
   context: PlannerContext
 ): Promise<ToolPlan> {
-  if (
-    !tools.some(function hasSelectItemsTool(tool) {
-      return tool.name === 'select_items'
-    })
-  ) {
-    return plan
-  }
+  const fallbackPlan = getDemoFallbackPlan(message, tools, context)
 
-  try {
-    const groundedPlan = await createDemoHeuristicPlanner().plan(message, tools, context)
-    if (groundedPlan.toolName !== 'select_items') return plan
-    if (!Array.isArray(groundedPlan.input.ids) || groundedPlan.input.ids.length === 0) return plan
-
+  if (fallbackPlan && isGroundedChecklistFallback(fallbackPlan)) {
     return {
-      ...groundedPlan,
-      confidence: Math.max(groundedPlan.confidence, plan.confidence),
-      reason: `Browser local AI plan grounded against visible checklist context. ${groundedPlan.reason}`
+      ...fallbackPlan,
+      confidence: Math.max(fallbackPlan.confidence, getPlanConfidence(plan)),
+      reason: `Browser local AI plan grounded against visible checklist context. ${fallbackPlan.reason}`
     }
-  } catch {
-    return plan
   }
+
+  if (fallbackPlan && !isValidBrowserLocalAIPlan(plan, tools)) {
+    return {
+      ...fallbackPlan,
+      confidence: Math.max(fallbackPlan.confidence, getPlanConfidence(plan)),
+      reason: `Browser local AI returned an invalid plan, so deterministic demo planning handled this command. ${fallbackPlan.reason}`
+    }
+  }
+
+  return plan
+}
+
+function getDemoFallbackPlan(
+  message: string,
+  tools: WebMCPTool[],
+  context: PlannerContext
+): ToolPlan | undefined {
+  return planWithDemoHeuristics(message, tools, context)
+}
+
+function isGroundedChecklistFallback(plan: ToolPlan): boolean {
+  return (
+    plan.toolName === 'select_items' && Array.isArray(plan.input.ids) && plan.input.ids.length > 0
+  )
+}
+
+function isValidBrowserLocalAIPlan(plan: ToolPlan, tools: WebMCPTool[]): boolean {
+  try {
+    validateToolPlan(plan, tools)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function getPlanConfidence(plan: ToolPlan): number {
+  return typeof plan.confidence === 'number' && Number.isFinite(plan.confidence)
+    ? plan.confidence
+    : 0
+}
+
+function isBrowserLocalAIOutputError(error: unknown): boolean {
+  if (error instanceof SyntaxError) return true
+  const message = getErrorMessage(error)
+
+  return (
+    message === 'provider returned no message content' ||
+    message.startsWith('Browser local AI returned')
+  )
 }
 
 async function assertWebGPUAvailable(): Promise<void> {

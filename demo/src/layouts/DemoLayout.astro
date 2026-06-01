@@ -1,5 +1,6 @@
 ---
 import '@/styles/global.css'
+import { ClientRouter } from 'astro:transitions'
 import { getDemoRouteStories } from '@/utils/demo-data'
 
 interface Props {
@@ -45,6 +46,7 @@ function getIsActive(path: string): boolean {
         background: #f7f3ec;
       }
     </style>
+    <ClientRouter />
   </head>
   <body>
     <header class="demo-topbar">

@@ -29,18 +29,32 @@ export function createDemoHeuristicPlanner(): ToolPlanner {
     ...corePlanner,
     name: 'Demo heuristic planner',
     async plan(message: string, tools: WebMCPTool[], context: PlannerContext = {}) {
-      const selectionPlan = createSemanticSelectionPlan(message, tools, context)
-      if (selectionPlan) return selectionPlan
-
-      const invoicePlan = createInvoiceStatusPlan(message, tools, context)
-      if (invoicePlan) return invoicePlan
-
-      const supportPlan = createSupportTicketPlan(message, tools)
-      if (supportPlan) return supportPlan
+      const demoPlan = planWithDemoHeuristics(message, tools, context)
+      if (demoPlan) return demoPlan
 
       return corePlanner.plan(message, tools, context)
     }
   }
+}
+
+export function planWithDemoHeuristics(
+  message: string,
+  tools: WebMCPTool[],
+  context: PlannerContext = {}
+): ToolPlan | undefined {
+  const selectionPlan = createSemanticSelectionPlan(message, tools, context)
+  if (selectionPlan) return selectionPlan
+
+  const invoicePlan = createInvoiceStatusPlan(message, tools, context)
+  if (invoicePlan) return invoicePlan
+
+  const invoiceCreationPlan = createInvoiceCreationPlan(message, tools)
+  if (invoiceCreationPlan) return invoiceCreationPlan
+
+  const supportPlan = createSupportTicketPlan(message, tools)
+  if (supportPlan) return supportPlan
+
+  return undefined
 }
 
 function createSemanticSelectionPlan(
@@ -130,6 +144,32 @@ function createInvoiceStatusPlan(
   }
 }
 
+function createInvoiceCreationPlan(message: string, tools: WebMCPTool[]): ToolPlan | undefined {
+  const normalizedMessage = message.toLowerCase()
+  if (!normalizedMessage.includes('invoice')) return undefined
+  if (!messageRequestsInvoiceCreation(normalizedMessage)) return undefined
+  if (
+    !tools.some(function hasCreateInvoiceTool(tool) {
+      return tool.name === 'create_invoice'
+    })
+  )
+    return undefined
+
+  const amount = getInvoiceAmountFromMessage(message)
+  const customerName = getInvoiceCustomerNameFromMessage(message)
+  if (!amount || !customerName) return undefined
+
+  return {
+    toolName: 'create_invoice',
+    input: {
+      customerName,
+      amount
+    },
+    confidence: 0.68,
+    reason: 'Matched invoice creation wording and extracted the amount and customer.'
+  }
+}
+
 function createSupportTicketPlan(message: string, tools: WebMCPTool[]): ToolPlan | undefined {
   const normalizedMessage = message.toLowerCase()
   if (!normalizedMessage.includes('support') && !normalizedMessage.includes('ticket')) {
@@ -154,6 +194,15 @@ function createSupportTicketPlan(message: string, tools: WebMCPTool[]): ToolPlan
   }
 }
 
+function messageRequestsInvoiceCreation(normalizedMessage: string): boolean {
+  return (
+    normalizedMessage.includes('create') ||
+    normalizedMessage.includes('draft') ||
+    normalizedMessage.includes('new') ||
+    normalizedMessage.includes('raise')
+  )
+}
+
 function messageRequestsTicketCreation(normalizedMessage: string): boolean {
   return (
     normalizedMessage.includes('create') ||
@@ -161,6 +210,32 @@ function messageRequestsTicketCreation(normalizedMessage: string): boolean {
     normalizedMessage.includes('open') ||
     normalizedMessage.includes('new')
   )
+}
+
+function getInvoiceAmountFromMessage(message: string): number | undefined {
+  const amountMatch = message.match(
+    /(?:€\s*(\d+(?:[.,]\d{1,2})?)|(\d+(?:[.,]\d{1,2})?)\s*(?:€|euros?|eur\b|eu\b))/i
+  )
+  const amountText = amountMatch?.[1] ?? amountMatch?.[2]
+  if (!amountText) return undefined
+
+  const amount = Number(amountText.replace(',', '.'))
+  return Number.isFinite(amount) && amount > 0 ? amount : undefined
+}
+
+function getInvoiceCustomerNameFromMessage(message: string): string | undefined {
+  const customerMatch = message.match(
+    /\b(?:for|to|bill)\s+([a-z][\w\s&.-]*?)(?:\s+(?:amount|due|for|on|owner|owned|with|worth)\b|$)/i
+  )
+  const customerName = customerMatch?.[1]?.replace(/[.,;:!?]+$/g, '').trim()
+  if (!customerName) return undefined
+
+  return customerName
+    .split(/\s+/)
+    .map(function titleCaseNamePart(part) {
+      return part.charAt(0).toUpperCase() + part.slice(1)
+    })
+    .join(' ')
 }
 
 function getSemanticContextItemIds(normalizedMessage: string, context: PlannerContext): string[] {

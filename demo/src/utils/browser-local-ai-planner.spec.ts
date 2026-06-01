@@ -419,4 +419,137 @@ describe('browser local AI planner', () => {
       ids: ['item_4', 'item_7']
     })
   })
+
+  it('falls back to deterministic planning when WebLLM returns an empty sequence', async () => {
+    stubWebGPU()
+    mockWebLLMContent(getEmptySequenceJson())
+    const planner = createBrowserLocalAIPlanner()
+
+    const plan = await planner.plan('create a 100 eu invoice for carlos', [createInvoiceTool()])
+
+    expect(plan).toMatchObject({
+      toolName: 'create_invoice',
+      input: {
+        customerName: 'Carlos',
+        amount: 100
+      }
+    })
+    expect(plan.reason).toContain('deterministic demo planning')
+  })
+
+  it('does not repair invalid WebLLM output with the generic heuristic fallback', async () => {
+    stubWebGPU()
+    mockWebLLMContent(getEmptySequenceJson())
+    const planner = createBrowserLocalAIPlanner()
+
+    await expect(
+      planner.plan('sort invoices by amount', [createSortInvoicesTool()])
+    ).rejects.toThrow('provider returned an empty tool sequence')
+  })
+
+  it('falls back to deterministic planning when WebLLM returns malformed JSON', async () => {
+    stubWebGPU()
+    mockWebLLMContent('{"toolName":"create_invoice","input":{"customerName":"Carlos","amount":100}')
+    const planner = createBrowserLocalAIPlanner()
+
+    const plan = await planner.plan('create a 100 eu invoice for carlos', [createInvoiceTool()])
+
+    expect(plan).toMatchObject({
+      toolName: 'create_invoice',
+      input: {
+        customerName: 'Carlos',
+        amount: 100
+      }
+    })
+    expect(plan.reason).toContain('unparseable output')
+  })
 })
+
+function stubWebGPU() {
+  vi.stubGlobal('navigator', {
+    ...navigator,
+    gpu: {
+      requestAdapter: async () => ({})
+    }
+  })
+}
+
+function mockWebLLMContent(content: string) {
+  webLLMMocks.createMLCEngine.mockResolvedValue({
+    chat: {
+      completions: {
+        create: vi.fn(async () => ({
+          choices: [
+            {
+              message: {
+                content
+              }
+            }
+          ]
+        }))
+      }
+    },
+    unload: vi.fn()
+  })
+}
+
+function getEmptySequenceJson(): string {
+  return JSON.stringify({
+    toolName: 'tool_sequence',
+    input: {},
+    confidence: 0.81,
+    reason: 'No valid tool steps found.',
+    steps: []
+  })
+}
+
+function createInvoiceTool() {
+  return {
+    name: 'create_invoice',
+    description: 'Create a draft invoice for a customer and add it to the local invoice list.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        customerName: {
+          type: 'string'
+        },
+        amount: {
+          type: 'number',
+          minimum: 0.01
+        },
+        dueDate: {
+          type: 'string'
+        },
+        owner: {
+          type: 'string'
+        }
+      },
+      required: ['customerName', 'amount'],
+      additionalProperties: false
+    },
+    execute: () => ({})
+  }
+}
+
+function createSortInvoicesTool() {
+  return {
+    name: 'sort_invoices',
+    description: 'Sort the visible invoice table by a supported column.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sortBy: {
+          type: 'string',
+          enum: ['amount', 'customerName', 'dueDate', 'status']
+        },
+        direction: {
+          type: 'string',
+          enum: ['asc', 'desc']
+        }
+      },
+      required: ['sortBy'],
+      additionalProperties: false
+    },
+    execute: () => []
+  }
+}

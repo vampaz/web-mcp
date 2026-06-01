@@ -416,16 +416,26 @@ describe('WebMCP command input', () => {
         {
           id: 'browser-local-ai',
           label: 'Browser local AI',
-          createPlanner() {
+          modelOptions: [
+            {
+              label: 'Hermes 3',
+              model: 'hermes-3'
+            },
+            {
+              label: 'Qwen 2B',
+              model: 'qwen-2b'
+            }
+          ],
+          createPlanner(options) {
             return {
               name: 'Browser local AI',
               available: true,
               status: 'downloadable',
-              detail: 'Runs in the browser.',
+              detail: `Runs ${options?.model ?? 'unknown'} in the browser.`,
               async plan() {
                 return {
                   toolName: 'select_items',
-                  input: { ids: ['item_4'] },
+                  input: { ids: [options?.model ?? 'missing-model'] },
                   confidence: 0.9,
                   reason: 'Selected with a consumer planner.'
                 }
@@ -470,11 +480,22 @@ describe('WebMCP command input', () => {
     provider!.dispatchEvent(new Event('change', { bubbles: true }))
     await Promise.resolve()
 
-    expect(element.shadowRoot?.querySelector('[data-model]')).toBeNull()
+    const model = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-model]')
+    expect(model).toBeInstanceOf(HTMLSelectElement)
+    expect(model?.value).toBe('hermes-3')
     expect(element.shadowRoot?.textContent).toContain('Browser local AI')
     await expect(element.run('Select French items')).resolves.toMatchObject({
       status: 'success',
-      output: { ids: ['item_4'] }
+      output: { ids: ['hermes-3'] }
+    })
+
+    model!.value = 'qwen-2b'
+    model!.dispatchEvent(new Event('change', { bubbles: true }))
+    await Promise.resolve()
+
+    await expect(element.run('Select French items')).resolves.toMatchObject({
+      status: 'success',
+      output: { ids: ['qwen-2b'] }
     })
   })
 

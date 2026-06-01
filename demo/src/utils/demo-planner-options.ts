@@ -7,13 +7,24 @@ import {
 } from '@/utils/demo-data'
 import {
   createBrowserLocalAIPlanner,
-  defaultBrowserLocalAIModel
+  defaultBrowserLocalAIModel,
+  qwenBrowserLocalAIModel
 } from '@/utils/browser-local-ai-planner'
 import { createDemoHeuristicPlanner } from '@/utils/demo-heuristic-planner'
 
 const cloudflareBindingModels = getCloudflareBindingModels()
 const openAIPlannerEndpoints = getOpenAIPlannerEndpoints()
 const openRouterPlannerEndpoints = getOpenRouterPlannerEndpoints()
+const browserLocalAIModels = [
+  {
+    label: 'Hermes 3 Llama 3.1 8B',
+    model: defaultBrowserLocalAIModel
+  },
+  {
+    label: 'Qwen3.5 2B',
+    model: qwenBrowserLocalAIModel
+  }
+]
 
 export const plannerEndpointOptions: WebMCPCommandInputEndpointOption[] = [
   ...cloudflareBindingModels.map(function mapCloudflareEndpoint(model) {
@@ -46,10 +57,11 @@ export const plannerEndpointOptions: WebMCPCommandInputEndpointOption[] = [
 export const plannerOptions: WebMCPCommandInputPlannerOption[] = [
   {
     id: 'browser-local-ai',
-    label: `Browser local AI · ${defaultBrowserLocalAIModel}`,
-    createPlanner() {
+    label: 'Browser local AI',
+    modelOptions: browserLocalAIModels,
+    createPlanner(options) {
       return createBrowserLocalAIPlanner({
-        model: defaultBrowserLocalAIModel
+        model: options?.model ?? defaultBrowserLocalAIModel
       })
     }
   },

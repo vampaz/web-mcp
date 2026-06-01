@@ -1,6 +1,7 @@
 import type { PlannerProviderConfig, PlannerProviderKind, ToolPlanner } from './interfaces/tool'
 import type {
   WebMCPCommandInputEndpointOption,
+  WebMCPCommandInputPlannerModelOption,
   WebMCPCommandInputPlannerOption
 } from './interfaces/command-input'
 import {
@@ -62,6 +63,16 @@ export function getOptionsStatusText(
   return `${getProviderLabel(provider)} · ${modelLabel}`
 }
 
+export function getPlannerOptionStatusText(
+  plannerOption: WebMCPCommandInputPlannerOption,
+  model: string
+): string {
+  const modelLabel = getPlannerOptionModelLabel(plannerOption, model)
+  if (!modelLabel) return plannerOption.label
+
+  return `${plannerOption.label} · ${modelLabel}`
+}
+
 export function getModelControlMarkup(
   provider: PlannerProviderKind,
   model: string,
@@ -79,6 +90,20 @@ export function getModelControlMarkup(
   `
 }
 
+export function getPlannerOptionModelControlMarkup(
+  plannerOption: WebMCPCommandInputPlannerOption,
+  model: string
+): string {
+  return `
+    <label>
+      <span>Model</span>
+      <select data-model>
+        ${getModelOptionsMarkup(getPlannerOptionModelOptions(plannerOption), model)}
+      </select>
+    </label>
+  `
+}
+
 export function getDefaultModelForProvider(
   provider: PlannerProviderKind,
   endpointOptions?: WebMCPCommandInputEndpointOption[]
@@ -86,6 +111,12 @@ export function getDefaultModelForProvider(
   const configuredOption = getConfiguredEndpointOptions(provider, endpointOptions)[0]
   if (configuredOption) return configuredOption.value
   return ''
+}
+
+export function getDefaultModelForPlannerOption(
+  plannerOption: WebMCPCommandInputPlannerOption | undefined
+): string {
+  return getPlannerOptionModelOptions(plannerOption)[0]?.value ?? ''
 }
 
 export function getDefaultProvider(
@@ -101,6 +132,12 @@ export function getModelOptionCount(
   endpointOptions?: WebMCPCommandInputEndpointOption[]
 ): number {
   return getConfiguredEndpointOptions(provider, endpointOptions).length
+}
+
+export function getPlannerOptionModelOptionCount(
+  plannerOption: WebMCPCommandInputPlannerOption | undefined
+): number {
+  return getPlannerOptionModelOptions(plannerOption).length
 }
 
 export function getProviderOptionCount(
@@ -183,6 +220,17 @@ function getModelLabel(
   return option?.label ?? model
 }
 
+function getPlannerOptionModelLabel(
+  plannerOption: WebMCPCommandInputPlannerOption,
+  model: string
+): string | undefined {
+  if (!model) return undefined
+  const option = getPlannerOptionModelOptions(plannerOption).find(function findModelOption(item) {
+    return item.value === model
+  })
+  return option?.label ?? model
+}
+
 function getModelOptionsMarkup(options: ModelOption[], model: string): string {
   return options
     .map(function mapModelOption(option) {
@@ -196,6 +244,19 @@ function getModelOptions(
   endpointOptions?: WebMCPCommandInputEndpointOption[]
 ): ModelOption[] {
   return getConfiguredEndpointOptions(provider, endpointOptions)
+}
+
+function getPlannerOptionModelOptions(
+  plannerOption: WebMCPCommandInputPlannerOption | undefined
+): ModelOption[] {
+  return (plannerOption?.modelOptions ?? []).map(function mapPlannerOptionModel(
+    option: WebMCPCommandInputPlannerModelOption
+  ) {
+    return {
+      label: option.label,
+      value: option.model
+    }
+  })
 }
 
 function getConfiguredEndpointOptions(

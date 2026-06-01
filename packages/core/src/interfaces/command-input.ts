@@ -22,10 +22,22 @@ export interface WebMCPCommandInputEndpointOption {
   provider: PlannerProviderKind
 }
 
+export interface WebMCPCommandInputPlannerModelOption {
+  label: string
+  model: string
+}
+
+export interface WebMCPCommandInputPlannerCreateOptions {
+  model?: string
+}
+
 export interface WebMCPCommandInputPlannerOption {
-  createPlanner: () => Promise<ToolPlanner> | ToolPlanner
+  createPlanner: (
+    options?: WebMCPCommandInputPlannerCreateOptions
+  ) => Promise<ToolPlanner> | ToolPlanner
   id: string
   label: string
+  modelOptions?: WebMCPCommandInputPlannerModelOption[]
 }
 
 export interface WebMCPCommandInputConfigureOptions {

@@ -962,7 +962,7 @@ webmcp-command-input:not(:defined) {
     bottom: auto;
     left: 0.5rem;
     width: auto;
-    --webmcp-floating-panel-max-height: min(22rem, calc(100dvh - 1rem));
+    --webmcp-floating-panel-max-height: min(34rem, calc(100dvh - 1rem));
   }
 
   webmcp-command-input[data-floating]:not([data-floating-expanded]) {
