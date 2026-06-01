@@ -148,8 +148,8 @@ h3 {
   align-content: start;
   gap: 0.62rem;
   padding: 0.62rem;
-  border: 1px solid var(--demo-blue-rule);
-  background: rgba(36, 88, 255, 0.035);
+  border: 1px solid var(--demo-rule);
+  background: var(--demo-paper);
 }
 
 .ticket-card {

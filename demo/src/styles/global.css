@@ -15,7 +15,7 @@
   --demo-danger: #c74b42;
   --demo-font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
   --demo-font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
-  --demo-good: #087d57;
+  --demo-good: var(--demo-blue);
   --demo-warn: #a35c00;
   font-family: var(--demo-font-sans);
   background: var(--demo-paper);

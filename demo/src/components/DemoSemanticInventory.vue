@@ -150,8 +150,8 @@ button {
   min-height: 0;
   max-width: 100%;
   overflow: auto;
-  border: 1px solid var(--demo-blue-rule);
-  background: rgba(36, 88, 255, 0.035);
+  border: 1px solid var(--demo-rule);
+  background: var(--demo-paper);
 }
 
 table {

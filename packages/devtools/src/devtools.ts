@@ -37,6 +37,11 @@ interface HistoryItem {
 
 const overlayStyles = `
 .wmk-devtools {
+  --wmk-devtools-accent: var(--demo-blue, #2458ff);
+  --wmk-devtools-accent-hover: color-mix(in srgb, var(--wmk-devtools-accent) 82%, white);
+  --wmk-devtools-accent-soft: color-mix(in srgb, var(--wmk-devtools-accent) 14%, transparent);
+  --wmk-devtools-accent-rule: color-mix(in srgb, var(--wmk-devtools-accent) 42%, transparent);
+  --wmk-devtools-accent-text: color-mix(in srgb, var(--wmk-devtools-accent) 58%, white);
   position: fixed;
   right: 18px;
   bottom: 18px;
@@ -59,14 +64,14 @@ const overlayStyles = `
 .wmk-devtools button:focus-visible,
 .wmk-devtools textarea:focus-visible,
 .wmk-devtools summary:focus-visible {
-  outline: 2px solid #50d7a1;
+  outline: 2px solid var(--wmk-devtools-accent-text);
   outline-offset: 2px;
 }
 .wmk-devtools__toggle {
   float: right;
-  border: 1px solid #1e9f72;
-  background: #1e9f72;
-  color: #06100c;
+  border: 1px solid var(--wmk-devtools-accent);
+  background: var(--wmk-devtools-accent);
+  color: #ffffff;
   padding: 10px 14px;
   font-weight: 800;
   cursor: pointer;
@@ -74,8 +79,8 @@ const overlayStyles = `
   transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
 }
 .wmk-devtools__toggle:hover {
-  border-color: #34c995;
-  background: #34c995;
+  border-color: var(--wmk-devtools-accent-hover);
+  background: var(--wmk-devtools-accent-hover);
   transform: translateY(-1px);
 }
 .wmk-devtools--inline .wmk-devtools__toggle {
@@ -159,9 +164,9 @@ const overlayStyles = `
   text-transform: uppercase;
 }
 .wmk-devtools__badge--ready {
-  border-color: rgba(30, 159, 114, 0.42);
-  background: rgba(30, 159, 114, 0.12);
-  color: #50d7a1;
+  border-color: var(--wmk-devtools-accent-rule);
+  background: var(--wmk-devtools-accent-soft);
+  color: var(--wmk-devtools-accent-text);
 }
 .wmk-devtools__badge--warning {
   border-color: rgba(232, 190, 83, 0.48);
@@ -188,9 +193,9 @@ const overlayStyles = `
   text-transform: uppercase;
 }
 .wmk-devtools__tool-badge--readonly {
-  border-color: rgba(80, 215, 161, 0.42);
-  background: rgba(80, 215, 161, 0.1);
-  color: #50d7a1;
+  border-color: var(--wmk-devtools-accent-rule);
+  background: var(--wmk-devtools-accent-soft);
+  color: var(--wmk-devtools-accent-text);
 }
 .wmk-devtools__diagnostics {
   display: grid;
@@ -224,7 +229,7 @@ const overlayStyles = `
   line-height: 1.15;
 }
 .wmk-devtools__status {
-  color: #50d7a1;
+  color: var(--wmk-devtools-accent-text);
   font-size: 12px;
   font-weight: 800;
   text-align: right;
@@ -267,9 +272,9 @@ const overlayStyles = `
   cursor: pointer;
 }
 .wmk-devtools__actions button:first-child {
-  border-color: #1e9f72;
-  background: #1e9f72;
-  color: #06100c;
+  border-color: var(--wmk-devtools-accent);
+  background: var(--wmk-devtools-accent);
+  color: #ffffff;
   font-weight: 800;
 }
 .wmk-devtools__warning {
@@ -281,7 +286,7 @@ const overlayStyles = `
   font-size: 12px;
 }
 .wmk-devtools__quality {
-  color: #50d7a1;
+  color: var(--wmk-devtools-accent-text);
   font-size: 12px;
   font-weight: 800;
 }

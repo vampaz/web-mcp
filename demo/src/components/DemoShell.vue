@@ -609,7 +609,7 @@ webmcp-command-input:not(:defined) {
 .demo-header-diagram {
   display: grid;
   aspect-ratio: 21 / 11.5;
-  border-inline: 1px solid var(--demo-blue-rule);
+  border-inline: 1px solid var(--demo-rule);
 }
 
 .demo-header-diagram svg {
@@ -789,24 +789,12 @@ webmcp-command-input:not(:defined) {
   line-height: 1.35;
 }
 
-.latest-plan {
-  box-shadow: inset 3px 0 0 var(--demo-blue-rule);
-}
-
-.latest-plan--success {
-  box-shadow: inset 3px 0 0 var(--demo-good);
-}
-
-.latest-plan--blocked {
-  box-shadow: inset 3px 0 0 var(--demo-danger);
-}
-
 .latest-plan pre {
   overflow: auto;
   max-height: 10rem;
   margin: 0.7rem 0 0;
-  border: 1px solid var(--demo-blue-rule);
-  background: rgba(36, 88, 255, 0.045);
+  border: 1px solid var(--demo-rule);
+  background: var(--demo-paper);
   color: var(--demo-ink);
   padding: 0.65rem;
   font-size: 0.78rem;
@@ -863,18 +851,6 @@ webmcp-command-input:not(:defined) {
   align-items: baseline;
   padding: 0.75rem;
   background: var(--demo-paper);
-}
-
-.activity-rail li.ai {
-  box-shadow: inset 3px 0 0 var(--demo-good);
-}
-
-.activity-rail li.system {
-  box-shadow: inset 3px 0 0 var(--demo-blue);
-}
-
-.activity-rail li.manual {
-  box-shadow: inset 3px 0 0 var(--demo-muted);
 }
 
 .activity-rail li span,
@@ -934,8 +910,8 @@ webmcp-command-input:not(:defined) {
   max-height: 15rem;
   margin: 0;
   padding: 0.85rem;
-  border: 1px solid var(--demo-blue-rule);
-  background: rgba(36, 88, 255, 0.045);
+  border: 1px solid var(--demo-rule);
+  background: var(--demo-paper);
   color: var(--demo-ink);
   white-space: pre-wrap;
 }

@@ -1,14 +1,14 @@
 export function getStyles(): string {
   return `
     :host {
-      --webmcp-ink: #121815;
-      --webmcp-muted: #66746d;
-      --webmcp-line: #dbe5df;
-      --webmcp-paper: #fbfcfa;
-      --webmcp-field: #f4f8f5;
-      --webmcp-accent: #1e9f72;
-      --webmcp-accent-dark: #0f6f51;
-      --webmcp-dark: #09110e;
+      --webmcp-ink: #141414;
+      --webmcp-muted: #5d5d58;
+      --webmcp-line: #d8d1c7;
+      --webmcp-paper: #fffaf1;
+      --webmcp-field: #f7f3ec;
+      --webmcp-accent: #2458ff;
+      --webmcp-accent-dark: #141414;
+      --webmcp-dark: #141414;
       display: block;
       position: relative;
       color: var(--webmcp-ink);
@@ -49,9 +49,9 @@ export function getStyles(): string {
     }
 
     .webmcp-input-shell:focus-within {
-      border-color: rgba(30, 159, 114, 0.58);
+      border-color: var(--webmcp-accent);
       background: #ffffff;
-      box-shadow: 0 0 0 3px rgba(30, 159, 114, 0.12);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--webmcp-accent) 14%, transparent);
     }
 
     .webmcp-input-shell span {
@@ -189,7 +189,7 @@ export function getStyles(): string {
 
     .webmcp-settings > summary:hover,
     .webmcp-diagnostics > summary:hover {
-      background: #f2f7f4;
+      background: color-mix(in srgb, var(--webmcp-accent) 8%, var(--webmcp-paper));
       color: var(--webmcp-ink);
     }
 

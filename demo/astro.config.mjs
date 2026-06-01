@@ -15,6 +15,9 @@ const caddyTlsDomain = process.env.CADDY_TLS_DOMAIN?.trim() || 'web-mcp.localtes
 const repositoryRoot = 'https://github.com/vampaz/web-mcp/blob/master/'
 
 export default defineConfig({
+  devToolbar: {
+    enabled: false
+  },
   output: 'server',
   srcDir: './src/',
   root: './',
