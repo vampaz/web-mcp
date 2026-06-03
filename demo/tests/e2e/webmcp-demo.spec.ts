@@ -716,6 +716,23 @@ test('renders README Mermaid diagrams', async function testReadmeMermaidDiagrams
 
   await page.goto('/readme/')
 
+  const codeBlockStyles = await page
+    .locator('pre[data-language="ts"]')
+    .first()
+    .evaluate(function getCodeBlockStyles(block) {
+      const code = block.querySelector('code')
+      const styledToken = block.querySelector('span[style]')
+
+      return {
+        background: getComputedStyle(block).backgroundColor,
+        codeColor: code ? getComputedStyle(code).color : '',
+        styledTokenColor: styledToken ? getComputedStyle(styledToken).color : ''
+      }
+    })
+  expect(codeBlockStyles.background).toBe('rgb(20, 23, 31)')
+  expect(codeBlockStyles.codeColor).toBe('rgb(231, 236, 244)')
+  expect(codeBlockStyles.styledTokenColor).not.toBe('rgb(20, 20, 20)')
+
   const mermaidDiagram = page.locator('.readme-mermaid').first()
   await expect(mermaidDiagram.locator('svg')).toBeVisible()
   await expect(mermaidDiagram).toHaveAttribute('data-rendered', 'true')

@@ -10,8 +10,8 @@
   --demo-blue-soft: #dfe6ff;
   --demo-blue-wash: rgba(36, 88, 255, 0.075);
   --demo-blue-rule: rgba(36, 88, 255, 0.22);
-  --demo-rule: rgba(20, 20, 20, 0.14);
-  --demo-rule-strong: rgba(20, 20, 20, 0.28);
+  --demo-rule: rgba(36, 88, 255, 0.14);
+  --demo-rule-strong: rgba(36, 88, 255, 0.28);
   --demo-danger: #c74b42;
   --demo-font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
   --demo-font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
@@ -69,7 +69,7 @@ button:hover:not(:disabled) {
   gap: 8px 20px;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 2px solid var(--demo-ink);
+  border-bottom: 2px solid var(--demo-blue);
   background: rgba(247, 243, 236, 0.9);
   padding: clamp(0.65rem, 1.5vw, 0.85rem)
     max(clamp(0.75rem, 2vw, 1rem), calc((100vw - 90rem) / 2 + 1rem));

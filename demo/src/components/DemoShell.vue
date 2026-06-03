@@ -561,7 +561,7 @@ webmcp-command-input:not(:defined) {
   gap: clamp(1rem, 2vw, 2rem);
   align-items: stretch;
   padding-block: clamp(1rem, 2.8vw, 2.2rem) clamp(0.8rem, 1.6vw, 1.2rem);
-  border-bottom: 2px solid var(--demo-ink);
+  border-bottom: 2px solid var(--demo-blue);
 }
 
 .demo-page-header p,

@@ -122,7 +122,7 @@ export const prerender = true
     justify-content: space-between;
     gap: 12px;
     margin-bottom: 20px;
-    border-bottom: 2px solid var(--demo-ink);
+    border-bottom: 2px solid var(--demo-blue);
     padding-bottom: 14px;
     color: var(--demo-muted);
   }
@@ -222,20 +222,24 @@ export const prerender = true
   .readme-document :global(pre) {
     overflow-x: auto;
     margin: 1rem 0 1.38rem;
-    border: 1px solid var(--demo-rule-strong);
-    background: var(--demo-paper-wash);
-    padding: 1rem;
+    border: 1px solid rgba(36, 88, 255, 0.34);
+    background: #14171f !important;
+    color: #e7ecf4;
+    padding: clamp(0.88rem, 2vw, 1.12rem);
+    font-family: var(--demo-font-mono);
+    font-size: 0.9rem;
+    line-height: 1.65;
   }
 
   .readme-document :global(pre code) {
     border: 0;
     background: transparent;
     padding: 0;
-    color: var(--demo-ink);
+    color: #e7ecf4;
   }
 
-  .readme-document :global(pre code span[style]) {
-    color: var(--demo-ink) !important;
+  .readme-document :global(pre .line) {
+    min-height: 1.65em;
   }
 
   .readme-document :global(pre[data-language='mermaid']) {
