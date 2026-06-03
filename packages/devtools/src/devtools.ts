@@ -76,12 +76,12 @@ const overlayStyles = `
   font-weight: 800;
   cursor: pointer;
   box-shadow: 0 16px 42px rgba(0, 0, 0, 0.26);
-  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
 }
 .wmk-devtools__toggle:hover {
   border-color: var(--wmk-devtools-accent-hover);
   background: var(--wmk-devtools-accent-hover);
-  transform: translateY(-1px);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.34);
 }
 .wmk-devtools--inline .wmk-devtools__toggle {
   float: none;
