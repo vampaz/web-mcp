@@ -46,6 +46,8 @@ describe('devtools overlay', () => {
     expect(document.body.textContent).toContain('1 tool registered and ready.')
     expect(document.body.textContent).toContain('create_invoice')
     expect(document.body.textContent).toContain('Quality 100%')
+    expect(document.body.textContent).toContain('Improve this tool')
+    expect(document.body.textContent).toContain('Require confirmation for this mutating action')
     expect(document.body.textContent).toContain('Prompt preview')
 
     const invokeButton = document.querySelector<HTMLButtonElement>('button[data-action="invoke"]')

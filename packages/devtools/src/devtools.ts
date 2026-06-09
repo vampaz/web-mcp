@@ -281,6 +281,25 @@ const overlayStyles = `
   border-left: 3px solid var(--wmk-devtools-accent-text);
   padding-left: 8px;
 }
+.wmk-devtools__guidance {
+  display: grid;
+  gap: 6px;
+  border: 1px solid rgba(224, 234, 229, 0.12);
+  background: rgba(0, 0, 0, 0.16);
+  padding: 10px;
+}
+.wmk-devtools__guidance strong {
+  color: #f7faf8;
+  font-size: 12px;
+}
+.wmk-devtools__guidance ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 16px;
+  color: #c4d0c9;
+  font-size: 12px;
+}
 .wmk-devtools__error {
   color: #f39a8d;
   font-size: 12px;
@@ -512,6 +531,7 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
             <p>${escapeHtml(registration.tool.description)}</p>
             <div class="wmk-devtools__quality">Quality ${getQualityScore(registration.warnings)}% · ${registration.warnings.length} warnings</div>
             ${registration.warnings.map((warning) => `<div class="wmk-devtools__warning">${escapeHtml(warning)}</div>`).join('')}
+            ${formatToolGuidance(registration.tool, registration.warnings)}
             <details class="wmk-devtools__preview">
               <summary>Prompt preview</summary>
               <pre>${escapeHtml(createPromptPreview(registration.tool.name, registration.tool.description, registration.tool.inputSchema))}</pre>
@@ -655,6 +675,68 @@ function formatToolBadges(tool: WebMCPTool): string {
       Read-only
     </span>
   `
+}
+
+function formatToolGuidance(tool: WebMCPTool, warnings: string[]): string {
+  return `
+    <section class="wmk-devtools__guidance" aria-label="Improve ${escapeAttribute(tool.name)}">
+      <strong>Improve this tool</strong>
+      <ul>
+        ${getToolGuidance(tool, warnings)
+          .map(function formatGuidanceItem(item) {
+            return `<li>${escapeHtml(item)}</li>`
+          })
+          .join('')}
+      </ul>
+    </section>
+  `
+}
+
+function getToolGuidance(tool: WebMCPTool, warnings: string[]): string[] {
+  const guidance: string[] = []
+  const schema = tool.inputSchema
+
+  if (warnings.length > 0) {
+    guidance.push('Fix registration warnings first; they directly affect planner reliability.')
+  }
+
+  if (schema.type !== 'object') {
+    guidance.push('Use an object input schema so every tool call has named parameters.')
+  } else if (schema.additionalProperties !== false) {
+    guidance.push('Set additionalProperties: false to keep model-generated input predictable.')
+  }
+
+  if (schema.type === 'object' && Object.keys(schema.properties ?? {}).length > 0) {
+    if ((schema.required ?? []).length === 0) {
+      guidance.push('Mark required fields explicitly so missing input is blocked early.')
+    }
+  }
+
+  if (isMutationTool(tool) && tool.confirmation?.required !== true) {
+    guidance.push('Require confirmation for this mutating action before exposing it to planners.')
+  }
+
+  if (!tool.examples?.length) {
+    guidance.push('Add one realistic example input for demos, evals, and planner prompts.')
+  }
+
+  if (!tool.outputSchema) {
+    guidance.push('Add outputSchema when the result feeds another tool, test, or UI assertion.')
+  }
+
+  if (guidance.length === 0) {
+    return ['Looks ready; add a Playwright or eval case for the workflow users will try first.']
+  }
+
+  return guidance.slice(0, 4)
+}
+
+function isMutationTool(tool: WebMCPTool): boolean {
+  if (tool.annotations?.readOnlyHint === true) return false
+
+  return /(^|_)(add|approve|archive|cancel|charge|checkout|create|delete|export|pay|publish|remove|send|submit|update|void)(_|$)/.test(
+    tool.name.toLowerCase()
+  )
 }
 
 function createSampleInput(schema: JsonSchema): Record<string, unknown> {
