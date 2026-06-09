@@ -11,7 +11,7 @@ if (fs.existsSync('./.env')) {
 }
 
 const cloudflareConfigPath = process.env.CLOUDFLARE_CONFIG_PATH?.trim()
-const caddyTlsDomain = process.env.CADDY_TLS_DOMAIN?.trim() || 'web-mcp.localtest.me'
+const caddyTlsDomain = process.env.CADDY_TLS_DOMAIN?.trim() || 'webmcp.localtest.me'
 const repositoryRoot = 'https://github.com/vampaz/web-mcp/blob/master/'
 
 export default defineConfig({
