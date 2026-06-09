@@ -191,9 +191,7 @@ function getInputValue(event: Event): string {
   display: grid;
   align-content: start;
   gap: clamp(0.75rem, 1.5vw, 1rem);
-  height: 100%;
   min-width: 0;
-  overflow: hidden;
   padding: clamp(0.9rem, 1.8vw, 1.25rem);
   border: 1px solid var(--demo-rule-strong);
   background: var(--demo-paper-wash);
@@ -306,7 +304,7 @@ button:disabled {
 .table-shell {
   min-width: 0;
   max-width: 100%;
-  overflow: auto;
+  overflow-x: auto;
   border: 1px solid var(--demo-rule);
   background: var(--demo-paper);
 }
@@ -314,7 +312,7 @@ button:disabled {
 table {
   width: 100%;
   border-collapse: collapse;
-  min-inline-size: min(100%, 48.75rem);
+  min-inline-size: 100%;
 }
 
 th,
@@ -409,29 +407,10 @@ td span {
     min-block-size: 2.5rem;
   }
 
-  table {
-    min-width: 0;
-    table-layout: fixed;
-  }
-
   th,
   td {
-    overflow: hidden;
     padding: 0.5rem 0.38rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .col-select {
-    inline-size: 2.5rem;
-  }
-
-  .col-status {
-    inline-size: 8ch;
-  }
-
-  .col-amount {
-    inline-size: 8ch;
+    overflow-wrap: anywhere;
   }
 
   .col-due,

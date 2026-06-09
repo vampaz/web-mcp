@@ -15,7 +15,6 @@ const {
   title = 'WebMCP Kit'
 } = Astro.props
 const currentPath = Astro.url.pathname
-const isInventoryPage = currentPath === '/'
 const demoRoutes = getDemoRouteStories()
 
 function getIsActive(path: string): boolean {
@@ -69,7 +68,7 @@ function getIsActive(path: string): boolean {
       </nav>
     </header>
 
-    <main class:list={['demo-shell', isInventoryPage && 'demo-shell--fixed']}>
+    <main class="demo-shell">
       <slot />
     </main>
   </body>

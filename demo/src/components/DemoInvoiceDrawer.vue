@@ -92,7 +92,6 @@ function getInputValue(event: Event): string {
   display: grid;
   align-content: start;
   gap: clamp(0.75rem, 1.5vw, 1rem);
-  height: 100%;
   padding: clamp(0.9rem, 1.8vw, 1.25rem);
   border: 1px solid var(--demo-rule-strong);
   background: var(--demo-paper-wash);

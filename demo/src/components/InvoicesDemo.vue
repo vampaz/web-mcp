@@ -609,7 +609,7 @@ function isInvoiceSortKey(
   }
 
   .demo-page-content--invoices > * {
-    min-height: 100%;
+    align-self: stretch;
   }
 }
 </style>

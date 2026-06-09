@@ -58,7 +58,6 @@ defineExpose({
   min-width: 0;
   gap: 0.62rem;
   align-items: center;
-  overflow: hidden;
   padding: 0.62rem 0.75rem;
   border-right: 1px solid var(--demo-rule);
 }
@@ -82,16 +81,12 @@ defineExpose({
   color: var(--demo-ink);
   min-width: 0;
   font-size: 0.92rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .status-strip small {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .devtools-host {

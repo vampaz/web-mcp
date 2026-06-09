@@ -89,11 +89,8 @@ function toggleItem(id: string, event: Event) {
 <style scoped>
 .semantic-inventory {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
   gap: clamp(0.75rem, 1.5vw, 1rem);
-  max-block-size: max(24rem, calc(100svh - 19rem));
   min-width: 0;
-  overflow: hidden;
   padding: clamp(0.9rem, 1.8vw, 1.25rem);
   border: 1px solid var(--demo-rule-strong);
   background: var(--demo-paper-wash);
@@ -147,16 +144,15 @@ button {
 
 .table-shell {
   min-width: 0;
-  min-height: 0;
   max-width: 100%;
-  overflow: auto;
+  overflow-x: auto;
   border: 1px solid var(--demo-rule);
   background: var(--demo-paper);
 }
 
 table {
   width: 100%;
-  min-inline-size: min(100%, 51.25rem);
+  min-inline-size: 100%;
   border-collapse: collapse;
 }
 
@@ -259,37 +255,10 @@ tbody th strong {
     min-block-size: 2.5rem;
   }
 
-  table {
-    min-width: 0;
-    table-layout: fixed;
-  }
-
   th,
   td {
-    overflow: hidden;
     padding: 0.5rem 0.38rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .col-select {
-    inline-size: 2.75rem;
-  }
-
-  .col-position {
-    inline-size: 4ch;
-  }
-
-  .col-stock {
-    inline-size: 7ch;
-  }
-
-  .col-demand {
-    inline-size: 8ch;
-  }
-
-  .col-margin {
-    inline-size: 7ch;
+    overflow-wrap: anywhere;
   }
 
   .col-supplier,

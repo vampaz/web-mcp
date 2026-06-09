@@ -1,19 +1,4 @@
 <template>
-  <button
-    class="webmcp-command-launcher"
-    :class="{ 'webmcp-command-launcher--open': commandPanelOpen }"
-    type="button"
-    :aria-label="commandPanelOpen ? 'Close WebMCP command input' : 'Open WebMCP command input'"
-    :aria-expanded="String(commandPanelOpen)"
-    @click="toggleCommandPanel"
-  >
-    <span v-if="commandPanelOpen">X</span>
-    <template v-else>
-      <span>WEB</span>
-      <span>MCP</span>
-    </template>
-  </button>
-
   <webmcp-command-input
     ref="commandInput"
     floating
@@ -72,6 +57,16 @@
       <div class="command-state">
         <span>Command layer</span>
         <strong>{{ commandStatusTitle }}</strong>
+        <button
+          class="webmcp-command-launcher"
+          :class="{ 'webmcp-command-launcher--open': commandPanelOpen }"
+          type="button"
+          :aria-label="commandPanelOpen ? 'Close WebMCP command input' : 'Open WebMCP command input'"
+          :aria-expanded="String(commandPanelOpen)"
+          @click="toggleCommandPanel"
+        >
+          <span>{{ commandPanelOpen ? 'Close command' : 'Open command' }}</span>
+        </button>
       </div>
       <div v-if="guideCommand" class="guided-flow">
         <span>Guided flow</span>
@@ -707,7 +702,6 @@ webmcp-command-input[data-floating] {
   --webmcp-accent-dark: var(--demo-ink);
   --webmcp-dark: var(--demo-ink);
   --webmcp-field: var(--demo-paper);
-  --webmcp-floating-panel-max-height: calc(100vh - 5rem);
   --webmcp-ink: var(--demo-ink);
   --webmcp-line: var(--demo-rule-strong);
   --webmcp-muted: var(--demo-muted);
@@ -719,25 +713,19 @@ webmcp-command-input:not(:defined) {
 }
 
 .webmcp-command-launcher {
-  position: fixed;
-  right: 0.5rem;
-  bottom: 0.5rem;
-  z-index: 1001;
-  display: grid;
-  place-items: center;
-  min-inline-size: 3rem;
-  min-block-size: 2.75rem;
-  padding: 0.18em 0.36em;
-  border: 2px solid var(--demo-blue);
+  display: inline-flex;
+  justify-self: start;
+  align-items: center;
+  min-block-size: 2.15rem;
+  margin-top: 0.75rem;
+  padding: 0.38rem 0.62rem;
+  border: 1px solid var(--demo-blue);
   background: var(--demo-blue);
   color: var(--demo-paper-wash);
   font: inherit;
-  font-size: 0.88rem;
-  font-weight: 950;
-  line-height: 0.9;
-  text-align: center;
+  font-size: 0.86rem;
+  font-weight: 900;
   cursor: pointer;
-  box-shadow: 0 14px 0 rgba(36, 88, 255, 0.14);
 }
 
 .webmcp-command-launcher:hover {
@@ -750,11 +738,11 @@ webmcp-command-input:not(:defined) {
 }
 
 .webmcp-command-launcher span {
-  display: block;
+  display: inline;
 }
 
 .webmcp-command-launcher--open {
-  box-shadow: none;
+  background: var(--demo-ink);
 }
 
 .demo-page-header {
@@ -817,8 +805,8 @@ webmcp-command-input:not(:defined) {
 }
 
 .demo-header-diagram svg {
+  display: block;
   width: 100%;
-  height: 100%;
 }
 
 .demo-header-diagram path,
@@ -919,6 +907,13 @@ webmcp-command-input:not(:defined) {
   margin-top: 0.25rem;
   color: var(--demo-ink);
   line-height: 1.35;
+}
+
+.demo-command-brief .webmcp-command-launcher span {
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  text-transform: none;
 }
 
 .guided-flow {
@@ -1098,8 +1093,7 @@ webmcp-command-input:not(:defined) {
 }
 
 .latest-plan pre {
-  overflow: auto;
-  max-height: 10rem;
+  overflow-x: auto;
   margin: 0.7rem 0 0;
   border: 1px solid var(--demo-rule);
   background: var(--demo-paper);
@@ -1214,8 +1208,7 @@ webmcp-command-input:not(:defined) {
 }
 
 .confirmation-dialog pre {
-  overflow: auto;
-  max-height: 15rem;
+  overflow-x: auto;
   margin: 0;
   padding: 0.85rem;
   border: 1px solid var(--demo-rule);
@@ -1270,7 +1263,6 @@ webmcp-command-input:not(:defined) {
     bottom: auto;
     left: 0.5rem;
     width: auto;
-    --webmcp-floating-panel-max-height: min(34rem, calc(100dvh - 1rem));
   }
 
   webmcp-command-input[data-floating]:not([data-floating-expanded]) {
@@ -1282,20 +1274,11 @@ webmcp-command-input:not(:defined) {
   }
 
   .webmcp-command-launcher--open {
-    top: max(0.9rem, calc(env(safe-area-inset-top) + 0.5rem));
-    right: 0.9rem;
-    bottom: auto;
-    min-inline-size: 2.5rem;
     min-block-size: 2.5rem;
-    padding: 0;
-    background: var(--demo-ink);
-    font-size: 1rem;
-    line-height: 1;
   }
 
   .webmcp-command-launcher:not(.webmcp-command-launcher--open) {
-    right: 0.9rem;
-    bottom: max(0.9rem, calc(100vh - 100dvh + env(safe-area-inset-bottom) + 0.9rem));
+    min-block-size: 2.5rem;
   }
 
   .demo-app-page {
@@ -1361,18 +1344,12 @@ webmcp-command-input:not(:defined) {
   .latest-plan p {
     font-size: 0.82rem;
   }
-
-  .latest-plan pre {
-    max-height: 7rem;
-  }
-
   .activity-rail {
     padding: 0.75rem;
   }
 
   .confirmation-dialog {
-    max-height: calc(100dvh - 2rem);
-    overflow: auto;
+    overflow-x: auto;
   }
 
   .confirmation-dialog div {

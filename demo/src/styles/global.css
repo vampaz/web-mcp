@@ -29,7 +29,6 @@
 }
 
 body {
-  min-height: 100vh;
   margin: 0;
   background-color: var(--demo-paper);
 }
@@ -122,6 +121,7 @@ button {
 
 @media (max-width: 620px) {
   .demo-topbar {
+    position: static;
     align-items: stretch;
   }
 
@@ -142,38 +142,5 @@ button {
 
   .demo-shell {
     width: min(100% - 1.25rem, 90rem);
-  }
-}
-
-@media (min-width: 70rem) {
-  body:has(.demo-shell--fixed) {
-    display: flex;
-    flex-direction: column;
-    height: 100svh;
-    min-height: 100svh;
-    overflow: hidden;
-  }
-
-  body:has(.demo-shell--fixed) .demo-topbar {
-    flex: 0 0 auto;
-  }
-
-  .demo-shell--fixed {
-    flex: 1 1 auto;
-    min-height: 0;
-    padding-bottom: 1.12rem;
-    overflow: hidden;
-  }
-
-  .demo-shell.demo-shell--fixed .demo-app-page {
-    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
-    height: 100%;
-    min-height: 0;
-    overflow: hidden;
-    padding-bottom: 0;
-  }
-
-  .demo-shell.demo-shell--fixed .activity-rail {
-    display: none;
   }
 }
