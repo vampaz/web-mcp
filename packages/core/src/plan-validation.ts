@@ -1,6 +1,9 @@
 import type { JsonSchema, ToolPlan, ToolPlanStep } from './interfaces/tool'
 import { formatJsonValueValidationError, validateJsonValue } from './schema'
 
+export const plannerOutcomeToolNames = ['needs_clarification', 'no_tools_match'] as const
+export type PlannerOutcomeToolName = (typeof plannerOutcomeToolNames)[number]
+
 export interface ToolPlanValidationTool {
   name?: string
   inputSchema?: JsonSchema
@@ -54,12 +57,20 @@ export function validateToolPlan(
     throw new Error(messages.invalidConfidence)
   }
   if (typeof typedPlan.reason !== 'string') throw new Error(messages.invalidReason)
+  if (isPlannerOutcomeToolName(typedPlan.toolName)) {
+    if (typedPlan.steps !== undefined) throw new Error(messages.invalidOutcomeSteps)
+    return
+  }
   if (typedPlan.steps !== undefined) {
     validateToolPlanSequence(typedPlan as ToolPlan, tools, messages)
     return
   }
 
   validateToolPlanStep(typedPlan as ToolPlanStep, tools, messages)
+}
+
+export function isPlannerOutcomeToolName(toolName: string): toolName is PlannerOutcomeToolName {
+  return plannerOutcomeToolNames.includes(toolName as PlannerOutcomeToolName)
 }
 
 function validateToolPlanSequence(
@@ -116,6 +127,7 @@ interface ToolPlanValidationMessages {
   invalidInput: string
   invalidConfidence: string
   invalidReason: string
+  invalidOutcomeSteps: string
   invalidSequence: string
   invalidSequenceSteps: string
   sequenceTooLong: string
@@ -137,6 +149,7 @@ function getValidationMessages(style: 'provider' | 'server'): ToolPlanValidation
       invalidInput: 'Invalid input',
       invalidConfidence: 'Invalid confidence',
       invalidReason: 'Invalid reason',
+      invalidOutcomeSteps: 'Planner outcomes cannot include steps',
       invalidSequence: 'Invalid tool sequence',
       invalidSequenceSteps: 'Invalid tool sequence steps',
       sequenceTooLong: 'Tool sequence is too long',
@@ -161,6 +174,7 @@ function getValidationMessages(style: 'provider' | 'server'): ToolPlanValidation
     invalidInput: 'provider returned a plan with invalid input',
     invalidConfidence: 'provider returned a plan without numeric confidence',
     invalidReason: 'provider returned a plan without reason',
+    invalidOutcomeSteps: 'provider returned a planner outcome with steps',
     invalidSequence: 'provider returned steps without tool_sequence',
     invalidSequenceSteps: 'provider returned an empty tool sequence',
     sequenceTooLong: 'provider returned too many tool sequence steps',

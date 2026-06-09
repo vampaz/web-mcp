@@ -242,7 +242,7 @@ function createChromeAISession(languageModel: LanguageModelApi): Promise<Languag
       {
         role: 'system',
         content:
-          'Choose one app tool, or a short ordered tool_sequence when the request requires multiple app actions. Return only JSON matching the requested schema.'
+          'Choose one app tool, a short ordered tool_sequence, needs_clarification, or no_tools_match. Return only JSON matching the requested schema.'
       }
     ]
   })
@@ -352,7 +352,7 @@ function createPlannerMessages(message: string, tools: WebMCPTool[], context: Pl
     {
       role: 'system',
       content:
-        'Choose one app tool, or a short ordered tool_sequence when the request requires multiple app actions. Return only JSON with toolName, input, confidence, reason, and optional steps.'
+        'Choose one app tool, a short ordered tool_sequence, needs_clarification, or no_tools_match. Return only JSON with toolName, input, confidence, reason, and optional steps.'
     },
     {
       role: 'user',
@@ -372,6 +372,8 @@ function createPlannerPrompt(
     `Available tools:\n${JSON.stringify(createToolCatalog(tools), null, 2)}`,
     'Choose the best tool and exact parameters from the current app context. Prefer stable IDs from context over labels.',
     'If the request requires multiple app actions, return a chained plan with toolName "tool_sequence", input {}, and steps ordered by dependency. Use at most 5 steps. Each step must use one available tool and must be executable after the previous step updates app state.',
+    'If the request is missing required information that is not present in context, return {"toolName":"needs_clarification","input":{},"confidence":0,"reason":"Ask for the missing information."}.',
+    'If none of the available tools can satisfy the request, return {"toolName":"no_tools_match","input":{},"confidence":0,"reason":"Explain what kind of app action is available instead."}.',
     'Return only valid JSON matching this schema:',
     JSON.stringify(toolPlanSchema, null, 2)
   ].join('\n\n')

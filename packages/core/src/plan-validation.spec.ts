@@ -56,6 +56,42 @@ describe('tool plan validation', () => {
     }).toThrow('provider returned a plan without numeric confidence')
   })
 
+  it('accepts planner outcome plans without registered tools', () => {
+    expect(function validateNoMatchPlan() {
+      validateToolPlan(
+        {
+          toolName: 'no_tools_match',
+          input: {},
+          confidence: 0,
+          reason: 'No available tool can satisfy this request.'
+        },
+        []
+      )
+    }).not.toThrow()
+  })
+
+  it('rejects planner outcomes that include executable steps', () => {
+    expect(function validateOutcomeWithSteps() {
+      validateToolPlan(
+        {
+          toolName: 'needs_clarification',
+          input: {},
+          confidence: 0,
+          reason: 'Missing item IDs.',
+          steps: [
+            {
+              toolName: 'select_items',
+              input: { ids: [] },
+              confidence: 0.5,
+              reason: 'Should not execute.'
+            }
+          ]
+        },
+        tools
+      )
+    }).toThrow('provider returned a planner outcome with steps')
+  })
+
   it('validates tool sequences with server-style messages', () => {
     expect(function validateInvalidServerPlan() {
       validateToolPlan(

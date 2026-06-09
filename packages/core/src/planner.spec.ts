@@ -269,6 +269,42 @@ describe('planner', () => {
     })
   })
 
+  it('returns no_tools_match when the local planner has no matching tool', async () => {
+    const planner = createHeuristicPlanner()
+    const plan = await planner.plan('Make coffee for the team', [
+      createTool('search_products', 'Search visible products.', {
+        type: 'object',
+        properties: {
+          query: { type: 'string' }
+        },
+        required: ['query'],
+        additionalProperties: false
+      })
+    ])
+
+    expect(plan).toEqual({
+      toolName: 'no_tools_match',
+      input: {},
+      confidence: 0,
+      reason: 'No registered WebMCP tool matched this request closely enough to run.'
+    })
+  })
+
+  it('returns needs_clarification when required IDs are missing from context', async () => {
+    const planner = createHeuristicPlanner()
+    const plan = await planner.plan('Select the water items', [createSelectItemsTool()], {
+      checklistItems: [{ id: 'item_1', name: 'Apple' }]
+    })
+
+    expect(plan).toEqual({
+      toolName: 'needs_clarification',
+      input: {},
+      confidence: 0,
+      reason:
+        'The request matched a tool, but the current app context did not contain the required item IDs.'
+    })
+  })
+
   it('does not match number words inside larger words', async () => {
     const planner = createHeuristicPlanner()
     const plan = await planner.plan('Add stone keyboards to the cart.', [createCartTool()], {
@@ -611,7 +647,7 @@ describe('planner', () => {
     expect(plan.steps).toBeUndefined()
   })
 
-  it('returns empty IDs when context cannot ground a selection request', async () => {
+  it('asks for clarification when context cannot ground a selection request', async () => {
     const planner = createHeuristicPlanner()
     const plan = await planner.plan('Select all the items that are French food.', [
       createSelectItemsTool(),
@@ -626,10 +662,8 @@ describe('planner', () => {
     ])
 
     expect(plan).toMatchObject({
-      toolName: 'select_items',
-      input: {
-        ids: []
-      }
+      toolName: 'needs_clarification',
+      input: {}
     })
   })
 

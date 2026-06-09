@@ -116,6 +116,34 @@ describe('WebMCP command input', () => {
     )
   })
 
+  it('returns planner outcomes without invoking a registered tool', async () => {
+    const planner: ToolPlanner = {
+      name: 'Outcome planner',
+      available: true,
+      status: 'ready',
+      detail: 'Ready for tests.',
+      async plan() {
+        return {
+          toolName: 'no_tools_match',
+          input: {},
+          confidence: 0,
+          reason: 'No tool can satisfy this command.'
+        }
+      }
+    }
+    const element = createCommandInputElement()
+    element.planner = planner
+
+    document.body.append(element)
+    await Promise.resolve()
+
+    await expect(element.run('Send the weekly report')).resolves.toMatchObject({
+      toolName: 'no_tools_match',
+      status: 'unavailable',
+      error: 'No tool can satisfy this command.'
+    })
+  })
+
   it('marks the run button as planning while the planner is working', async () => {
     const planRequest = createDeferred<ToolPlan>()
     registerTool(

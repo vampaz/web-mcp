@@ -75,8 +75,11 @@ export {
   normalizeJsonText
 } from './planner'
 export {
+  isPlannerOutcomeToolName,
+  plannerOutcomeToolNames,
   toolPlanSchema,
   validateToolPlan,
+  type PlannerOutcomeToolName,
   type ToolPlanValidationOptions,
   type ToolPlanValidationTool
 } from './plan-validation'

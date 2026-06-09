@@ -277,7 +277,7 @@ function createPlannerMessages(body: PlannerRequestBody): CloudflareAiInput['mes
     {
       role: 'system',
       content:
-        'Choose one WebMCP tool, or a short ordered tool_sequence when the request requires multiple app actions. Return only one raw JSON object with toolName, input, confidence, reason, and optional steps. Do not return Markdown, HTML, prose, or a code fence.'
+        'Choose one WebMCP tool, a short ordered tool_sequence, needs_clarification, or no_tools_match. Return only one raw JSON object with toolName, input, confidence, reason, and optional steps. Do not return Markdown, HTML, prose, or a code fence.'
     },
     {
       role: 'user',
@@ -287,6 +287,8 @@ function createPlannerMessages(body: PlannerRequestBody): CloudflareAiInput['mes
         `Available tools:\n${JSON.stringify(body.tools ?? [], null, 2)}`,
         'Use stable IDs from context when selecting existing items.',
         'If the request requires multiple app actions, return {"toolName":"tool_sequence","input":{},"confidence":0.9,"reason":"Brief reason for the chain.","steps":[{"toolName":"tool_name","input":{"id":"stable_id_from_context"},"confidence":0.9,"reason":"Brief reason for this step."}]} with at most 5 steps.',
+        'If required information is missing from the request and context, return {"toolName":"needs_clarification","input":{},"confidence":0,"reason":"Ask for the missing information."}.',
+        'If no available tool can satisfy the request, return {"toolName":"no_tools_match","input":{},"confidence":0,"reason":"Explain which app actions are available."}.',
         'For one app action, return {"toolName":"tool_name","input":{"id":"stable_id_from_context"},"confidence":0.9,"reason":"Brief reason for the selected tool."}'
       ].join('\n\n')
     }
@@ -515,6 +517,7 @@ function isSafePlannerFailureMessage(message: string): boolean {
     message.startsWith('Invalid ') ||
     message.startsWith('Unknown tool') ||
     message.startsWith('Selected tool has no input schema') ||
+    message.startsWith('Planner outcomes cannot include steps') ||
     message.startsWith('Tool sequence is too long')
   )
 }

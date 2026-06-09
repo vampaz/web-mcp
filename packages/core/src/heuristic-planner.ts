@@ -53,7 +53,20 @@ export function planWithHeuristics(
   context: PlannerContext = {}
 ): ToolPlan {
   const selectedTool = selectTool(message, tools)
+  if (!selectedTool) {
+    return createPlannerOutcome(
+      'no_tools_match',
+      'No registered WebMCP tool matched this request closely enough to run.'
+    )
+  }
+
   const input = createInputFromSchema(selectedTool.inputSchema, message, context)
+  if (hasMissingRequiredArrayInput(selectedTool.inputSchema, input)) {
+    return createPlannerOutcome(
+      'needs_clarification',
+      'The request matched a tool, but the current app context did not contain the required item IDs.'
+    )
+  }
 
   return {
     toolName: selectedTool.name,
@@ -64,14 +77,26 @@ export function planWithHeuristics(
   }
 }
 
-function selectTool(message: string, tools: WebMCPTool[]): WebMCPTool {
+function createPlannerOutcome(toolName: 'needs_clarification' | 'no_tools_match', reason: string) {
+  return {
+    toolName,
+    input: {},
+    confidence: 0,
+    reason
+  }
+}
+
+function selectTool(message: string, tools: WebMCPTool[]): WebMCPTool | undefined {
   if (tools.length === 0) {
-    throw new Error('Local heuristic planner needs at least one registered tool.')
+    return undefined
   }
 
-  return [...tools].sort(function sortByScore(left, right) {
+  const selectedTool = [...tools].sort(function sortByScore(left, right) {
     return selectedToolScore(message, right) - selectedToolScore(message, left)
   })[0]
+  if (selectedToolScore(message, selectedTool) <= 0) return undefined
+
+  return selectedTool
 }
 
 function selectedToolScore(message: string, tool: WebMCPTool): number {
@@ -86,7 +111,11 @@ function selectedToolScore(message: string, tool: WebMCPTool): number {
     return total + (tool.name.toLowerCase().includes(term) ? 2 : 1)
   }, 0)
 
-  return tokenScore + getSchemaEnumScore(message, tool.inputSchema)
+  return (
+    tokenScore +
+    getSchemaEnumScore(message, tool.inputSchema) +
+    getSearchIntentScore(message, tool)
+  )
 }
 
 function getSchemaEnumScore(message: string, schema: JsonSchema): number {
@@ -100,6 +129,26 @@ function getSchemaEnumScore(message: string, schema: JsonSchema): number {
     })
     return hasMatchingEnum ? total + 3 : total
   }, 0)
+}
+
+function getSearchIntentScore(message: string, tool: WebMCPTool): number {
+  const normalizedMessage = message.toLowerCase()
+  const hasSearchIntent =
+    normalizedMessage.includes('find') ||
+    normalizedMessage.includes('search') ||
+    normalizedMessage.includes('show')
+  if (!hasSearchIntent) return 0
+
+  const toolText = `${tool.name} ${tool.description}`.toLowerCase()
+  if (toolText.includes('search') || toolText.includes('find')) return 2
+  if (!tool.inputSchema.properties) return 0
+
+  const hasQueryInput = Object.keys(tool.inputSchema.properties).some(
+    function propertyIsQuery(key) {
+      return isQueryKey(key)
+    }
+  )
+  return hasQueryInput ? 2 : 0
 }
 
 function createInputFromSchema(
@@ -118,6 +167,18 @@ function createInputFromSchema(
   }
 
   return input
+}
+
+function hasMissingRequiredArrayInput(
+  schema: JsonSchema,
+  input: Record<string, unknown>
+): boolean {
+  if (schema.type !== 'object' || !schema.properties) return false
+
+  return (schema.required ?? []).some(function requiredArrayIsEmpty(key) {
+    const propertySchema = schema.properties?.[key]
+    return propertySchema?.type === 'array' && Array.isArray(input[key]) && input[key].length === 0
+  })
 }
 
 function createInputValue(
