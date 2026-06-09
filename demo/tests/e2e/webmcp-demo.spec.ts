@@ -131,9 +131,9 @@ test('shows browser local AI as a selectable demo provider', async function test
   await providerSelect.selectOption('planner:browser-local-ai')
   await expect(providerSelect).toHaveValue('planner:browser-local-ai')
   await expect(page.locator('webmcp-command-input .webmcp-status')).toContainText(
-    'Browser local AI · Hermes 3 Llama 3.1 8B'
+    'Browser local AI · Qwen3.5 4B (8k context)'
   )
-  await expect(page.getByLabel('Model')).toHaveValue('Hermes-3-Llama-3.1-8B-q4f16_1-MLC')
+  await expect(page.getByLabel('Model')).toHaveValue('Qwen3.5-4B-q4f16_1-MLC')
 })
 
 test('exposes the full demo provider and model matrix', async function testProviderModelMatrix({
@@ -149,7 +149,7 @@ test('exposes the full demo provider and model matrix', async function testProvi
   await expect(providerSelect).toBeVisible()
   await expect(providerSelect).toHaveValue('planner:browser-local-ai')
   await expect(page.locator('webmcp-command-input .webmcp-status')).toContainText(
-    'Browser local AI · Hermes 3 Llama 3.1 8B'
+    'Browser local AI · Qwen3.5 4B (8k context)'
   )
   await expect(providerSelect.locator('option')).toHaveText([
     'Chrome built-in AI',
@@ -161,6 +161,7 @@ test('exposes the full demo provider and model matrix', async function testProvi
     'Auto'
   ])
   await expect(page.getByLabel('Model').locator('option')).toHaveText([
+    'Qwen3.5 4B (8k context)',
     'Hermes 3 Llama 3.1 8B',
     'Qwen3.5 2B'
   ])
@@ -191,11 +192,12 @@ test('exposes the full demo provider and model matrix', async function testProvi
 
   await providerSelect.selectOption('planner:browser-local-ai')
   await expect(page.getByLabel('Model').locator('option')).toHaveText([
+    'Qwen3.5 4B (8k context)',
     'Hermes 3 Llama 3.1 8B',
     'Qwen3.5 2B'
   ])
   await expect(page.locator('webmcp-command-input .webmcp-status')).toContainText(
-    'Browser local AI · Hermes 3 Llama 3.1 8B'
+    'Browser local AI · Qwen3.5 4B (8k context)'
   )
 })
 
@@ -234,7 +236,7 @@ test('runs the browser local AI provider through the command input', async funct
   await selectPlannerProvider(page, 'planner:browser-local-ai')
 
   await getCommandTextbox(page).fill('Select all the liquids')
-  await page.getByRole('button', { name: 'Run' }).click()
+  await page.getByRole('button', { name: 'Run', exact: true }).click()
 
   await expect(page.getByText('5 selected')).toBeVisible()
   await expect(getItemInput(page, 'Water')).toBeChecked()

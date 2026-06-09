@@ -10,6 +10,7 @@ import {
 } from 'webmcp-kit'
 
 import type {
+  BrowserLocalAIModelOption,
   BrowserLocalAIPlannerOptions,
   NavigatorWithGpu,
   WebLLMEngine,
@@ -18,23 +19,42 @@ import type {
 } from '@/interfaces/browser-local-ai'
 import { planWithDemoHeuristics } from '@/utils/demo-heuristic-planner'
 
-export const defaultBrowserLocalAIModel = 'Hermes-3-Llama-3.1-8B-q4f16_1-MLC'
-export const qwenBrowserLocalAIModel = 'Qwen3.5-2B-q4f16_1-MLC'
+export const qwenBrowserLocalAIModel = 'Qwen3.5-4B-q4f16_1-MLC'
+export const defaultBrowserLocalAIModel = qwenBrowserLocalAIModel
+export const hermesBrowserLocalAIModel = 'Hermes-3-Llama-3.1-8B-q4f16_1-MLC'
+export const compactQwenBrowserLocalAIModel = 'Qwen3.5-2B-q4f16_1-MLC'
+export const browserLocalAIModels: BrowserLocalAIModelOption[] = [
+  {
+    contextWindowSize: 8192,
+    label: 'Qwen3.5 4B (8k context)',
+    model: qwenBrowserLocalAIModel
+  },
+  {
+    label: 'Hermes 3 Llama 3.1 8B',
+    model: hermesBrowserLocalAIModel
+  },
+  {
+    label: 'Qwen3.5 2B',
+    model: compactQwenBrowserLocalAIModel
+  }
+]
 
 export function createBrowserLocalAIPlanner(
   options: BrowserLocalAIPlannerOptions = { model: defaultBrowserLocalAIModel }
 ): ToolPlanner {
   let engine: WebLLMEngine | undefined
   let enginePromise: Promise<WebLLMEngine> | undefined
+  const contextWindowSize =
+    options.contextWindowSize ?? getBrowserLocalAIContextWindowSize(options.model)
   const planner: ToolPlanner = {
     name: 'Browser local AI',
     available: true,
     status: 'downloadable',
-    detail: `Browser local AI will download and run ${options.model} with WebGPU on the first command.`,
+    detail: getModelDownloadDetail(options.model, contextWindowSize),
     async plan(message: string, tools: WebMCPTool[], context: PlannerContext = {}) {
       try {
         await assertWebGPUAvailable()
-        enginePromise ??= createWebLLMEngine(options.model, planner)
+        enginePromise ??= createWebLLMEngine(options.model, planner, contextWindowSize)
         engine ??= await enginePromise
         const modelPlan = await planWithWebLLMOrFallback(
           engine,
@@ -46,7 +66,7 @@ export function createBrowserLocalAIPlanner(
         const plan = await repairBrowserLocalAIPlan(modelPlan, message, tools, context)
         validateToolPlan(plan, tools)
         planner.status = 'ready'
-        planner.detail = `Browser local AI is running ${options.model} locally with WebGPU.`
+        planner.detail = getModelReadyDetail(options.model, contextWindowSize)
         return plan
       } catch (error) {
         const errorMessage = getErrorMessage(error)
@@ -61,7 +81,7 @@ export function createBrowserLocalAIPlanner(
       engine = undefined
       enginePromise = undefined
       planner.status = 'downloadable'
-      planner.detail = `Browser local AI will download and run ${options.model} with WebGPU on the first command.`
+      planner.detail = getModelDownloadDetail(options.model, contextWindowSize)
     }
   }
 
@@ -167,18 +187,58 @@ async function assertWebGPUAvailable(): Promise<void> {
   }
 }
 
-async function createWebLLMEngine(model: string, planner: ToolPlanner): Promise<WebLLMEngine> {
+function getBrowserLocalAIContextWindowSize(model: string): number | undefined {
+  return browserLocalAIModels.find(function findModelOption(option) {
+    return option.model === model
+  })?.contextWindowSize
+}
+
+function getChatOptions(contextWindowSize?: number) {
+  if (!contextWindowSize) return undefined
+
+  return {
+    context_window_size: contextWindowSize
+  }
+}
+
+function getModelDownloadDetail(model: string, contextWindowSize?: number): string {
+  const contextDetail = getContextDetail(contextWindowSize)
+
+  return `Browser local AI will download and run ${model}${contextDetail} with WebGPU on the first command.`
+}
+
+function getModelReadyDetail(model: string, contextWindowSize?: number): string {
+  const contextDetail = getContextDetail(contextWindowSize)
+
+  return `Browser local AI is running ${model}${contextDetail} locally with WebGPU.`
+}
+
+function getContextDetail(contextWindowSize?: number): string {
+  if (!contextWindowSize) return ''
+
+  return ` with a ${contextWindowSize.toLocaleString('en-US')}-token context window`
+}
+
+async function createWebLLMEngine(
+  model: string,
+  planner: ToolPlanner,
+  contextWindowSize?: number
+): Promise<WebLLMEngine> {
   planner.status = 'downloading'
   planner.detail = `Browser local AI is loading ${model}.`
   const webllm = (await import('@mlc-ai/web-llm')) as unknown as WebLLMModule
-  const createdEngine = await webllm.CreateMLCEngine(model, {
-    initProgressCallback(report) {
+  const engineConfig = {
+    initProgressCallback(report: WebLLMInitProgressReport) {
       planner.status = 'downloading'
       planner.detail = getProgressDetail(model, report)
     }
-  })
+  }
+  const chatOptions = getChatOptions(contextWindowSize)
+  const createdEngine = chatOptions
+    ? await webllm.CreateMLCEngine(model, engineConfig, chatOptions)
+    : await webllm.CreateMLCEngine(model, engineConfig)
   planner.status = 'ready'
-  planner.detail = `Browser local AI is running ${model} locally with WebGPU.`
+  planner.detail = getModelReadyDetail(model, contextWindowSize)
   return createdEngine
 }
 

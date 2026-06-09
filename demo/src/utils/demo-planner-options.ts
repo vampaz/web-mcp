@@ -6,25 +6,15 @@ import {
   getOpenRouterPlannerEndpoints
 } from '@/utils/demo-data'
 import {
+  browserLocalAIModels,
   createBrowserLocalAIPlanner,
-  defaultBrowserLocalAIModel,
-  qwenBrowserLocalAIModel
+  defaultBrowserLocalAIModel
 } from '@/utils/browser-local-ai-planner'
 import { createDemoHeuristicPlanner } from '@/utils/demo-heuristic-planner'
 
 const cloudflareBindingModels = getCloudflareBindingModels()
 const openAIPlannerEndpoints = getOpenAIPlannerEndpoints()
 const openRouterPlannerEndpoints = getOpenRouterPlannerEndpoints()
-const browserLocalAIModels = [
-  {
-    label: 'Hermes 3 Llama 3.1 8B',
-    model: defaultBrowserLocalAIModel
-  },
-  {
-    label: 'Qwen3.5 2B',
-    model: qwenBrowserLocalAIModel
-  }
-]
 
 export const plannerEndpointOptions: WebMCPCommandInputEndpointOption[] = [
   ...cloudflareBindingModels.map(function mapCloudflareEndpoint(model) {

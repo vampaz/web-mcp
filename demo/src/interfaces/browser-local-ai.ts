@@ -1,4 +1,11 @@
 export interface BrowserLocalAIPlannerOptions {
+  contextWindowSize?: number
+  model: string
+}
+
+export interface BrowserLocalAIModelOption {
+  contextWindowSize?: number
+  label: string
   model: string
 }
 
@@ -35,6 +42,9 @@ export interface WebLLMModule {
     model: string,
     config?: {
       initProgressCallback?: (report: WebLLMInitProgressReport) => void
+    },
+    chatOptions?: {
+      context_window_size?: number
     }
   ) => Promise<WebLLMEngine>
 }

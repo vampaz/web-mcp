@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { createBrowserLocalAIPlanner } from './browser-local-ai-planner'
+import { createBrowserLocalAIPlanner, defaultBrowserLocalAIModel } from './browser-local-ai-planner'
 
 const webLLMMocks = vi.hoisted(() => ({
   createMLCEngine: vi.fn()
@@ -192,6 +192,15 @@ describe('browser local AI planner', () => {
       }
     })
     expect(plan.reason).toContain('grounded against visible checklist context')
+    expect(webLLMMocks.createMLCEngine).toHaveBeenCalledWith(
+      defaultBrowserLocalAIModel,
+      expect.objectContaining({
+        initProgressCallback: expect.any(Function)
+      }),
+      {
+        context_window_size: 8192
+      }
+    )
   })
 
   it('omits table rows from Browser local AI sort prompts', async () => {
