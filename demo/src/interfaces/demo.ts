@@ -109,13 +109,16 @@ export interface DemoShellProps {
   confirmationsEnabled?: boolean
   description?: string
   eyebrow: string
+  expectedToolCall?: string
   getContext: () => unknown
+  guideCommand?: string
   metrics?: DemoMetric[]
   placeholder: string
   proofDescription?: string
   proofPoints?: DemoProofPoint[]
   proofTitle?: string
   registeredToolsCount: number
+  safety?: string
   suggestions?: string[]
   title: string
 }

@@ -67,9 +67,15 @@
     </header>
 
     <section class="demo-command-brief" aria-label="Command examples and latest result">
-      <div>
+      <div class="command-state">
         <span>Command layer</span>
         <strong>{{ commandStatusTitle }}</strong>
+      </div>
+      <div v-if="guideCommand" class="guided-flow">
+        <span>Guided flow</span>
+        <strong>{{ guideCommand }}</strong>
+        <p v-if="expectedToolCall">{{ expectedToolCall }}</p>
+        <button type="button" @click="runGuidedFlow">Run guided flow</button>
       </div>
       <div class="suggestion-strip" aria-label="Suggested commands">
         <button
@@ -99,6 +105,7 @@
         <span>Planned input</span>
         <strong>{{ latestPlanTitle }}</strong>
         <p>{{ latestPlanDetail }}</p>
+        <p v-if="safety" class="latest-plan__safety">{{ safety }}</p>
         <pre v-if="latestPlanInput">{{ latestPlanInput }}</pre>
       </div>
     </section>
@@ -183,6 +190,8 @@ const props = withDefaults(defineProps<DemoShellProps>(), {
   activityItems: () => [],
   confirmationsEnabled: true,
   description: '',
+  expectedToolCall: '',
+  guideCommand: '',
   metrics: () => [],
   proofDescription:
     'The app registers typed tools, validates planner input, and keeps ownership of execution.',
@@ -201,6 +210,7 @@ const props = withDefaults(defineProps<DemoShellProps>(), {
     }
   ],
   proofTitle: 'Typed app actions',
+  safety: '',
   suggestions: () => []
 })
 
@@ -436,6 +446,11 @@ async function runSuggestion(suggestion: string) {
   openCommandPanel()
   await getCommandInputElement()?.run(suggestion)
   syncCommandPanelState()
+}
+
+async function runGuidedFlow() {
+  if (!props.guideCommand) return
+  await runSuggestion(props.guideCommand)
 }
 
 function toggleCommandPanel() {
@@ -686,7 +701,9 @@ webmcp-command-input:not(:defined) {
 
 .demo-command-brief {
   display: grid;
-  grid-template-columns: minmax(min(100%, 16rem), 0.42fr) minmax(0, 1fr);
+  grid-template-columns:
+    minmax(min(100%, 15rem), 0.28fr) minmax(min(100%, 18rem), 0.36fr)
+    minmax(0, 0.36fr);
   gap: 1px;
   border: 1px solid var(--demo-rule-strong);
   background: var(--demo-rule-strong);
@@ -713,6 +730,30 @@ webmcp-command-input:not(:defined) {
   margin-top: 0.25rem;
   color: var(--demo-ink);
   line-height: 1.35;
+}
+
+.guided-flow {
+  display: grid;
+  align-content: start;
+  gap: 0.45rem;
+}
+
+.guided-flow p {
+  margin: 0;
+  color: var(--demo-muted);
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.guided-flow button {
+  justify-self: start;
+  min-height: 2.15rem;
+  border: 1px solid var(--demo-blue);
+  background: var(--demo-blue);
+  color: var(--demo-paper-wash);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 900;
 }
 
 .demo-wire-panel {
@@ -763,6 +804,10 @@ webmcp-command-input:not(:defined) {
   color: var(--demo-muted);
   font-size: 0.88rem;
   line-height: 1.45;
+}
+
+.latest-plan__safety {
+  color: var(--demo-ink) !important;
 }
 
 .wire-points {
@@ -1038,6 +1083,11 @@ webmcp-command-input:not(:defined) {
     min-height: 2.5rem;
     text-align: left;
     white-space: normal;
+  }
+
+  .guided-flow button {
+    width: 100%;
+    min-height: 2.5rem;
   }
 
   .demo-wire-panel .wire-points {
