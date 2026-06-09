@@ -39,7 +39,8 @@ export type {
   WebMCPCommandPanelToggleEventDetail,
   WebMCPCommandPlanEventDetail,
   WebMCPCommandPlannerEventDetail,
-  WebMCPCommandResultEventDetail
+  WebMCPCommandResultEventDetail,
+  WebMCPCommandStepEventDetail
 } from './interfaces/command-input'
 export type {
   IntegrationDiagnostic,

@@ -20,8 +20,10 @@
     :placeholder="placeholder"
     @webmcp-command-error="handleCommandError"
     @webmcp-command-panel-toggle="handleCommandPanelToggle"
+    @webmcp-command-plan="handleCommandPlan"
     @webmcp-command-planner="handleCommandPlanner"
     @webmcp-command-result="handleCommandResult"
+    @webmcp-command-step="handleCommandStep"
   >
     <DemoRuntimeStatus
       ref="runtimeStatusPanel"
@@ -87,6 +89,20 @@
           {{ suggestion }}
         </button>
       </div>
+    </section>
+
+    <section class="plan-timeline" aria-label="Plan timeline">
+      <div class="timeline-heading">
+        <span>Execution trace</span>
+        <strong>{{ timelineTitle }}</strong>
+      </div>
+      <ol>
+        <li v-for="item in timelineItems" :key="item.id" :class="`timeline-item--${item.status}`">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.title }}</strong>
+          <p>{{ item.detail }}</p>
+        </li>
+      </ol>
     </section>
 
     <section class="demo-wire-panel" :class="wirePanelState" aria-label="How this page is wired">
@@ -171,8 +187,10 @@ import {
   type WebMCPCommandErrorEventDetail,
   type WebMCPCommandInputElement,
   type WebMCPCommandPanelToggleEventDetail,
+  type WebMCPCommandPlanEventDetail,
   type WebMCPCommandPlannerEventDetail,
-  type WebMCPCommandResultEventDetail
+  type WebMCPCommandResultEventDetail,
+  type WebMCPCommandStepEventDetail
 } from 'webmcp-kit'
 import { mountDevtoolsOverlay, type DevtoolsOverlay } from 'webmcp-kit/devtools'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
@@ -185,6 +203,14 @@ import {
   plannerOptions
 } from '@/utils/demo-planner-options'
 import type { DemoConfirmationRequest, DemoShellProps, LatestPlanSummary } from '@/interfaces/demo'
+
+interface TimelineItem {
+  detail: string
+  id: string
+  label: string
+  status: 'done' | 'idle' | 'running' | 'stopped'
+  title: string
+}
 
 const props = withDefaults(defineProps<DemoShellProps>(), {
   activityItems: () => [],
@@ -238,6 +264,7 @@ const latestPlan = ref<LatestPlanSummary>({
   status: 'idle',
   title: 'No command run yet'
 })
+const timelineItems = ref<TimelineItem[]>(createIdleTimeline())
 let devtoolsOverlay: DevtoolsOverlay | undefined
 const supportLabel = computed(function getCurrentSupportLabel() {
   return getSupportLabel()
@@ -259,6 +286,24 @@ const latestPlanStatus = computed(function getLatestPlanStatus() {
 })
 const wirePanelState = computed(function getWirePanelState() {
   return latestPlan.value.status === 'idle' ? '' : 'demo-wire-panel--active'
+})
+const timelineTitle = computed(function getTimelineTitle() {
+  const runningItem = timelineItems.value.find(function findRunningItem(item) {
+    return item.status === 'running'
+  })
+  if (runningItem) return runningItem.title
+
+  const stoppedItem = timelineItems.value.find(function findStoppedItem(item) {
+    return item.status === 'stopped'
+  })
+  if (stoppedItem) return stoppedItem.title
+
+  const completedCount = timelineItems.value.filter(function filterDoneItem(item) {
+    return item.status === 'done'
+  }).length
+  if (completedCount > 0) return `${completedCount} checks completed`
+
+  return 'Waiting for a command'
 })
 
 if (typeof customElements !== 'undefined') {
@@ -347,6 +392,47 @@ function handleCommandPlanner(event: Event) {
   window.__webMCPKitDemoPlanner = planner
 }
 
+function handleCommandPlan(event: Event) {
+  const detail = (event as CustomEvent<WebMCPCommandPlanEventDetail>).detail
+  timelineItems.value = [
+    {
+      id: 'command',
+      label: '01',
+      status: 'done',
+      title: 'Command received',
+      detail: detail.message
+    },
+    {
+      id: 'plan',
+      label: '02',
+      status: 'done',
+      title: formatPlanTitle(detail.plan),
+      detail: detail.plan.reason
+    },
+    {
+      id: 'schema',
+      label: '03',
+      status: 'done',
+      title: 'Input validated',
+      detail: 'The selected input matched the registered tool schema before execution.'
+    },
+    {
+      id: 'confirmation',
+      label: '04',
+      status: 'idle',
+      title: 'Confirmation boundary',
+      detail: 'Mutating tools request app approval before execution.'
+    },
+    {
+      id: 'execute',
+      label: '05',
+      status: 'running',
+      title: 'Execution started',
+      detail: 'The app is invoking the selected tool through WebMCP Kit.'
+    }
+  ]
+}
+
 function handleCommandResult(event: Event) {
   const detail = (event as CustomEvent<WebMCPCommandResultEventDetail>).detail
   const stepCount = detail.plan.steps?.length ?? 1
@@ -363,6 +449,14 @@ function handleCommandResult(event: Event) {
     status: detail.result.status === 'success' ? 'success' : 'blocked',
     title: formatPlanTitle(detail.plan)
   }
+  updateTimelineItem('execute', {
+    status: detail.result.status === 'success' ? 'done' : 'stopped',
+    title: detail.result.status === 'success' ? 'Execution completed' : 'Execution stopped',
+    detail:
+      detail.result.status === 'success'
+        ? 'The app state was updated by the selected tool.'
+        : (detail.result.error ?? 'The app stopped the selected tool.')
+  })
 }
 
 function handleCommandError(event: Event) {
@@ -374,6 +468,44 @@ function handleCommandError(event: Event) {
     status: 'blocked',
     title: 'Planner error'
   }
+  timelineItems.value = [
+    {
+      id: 'command',
+      label: '01',
+      status: 'done',
+      title: 'Command received',
+      detail: detail.message
+    },
+    {
+      id: 'error',
+      label: '02',
+      status: 'stopped',
+      title: 'Planner stopped',
+      detail: detail.error
+    }
+  ]
+}
+
+function handleCommandStep(event: Event) {
+  const detail = (event as CustomEvent<WebMCPCommandStepEventDetail>).detail
+  updateTimelineItem('execute', {
+    status:
+      detail.phase === 'started'
+        ? 'running'
+        : detail.result?.status === 'success'
+          ? 'done'
+          : 'stopped',
+    title:
+      detail.phase === 'started'
+        ? `Running ${detail.step.toolName}`
+        : detail.result?.status === 'success'
+          ? `Completed ${detail.step.toolName}`
+          : `Stopped ${detail.step.toolName}`,
+    detail:
+      detail.phase === 'started'
+        ? `Step ${detail.stepIndex + 1} of ${detail.stepCount}.`
+        : (detail.result?.error ?? detail.step.reason)
+  })
 }
 
 async function confirmToolInvocation(
@@ -387,14 +519,31 @@ async function confirmToolInvocation(
   }
 
   return await new Promise(function resolveConfirmation(resolve) {
+    updateTimelineItem('confirmation', {
+      id: 'confirmation',
+      label: '04',
+      status: 'running',
+      title: 'Confirmation requested',
+      detail: `${tool.name}: ${reason}`
+    })
     pendingConfirmation.value = {
       approve() {
         latestCommandStatus.value = `Approved ${tool.name}.`
+        updateTimelineItem('confirmation', {
+          status: 'done',
+          title: 'Confirmation approved',
+          detail: `${tool.name} approved by the app confirmation handler.`
+        })
         pendingConfirmation.value = null
         resolve(true)
       },
       deny() {
         latestCommandStatus.value = `Denied ${tool.name}.`
+        updateTimelineItem('confirmation', {
+          status: 'stopped',
+          title: 'Confirmation denied',
+          detail: `${tool.name} was denied by the app confirmation handler.`
+        })
         pendingConfirmation.value = null
         resolve(false)
       },
@@ -440,6 +589,46 @@ function formatPlanInput(plan: ToolPlan): string {
     null,
     2
   )
+}
+
+function updateTimelineItem(id: string, item: Partial<TimelineItem>) {
+  const existingIndex = timelineItems.value.findIndex(function findItem(candidate) {
+    return candidate.id === id
+  })
+  if (existingIndex === -1) {
+    timelineItems.value = [
+      ...timelineItems.value,
+      {
+        detail: item.detail ?? '',
+        id,
+        label: item.label ?? String(timelineItems.value.length + 1).padStart(2, '0'),
+        status: item.status ?? 'idle',
+        title: item.title ?? id
+      }
+    ]
+    return
+  }
+
+  timelineItems.value = timelineItems.value.map(function mapItem(candidate, index) {
+    return index === existingIndex
+      ? {
+          ...candidate,
+          ...item
+        }
+      : candidate
+  })
+}
+
+function createIdleTimeline(): TimelineItem[] {
+  return [
+    {
+      id: 'idle',
+      label: '00',
+      status: 'idle',
+      title: 'No command yet',
+      detail: 'Run a suggested or guided command to see planning, checks, and execution.'
+    }
+  ]
 }
 
 async function runSuggestion(suggestion: string) {
@@ -754,6 +943,80 @@ webmcp-command-input:not(:defined) {
   font: inherit;
   font-size: 0.86rem;
   font-weight: 900;
+}
+
+.plan-timeline {
+  display: grid;
+  gap: 1px;
+  border: 1px solid var(--demo-rule-strong);
+  background: var(--demo-rule-strong);
+}
+
+.timeline-heading,
+.plan-timeline li {
+  min-width: 0;
+  background: var(--demo-paper-wash);
+  padding: 0.72rem 0.8rem;
+}
+
+.timeline-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.timeline-heading span,
+.plan-timeline li > span {
+  color: var(--demo-muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.timeline-heading strong {
+  color: var(--demo-ink);
+}
+
+.plan-timeline ol {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--demo-rule-strong);
+}
+
+.plan-timeline li {
+  display: grid;
+  align-content: start;
+  gap: 0.28rem;
+}
+
+.plan-timeline li > strong {
+  color: var(--demo-ink);
+  line-height: 1.25;
+}
+
+.plan-timeline li > p {
+  margin: 0;
+  color: var(--demo-muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.timeline-item--done {
+  box-shadow: inset 3px 0 0 var(--demo-blue);
+}
+
+.timeline-item--running {
+  box-shadow: inset 3px 0 0 var(--demo-ink);
+}
+
+.timeline-item--stopped {
+  box-shadow: inset 3px 0 0 var(--demo-danger);
 }
 
 .demo-wire-panel {
