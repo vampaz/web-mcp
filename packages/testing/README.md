@@ -12,3 +12,21 @@ await invokeWebMCPTool(page, {
   source: 'planner'
 })
 ```
+
+Planner evals can run without a browser:
+
+```ts
+import { createHeuristicPlanner } from 'webmcp-kit'
+import { runWebMCPPlannerEvals } from 'webmcp-kit/testing'
+
+const results = await runWebMCPPlannerEvals(createHeuristicPlanner(), tools, [
+  {
+    name: 'product search',
+    message: 'Find docks',
+    expectedToolName: 'search_products',
+    expectedInput: { query: 'docks' }
+  }
+])
+
+expect(results.every((result) => result.passed)).toBe(true)
+```
