@@ -27,3 +27,29 @@ function searchProducts(query: string) {
   return [{ query }]
 }
 ```
+
+For actions that need secrets, database access, or a private API, keep the handler on your server and register a server-backed tool in the app:
+
+```ts
+import { defineServerTool, objectInputSchema, registerTool, stringParam } from 'webmcp-kit'
+
+registerTool(
+  defineServerTool({
+    name: 'send_invoice',
+    description: 'Send an invoice email from the server.',
+    endpoint: '/api/tools/send-invoice',
+    inputSchema: objectInputSchema(
+      {
+        invoiceId: stringParam({ description: 'Visible invoice ID.' })
+      },
+      { required: ['invoiceId'] }
+    ),
+    confirmation: {
+      required: true,
+      reason: 'Sending an invoice emails a customer.'
+    }
+  })
+)
+```
+
+The browser validates input, enforces guards and confirmation, then posts `{ toolName, input, source }` to the endpoint.

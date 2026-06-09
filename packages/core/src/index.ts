@@ -105,6 +105,11 @@ export {
   type ObjectInputSchemaOptions,
   type StringParamOptions
 } from './schema-builders'
+export {
+  defineServerTool,
+  type DefineServerToolOptions,
+  type ServerToolFetch
+} from './server-tool'
 export { getSupportLabel, isWebMCPSupported } from './support'
 export { escapeHtml, escapeAttribute } from './command-input-html'
 export {

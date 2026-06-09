@@ -78,6 +78,33 @@ registerTool(
 
       <article>
         <span>03</span>
+        <h2>Call the server for secrets</h2>
+        <p>Keep private APIs, payments, email, and database writes behind an app endpoint.</p>
+        <pre><code>import { defineServerTool, registerTool } from 'webmcp-kit'
+
+registerTool(
+  defineServerTool({
+    name: 'send_invoice',
+    description: 'Send an invoice email from the server.',
+    endpoint: '/api/tools/send-invoice',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        invoiceId: { type: 'string' }
+      },
+      required: ['invoiceId'],
+      additionalProperties: false
+    },
+    confirmation: {
+      required: true,
+      reason: 'Sending an invoice emails a customer.'
+    }
+  })
+)</code></pre>
+      </article>
+
+      <article>
+        <span>04</span>
         <h2>Upgrade an existing form</h2>
         <p>Turn a visible form into a tool without rebuilding the workflow.</p>
         <pre><code>import { registerFormTool } from 'webmcp-kit'
@@ -94,7 +121,7 @@ if (form) {
       </article>
 
       <article>
-        <span>04</span>
+        <span>05</span>
         <h2>Verify from Playwright</h2>
         <p>Inspect the registered surface and invoke tools through the app boundary.</p>
         <pre><code>import {
