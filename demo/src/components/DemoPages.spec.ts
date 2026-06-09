@@ -23,6 +23,11 @@ interface WindowWithLanguageModel extends Window {
   }
 }
 
+const defaultViewport = {
+  height: window.innerHeight,
+  width: window.innerWidth
+}
+
 describe('demo pages', () => {
   beforeEach(() => {
     clearToolsForTest()
@@ -34,6 +39,7 @@ describe('demo pages', () => {
     clearToolsForTest()
     delete (window as WindowWithLanguageModel).LanguageModel
     document.body.innerHTML = ''
+    setViewportSize(defaultViewport.width, defaultViewport.height)
   })
 
   it('starts with an empty command input and placeholder example', async () => {
@@ -96,6 +102,14 @@ describe('demo pages', () => {
     await flushPromises()
 
     const commandInput = await getCommandInput(wrapper)
+    const commandLauncher = wrapper.get('button.webmcp-command-launcher')
+    expect(
+      commandLauncher.findAll('span').map(function mapLauncherWord(word) {
+        return word.text()
+      })
+    ).toEqual(['WEB', 'MCP'])
+    expect(commandLauncher.attributes('aria-label')).toBe('Open WebMCP command input')
+
     const event = new KeyboardEvent('keydown', {
       bubbles: true,
       cancelable: true,
@@ -109,7 +123,8 @@ describe('demo pages', () => {
     expect(event.defaultPrevented).toBe(true)
     expect(commandInput.panelOpen).toBe(true)
     expect(commandInput.shadowRoot?.activeElement).toBe(getCommandTextInput(commandInput))
-    expect(wrapper.get('button.webmcp-command-launcher').attributes('aria-expanded')).toBe('true')
+    expect(commandLauncher.attributes('aria-label')).toBe('Close WebMCP command input')
+    expect(commandLauncher.attributes('aria-expanded')).toBe('true')
 
     getCommandTextInput(commandInput).dispatchEvent(
       new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' })
@@ -117,7 +132,87 @@ describe('demo pages', () => {
     await flushPromises()
 
     expect(commandInput.panelOpen).toBe(false)
-    expect(wrapper.get('button.webmcp-command-launcher').attributes('aria-expanded')).toBe('false')
+    expect(commandLauncher.attributes('aria-label')).toBe('Open WebMCP command input')
+    expect(commandLauncher.attributes('aria-expanded')).toBe('false')
+  })
+
+  it('keeps the floating command launcher draggable without resizing it', async () => {
+    setViewportSize(1200, 900)
+    const wrapper = mountWithDeps(InventoryDemo, { attachTo: document.body })
+    await flushPromises()
+
+    const commandLauncher = wrapper.get('button.webmcp-command-launcher').element as HTMLElement
+    Object.defineProperty(commandLauncher, 'offsetWidth', {
+      configurable: true,
+      value: 46
+    })
+    Object.defineProperty(commandLauncher, 'offsetHeight', {
+      configurable: true,
+      value: 34
+    })
+    commandLauncher.getBoundingClientRect = function getCommandLauncherRect() {
+      const left = Number.parseFloat(commandLauncher.style.left || '0')
+      const top = Number.parseFloat(commandLauncher.style.top || '0')
+
+      return {
+        bottom: top + 34,
+        height: 34,
+        left,
+        right: left + 46,
+        top,
+        width: 46,
+        x: left,
+        y: top,
+        toJSON: function toJSON() {
+          return {}
+        }
+      }
+    }
+    window.dispatchEvent(new Event('resize'))
+
+    const initialStyle = commandLauncher.style.cssText
+    const initialRect = commandLauncher.getBoundingClientRect()
+    commandLauncher.dispatchEvent(
+      new PointerEvent('pointerdown', {
+        bubbles: true,
+        buttons: 1,
+        clientX: initialRect.left + 23,
+        clientY: initialRect.top + 17,
+        pointerId: 1,
+        pointerType: 'mouse'
+      })
+    )
+    window.dispatchEvent(
+      new PointerEvent('pointermove', {
+        bubbles: true,
+        buttons: 1,
+        clientX: initialRect.left - 257,
+        clientY: initialRect.top - 213,
+        pointerId: 1,
+        pointerType: 'mouse'
+      })
+    )
+    window.dispatchEvent(
+      new PointerEvent('pointerup', {
+        bubbles: true,
+        clientX: initialRect.left - 257,
+        clientY: initialRect.top - 213,
+        pointerId: 1,
+        pointerType: 'mouse'
+      })
+    )
+    await new Promise(function waitForDragCleanup(resolve) {
+      window.setTimeout(resolve, 0)
+    })
+
+    expect(initialStyle).toContain('right: auto')
+    expect(initialStyle).toContain('bottom: auto')
+    expect(commandLauncher.style.left).toBe(`${initialRect.left - 280}px`)
+    expect(commandLauncher.style.top).toBe(`${initialRect.top - 230}px`)
+    expect(commandLauncher.style.right).toBe('auto')
+    expect(commandLauncher.style.bottom).toBe('auto')
+    expect(commandLauncher.style.width).toBe('')
+    expect(commandLauncher.style.height).toBe('')
   })
 
   it('uses page-specific command examples', async () => {
@@ -389,4 +484,15 @@ function getRegisteredToolNames(): string[] {
       return entry.tool.name
     })
     .sort()
+}
+
+function setViewportSize(width: number, height: number) {
+  Object.defineProperty(window, 'innerWidth', {
+    configurable: true,
+    value: width
+  })
+  Object.defineProperty(window, 'innerHeight', {
+    configurable: true,
+    value: height
+  })
 }

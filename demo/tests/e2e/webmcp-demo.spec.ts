@@ -67,6 +67,33 @@ test('uses the local planner for semantic item selections when AI is unavailable
   await expect(page.locator('.latest-plan')).toContainText('"ids"')
 })
 
+test('keeps the floating WebMCP launcher draggable without resizing it', async function testFloatingLauncherDrag({
+  page
+}) {
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible()
+
+  const launcher = page.getByRole('button', { name: 'Open WebMCP command input' })
+  const before = await launcher.boundingBox()
+  if (!before) throw new Error('Expected floating WebMCP launcher to be visible.')
+
+  await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(before.x - 220, before.y - 180)
+  await page.mouse.up()
+  await expect(launcher).toHaveAttribute('aria-expanded', 'false')
+
+  const after = await launcher.boundingBox()
+  if (!after) throw new Error('Expected floating WebMCP launcher after drag.')
+  expect(after.x).toBeLessThan(before.x - 100)
+  expect(after.y).toBeLessThan(before.y - 100)
+  expect(Math.round(after.width)).toBe(Math.round(before.width))
+  expect(Math.round(after.height)).toBe(Math.round(before.height))
+
+  await launcher.click()
+  await expect(page.locator('webmcp-command-input')).toHaveAttribute('data-floating-expanded', '')
+})
+
 test('renders the guided demo proof points', async function testDemoGuide({ page }) {
   await page.goto('/guide/')
 

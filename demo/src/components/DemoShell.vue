@@ -1,4 +1,17 @@
 <template>
+  <button
+    ref="commandLauncher"
+    class="webmcp-command-launcher"
+    type="button"
+    :aria-label="commandPanelOpen ? 'Close WebMCP command input' : 'Open WebMCP command input'"
+    :aria-expanded="String(commandPanelOpen)"
+    @click="handleCommandLauncherClicked"
+    @pointerdown="handleCommandLauncherDragStarted"
+  >
+    <span>WEB</span>
+    <span>MCP</span>
+  </button>
+
   <webmcp-command-input
     ref="commandInput"
     floating
@@ -57,16 +70,6 @@
       <div class="command-state">
         <span>Command layer</span>
         <strong>{{ commandStatusTitle }}</strong>
-        <button
-          class="webmcp-command-launcher"
-          :class="{ 'webmcp-command-launcher--open': commandPanelOpen }"
-          type="button"
-          :aria-label="commandPanelOpen ? 'Close WebMCP command input' : 'Open WebMCP command input'"
-          :aria-expanded="String(commandPanelOpen)"
-          @click="toggleCommandPanel"
-        >
-          <span>{{ commandPanelOpen ? 'Close command' : 'Open command' }}</span>
-        </button>
       </div>
       <div v-if="guideCommand" class="guided-flow">
         <span>Guided flow</span>
@@ -207,6 +210,18 @@ interface TimelineItem {
   title: string
 }
 
+interface CommandLauncherDragState {
+  hasMoved: boolean
+  offsetX: number
+  offsetY: number
+  pointerId: number
+}
+
+interface CommandLauncherPosition {
+  x: number
+  y: number
+}
+
 const props = withDefaults(defineProps<DemoShellProps>(), {
   activityItems: () => [],
   confirmationsEnabled: true,
@@ -248,6 +263,7 @@ const defaultPlannerProvider: PlannerProviderKind = 'openai'
 const defaultPlannerOptionId = shouldDefaultToBrowserLocalAI ? 'browser-local-ai' : undefined
 const plannerEndpoint = '/api/webmcp/plan'
 const unregisterCallbacks: Array<() => void> = []
+const commandLauncher = ref<HTMLButtonElement | null>(null)
 const commandInput = ref<WebMCPCommandInputElement | null>(null)
 const commandPanelOpen = ref(false)
 const runtimeStatusPanel = ref<{ devtoolsHost: HTMLElement | null } | null>(null)
@@ -261,6 +277,18 @@ const latestPlan = ref<LatestPlanSummary>({
 })
 const timelineItems = ref<TimelineItem[]>(createIdleTimeline())
 let devtoolsOverlay: DevtoolsOverlay | undefined
+let commandLauncherDragState: CommandLauncherDragState | undefined
+let commandLauncherPinnedBottom = true
+let commandLauncherPinnedRight = true
+let commandLauncherPosition: CommandLauncherPosition = {
+  x: 24,
+  y: 96
+}
+let commandLauncherViewport = {
+  height: 0,
+  width: 0
+}
+let commandLauncherWasPositioned = false
 const supportLabel = computed(function getCurrentSupportLabel() {
   return getSupportLabel()
 })
@@ -308,6 +336,7 @@ if (typeof customElements !== 'undefined') {
 onMounted(async function handleMounted() {
   setConfirmationHandler(confirmToolInvocation)
   window.addEventListener('keydown', handleCommandShortcut)
+  window.addEventListener('resize', handleCommandLauncherViewportChanged)
   if (shouldInstallTestBridge) {
     unregisterCallbacks.push(installWebMCPKitTestBridge())
   }
@@ -320,11 +349,17 @@ onMounted(async function handleMounted() {
   }
 
   configureCommandInput()
+  commandLauncherViewport = getCommandLauncherViewport()
+  syncCommandLauncherPosition()
   syncCommandPanelState()
 })
 
 onUnmounted(function handleUnmounted() {
   window.removeEventListener('keydown', handleCommandShortcut)
+  window.removeEventListener('resize', handleCommandLauncherViewportChanged)
+  window.removeEventListener('pointermove', handleCommandLauncherDragged)
+  window.removeEventListener('pointerup', handleCommandLauncherDragEnded)
+  window.removeEventListener('pointercancel', handleCommandLauncherDragEnded)
   pendingConfirmation.value?.deny()
   for (const unregister of unregisterCallbacks) {
     unregister()
@@ -637,14 +672,92 @@ async function runGuidedFlow() {
   await runSuggestion(props.guideCommand)
 }
 
+function handleCommandLauncherClicked() {
+  if (commandLauncherDragState?.hasMoved) return
+  toggleCommandPanel()
+}
+
+function handleCommandLauncherDragStarted(event: PointerEvent) {
+  if (!(event.currentTarget instanceof HTMLElement)) return
+  event.preventDefault()
+  syncCommandLauncherPosition()
+  const rect = event.currentTarget.getBoundingClientRect()
+  commandLauncherDragState = {
+    hasMoved: false,
+    offsetX: event.clientX - rect.left,
+    offsetY: event.clientY - rect.top,
+    pointerId: event.pointerId
+  }
+  try {
+    event.currentTarget.setPointerCapture(event.pointerId)
+  } catch {
+    // Synthetic pointer events do not always have an active pointer to capture.
+  }
+  window.addEventListener('pointermove', handleCommandLauncherDragged)
+  window.addEventListener('pointerup', handleCommandLauncherDragEnded)
+  window.addEventListener('pointercancel', handleCommandLauncherDragEnded)
+}
+
+function handleCommandLauncherDragged(event: PointerEvent) {
+  if (!commandLauncherDragState || event.pointerId !== commandLauncherDragState.pointerId) return
+  event.preventDefault()
+  const nextX = event.clientX - commandLauncherDragState.offsetX
+  const nextY = event.clientY - commandLauncherDragState.offsetY
+  const deltaX = Math.abs(nextX - commandLauncherPosition.x)
+  const deltaY = Math.abs(nextY - commandLauncherPosition.y)
+  const nextPosition = clampCommandLauncherPosition(nextX, nextY)
+  const bounds = getCommandLauncherBounds()
+
+  if (deltaX > 3 || deltaY > 3) commandLauncherDragState.hasMoved = true
+  commandLauncherPosition = nextPosition
+  commandLauncherPinnedRight = Math.abs(nextPosition.x - bounds.maxX) <= 2
+  commandLauncherPinnedBottom = Math.abs(nextPosition.y - bounds.maxY) <= 2
+  syncCommandLauncherPosition()
+  updateCommandPanelPlacement()
+}
+
+function handleCommandLauncherDragEnded(event: PointerEvent) {
+  if (!commandLauncherDragState || event.pointerId !== commandLauncherDragState.pointerId) return
+  window.removeEventListener('pointermove', handleCommandLauncherDragged)
+  window.removeEventListener('pointerup', handleCommandLauncherDragEnded)
+  window.removeEventListener('pointercancel', handleCommandLauncherDragEnded)
+  window.setTimeout(function clearCommandLauncherDragState() {
+    commandLauncherDragState = undefined
+  }, 0)
+}
+
+function handleCommandLauncherViewportChanged() {
+  const triggerWidth = getCommandLauncherWidth()
+  const triggerHeight = getCommandLauncherHeight()
+  const previousMaxX = Math.max(8, commandLauncherViewport.width - triggerWidth - 8)
+  const previousMaxY = Math.max(8, commandLauncherViewport.height - triggerHeight - 8)
+  const wasPinnedRight =
+    commandLauncherPinnedRight || Math.abs(commandLauncherPosition.x - previousMaxX) <= 2
+  const wasPinnedBottom =
+    commandLauncherPinnedBottom || Math.abs(commandLauncherPosition.y - previousMaxY) <= 2
+  commandLauncherViewport = getCommandLauncherViewport()
+  const nextMaxX = Math.max(8, commandLauncherViewport.width - triggerWidth - 8)
+  const nextMaxY = Math.max(8, commandLauncherViewport.height - triggerHeight - 8)
+  const nextX = wasPinnedRight ? nextMaxX : commandLauncherPosition.x
+  const nextY = wasPinnedBottom ? nextMaxY : commandLauncherPosition.y
+
+  commandLauncherPinnedRight = wasPinnedRight
+  commandLauncherPinnedBottom = wasPinnedBottom
+  commandLauncherPosition = clampCommandLauncherPosition(nextX, nextY)
+  syncCommandLauncherPosition()
+  updateCommandPanelPlacement()
+}
+
 function toggleCommandPanel() {
   getCommandInputElement()?.togglePanel()
   syncCommandPanelState()
+  updateCommandPanelPlacement()
 }
 
 function openCommandPanel() {
   getCommandInputElement()?.openPanel()
   syncCommandPanelState()
+  updateCommandPanelPlacement()
 }
 
 function syncCommandPanelState() {
@@ -653,6 +766,7 @@ function syncCommandPanelState() {
 
 function handleCommandPanelToggle(event: Event) {
   commandPanelOpen.value = (event as CustomEvent<WebMCPCommandPanelToggleEventDetail>).detail.open
+  updateCommandPanelPlacement()
 }
 
 function handleCommandShortcut(event: KeyboardEvent) {
@@ -666,6 +780,101 @@ function getCommandInputElement(): WebMCPCommandInputElement | null {
   return (
     commandInput.value ?? document.querySelector<WebMCPCommandInputElement>('webmcp-command-input')
   )
+}
+
+function syncCommandLauncherPosition() {
+  const launcher = commandLauncher.value
+  if (!launcher) return
+  if (!commandLauncherWasPositioned) setInitialCommandLauncherPosition()
+
+  launcher.style.left = `${commandLauncherPosition.x}px`
+  launcher.style.top = `${commandLauncherPosition.y}px`
+  launcher.style.right = 'auto'
+  launcher.style.bottom = 'auto'
+}
+
+function setInitialCommandLauncherPosition() {
+  const bounds = getCommandLauncherBounds()
+  commandLauncherPosition = {
+    x: bounds.maxX,
+    y: bounds.maxY
+  }
+  commandLauncherPinnedRight = true
+  commandLauncherPinnedBottom = true
+  commandLauncherViewport = getCommandLauncherViewport()
+  commandLauncherWasPositioned = true
+}
+
+function clampCommandLauncherPosition(x: number, y: number): CommandLauncherPosition {
+  const { maxX, maxY } = getCommandLauncherBounds()
+
+  return {
+    x: Math.min(Math.max(8, x), maxX),
+    y: Math.min(Math.max(8, y), maxY)
+  }
+}
+
+function getCommandLauncherWidth(): number {
+  return commandLauncher.value?.offsetWidth || 0
+}
+
+function getCommandLauncherHeight(): number {
+  return commandLauncher.value?.offsetHeight || 0
+}
+
+function getCommandLauncherBounds(): { maxX: number; maxY: number } {
+  const viewport = getCommandLauncherViewport()
+  const width = getCommandLauncherWidth()
+  const height = getCommandLauncherHeight()
+
+  return {
+    maxX: Math.max(8, viewport.width - width - 8),
+    maxY: Math.max(8, viewport.height - height - 8)
+  }
+}
+
+function getCommandLauncherViewport(): { height: number; width: number } {
+  return {
+    height: window.innerHeight,
+    width: window.innerWidth
+  }
+}
+
+function updateCommandPanelPlacement() {
+  const element = getCommandInputElement()
+  const launcher = commandLauncher.value
+  if (!element || !launcher || !element.panelOpen) return
+
+  const launcherRect = launcher.getBoundingClientRect()
+  const panelWidth = Math.min(element.scrollWidth || 920, window.innerWidth - 16)
+  const panelHeight = Math.min(element.scrollHeight || 320, window.innerHeight - 16)
+  const spaceAbove = launcherRect.top - 8
+  const spaceBelow = window.innerHeight - launcherRect.bottom - 8
+  const spaceLeft = launcherRect.right - 8
+  const spaceRight = window.innerWidth - launcherRect.left - 8
+  const vertical = spaceBelow >= panelHeight || spaceBelow >= spaceAbove ? 'down' : 'up'
+  const horizontal = spaceRight >= panelWidth || spaceRight >= spaceLeft ? 'right' : 'left'
+  const maxHeight = Math.max(0, vertical === 'down' ? spaceBelow - 8 : spaceAbove - 8)
+  const panelLeft =
+    horizontal === 'right'
+      ? Math.min(launcherRect.left, window.innerWidth - panelWidth - 8)
+      : Math.max(8, launcherRect.right - panelWidth)
+
+  element.style.left = `${panelLeft}px`
+  element.style.removeProperty('right')
+  element.style.setProperty('--webmcp-floating-panel-max-height', `${maxHeight}px`)
+
+  if (vertical === 'down') {
+    element.style.top = `${Math.min(
+      launcherRect.bottom + 8,
+      window.innerHeight - panelHeight - 8
+    )}px`
+    element.style.removeProperty('bottom')
+    return
+  }
+
+  element.style.bottom = `${Math.max(8, window.innerHeight - launcherRect.top + 8)}px`
+  element.style.removeProperty('top')
 }
 
 declare global {
@@ -713,36 +922,41 @@ webmcp-command-input:not(:defined) {
 }
 
 .webmcp-command-launcher {
-  display: inline-flex;
-  justify-self: start;
-  align-items: center;
-  min-block-size: 2.15rem;
-  margin-top: 0.75rem;
-  padding: 0.38rem 0.62rem;
-  border: 1px solid var(--demo-blue);
-  background: var(--demo-blue);
-  color: var(--demo-paper-wash);
+  position: fixed;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 1001;
+  display: grid;
+  place-items: center;
+  width: auto;
+  min-width: auto;
+  min-height: auto;
+  margin: 0;
+  padding: 0.18em 0.36em;
+  border: 2px solid #0f1512;
+  background: #e8be53;
+  color: #0c1110;
   font: inherit;
-  font-size: 0.86rem;
-  font-weight: 900;
+  font-size: 0.88rem;
+  font-weight: 950;
+  line-height: 0.9;
+  text-align: center;
+  touch-action: none;
   cursor: pointer;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.34);
 }
 
 .webmcp-command-launcher:hover {
-  background: var(--demo-ink);
+  background: #f1cd70;
 }
 
 .webmcp-command-launcher:focus-visible {
-  outline: 2px solid var(--demo-blue);
+  outline: 2px solid #e8be53;
   outline-offset: 3px;
 }
 
 .webmcp-command-launcher span {
-  display: inline;
-}
-
-.webmcp-command-launcher--open {
-  background: var(--demo-ink);
+  display: block;
 }
 
 .demo-page-header {
@@ -1271,14 +1485,6 @@ webmcp-command-input:not(:defined) {
     bottom: 4rem;
     left: auto;
     width: min(57.5rem, calc(100vw - 1rem));
-  }
-
-  .webmcp-command-launcher--open {
-    min-block-size: 2.5rem;
-  }
-
-  .webmcp-command-launcher:not(.webmcp-command-launcher--open) {
-    min-block-size: 2.5rem;
   }
 
   .demo-app-page {
