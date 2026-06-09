@@ -2,22 +2,25 @@ import { useEffect, useRef } from 'react'
 
 import { registerTool, type RegisteredTool, type WebMCPTool } from 'webmcp-kit'
 
-import type { UseWebMCPToolOptions } from './interfaces/webmcp-tool'
+import type { UseWebMCPToolOptions, UseWebMCPToolResult } from './interfaces/webmcp-tool'
 
-export type { ReactWebMCPTool, UseWebMCPToolOptions } from './interfaces/webmcp-tool'
+export type {
+  ReactWebMCPTool,
+  UseWebMCPToolOptions,
+  UseWebMCPToolResult
+} from './interfaces/webmcp-tool'
 
 export function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unknown>(
   tool: WebMCPTool<TInput, TOutput>,
   options: UseWebMCPToolOptions = {}
-): void {
+): UseWebMCPToolResult<TInput, TOutput> {
   const registration = useRef<RegisteredTool<TInput, TOutput> | undefined>(undefined)
   const registeredTool = useRef<WebMCPTool<TInput, TOutput> | undefined>(undefined)
-  const whenValue = typeof options.when === 'function' ? options.when() : options.when
+  const handle = useRef<UseWebMCPToolResult<TInput, TOutput> | undefined>(undefined)
+  const available = options.when === undefined || options.when
 
   useEffect(
     function syncWebMCPTool() {
-      const available = whenValue === undefined || whenValue
-
       if (registration.current && registeredTool.current !== tool) {
         registration.current?.unregister()
         registration.current = undefined
@@ -41,6 +44,21 @@ export function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unknow
         registeredTool.current = undefined
       }
     },
-    [tool, whenValue]
+    [tool, available]
   )
+
+  if (!handle.current) {
+    handle.current = {
+      unregister() {
+        registration.current?.unregister()
+        registration.current = undefined
+        registeredTool.current = undefined
+      },
+      getRegistration() {
+        return registration.current
+      }
+    }
+  }
+
+  return handle.current
 }

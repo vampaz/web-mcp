@@ -42,11 +42,15 @@ const overlayStyles = `
   --wmk-devtools-accent-soft: color-mix(in srgb, var(--wmk-devtools-accent) 14%, transparent);
   --wmk-devtools-accent-rule: color-mix(in srgb, var(--wmk-devtools-accent) 42%, transparent);
   --wmk-devtools-accent-text: color-mix(in srgb, var(--wmk-devtools-accent) 58%, white);
+  --wmk-devtools-edge-offset: 18px;
+  --wmk-devtools-width: min(460px, calc(100vw - 36px));
+  --wmk-devtools-panel-max-height: min(720px, calc(100vh - 96px));
+  --wmk-devtools-inline-panel-max-height: none;
   position: fixed;
-  right: 18px;
-  bottom: 18px;
+  right: var(--wmk-devtools-edge-offset);
+  bottom: var(--wmk-devtools-edge-offset);
   z-index: 2147483647;
-  width: min(460px, calc(100vw - 36px));
+  width: var(--wmk-devtools-width);
   color: #f7faf8;
   font: 500 14px/1.45 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -100,7 +104,7 @@ const overlayStyles = `
   clear: both;
   display: grid;
   gap: 12px;
-  max-height: min(720px, calc(100vh - 96px));
+  max-height: var(--wmk-devtools-panel-max-height);
   overflow: auto;
   margin-top: 12px;
   padding: 14px;
@@ -110,7 +114,7 @@ const overlayStyles = `
   backdrop-filter: blur(18px);
 }
 .wmk-devtools--inline .wmk-devtools__panel {
-  max-height: none;
+  max-height: var(--wmk-devtools-inline-panel-max-height);
   margin-top: 0;
   border: 0;
   border-radius: 0;
@@ -337,19 +341,18 @@ const overlayStyles = `
 }
 @media (max-width: 48rem) {
   .wmk-devtools {
-    right: 8px;
-    bottom: 8px;
-    width: calc(100vw - 16px);
+    --wmk-devtools-edge-offset: 8px;
+    --wmk-devtools-width: calc(100vw - 16px);
+    --wmk-devtools-panel-max-height: min(34rem, calc(100svh - 5rem));
+    --wmk-devtools-inline-panel-max-height: min(24rem, calc(100svh - 19rem));
   }
 
   .wmk-devtools__panel {
     gap: 10px;
-    max-height: min(34rem, calc(100svh - 5rem));
     padding: 10px;
   }
 
   .wmk-devtools--inline .wmk-devtools__panel {
-    max-height: min(24rem, calc(100svh - 19rem));
     overflow: auto;
   }
 

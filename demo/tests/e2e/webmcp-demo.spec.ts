@@ -13,7 +13,7 @@ test('uses Chrome AI context to select semantic inventory items and open records
   await selectPlannerProvider(page, 'chrome-built-in')
 
   await getCommandTextbox(page).fill('Select all French items')
-  await page.getByRole('button', { name: 'Run' }).click()
+  await page.getByRole('button', { name: 'Run', exact: true }).click()
 
   await expect(page.getByText('5 selected')).toBeVisible()
   await expect(getItemInput(page, 'Croissant')).toBeChecked()
@@ -33,7 +33,7 @@ test('uses Chrome AI context to select semantic inventory items and open records
   await expect(page.getByRole('heading', { name: 'Invoices', exact: true })).toBeVisible()
   await selectPlannerProvider(page, 'chrome-built-in', 'open_invoice')
   await getCommandTextbox(page).fill('Open the Stark invoice')
-  await page.getByRole('button', { name: 'Run' }).click()
+  await page.getByRole('button', { name: 'Run', exact: true }).click()
 
   await expect(
     page.locator('.active-record strong').filter({ hasText: 'Stark Industries' })
@@ -56,7 +56,7 @@ test('uses the local planner for semantic item selections when AI is unavailable
   await selectPlannerProvider(page, 'local')
 
   await getCommandTextbox(page).fill('Select all liquids')
-  await page.getByRole('button', { name: 'Run' }).click()
+  await page.getByRole('button', { name: 'Run', exact: true }).click()
 
   await expect(page.getByText('5 selected')).toBeVisible()
   await expect(getItemInput(page, 'Water')).toBeChecked()
@@ -301,7 +301,9 @@ test('covers commerce tools through the browser bridge and confirmation flow', a
     },
     source: 'planner'
   })
-  await expect(page.getByLabel('Quantity for Low-profile keyboard')).toHaveValue('2')
+  await expect(
+    page.locator('.cart-lines').getByLabel('Quantity for Low-profile keyboard')
+  ).toHaveValue('2')
   await expect(page.locator('.cart-total')).toContainText('€258')
 
   await invokeWebMCPTool(page, {
@@ -312,7 +314,9 @@ test('covers commerce tools through the browser bridge and confirmation flow', a
     },
     source: 'planner'
   })
-  await expect(page.getByLabel('Quantity for Low-profile keyboard')).toHaveValue('3')
+  await expect(
+    page.locator('.cart-lines').getByLabel('Quantity for Low-profile keyboard')
+  ).toHaveValue('3')
   await expect(page.locator('.cart-total')).toContainText('€387')
 
   await invokeWebMCPTool(page, {
@@ -351,7 +355,7 @@ test('shows command guard failures in the latest plan panel', async function tes
   await selectPlannerProvider(page, 'local', 'add_to_cart')
 
   await getCommandTextbox(page).fill('Add 20 keyboard kits to the cart')
-  await page.getByRole('button', { name: 'Run' }).click()
+  await page.getByRole('button', { name: 'Run', exact: true }).click()
 
   await expect(page.locator('.latest-plan')).toContainText('add_to_cart')
   await expect(page.locator('.latest-plan')).toContainText('"quantity": 20')
@@ -404,7 +408,7 @@ test('executes chained local invoice commands with confirmation', async function
   await selectPlannerProvider(page, 'local', 'update_selected_invoice_status')
 
   await getCommandTextbox(page).fill('Mark Stark Industries invoices as paid')
-  await page.getByRole('button', { name: 'Run' }).click()
+  await page.getByRole('button', { name: 'Run', exact: true }).click()
   const statusDialog = page.getByRole('dialog', {
     name: /Changing invoice status mutates business records/
   })
@@ -431,7 +435,7 @@ test('rechecks Chrome AI before running a command if the page mounted with fallb
   await installLanguageModelInPage(page, 'available')
 
   await getCommandTextbox(page).fill('Select all fruits')
-  await page.getByRole('button', { name: 'Run' }).click()
+  await page.getByRole('button', { name: 'Run', exact: true }).click()
 
   await expect(getItemInput(page, 'Apple')).toBeChecked()
   await expect(getItemInput(page, 'Grapefruit')).toBeChecked()
@@ -545,7 +549,7 @@ test('plans through the dev OpenRouter server provider', async function testOpen
   await selectPlannerProvider(page, 'openrouter')
 
   await getCommandTextbox(page).fill('Select all French items')
-  await page.getByRole('button', { name: 'Run' }).click()
+  await page.getByRole('button', { name: 'Run', exact: true }).click()
 
   await expect(getItemInput(page, 'Croissant')).toBeChecked()
   await expect(getItemInput(page, 'Quiche')).toBeChecked()
@@ -577,7 +581,7 @@ test('plans through the dev OpenAI server provider', async function testOpenAIPr
   await selectPlannerProvider(page, 'openai')
 
   await getCommandTextbox(page).fill('Select all French items')
-  await page.getByRole('button', { name: 'Run' }).click()
+  await page.getByRole('button', { name: 'Run', exact: true }).click()
 
   await expect(getItemInput(page, 'Croissant')).toBeChecked()
   await expect(getItemInput(page, 'Quiche')).toBeChecked()
@@ -608,7 +612,7 @@ test('plans through the dev Cloudflare binding provider', async function testClo
   await expect(page.getByRole('heading', { name: 'Inventory', exact: true })).toBeVisible()
   await selectPlannerProvider(page, 'cloudflare-binding', 'select_items', '@cf/qwen/qwq-32b')
   await getCommandTextbox(page).fill('Select all French items')
-  await page.getByRole('button', { name: 'Run' }).click()
+  await page.getByRole('button', { name: 'Run', exact: true }).click()
 
   await expect(getItemInput(page, 'Croissant')).toBeChecked()
   await expect(getItemInput(page, 'Quiche')).toBeChecked()
@@ -624,20 +628,30 @@ test('keeps demo pages responsive without forcing cramped columns', async functi
     { width: 1154, height: 900 },
     { width: 1440, height: 1000 }
   ]
-  const paths = ['/', '/invoices/', '/commerce/', '/support/', '/guide/', '/readme/']
+  const paths = [
+    { heading: 'Inventory', path: '/' },
+    { heading: 'Invoices', path: '/invoices/' },
+    { heading: 'Commerce', path: '/commerce/' },
+    { heading: 'Support', path: '/support/' },
+    { heading: '', path: '/guide/' },
+    { heading: '', path: '/readme/' }
+  ]
 
   for (const viewport of viewports) {
     await page.setViewportSize(viewport)
 
-    for (const path of paths) {
-      await page.goto(path)
+    for (const route of paths) {
+      await page.goto(route.path)
       await expect(page.locator('main')).toBeVisible()
-      if (path === '/readme/') {
+      if (route.path === '/readme/') {
         await expect(page.locator('.readme-document')).toBeVisible()
-      } else if (path === '/guide/') {
+      } else if (route.path === '/guide/') {
         await expect(page.locator('.guide-header')).toBeVisible()
       } else {
+        await expect(page.getByRole('heading', { name: route.heading, exact: true })).toBeVisible()
         await expect(page.locator('.demo-page-header')).toBeVisible()
+        await expect(page.getByRole('button', { name: 'Open WebMCP command input' })).toBeVisible()
+        await expect(page.locator('webmcp-command-input')).toBeAttached()
       }
 
       const hasHorizontalOverflow = await page.evaluate(function hasHorizontalPageOverflow() {
@@ -728,13 +742,18 @@ test('keeps demo pages responsive without forcing cramped columns', async functi
   const wideTriggerBox = await getWebMCPTriggerBox(page)
 
   await page.setViewportSize({ width: 640, height: 900 })
-  const narrowTriggerBox = await getWebMCPTriggerBox(page)
+  await expect
+    .poll(async function getNarrowTriggerX() {
+      return (await getWebMCPTriggerBox(page)).x
+    })
+    .toBeLessThan(wideTriggerBox.x)
 
   await page.setViewportSize({ width: 1154, height: 900 })
-  const regrownTriggerBox = await getWebMCPTriggerBox(page)
-
-  expect(narrowTriggerBox.x).toBeLessThan(wideTriggerBox.x)
-  expect(Math.abs(regrownTriggerBox.x - wideTriggerBox.x)).toBeLessThanOrEqual(2)
+  await expect
+    .poll(async function getRegrownTriggerOffset() {
+      return Math.abs((await getWebMCPTriggerBox(page)).x - wideTriggerBox.x)
+    })
+    .toBeLessThanOrEqual(2)
 })
 
 test('renders README Mermaid diagrams', async function testReadmeMermaidDiagrams({ page }) {

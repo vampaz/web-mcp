@@ -29,6 +29,7 @@ export interface WebMCPCommandInputPlannerModelOption {
 
 export interface WebMCPCommandInputPlannerCreateOptions {
   model?: string
+  modelOption?: WebMCPCommandInputPlannerModelOption
 }
 
 export interface WebMCPCommandInputPlannerOption {
@@ -51,6 +52,7 @@ export interface WebMCPCommandInputConfigureOptions {
   endpointOptions?: WebMCPCommandInputEndpointOption[]
   floating?: boolean
   initialModel?: string
+  initialPlannerOptionId?: string
   initialProvider?: PlannerProviderKind
   model?: string
   placeholder?: string
@@ -58,6 +60,7 @@ export interface WebMCPCommandInputConfigureOptions {
   plannerConfig?: PlannerProviderConfig
   plannerOptions?: WebMCPCommandInputPlannerOption[]
   provider?: PlannerProviderKind
+  settingsOpen?: boolean
   showChromeAI?: boolean
 }
 

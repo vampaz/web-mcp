@@ -3,34 +3,38 @@ import type { Readable, Unsubscriber } from 'svelte/store'
 
 import { registerTool, type RegisteredTool, type WebMCPTool } from 'webmcp-kit'
 
-import type { UseWebMCPToolOptions } from './interfaces/webmcp-tool'
+import type { UseWebMCPToolOptions, UseWebMCPToolResult } from './interfaces/webmcp-tool'
 
-export type { SvelteWebMCPTool, UseWebMCPToolOptions } from './interfaces/webmcp-tool'
+export type {
+  SvelteWebMCPTool,
+  UseWebMCPToolOptions,
+  UseWebMCPToolResult
+} from './interfaces/webmcp-tool'
 
 export function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unknown>(
   tool: WebMCPTool<TInput, TOutput>,
   options: UseWebMCPToolOptions = {}
-): void {
+): UseWebMCPToolResult<TInput, TOutput> {
+  let registration: RegisteredTool<TInput, TOutput> | undefined
+  let unsubscribe: Unsubscriber | undefined
+
+  function unregister(): void {
+    registration?.unregister()
+    registration = undefined
+  }
+
+  function syncRegistration(available: boolean): void {
+    if (available && !registration) {
+      registration = registerTool(tool)
+      return
+    }
+
+    if (!available) {
+      unregister()
+    }
+  }
+
   onMount(function mountWebMCPTool() {
-    let registration: RegisteredTool<TInput, TOutput> | undefined
-    let unsubscribe: Unsubscriber | undefined
-
-    function unregister(): void {
-      registration?.unregister()
-      registration = undefined
-    }
-
-    function syncRegistration(available: boolean): void {
-      if (available && !registration) {
-        registration = registerTool(tool)
-        return
-      }
-
-      if (!available) {
-        unregister()
-      }
-    }
-
     if (isReadable(options.when)) {
       unsubscribe = options.when.subscribe(syncRegistration)
     } else {
@@ -42,9 +46,17 @@ export function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unknow
 
     return function disposeWebMCPTool() {
       unsubscribe?.()
+      unsubscribe = undefined
       unregister()
     }
   })
+
+  return {
+    unregister,
+    getRegistration() {
+      return registration
+    }
+  }
 }
 
 function isReadable(value: UseWebMCPToolOptions['when']): value is Readable<boolean> {

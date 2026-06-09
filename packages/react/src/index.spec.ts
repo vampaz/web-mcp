@@ -51,6 +51,98 @@ describe('React useWebMCPTool', () => {
     expect(listTools()).toEqual([])
   })
 
+  it('registers and unregisters as the when option toggles across renders', async () => {
+    const runtime = createReactHookRuntime()
+    vi.doMock('react', function mockReact() {
+      return runtime
+    })
+
+    const { useWebMCPTool } = await import('./index')
+    const { defineTool, listTools } = await import('webmcp-kit')
+    const tool = defineTool({
+      name: 'create_ticket',
+      description: 'Create a support ticket from the current React screen.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        required: [],
+        additionalProperties: false
+      },
+      execute() {
+        return {}
+      }
+    })
+
+    let available = true
+    function renderHook() {
+      useWebMCPTool(tool, {
+        when: available
+      })
+    }
+
+    runtime.render(renderHook)
+
+    expect(listTools()).toHaveLength(1)
+
+    available = false
+    runtime.render(renderHook)
+
+    expect(listTools()).toEqual([])
+
+    available = true
+    runtime.render(renderHook)
+
+    expect(listTools()).toHaveLength(1)
+
+    runtime.cleanup()
+  })
+
+  it('returns a stable handle with unregister and getRegistration', async () => {
+    const runtime = createReactHookRuntime()
+    vi.doMock('react', function mockReact() {
+      return runtime
+    })
+
+    const { useWebMCPTool } = await import('./index')
+    const { defineTool, listTools } = await import('webmcp-kit')
+    const tool = defineTool({
+      name: 'create_ticket',
+      description: 'Create a support ticket from the current React screen.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        required: [],
+        additionalProperties: false
+      },
+      execute() {
+        return {}
+      }
+    })
+
+    const handles: unknown[] = []
+    function renderHook() {
+      handles.push(useWebMCPTool(tool))
+    }
+
+    runtime.render(renderHook)
+    runtime.render(renderHook)
+
+    expect(handles[0]).toBe(handles[1])
+
+    const handle = handles[0] as {
+      unregister: () => void
+      getRegistration: () => { tool: { name: string } } | undefined
+    }
+    expect(handle.getRegistration()?.tool.name).toBe('create_ticket')
+
+    handle.unregister()
+
+    expect(listTools()).toEqual([])
+    expect(handle.getRegistration()).toBeUndefined()
+
+    runtime.cleanup()
+  })
+
   it('respects a false when option', async () => {
     const runtime = createReactHookRuntime()
     vi.doMock('react', function mockReact() {

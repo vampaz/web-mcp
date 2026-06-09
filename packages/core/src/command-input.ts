@@ -20,7 +20,11 @@ import type {
   WebMCPCommandStepEventDetail,
   WebMCPCommandInputRunOptions
 } from './interfaces/command-input'
-import { escapeAttribute, escapeHtml } from './command-input-html'
+import {
+  getShadowMarkup,
+  getStructureSignature,
+  type CommandInputViewState
+} from './command-input-render'
 import { invokePlannedSteps, throwIfAborted } from './command-input-runner'
 import { getErrorMessage } from './confirmation'
 import {
@@ -44,7 +48,6 @@ import {
   isPlannerAttribute,
   isPlannerProviderKind
 } from './command-input-options'
-import { getStyles } from './command-input-styles'
 import { createChromeAIPlanner } from './planner'
 import { listTools } from './registry'
 
@@ -120,6 +123,7 @@ export function defineWebMCPCommandInput(
     private plannerRevision = 0
     private providedPlanner?: ToolPlanner
     private providedPlannerConfig?: PlannerProviderConfig
+    private renderedStructureSignature = ''
     private running = false
     private readonly state: CommandInputRuntimeState = {
       buttonLabel: defaultButtonLabel,
@@ -177,7 +181,7 @@ export function defineWebMCPCommandInput(
     }
 
     set buttonLabel(value: string | undefined) {
-      this.state.buttonLabel = value || defaultButtonLabel
+      this.applyButtonLabelState(value)
       this.renderIfConnected()
     }
 
@@ -195,8 +199,7 @@ export function defineWebMCPCommandInput(
     }
 
     set floating(value: boolean) {
-      this.state.floating = value
-      if (!value) this.state.floatingExpanded = false
+      this.applyFloatingState(value)
       this.renderIfConnected()
     }
 
@@ -213,8 +216,7 @@ export function defineWebMCPCommandInput(
     }
 
     set model(value: string | undefined) {
-      this.state.fixedModel = value || undefined
-      this.state.model = value || defaultModel
+      this.applyModelState(value)
       this.invalidatePlanner()
       this.renderIfConnected()
       void this.refreshPlannerStatus()
@@ -225,7 +227,7 @@ export function defineWebMCPCommandInput(
     }
 
     set placeholder(value: string | undefined) {
-      this.state.placeholder = value || defaultPlaceholder
+      this.applyPlaceholderState(value)
       this.renderIfConnected()
     }
 
@@ -256,10 +258,7 @@ export function defineWebMCPCommandInput(
     }
 
     set provider(value: PlannerProviderKind | undefined) {
-      this.state.fixedProvider = isPlannerProviderKind(value) ? value : undefined
-      this.providerWasChosen = Boolean(this.state.fixedProvider)
-      this.state.plannerOptionId = undefined
-      this.state.provider = this.state.fixedProvider ?? 'auto'
+      this.applyProviderState(value)
       this.invalidatePlanner()
       this.renderIfConnected()
       void this.refreshPlannerStatus()
@@ -283,7 +282,7 @@ export function defineWebMCPCommandInput(
           }
         }
       }
-      if (options.floating !== undefined) this.floating = options.floating
+      if (options.floating !== undefined) this.applyFloatingState(options.floating)
       if (options.initialProvider !== undefined && !this.state.fixedProvider) {
         this.providerWasChosen = true
         this.state.plannerOptionId = undefined
@@ -303,17 +302,26 @@ export function defineWebMCPCommandInput(
       } else if (options.endpointOptions !== undefined && !this.state.fixedModel) {
         this.state.model = getDefaultModelForProvider(this.state.provider, options.endpointOptions)
       }
-      this.planner = options.planner ?? this.planner
-      this.plannerConfig = options.plannerConfig ?? this.plannerConfig
-
-      if (options.buttonLabel !== undefined) this.buttonLabel = options.buttonLabel
-      if (options.disabled !== undefined) this.disabled = options.disabled
-      if (options.placeholder !== undefined) this.placeholder = options.placeholder
-      if (options.model !== undefined) this.model = options.model
-      if (options.provider !== undefined) {
-        this.providerWasChosen = true
-        this.provider = options.provider
+      if (options.initialPlannerOptionId !== undefined && !this.state.fixedProvider) {
+        const initialPlannerOption = this.getPlannerOptionById(options.initialPlannerOptionId)
+        if (initialPlannerOption) {
+          this.providerWasChosen = true
+          this.state.plannerOptionId = initialPlannerOption.id
+          this.state.provider = 'auto'
+          if (!this.state.fixedModel) {
+            this.state.model = getDefaultModelForPlannerOption(initialPlannerOption)
+          }
+        }
       }
+      if (options.settingsOpen !== undefined) this.state.settingsOpen = options.settingsOpen
+      if (options.planner !== undefined) this.providedPlanner = options.planner
+      if (options.plannerConfig !== undefined) this.providedPlannerConfig = options.plannerConfig
+
+      if (options.buttonLabel !== undefined) this.applyButtonLabelState(options.buttonLabel)
+      if (options.disabled !== undefined) this.state.disabled = options.disabled
+      if (options.placeholder !== undefined) this.applyPlaceholderState(options.placeholder)
+      if (options.model !== undefined) this.applyModelState(options.model)
+      if (options.provider !== undefined) this.applyProviderState(options.provider)
 
       this.invalidatePlanner()
       this.renderIfConnected()
@@ -428,24 +436,38 @@ export function defineWebMCPCommandInput(
       if (name === 'api-key') this.apiKey = value ?? undefined
       if (name === 'auth-mode') this.authMode = isAuthMode(value) ? value : undefined
       if (name === 'base-url') this.baseUrl = value ?? undefined
-      if (name === 'button-label') this.state.buttonLabel = value || defaultButtonLabel
+      if (name === 'button-label') this.applyButtonLabelState(value ?? undefined)
       if (name === 'disabled') this.state.disabled = value !== null
       if (name === 'endpoint') this.endpoint = value ?? undefined
-      if (name === 'floating') {
-        this.state.floating = value !== null
-        if (!this.state.floating) this.state.floatingExpanded = false
-      }
-      if (name === 'model') {
-        this.state.fixedModel = value ?? undefined
-        this.state.model = value || defaultModel
-      }
-      if (name === 'placeholder') this.state.placeholder = value || defaultPlaceholder
-      if (name === 'provider') {
-        this.state.fixedProvider = isPlannerProviderKind(value) ? value : undefined
-        this.providerWasChosen = Boolean(this.state.fixedProvider)
-        this.state.plannerOptionId = undefined
-        this.state.provider = this.state.fixedProvider ?? 'auto'
-      }
+      if (name === 'floating') this.applyFloatingState(value !== null)
+      if (name === 'model') this.applyModelState(value ?? undefined)
+      if (name === 'placeholder') this.applyPlaceholderState(value ?? undefined)
+      if (name === 'provider') this.applyProviderState(value)
+    }
+
+    private applyButtonLabelState(value: string | undefined) {
+      this.state.buttonLabel = value || defaultButtonLabel
+    }
+
+    private applyPlaceholderState(value: string | undefined) {
+      this.state.placeholder = value || defaultPlaceholder
+    }
+
+    private applyFloatingState(value: boolean) {
+      this.state.floating = value
+      if (!value) this.state.floatingExpanded = false
+    }
+
+    private applyModelState(value: string | undefined) {
+      this.state.fixedModel = value || undefined
+      this.state.model = value || defaultModel
+    }
+
+    private applyProviderState(value: string | null | undefined) {
+      this.state.fixedProvider = isPlannerProviderKind(value) ? value : undefined
+      this.providerWasChosen = Boolean(this.state.fixedProvider)
+      this.state.plannerOptionId = undefined
+      this.state.provider = this.state.fixedProvider ?? 'auto'
     }
 
     private async getCurrentPlanner(): Promise<ToolPlanner> {
@@ -471,7 +493,10 @@ export function defineWebMCPCommandInput(
         this.plannerLoadId = loadId
         const revision = this.plannerRevision
         const planner = await plannerOption.createPlanner({
-          model: plannerModel || undefined
+          model: plannerModel || undefined,
+          modelOption: plannerOption.modelOptions?.find(function findModelOption(option) {
+            return option.model === plannerModel
+          })
         })
         if (revision !== this.plannerRevision || loadId !== this.plannerLoadId) {
           planner.dispose?.()
@@ -793,11 +818,16 @@ export function defineWebMCPCommandInput(
 
     private render() {
       if (!this.shadowRoot) return
-      const previousInput = this.getPromptInput()
-      const shouldRestorePromptFocus = this.shadowRoot.activeElement === previousInput
-      const selectionStart = previousInput?.selectionStart
-      const selectionEnd = previousInput?.selectionEnd
+      const view = this.getViewState()
+      const structureSignature = getStructureSignature(view)
+      if (this.renderedStructureSignature !== structureSignature) {
+        this.renderStructure(view)
+        this.renderedStructureSignature = structureSignature
+      }
+      this.applyViewState(view)
+    }
 
+    private getViewState(): CommandInputViewState {
       const plannerOption = this.getSelectedPlannerOption()
       const provider =
         this.plannerConfig?.provider ?? this.state.fixedProvider ?? this.state.provider
@@ -818,86 +848,50 @@ export function defineWebMCPCommandInput(
         (plannerOption
           ? getPlannerOptionModelOptionCount(plannerOption) > 1
           : getModelOptionCount(provider, this.endpointOptions) > 1)
-      const showDiagnostics = this.state.hasDiagnostics
       const optionsStatus = this.planner
         ? this.state.plannerName
         : plannerOption
           ? getPlannerOptionStatusText(plannerOption, model)
           : getOptionsStatusText(provider, model, this.endpointOptions)
-      const statusLabel = getStatusLabel(this.state.phase)
-      const buttonLabel = this.running ? statusLabel : this.state.buttonLabel
-      const commandMarkup = `
-        <form class="webmcp-command" aria-label="WebMCP command input">
-          <label class="webmcp-input-shell">
-            <span>WebMCP</span>
-            <input
-              data-command-input
-              type="text"
-              autocomplete="off"
-              spellcheck="false"
-              placeholder="${escapeAttribute(this.state.placeholder)}"
-              value="${escapeAttribute(this.state.prompt)}"
-              ${this.state.disabled ? 'disabled' : ''}
-            />
-          </label>
-          <button
-            class="webmcp-run-button"
-            type="submit"
-            data-phase="${escapeAttribute(this.state.phase)}"
-            ${this.running || this.state.disabled ? 'disabled' : ''}
-            aria-busy="${String(this.running)}"
-          >
-            ${escapeHtml(buttonLabel)}
-          </button>
-        </form>
-        ${
-          showProviderControl || showModelControl
-            ? `
-          <details class="webmcp-settings" ${this.state.settingsOpen ? 'open' : ''}>
-            <summary class="webmcp-settings-summary">
-              <span>Options</span>
-              <span class="webmcp-status" aria-live="polite" aria-atomic="true">
-              ${escapeHtml(optionsStatus)}
-              </span>
-            </summary>
-            <div class="webmcp-settings-grid">
-              ${showProviderControl ? getProviderControlMarkup(providerControlValue, this.endpointOptions, showChromeAIOption, this.plannerOptions) : ''}
-              ${showModelControl ? (plannerOption ? getPlannerOptionModelControlMarkup(plannerOption, model) : getModelControlMarkup(provider, model, this.endpointOptions)) : ''}
-            </div>
-          </details>
-        `
-            : ''
-        }
-        ${
-          showDiagnostics
-            ? `
-          <details class="webmcp-diagnostics" ${this.state.diagnosticsOpen ? 'open' : ''}>
-            <summary class="webmcp-disclosure-summary">
-              <span>Developer diagnostics</span>
-            </summary>
-            <div class="webmcp-diagnostics-content">
-              <slot name="diagnostics"></slot>
-            </div>
-          </details>
-        `
-            : ''
-        }
-      `
 
-      this.shadowRoot.innerHTML = this.state.floating
-        ? `
-        <style>${getStyles()}</style>
-        <section
-          class="webmcp-floating-panel"
-          ${this.state.floatingExpanded ? '' : 'hidden'}
-        >
-          ${commandMarkup}
-        </section>
-      `
-        : `
-        <style>${getStyles()}</style>
-        ${commandMarkup}
-      `
+      return {
+        buttonLabel: this.running ? getStatusLabel(this.state.phase) : this.state.buttonLabel,
+        diagnosticsOpen: this.state.diagnosticsOpen,
+        disabled: this.state.disabled,
+        floating: this.state.floating,
+        floatingExpanded: this.state.floatingExpanded,
+        modelControlMarkup: showModelControl
+          ? plannerOption
+            ? getPlannerOptionModelControlMarkup(plannerOption, model)
+            : getModelControlMarkup(provider, model, this.endpointOptions)
+          : '',
+        optionsStatus,
+        phase: this.state.phase,
+        placeholder: this.state.placeholder,
+        prompt: this.state.prompt,
+        providerControlMarkup: showProviderControl
+          ? getProviderControlMarkup(
+              providerControlValue,
+              this.endpointOptions,
+              showChromeAIOption,
+              this.plannerOptions
+            )
+          : '',
+        running: this.running,
+        settingsOpen: this.state.settingsOpen,
+        showDiagnostics: this.state.hasDiagnostics,
+        showSettings: showProviderControl || showModelControl
+      }
+    }
+
+    private renderStructure(view: CommandInputViewState) {
+      if (!this.shadowRoot) return
+      const previousInput = this.getPromptInput()
+      const shouldRestorePromptFocus = this.shadowRoot.activeElement === previousInput
+      const selectionStart = previousInput?.selectionStart
+      const selectionEnd = previousInput?.selectionEnd
+
+      this.shadowRoot.innerHTML = getShadowMarkup(view)
 
       const form = this.shadowRoot.querySelector<HTMLFormElement>('form')
       const input = this.shadowRoot.querySelector<HTMLInputElement>('[data-command-input]')
@@ -909,8 +903,6 @@ export function defineWebMCPCommandInput(
       const modelControl = this.shadowRoot.querySelector<HTMLInputElement | HTMLSelectElement>(
         '[data-model]'
       )
-
-      this.syncFloatingHost()
 
       form?.addEventListener('submit', this.handleSubmit.bind(this))
       input?.addEventListener('input', this.handlePromptChanged.bind(this))
@@ -926,6 +918,46 @@ export function defineWebMCPCommandInput(
           input?.setSelectionRange(selectionStart ?? 0, selectionEnd ?? selectionStart ?? 0)
         }
       }
+    }
+
+    private applyViewState(view: CommandInputViewState) {
+      const root = this.shadowRoot
+      if (!root) return
+
+      const input = this.getPromptInput()
+      if (input) {
+        input.placeholder = view.placeholder
+        if (input.value !== view.prompt) input.value = view.prompt
+        if (input.getAttribute('value') !== view.prompt) input.setAttribute('value', view.prompt)
+        input.toggleAttribute('disabled', view.disabled)
+      }
+
+      const button = root.querySelector<HTMLButtonElement>('.webmcp-run-button')
+      if (button) {
+        button.dataset.phase = view.phase
+        button.toggleAttribute('disabled', view.running || view.disabled)
+        button.setAttribute('aria-busy', String(view.running))
+        if (button.textContent.trim() !== view.buttonLabel) button.textContent = view.buttonLabel
+      }
+
+      const settingsControl = root.querySelector<HTMLDetailsElement>('.webmcp-settings')
+      if (settingsControl && settingsControl.open !== view.settingsOpen) {
+        settingsControl.open = view.settingsOpen
+      }
+      const status = root.querySelector<HTMLElement>('.webmcp-settings-summary .webmcp-status')
+      if (status && status.textContent.trim() !== view.optionsStatus) {
+        status.textContent = view.optionsStatus
+      }
+
+      const diagnosticsControl = root.querySelector<HTMLDetailsElement>('.webmcp-diagnostics')
+      if (diagnosticsControl && diagnosticsControl.open !== view.diagnosticsOpen) {
+        diagnosticsControl.open = view.diagnosticsOpen
+      }
+
+      const floatingPanel = root.querySelector<HTMLElement>('.webmcp-floating-panel')
+      if (floatingPanel) floatingPanel.hidden = !view.floatingExpanded
+
+      this.syncFloatingHost()
     }
 
     private getSelectedPlannerOption(): WebMCPCommandInputPlannerOption | undefined {

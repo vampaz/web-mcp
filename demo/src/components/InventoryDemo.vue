@@ -28,35 +28,34 @@
 </template>
 
 <script setup lang="ts">
-import { defineTool, listTools, registerTool } from 'webmcp-kit'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { defineTool } from 'webmcp-kit'
+import { computed, ref } from 'vue'
 
 import DemoSemanticInventory from '@/components/DemoSemanticInventory.vue'
 import DemoShell from '@/components/DemoShell.vue'
-import type { DemoActivityItem, DemoMetric, SelectableItem } from '@/interfaces/demo'
-import {
-  getDemoRouteStory,
-  getInitialDemoSettings,
-  getInitialSelectableItems
-} from '@/utils/demo-data'
+import { useDemoTools } from '@/composables/use-demo-tools'
+import type { DemoMetric, SelectableItem } from '@/interfaces/demo'
+import { getDemoRouteStory, getInitialSelectableItems } from '@/utils/demo-data'
 
 type InventorySortKey = 'aisle' | 'demand' | 'margin' | 'name' | 'stock' | 'supplier'
 type InventorySortDirection = 'asc' | 'desc'
 
 const selectableItems = ref<SelectableItem[]>(getInitialSelectableItems())
 const story = getDemoRouteStory('inventory')
-const settings = ref(getInitialDemoSettings())
-const registeredToolsCount = ref(0)
-const activityItems = ref<DemoActivityItem[]>([
-  {
-    id: 'inventory-seed',
-    kind: 'system',
-    time: '09:12',
-    title: 'Morning stock sync',
-    detail: '72 items loaded with aisle, margin, demand, and supplier metadata.'
-  }
-])
-const unregisterCallbacks: Array<() => void> = []
+const { activityItems, addActivity, registerDemoTool, registeredToolsCount, settings } =
+  useDemoTools({
+    maxActivityItems: 6,
+    registerTools: registerInventoryTools,
+    seedActivity: [
+      {
+        id: 'inventory-seed',
+        kind: 'system',
+        time: '09:12',
+        title: 'Morning stock sync',
+        detail: '72 items loaded with aisle, margin, demand, and supplier metadata.'
+      }
+    ]
+  })
 const selectedItems = computed(function getSelectedItems() {
   return selectableItems.value.filter(function filterSelectedItem(item) {
     return item.selected
@@ -94,107 +93,90 @@ const metrics = computed<DemoMetric[]>(function getInventoryMetrics() {
   ]
 })
 
-onMounted(function handleMounted() {
-  registerInventoryTools()
-  refreshTools()
-})
-
-onUnmounted(function handleUnmounted() {
-  for (const unregister of unregisterCallbacks) {
-    unregister()
-  }
-})
-
 function registerInventoryTools() {
-  unregisterCallbacks.push(
-    registerTool(
-      defineTool({
-        name: 'select_items',
-        description: 'Select visible inventory items by stable item IDs.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            ids: {
-              type: 'array',
-              items: {
-                type: 'string'
-              },
-              description: 'Stable item IDs to select from the visible inventory.'
-            }
-          },
-          required: ['ids'],
-          additionalProperties: false
-        },
-        execute(input) {
-          const ids = Array.isArray(input.ids) ? input.ids.map(String) : []
-          selectableItems.value = selectableItems.value.map(function mapItem(item) {
-            return {
-              ...item,
-              selected: ids.includes(item.id)
-            }
-          })
-          addActivity(
-            'ai',
-            'Selection updated',
-            `${selectedItems.value.length} inventory items selected from the current merchandising context.`
-          )
-          return selectedItems.value
-        }
-      })
-    ).unregister
-  )
-
-  unregisterCallbacks.push(
-    registerTool(
-      defineTool({
-        name: 'clear_item_selection',
-        description: 'Clear the current semantic inventory selection.',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-          required: [],
-          additionalProperties: false
-        },
-        execute() {
-          clearItemSelection()
-          addActivity('ai', 'Selection cleared', 'All merchandising selections were removed.')
-          return []
-        }
-      })
-    ).unregister
-  )
-
-  unregisterCallbacks.push(
-    registerTool(
-      defineTool({
-        name: 'sort_inventory',
-        description: 'Sort the visible inventory table by a supported column.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            sortBy: {
-              type: 'string',
-              enum: ['aisle', 'demand', 'margin', 'name', 'stock', 'supplier']
+  registerDemoTool(
+    defineTool({
+      name: 'select_items',
+      description: 'Select visible inventory items by stable item IDs.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          ids: {
+            type: 'array',
+            items: {
+              type: 'string'
             },
-            direction: {
-              type: 'string',
-              enum: ['asc', 'desc']
-            }
-          },
-          required: ['sortBy'],
-          additionalProperties: false
+            description: 'Stable item IDs to select from the visible inventory.'
+          }
         },
-        execute(input) {
-          const sortBy = isInventorySortKey(input.sortBy) ? input.sortBy : 'name'
-          const direction = input.direction === 'desc' ? 'desc' : 'asc'
-          selectableItems.value = [...selectableItems.value].sort(function sortItems(left, right) {
-            return compareInventoryItems(left, right, sortBy, direction)
-          })
-          addActivity('ai', 'Inventory table sorted', `Sorted by ${sortBy}.`)
-          return selectableItems.value
-        }
-      })
-    ).unregister
+        required: ['ids'],
+        additionalProperties: false
+      },
+      execute(input) {
+        const ids = Array.isArray(input.ids) ? input.ids.map(String) : []
+        selectableItems.value = selectableItems.value.map(function mapItem(item) {
+          return {
+            ...item,
+            selected: ids.includes(item.id)
+          }
+        })
+        addActivity(
+          'ai',
+          'Selection updated',
+          `${selectedItems.value.length} inventory items selected from the current merchandising context.`
+        )
+        return selectedItems.value
+      }
+    })
+  )
+
+  registerDemoTool(
+    defineTool({
+      name: 'clear_item_selection',
+      description: 'Clear the current semantic inventory selection.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        required: [],
+        additionalProperties: false
+      },
+      execute() {
+        clearItemSelection()
+        addActivity('ai', 'Selection cleared', 'All merchandising selections were removed.')
+        return []
+      }
+    })
+  )
+
+  registerDemoTool(
+    defineTool({
+      name: 'sort_inventory',
+      description: 'Sort the visible inventory table by a supported column.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sortBy: {
+            type: 'string',
+            enum: ['aisle', 'demand', 'margin', 'name', 'stock', 'supplier']
+          },
+          direction: {
+            type: 'string',
+            enum: ['asc', 'desc']
+          }
+        },
+        required: ['sortBy'],
+        additionalProperties: false
+      },
+      execute(input) {
+        const sortBy = isInventorySortKey(input.sortBy) ? input.sortBy : 'name'
+        const direction = input.direction === 'desc' ? 'desc' : 'asc'
+        selectableItems.value = [...selectableItems.value].sort(function sortItems(left, right) {
+          return compareInventoryItems(left, right, sortBy, direction)
+        })
+        addActivity('ai', 'Inventory table sorted', `Sorted by ${sortBy}.`)
+        return selectableItems.value
+      }
+    })
   )
 }
 
@@ -285,10 +267,6 @@ function isInventorySortKey(value: unknown): value is InventorySortKey {
   )
 }
 
-function refreshTools() {
-  registeredToolsCount.value = listTools().length
-}
-
 function getPlannerContext() {
   return {
     checklistItems: selectableItems.value.map(function mapChecklistItem(item, index) {
@@ -306,21 +284,5 @@ function getPlannerContext() {
     }),
     settings: settings.value
   }
-}
-
-function addActivity(kind: DemoActivityItem['kind'], title: string, detail: string) {
-  activityItems.value = [
-    {
-      id: `${Date.now()}-${activityItems.value.length}`,
-      kind,
-      time: new Date().toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit'
-      }),
-      title,
-      detail
-    },
-    ...activityItems.value
-  ].slice(0, 6)
 }
 </script>

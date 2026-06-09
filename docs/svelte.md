@@ -29,3 +29,12 @@ Use `useWebMCPTool` to register a tool while the component is mounted. `when` ca
   })
 </script>
 ```
+
+The helper returns the same handle shape as the Vue and React helpers:
+
+```ts
+const searchTool = useWebMCPTool(searchProductsTool)
+
+searchTool.getRegistration() // current RegisteredTool or undefined (set after mount)
+searchTool.unregister() // unregister before destroy when needed
+```

@@ -51,24 +51,17 @@
 </template>
 
 <script setup lang="ts">
-import { defineTool, listTools, registerTool } from 'webmcp-kit'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { defineTool } from 'webmcp-kit'
+import { computed, ref } from 'vue'
 
 import DemoInvoiceDrawer from '@/components/DemoInvoiceDrawer.vue'
 import DemoInvoiceTable from '@/components/DemoInvoiceTable.vue'
 import DemoShell from '@/components/DemoShell.vue'
-import type {
-  Customer,
-  DemoActivityItem,
-  DemoMetric,
-  Invoice,
-  InvoiceDraft,
-  InvoiceFilters
-} from '@/interfaces/demo'
+import { useDemoTools } from '@/composables/use-demo-tools'
+import type { Customer, DemoMetric, Invoice, InvoiceDraft, InvoiceFilters } from '@/interfaces/demo'
 import {
   getDemoRouteStory,
   getInitialCustomers,
-  getInitialDemoSettings,
   getInitialInvoiceDraft,
   getInitialInvoices
 } from '@/utils/demo-data'
@@ -84,18 +77,19 @@ const invoiceSortKey = ref<'amount' | 'customerName' | 'dueDate' | 'status'>('du
 const invoiceSortDirection = ref<'asc' | 'desc'>('asc')
 const activeInvoiceId = ref(invoices.value[0]?.id ?? '')
 const invoiceDraft = ref<InvoiceDraft>(getInitialInvoiceDraft())
-const settings = ref(getInitialDemoSettings())
-const registeredToolsCount = ref(0)
-const activityItems = ref<DemoActivityItem[]>([
-  {
-    id: 'invoice-seed',
-    kind: 'system',
-    time: '08:55',
-    title: 'Receivables snapshot loaded',
-    detail: 'Invoice risk, account health, and owner context are ready for planning.'
-  }
-])
-const unregisterCallbacks: Array<() => void> = []
+const { activityItems, addActivity, registerDemoTool, registeredToolsCount, settings } =
+  useDemoTools({
+    registerTools: registerInvoiceTools,
+    seedActivity: [
+      {
+        id: 'invoice-seed',
+        kind: 'system',
+        time: '08:55',
+        title: 'Receivables snapshot loaded',
+        detail: 'Invoice risk, account health, and owner context are ready for planning.'
+      }
+    ]
+  })
 const selectedInvoices = computed(function getSelectedInvoices() {
   return invoices.value.filter(function filterSelectedInvoice(invoice) {
     return invoice.selected
@@ -166,273 +160,250 @@ const metrics = computed<DemoMetric[]>(function getInvoiceMetrics() {
   ]
 })
 
-onMounted(function handleMounted() {
-  registerInvoiceTools()
-  refreshTools()
-})
-
-onUnmounted(function handleUnmounted() {
-  for (const unregister of unregisterCallbacks) {
-    unregister()
-  }
-})
-
 function registerInvoiceTools() {
-  unregisterCallbacks.push(
-    registerTool(
-      defineTool({
-        name: 'create_invoice',
-        description: 'Create a draft invoice for a customer and add it to the local invoice list.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            customerName: {
-              type: 'string',
-              description: 'The customer name to invoice.'
-            },
-            amount: {
-              type: 'number',
-              minimum: 0.01,
-              description: 'The invoice amount in euros.'
-            },
-            dueDate: {
-              type: 'string',
-              description: 'The invoice due date as YYYY-MM-DD.'
-            },
-            owner: {
-              type: 'string',
-              description: 'The internal owner responsible for the invoice.'
-            }
+  registerDemoTool(
+    defineTool({
+      name: 'create_invoice',
+      description: 'Create a draft invoice for a customer and add it to the local invoice list.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          customerName: {
+            type: 'string',
+            description: 'The customer name to invoice.'
           },
-          required: ['customerName', 'amount'],
-          additionalProperties: false
-        },
-        confirmation: {
-          required: true,
-          reason: 'Creating an invoice changes local business state.'
-        },
-        execute(input) {
-          const invoice = {
-            id: `inv_${Date.now()}`,
-            customerId: findCustomerId(String(input.customerName ?? 'Acme Corp')),
-            customerName: String(input.customerName ?? 'Acme Corp'),
-            amount: Number(input.amount ?? 100),
-            status: 'draft' as const,
-            dueDate: String(input.dueDate ?? invoiceDraft.value.dueDate),
-            owner: String(input.owner ?? invoiceDraft.value.owner),
-            risk: 'medium' as const,
-            selected: false
+          amount: {
+            type: 'number',
+            minimum: 0.01,
+            description: 'The invoice amount in euros.'
+          },
+          dueDate: {
+            type: 'string',
+            description: 'The invoice due date as YYYY-MM-DD.'
+          },
+          owner: {
+            type: 'string',
+            description: 'The internal owner responsible for the invoice.'
           }
-          invoices.value = [invoice, ...invoices.value]
-          activeInvoiceId.value = invoice.id
-          addActivity(
-            'ai',
-            'Invoice created',
-            `${invoice.customerName} draft invoice for €${invoice.amount}.`
-          )
-          return invoice
+        },
+        required: ['customerName', 'amount'],
+        additionalProperties: false
+      },
+      confirmation: {
+        required: true,
+        reason: 'Creating an invoice changes local business state.'
+      },
+      execute(input) {
+        const invoice = {
+          id: `inv_${Date.now()}`,
+          customerId: findCustomerId(String(input.customerName ?? 'Acme Corp')),
+          customerName: String(input.customerName ?? 'Acme Corp'),
+          amount: Number(input.amount ?? 100),
+          status: 'draft' as const,
+          dueDate: String(input.dueDate ?? invoiceDraft.value.dueDate),
+          owner: String(input.owner ?? invoiceDraft.value.owner),
+          risk: 'medium' as const,
+          selected: false
         }
-      })
-    ).unregister
+        invoices.value = [invoice, ...invoices.value]
+        activeInvoiceId.value = invoice.id
+        addActivity(
+          'ai',
+          'Invoice created',
+          `${invoice.customerName} draft invoice for €${invoice.amount}.`
+        )
+        return invoice
+      }
+    })
   )
 
-  unregisterCallbacks.push(
-    registerTool(
-      defineTool({
-        name: 'filter_invoices',
-        description:
-          'Apply visible invoice table filters by status, search query, or minimum amount.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            status: {
-              type: 'string',
-              enum: ['all', 'draft', 'sent', 'overdue', 'paid', 'void'],
-              description: 'Invoice status filter.'
-            },
-            query: {
-              type: 'string',
-              description: 'Search text for customer, owner, status, or ID.'
-            },
-            minAmount: {
-              type: 'number',
-              description: 'Optional minimum invoice amount to convert into a search selection.'
-            }
+  registerDemoTool(
+    defineTool({
+      name: 'filter_invoices',
+      description:
+        'Apply visible invoice table filters by status, search query, or minimum amount.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          status: {
+            type: 'string',
+            enum: ['all', 'draft', 'sent', 'overdue', 'paid', 'void'],
+            description: 'Invoice status filter.'
           },
-          additionalProperties: false
+          query: {
+            type: 'string',
+            description: 'Search text for customer, owner, status, or ID.'
+          },
+          minAmount: {
+            type: 'number',
+            description: 'Optional minimum invoice amount to convert into a search selection.'
+          }
         },
-        execute(input) {
-          invoiceFilters.value = {
-            query: String(input.query ?? ''),
-            status: isInvoiceStatusFilter(input.status) ? input.status : 'all'
+        additionalProperties: false
+      },
+      execute(input) {
+        invoiceFilters.value = {
+          query: String(input.query ?? ''),
+          status: isInvoiceStatusFilter(input.status) ? input.status : 'all'
+        }
+
+        if (typeof input.minAmount === 'number') {
+          const minAmount = input.minAmount
+          invoices.value = invoices.value.map(function mapInvoice(invoice) {
+            return {
+              ...invoice,
+              selected: invoice.amount >= minAmount
+            }
+          })
+        }
+
+        addActivity(
+          'ai',
+          'Invoice filters applied',
+          `${visibleInvoices.value.length} invoices match the current filter set.`
+        )
+
+        return {
+          filters: invoiceFilters.value,
+          visibleInvoices: visibleInvoices.value
+        }
+      }
+    })
+  )
+
+  registerDemoTool(
+    defineTool({
+      name: 'sort_invoices',
+      description: 'Sort the visible invoice table by a supported column.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sortBy: {
+            type: 'string',
+            enum: ['amount', 'customerName', 'dueDate', 'status']
+          },
+          direction: {
+            type: 'string',
+            enum: ['asc', 'desc']
           }
+        },
+        required: ['sortBy'],
+        additionalProperties: false
+      },
+      execute(input) {
+        invoiceSortKey.value = isInvoiceSortKey(input.sortBy) ? input.sortBy : 'dueDate'
+        invoiceSortDirection.value = input.direction === 'desc' ? 'desc' : 'asc'
+        addActivity('ai', 'Invoice table sorted', `Sorted by ${invoiceSortKey.value}.`)
+        return visibleInvoices.value
+      }
+    })
+  )
 
-          if (typeof input.minAmount === 'number') {
-            const minAmount = input.minAmount
-            invoices.value = invoices.value.map(function mapInvoice(invoice) {
-              return {
-                ...invoice,
-                selected: invoice.amount >= minAmount
-              }
-            })
+  registerDemoTool(
+    defineTool({
+      name: 'select_invoices',
+      description: 'Select invoice rows by stable invoice IDs in the visible invoice table.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          ids: {
+            type: 'array',
+            items: {
+              type: 'string'
+            },
+            description: 'Stable invoice IDs to select.'
           }
-
-          addActivity(
-            'ai',
-            'Invoice filters applied',
-            `${visibleInvoices.value.length} invoices match the current filter set.`
-          )
-
+        },
+        required: ['ids'],
+        additionalProperties: false
+      },
+      execute(input) {
+        const ids = Array.isArray(input.ids) ? input.ids.map(String) : []
+        invoices.value = invoices.value.map(function mapInvoice(invoice) {
           return {
-            filters: invoiceFilters.value,
-            visibleInvoices: visibleInvoices.value
+            ...invoice,
+            selected: ids.includes(invoice.id)
           }
-        }
-      })
-    ).unregister
+        })
+        addActivity('ai', 'Invoices selected', `${selectedInvoices.value.length} rows selected.`)
+        return selectedInvoices.value
+      }
+    })
   )
 
-  unregisterCallbacks.push(
-    registerTool(
-      defineTool({
-        name: 'sort_invoices',
-        description: 'Sort the visible invoice table by a supported column.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            sortBy: {
-              type: 'string',
-              enum: ['amount', 'customerName', 'dueDate', 'status']
-            },
-            direction: {
-              type: 'string',
-              enum: ['asc', 'desc']
-            }
-          },
-          required: ['sortBy'],
-          additionalProperties: false
-        },
-        execute(input) {
-          invoiceSortKey.value = isInvoiceSortKey(input.sortBy) ? input.sortBy : 'dueDate'
-          invoiceSortDirection.value = input.direction === 'desc' ? 'desc' : 'asc'
-          addActivity('ai', 'Invoice table sorted', `Sorted by ${invoiceSortKey.value}.`)
-          return visibleInvoices.value
-        }
-      })
-    ).unregister
-  )
-
-  unregisterCallbacks.push(
-    registerTool(
-      defineTool({
-        name: 'select_invoices',
-        description: 'Select invoice rows by stable invoice IDs in the visible invoice table.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            ids: {
-              type: 'array',
-              items: {
-                type: 'string'
-              },
-              description: 'Stable invoice IDs to select.'
-            }
-          },
-          required: ['ids'],
-          additionalProperties: false
-        },
-        execute(input) {
-          const ids = Array.isArray(input.ids) ? input.ids.map(String) : []
-          invoices.value = invoices.value.map(function mapInvoice(invoice) {
-            return {
-              ...invoice,
-              selected: ids.includes(invoice.id)
-            }
-          })
-          addActivity('ai', 'Invoices selected', `${selectedInvoices.value.length} rows selected.`)
-          return selectedInvoices.value
-        }
-      })
-    ).unregister
-  )
-
-  unregisterCallbacks.push(
-    registerTool(
-      defineTool({
-        name: 'open_invoice',
-        description: 'Open an invoice row in the visible invoice detail drawer.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            id: {
-              type: 'string',
-              description: 'Stable invoice ID to open.'
-            }
-          },
-          required: ['id'],
-          additionalProperties: false
-        },
-        guard(input) {
-          return (
-            invoices.value.some(function hasInvoice(invoice) {
-              return invoice.id === String(input.id ?? '')
-            }) || 'Invoice is not visible in the current workspace.'
-          )
-        },
-        execute(input) {
-          activeInvoiceId.value = String(input.id)
-          const invoice = activeInvoice.value
-          if (invoice) {
-            addActivity('ai', 'Invoice opened', `${invoice.customerName} ${invoice.id} is active.`)
+  registerDemoTool(
+    defineTool({
+      name: 'open_invoice',
+      description: 'Open an invoice row in the visible invoice detail drawer.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: {
+            type: 'string',
+            description: 'Stable invoice ID to open.'
           }
-          return invoice
+        },
+        required: ['id'],
+        additionalProperties: false
+      },
+      guard(input) {
+        return (
+          invoices.value.some(function hasInvoice(invoice) {
+            return invoice.id === String(input.id ?? '')
+          }) || 'Invoice is not visible in the current workspace.'
+        )
+      },
+      execute(input) {
+        activeInvoiceId.value = String(input.id)
+        const invoice = activeInvoice.value
+        if (invoice) {
+          addActivity('ai', 'Invoice opened', `${invoice.customerName} ${invoice.id} is active.`)
         }
-      })
-    ).unregister
+        return invoice
+      }
+    })
   )
 
-  unregisterCallbacks.push(
-    registerTool(
-      defineTool({
-        name: 'update_selected_invoice_status',
-        description: 'Update the status for currently selected invoice rows.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            status: {
-              type: 'string',
-              enum: ['draft', 'sent', 'overdue', 'paid', 'void']
-            }
-          },
-          required: ['status'],
-          additionalProperties: false
+  registerDemoTool(
+    defineTool({
+      name: 'update_selected_invoice_status',
+      description: 'Update the status for currently selected invoice rows.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          status: {
+            type: 'string',
+            enum: ['draft', 'sent', 'overdue', 'paid', 'void']
+          }
         },
-        confirmation: {
-          required: true,
-          reason: 'Changing invoice status mutates business records.'
-        },
-        guard(input) {
-          if (selectedInvoices.value.length === 0) return 'No invoices are selected.'
-          return isInvoiceStatus(input.status) || 'Unsupported invoice status.'
-        },
-        execute(input) {
-          const status = input.status as Invoice['status']
-          invoices.value = invoices.value.map(function mapInvoice(invoice) {
-            if (!invoice.selected) return invoice
-            return {
-              ...invoice,
-              status
-            }
-          })
-          addActivity(
-            'ai',
-            'Invoice status updated',
-            `${selectedInvoices.value.length} selected invoices moved to ${status}.`
-          )
-          return selectedInvoices.value
-        }
-      })
-    ).unregister
+        required: ['status'],
+        additionalProperties: false
+      },
+      confirmation: {
+        required: true,
+        reason: 'Changing invoice status mutates business records.'
+      },
+      guard(input) {
+        if (selectedInvoices.value.length === 0) return 'No invoices are selected.'
+        return isInvoiceStatus(input.status) || 'Unsupported invoice status.'
+      },
+      execute(input) {
+        const status = input.status as Invoice['status']
+        invoices.value = invoices.value.map(function mapInvoice(invoice) {
+          if (!invoice.selected) return invoice
+          return {
+            ...invoice,
+            status
+          }
+        })
+        addActivity(
+          'ai',
+          'Invoice status updated',
+          `${selectedInvoices.value.length} selected invoices moved to ${status}.`
+        )
+        return selectedInvoices.value
+      }
+    })
   )
 }
 
@@ -530,10 +501,6 @@ function createInvoiceFromDraft() {
   )
 }
 
-function refreshTools() {
-  registeredToolsCount.value = listTools().length
-}
-
 function getPlannerContext() {
   return {
     invoiceFilters: invoiceFilters.value,
@@ -551,22 +518,6 @@ function findCustomerId(customerName: string): string {
   })
 
   return customer?.id ?? `cust_${customerName.toLowerCase().replace(/\W+/g, '_')}`
-}
-
-function addActivity(kind: DemoActivityItem['kind'], title: string, detail: string) {
-  activityItems.value = [
-    {
-      id: `${Date.now()}-${activityItems.value.length}`,
-      kind,
-      time: new Date().toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit'
-      }),
-      title,
-      detail
-    },
-    ...activityItems.value
-  ].slice(0, 7)
 }
 
 function isInvoiceStatus(value: unknown): value is Invoice['status'] {

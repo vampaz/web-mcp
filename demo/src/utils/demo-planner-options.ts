@@ -1,5 +1,6 @@
 import type { WebMCPCommandInputEndpointOption, WebMCPCommandInputPlannerOption } from 'webmcp-kit'
 
+import type { BrowserLocalAIModelOption } from '@/interfaces/browser-local-ai'
 import {
   getCloudflareBindingModels,
   getOpenAIPlannerEndpoints,
@@ -50,7 +51,10 @@ export const plannerOptions: WebMCPCommandInputPlannerOption[] = [
     label: 'Browser local AI',
     modelOptions: browserLocalAIModels,
     createPlanner(options) {
+      const modelOption = options?.modelOption as BrowserLocalAIModelOption | undefined
+
       return createBrowserLocalAIPlanner({
+        contextWindowSize: modelOption?.contextWindowSize,
         model: options?.model ?? defaultBrowserLocalAIModel
       })
     }

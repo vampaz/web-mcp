@@ -16,7 +16,7 @@ export async function invokeToolPipeline<TInput, TOutput>(
   const startedAt = options.startedAt ?? performance.now()
   const inputValidationErrors = validateJsonValue(options.input, tool.inputSchema)
   if (inputValidationErrors.length > 0) {
-    return createResult<TOutput>(
+    return createInvocationResult<TOutput>(
       tool.name,
       'error',
       startedAt,
@@ -28,7 +28,7 @@ export async function invokeToolPipeline<TInput, TOutput>(
   try {
     const availability = tool.scope?.()
     if (availability && !availability.available) {
-      return createResult<TOutput>(
+      return createInvocationResult<TOutput>(
         tool.name,
         'unavailable',
         startedAt,
@@ -37,7 +37,7 @@ export async function invokeToolPipeline<TInput, TOutput>(
       )
     }
   } catch (error) {
-    return createResult<TOutput>(
+    return createInvocationResult<TOutput>(
       tool.name,
       'error',
       startedAt,
@@ -51,7 +51,7 @@ export async function invokeToolPipeline<TInput, TOutput>(
     try {
       confirmed = await requestToolConfirmation(tool, options.input)
     } catch (error) {
-      return createResult<TOutput>(
+      return createInvocationResult<TOutput>(
         tool.name,
         'error',
         startedAt,
@@ -62,7 +62,7 @@ export async function invokeToolPipeline<TInput, TOutput>(
   }
 
   if (tool.confirmation?.required && !confirmed) {
-    return createResult<TOutput>(
+    return createInvocationResult<TOutput>(
       tool.name,
       'blocked',
       startedAt,
@@ -75,7 +75,7 @@ export async function invokeToolPipeline<TInput, TOutput>(
   try {
     const guardResult = await tool.guard?.(typedInput)
     if (typeof guardResult === 'string' || guardResult === false) {
-      return createResult<TOutput>(
+      return createInvocationResult<TOutput>(
         tool.name,
         'blocked',
         startedAt,
@@ -84,7 +84,7 @@ export async function invokeToolPipeline<TInput, TOutput>(
       )
     }
   } catch (error) {
-    return createResult<TOutput>(
+    return createInvocationResult<TOutput>(
       tool.name,
       'error',
       startedAt,
@@ -97,9 +97,9 @@ export async function invokeToolPipeline<TInput, TOutput>(
     const output = await tool.execute(typedInput, {
       source: options.source
     })
-    return createResult<TOutput>(tool.name, 'success', startedAt, output)
+    return createInvocationResult<TOutput>(tool.name, 'success', startedAt, output)
   } catch (error) {
-    return createResult<TOutput>(
+    return createInvocationResult<TOutput>(
       tool.name,
       'error',
       startedAt,
@@ -109,7 +109,7 @@ export async function invokeToolPipeline<TInput, TOutput>(
   }
 }
 
-function createResult<TOutput>(
+export function createInvocationResult<TOutput>(
   toolName: string,
   status: ToolInvocationResult['status'],
   startedAt: number,

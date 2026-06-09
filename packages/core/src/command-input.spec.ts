@@ -4,6 +4,7 @@ import { defineWebMCPCommandInput } from './command-input'
 import { defineTool } from './define-tool'
 import type {
   WebMCPCommandInputElement,
+  WebMCPCommandInputPlannerCreateOptions,
   WebMCPCommandPlannerEventDetail,
   WebMCPCommandResultEventDetail,
   WebMCPCommandStepEventDetail
@@ -1063,6 +1064,300 @@ describe('WebMCP command input', () => {
 
     expect(element.shadowRoot?.querySelector('[data-provider]')).toBeNull()
     expect(element.shadowRoot?.querySelector('[data-model]')).toBeNull()
+  })
+
+  it('selects a configured planner option through initialPlannerOptionId', async () => {
+    registerTool(
+      defineTool({
+        name: 'select_items',
+        description: 'Select checklist items.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            ids: {
+              type: 'array',
+              items: { type: 'string' }
+            }
+          },
+          required: ['ids'],
+          additionalProperties: false
+        },
+        execute(input) {
+          return input
+        }
+      })
+    )
+    const element = createCommandInputElement()
+    element.configure({
+      endpointOptions: [
+        {
+          label: 'GPT-5.4 mini',
+          model: 'gpt-5.4-mini',
+          provider: 'openai'
+        }
+      ],
+      initialPlannerOptionId: 'browser-local-ai',
+      plannerOptions: [
+        {
+          id: 'browser-local-ai',
+          label: 'Browser local AI',
+          modelOptions: [
+            {
+              label: 'Hermes 3',
+              model: 'hermes-3'
+            },
+            {
+              label: 'Qwen 2B',
+              model: 'qwen-2b'
+            }
+          ],
+          createPlanner(options) {
+            return {
+              name: 'Browser local AI',
+              available: true,
+              status: 'ready',
+              detail: `Runs ${options?.model ?? 'unknown'} in the browser.`,
+              async plan() {
+                return {
+                  toolName: 'select_items',
+                  input: { ids: [options?.model ?? 'missing-model'] },
+                  confidence: 0.9,
+                  reason: 'Selected with the initial consumer planner.'
+                }
+              }
+            }
+          }
+        }
+      ]
+    })
+    document.body.append(element)
+    await Promise.resolve()
+
+    const provider = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
+    const model = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-model]')
+    const settings = element.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-settings')
+    expect(provider?.value).toBe('planner:browser-local-ai')
+    expect(model?.value).toBe('hermes-3')
+    expect(settings?.open).toBe(false)
+
+    await expect(element.run('Select items')).resolves.toMatchObject({
+      status: 'success',
+      output: { ids: ['hermes-3'] }
+    })
+
+    provider!.value = 'openai'
+    provider!.dispatchEvent(new Event('change', { bubbles: true }))
+    await Promise.resolve()
+
+    const changedProvider = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
+    expect(changedProvider?.value).toBe('openai')
+  })
+
+  it('passes the selected model option object to createPlanner', async () => {
+    const hermesModelOption = {
+      label: 'Hermes 3',
+      model: 'hermes-3',
+      contextWindowSize: 8192
+    }
+    let receivedModelOption: unknown
+    const createPlanner = vi.fn(function createPlannerSpy(
+      options?: WebMCPCommandInputPlannerCreateOptions
+    ): ToolPlanner {
+      receivedModelOption = options?.modelOption
+
+      return {
+        name: 'Browser local AI',
+        available: true,
+        status: 'ready',
+        detail: 'Browser planner.',
+        async plan(): Promise<ToolPlan> {
+          throw new Error('Not planned in this spec.')
+        }
+      }
+    })
+    const element = createCommandInputElement()
+    element.configure({
+      initialPlannerOptionId: 'browser-local-ai',
+      plannerOptions: [
+        {
+          id: 'browser-local-ai',
+          label: 'Browser local AI',
+          modelOptions: [
+            hermesModelOption,
+            {
+              label: 'Qwen 2B',
+              model: 'qwen-2b'
+            }
+          ],
+          createPlanner
+        }
+      ]
+    })
+    document.body.append(element)
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(createPlanner).toHaveBeenCalledWith({
+      model: 'hermes-3',
+      modelOption: hermesModelOption
+    })
+    expect(receivedModelOption).toBe(hermesModelOption)
+  })
+
+  it('ignores unknown initialPlannerOptionId values', async () => {
+    const element = createCommandInputElement()
+    element.configure({
+      endpointOptions: [
+        {
+          label: 'Nemotron 3 Super 120B A12B',
+          model: 'nvidia/nemotron-3-super-120b-a12b:free',
+          provider: 'openrouter'
+        },
+        {
+          label: 'GLM 4.7 Flash',
+          model: '@cf/zai-org/glm-4.7-flash',
+          provider: 'cloudflare-binding'
+        }
+      ],
+      initialPlannerOptionId: 'missing-planner-option'
+    })
+    document.body.append(element)
+    await Promise.resolve()
+
+    const provider = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
+    expect(provider?.value).toBe('openrouter')
+  })
+
+  it('ignores initialPlannerOptionId when the provider is fixed by the app', async () => {
+    const element = createCommandInputElement()
+    element.configure({
+      endpoint: '/api/webmcp/plan',
+      model: 'gpt-5.4-mini',
+      provider: 'openai',
+      initialPlannerOptionId: 'browser-local-ai',
+      plannerOptions: [
+        {
+          id: 'browser-local-ai',
+          label: 'Browser local AI',
+          createPlanner() {
+            return {
+              name: 'Browser local AI',
+              available: true,
+              status: 'ready',
+              detail: 'Should not be selected.',
+              async plan() {
+                throw new Error('Should not plan.')
+              }
+            }
+          }
+        }
+      ]
+    })
+    document.body.append(element)
+    await Promise.resolve()
+
+    expect(element.shadowRoot?.querySelector('[data-provider]')).toBeNull()
+    expect(element.provider).toBe('openai')
+  })
+
+  it('controls the settings disclosure through configure settingsOpen', async () => {
+    const element = createCommandInputElement()
+    element.configure({
+      endpointOptions: [
+        {
+          label: 'Nemotron 3 Super 120B A12B',
+          model: 'nvidia/nemotron-3-super-120b-a12b:free',
+          provider: 'openrouter'
+        },
+        {
+          label: 'GLM 4.7 Flash',
+          model: '@cf/zai-org/glm-4.7-flash',
+          provider: 'cloudflare-binding'
+        }
+      ],
+      settingsOpen: true
+    })
+    document.body.append(element)
+    await Promise.resolve()
+
+    expect(element.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-settings')?.open).toBe(
+      true
+    )
+
+    element.configure({ settingsOpen: false })
+
+    expect(element.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-settings')?.open).toBe(
+      false
+    )
+  })
+
+  it('commits configure() with a single render', async () => {
+    const element = createCommandInputElement()
+    document.body.append(element)
+    await Promise.resolve()
+
+    const observer = new MutationObserver(function ignoreMutations() {})
+    observer.observe(element.shadowRoot as ShadowRoot, { childList: true })
+    observer.takeRecords()
+
+    element.configure({
+      buttonLabel: 'Go',
+      endpoint: '/api/webmcp/plan',
+      endpointOptions: [
+        {
+          label: 'Nemotron 3 Super 120B A12B',
+          model: 'nvidia/nemotron-3-super-120b-a12b:free',
+          provider: 'openrouter'
+        },
+        {
+          label: 'GLM 4.7 Flash',
+          model: '@cf/zai-org/glm-4.7-flash',
+          provider: 'cloudflare-binding'
+        }
+      ],
+      floating: false,
+      initialModel: 'nvidia/nemotron-3-super-120b-a12b:free',
+      initialProvider: 'openrouter',
+      placeholder: 'Try a command'
+    })
+
+    const records = observer.takeRecords()
+    observer.disconnect()
+    expect(records.length).toBe(1)
+  })
+
+  it('emits one planner status after a multi-option configure() call', async () => {
+    const element = createCommandInputElement()
+    document.body.append(element)
+    await Promise.resolve()
+
+    const plannerNames: string[] = []
+    element.addEventListener('webmcp-command-planner', function trackPlanner(event) {
+      plannerNames.push((event as CustomEvent<WebMCPCommandPlannerEventDetail>).detail.planner.name)
+    })
+
+    element.configure({
+      endpoint: '/api/webmcp/plan',
+      endpointOptions: [
+        {
+          label: 'Nemotron 3 Super 120B A12B',
+          model: 'nvidia/nemotron-3-super-120b-a12b:free',
+          provider: 'openrouter'
+        },
+        {
+          label: 'GLM 4.7 Flash',
+          model: '@cf/zai-org/glm-4.7-flash',
+          provider: 'cloudflare-binding'
+        }
+      ],
+      initialModel: 'nvidia/nemotron-3-super-120b-a12b:free',
+      initialProvider: 'openrouter'
+    })
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(plannerNames).toEqual(['OpenRouter'])
   })
 
   it('does not show superseded planner refreshes after late configuration', async () => {

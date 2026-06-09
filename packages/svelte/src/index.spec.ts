@@ -102,4 +102,47 @@ describe('Svelte useWebMCPTool', () => {
     if (typeof destroy === 'function') destroy()
     expect(listTools()).toEqual([])
   })
+
+  it('returns a handle with unregister and getRegistration', async () => {
+    const mountCallbacks: MountCallback[] = []
+    vi.doMock('svelte', function mockSvelte() {
+      return {
+        onMount(callback: MountCallback) {
+          mountCallbacks.push(callback)
+        }
+      }
+    })
+
+    const { useWebMCPTool } = await import('./index')
+    const { defineTool, listTools } = await import('webmcp-kit')
+
+    const handle = useWebMCPTool(
+      defineTool({
+        name: 'search_products',
+        description: 'Search the local product catalog from a Svelte component.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          required: [],
+          additionalProperties: false
+        },
+        execute() {
+          return {}
+        }
+      })
+    )
+
+    expect(handle.getRegistration()).toBeUndefined()
+
+    const destroy = mountCallbacks[0]?.()
+
+    expect(handle.getRegistration()?.tool.name).toBe('search_products')
+
+    handle.unregister()
+
+    expect(listTools()).toEqual([])
+    expect(handle.getRegistration()).toBeUndefined()
+
+    if (typeof destroy === 'function') destroy()
+  })
 })

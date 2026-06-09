@@ -21,11 +21,12 @@ import { planWithDemoHeuristics } from '@/utils/demo-heuristic-planner'
 
 export const qwenBrowserLocalAIModel = 'Qwen3.5-4B-q4f16_1-MLC'
 export const defaultBrowserLocalAIModel = qwenBrowserLocalAIModel
+export const defaultBrowserLocalAIContextWindowSize = 8192
 export const hermesBrowserLocalAIModel = 'Hermes-3-Llama-3.1-8B-q4f16_1-MLC'
 export const compactQwenBrowserLocalAIModel = 'Qwen3.5-2B-q4f16_1-MLC'
 export const browserLocalAIModels: BrowserLocalAIModelOption[] = [
   {
-    contextWindowSize: 8192,
+    contextWindowSize: defaultBrowserLocalAIContextWindowSize,
     label: 'Qwen3.5 4B (8k context)',
     model: qwenBrowserLocalAIModel
   },
@@ -40,12 +41,14 @@ export const browserLocalAIModels: BrowserLocalAIModelOption[] = [
 ]
 
 export function createBrowserLocalAIPlanner(
-  options: BrowserLocalAIPlannerOptions = { model: defaultBrowserLocalAIModel }
+  options: BrowserLocalAIPlannerOptions = {
+    contextWindowSize: defaultBrowserLocalAIContextWindowSize,
+    model: defaultBrowserLocalAIModel
+  }
 ): ToolPlanner {
   let engine: WebLLMEngine | undefined
   let enginePromise: Promise<WebLLMEngine> | undefined
-  const contextWindowSize =
-    options.contextWindowSize ?? getBrowserLocalAIContextWindowSize(options.model)
+  const contextWindowSize = options.contextWindowSize
   const planner: ToolPlanner = {
     name: 'Browser local AI',
     available: true,
@@ -185,12 +188,6 @@ async function assertWebGPUAvailable(): Promise<void> {
   } catch {
     throw new Error('Browser local AI needs WebGPU support in this browser.')
   }
-}
-
-function getBrowserLocalAIContextWindowSize(model: string): number | undefined {
-  return browserLocalAIModels.find(function findModelOption(option) {
-    return option.model === model
-  })?.contextWindowSize
 }
 
 function getChatOptions(contextWindowSize?: number) {

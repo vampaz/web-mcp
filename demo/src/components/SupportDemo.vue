@@ -40,33 +40,44 @@
 </template>
 
 <script setup lang="ts">
-import { defineTool, invokeTool, listTools, registerFormTool, registerTool } from 'webmcp-kit'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { defineTool, invokeTool, registerFormTool } from 'webmcp-kit'
+import { computed, ref } from 'vue'
 
 import DemoShell from '@/components/DemoShell.vue'
 import DemoSupportTicketPanel from '@/components/DemoSupportTicketPanel.vue'
 import DemoTicketBoard from '@/components/DemoTicketBoard.vue'
-import type { DemoActivityItem, DemoMetric, SupportTicket } from '@/interfaces/demo'
-import { getDemoRouteStory, getInitialDemoSettings, getInitialTickets } from '@/utils/demo-data'
+import { useDemoTools } from '@/composables/use-demo-tools'
+import type { DemoMetric, SupportTicket } from '@/interfaces/demo'
+import { getDemoRouteStory, getInitialTickets } from '@/utils/demo-data'
 
 const tickets = ref<SupportTicket[]>(getInitialTickets())
 const story = getDemoRouteStory('support')
-const settings = ref(getInitialDemoSettings())
-const registeredToolsCount = ref(0)
 const supportTicketPanel = ref<{ supportForm: HTMLFormElement | null } | null>(null)
 const supportAccount = ref('Northwind')
 const supportSubject = ref('Billing access')
 const supportBody = ref('I cannot open the latest invoice from the workspace.')
-const activityItems = ref<DemoActivityItem[]>([
-  {
-    id: 'support-seed',
-    kind: 'system',
-    time: '09:18',
-    title: 'Support queue loaded',
-    detail: 'Tickets include account, SLA age, priority, and ownership context.'
-  }
-])
-const unregisterCallbacks: Array<() => void> = []
+const {
+  activityItems,
+  addActivity,
+  registerDemoTool,
+  registeredToolsCount,
+  settings,
+  trackUnregister
+} = useDemoTools({
+  registerTools() {
+    registerSupportTools()
+    registerSupportFormTool()
+  },
+  seedActivity: [
+    {
+      id: 'support-seed',
+      kind: 'system',
+      time: '09:18',
+      title: 'Support queue loaded',
+      detail: 'Tickets include account, SLA age, priority, and ownership context.'
+    }
+  ]
+})
 const metrics = computed<DemoMetric[]>(function getSupportMetrics() {
   const urgent = tickets.value.filter(function filterUrgent(ticket) {
     return ticket.priority === 'urgent' || ticket.priority === 'high'
@@ -99,79 +110,65 @@ const metrics = computed<DemoMetric[]>(function getSupportMetrics() {
   ]
 })
 
-onMounted(function handleMounted() {
-  registerSupportTools()
-  registerSupportFormTool()
-  refreshTools()
-})
-
-onUnmounted(function handleUnmounted() {
-  for (const unregister of unregisterCallbacks) {
-    unregister()
-  }
-})
-
 function registerSupportTools() {
-  unregisterCallbacks.push(
-    registerTool(
-      defineTool({
-        name: 'update_ticket',
-        description:
-          'Update a support ticket status, assignee, or priority from the visible ticket board.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            id: {
-              type: 'string'
-            },
-            status: {
-              type: 'string',
-              enum: ['new', 'triaged', 'in_progress', 'resolved']
-            },
-            assignee: {
-              type: 'string'
-            },
-            priority: {
-              type: 'string',
-              enum: ['low', 'medium', 'high', 'urgent']
-            }
+  registerDemoTool(
+    defineTool({
+      name: 'update_ticket',
+      description:
+        'Update a support ticket status, assignee, or priority from the visible ticket board.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: {
+            type: 'string'
           },
-          required: ['id'],
-          additionalProperties: false
-        },
-        guard(input) {
-          return (
-            tickets.value.some(function hasTicket(ticket) {
-              return ticket.id === String(input.id ?? '')
-            }) || 'Ticket is not visible in the current board.'
-          )
-        },
-        execute(input) {
-          tickets.value = tickets.value.map(function mapTicket(ticket) {
-            if (ticket.id !== String(input.id)) return ticket
-            return {
-              ...ticket,
-              assignee: typeof input.assignee === 'string' ? input.assignee : ticket.assignee,
-              priority: isTicketPriority(input.priority) ? input.priority : ticket.priority,
-              status: isTicketStatus(input.status) ? input.status : ticket.status
-            }
-          })
-          const updatedTicket = tickets.value.find(function findTicket(ticket) {
-            return ticket.id === String(input.id)
-          })
-          if (updatedTicket) {
-            addActivity(
-              'ai',
-              'Ticket updated',
-              `${updatedTicket.subject} is ${updatedTicket.status} and owned by ${updatedTicket.assignee}.`
-            )
+          status: {
+            type: 'string',
+            enum: ['new', 'triaged', 'in_progress', 'resolved']
+          },
+          assignee: {
+            type: 'string'
+          },
+          priority: {
+            type: 'string',
+            enum: ['low', 'medium', 'high', 'urgent']
           }
-          return tickets.value.find(function findTicket(ticket) {
-            return ticket.id === String(input.id)
-          })
+        },
+        required: ['id'],
+        additionalProperties: false
+      },
+      guard(input) {
+        return (
+          tickets.value.some(function hasTicket(ticket) {
+            return ticket.id === String(input.id ?? '')
+          }) || 'Ticket is not visible in the current board.'
+        )
+      },
+      execute(input) {
+        tickets.value = tickets.value.map(function mapTicket(ticket) {
+          if (ticket.id !== String(input.id)) return ticket
+          return {
+            ...ticket,
+            assignee: typeof input.assignee === 'string' ? input.assignee : ticket.assignee,
+            priority: isTicketPriority(input.priority) ? input.priority : ticket.priority,
+            status: isTicketStatus(input.status) ? input.status : ticket.status
+          }
+        })
+        const updatedTicket = tickets.value.find(function findTicket(ticket) {
+          return ticket.id === String(input.id)
+        })
+        if (updatedTicket) {
+          addActivity(
+            'ai',
+            'Ticket updated',
+            `${updatedTicket.subject} is ${updatedTicket.status} and owned by ${updatedTicket.assignee}.`
+          )
         }
-      })
-    ).unregister
+        return tickets.value.find(function findTicket(ticket) {
+          return ticket.id === String(input.id)
+        })
+      }
+    })
   )
 }
 
@@ -179,7 +176,7 @@ function registerSupportFormTool() {
   const form = supportTicketPanel.value?.supportForm
   if (!form) return
 
-  unregisterCallbacks.push(
+  trackUnregister(
     registerFormTool({
       form,
       name: 'create_support_ticket',
@@ -240,10 +237,6 @@ async function submitSupportForm() {
   })
 }
 
-function refreshTools() {
-  registeredToolsCount.value = listTools().length
-}
-
 function getPlannerContext() {
   return {
     settings: settings.value,
@@ -265,22 +258,6 @@ function createSupportTicket(account: string, subject: string, body: string): Su
   tickets.value = [ticket, ...tickets.value]
   addActivity('manual', 'Support ticket created', `${subject} opened for ${account}.`)
   return ticket
-}
-
-function addActivity(kind: DemoActivityItem['kind'], title: string, detail: string) {
-  activityItems.value = [
-    {
-      id: `${Date.now()}-${activityItems.value.length}`,
-      kind,
-      time: new Date().toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit'
-      }),
-      title,
-      detail
-    },
-    ...activityItems.value
-  ].slice(0, 7)
 }
 
 function isTicketStatus(value: unknown): value is SupportTicket['status'] {

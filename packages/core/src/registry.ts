@@ -7,7 +7,7 @@ import type {
   ToolInvocationResult,
   WebMCPTool
 } from './interfaces/tool'
-import { invokeToolPipeline } from './invocation'
+import { createInvocationResult, invokeToolPipeline } from './invocation'
 import { registerNativeTool } from './native-adapter'
 import { getToolWarnings } from './quality'
 import { getSupportLabel, isWebMCPSupported } from './support'
@@ -78,7 +78,7 @@ export async function invokeTool<TOutput = unknown>(
   const registration = registeredTools.get(invocation.toolName)
 
   if (!registration) {
-    return createResult<TOutput>(
+    return createInvocationResult<TOutput>(
       invocation.toolName,
       'error',
       startedAt,
@@ -123,22 +123,6 @@ export async function invokeTool<TOutput = unknown>(
 
 export function clearToolsForTest(): void {
   registeredTools.clear()
-}
-
-function createResult<TOutput>(
-  toolName: string,
-  status: ToolInvocationResult['status'],
-  startedAt: number,
-  output?: TOutput,
-  error?: string
-): ToolInvocationResult<TOutput> {
-  return {
-    toolName,
-    status,
-    output,
-    error,
-    durationMs: Math.round(performance.now() - startedAt)
-  }
 }
 
 function createInvocationId(): string {

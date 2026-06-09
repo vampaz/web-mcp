@@ -38,13 +38,14 @@
 </template>
 
 <script setup lang="ts">
-import { defineTool, invokeTool, listTools, registerTool } from 'webmcp-kit'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { defineTool, invokeTool } from 'webmcp-kit'
+import { computed, ref } from 'vue'
 
 import DemoCartEditor from '@/components/DemoCartEditor.vue'
 import DemoShell from '@/components/DemoShell.vue'
-import type { CartLine, DemoActivityItem, DemoMetric, Product } from '@/interfaces/demo'
-import { getDemoRouteStory, getInitialDemoSettings, getInitialProducts } from '@/utils/demo-data'
+import { useDemoTools } from '@/composables/use-demo-tools'
+import type { CartLine, DemoMetric, Product } from '@/interfaces/demo'
+import { getDemoRouteStory, getInitialProducts } from '@/utils/demo-data'
 
 const products = ref<Product[]>(getInitialProducts())
 const story = getDemoRouteStory('commerce')
@@ -53,18 +54,19 @@ const selectedProductId = ref(products.value[0]?.id ?? '')
 const cartQuantity = ref(1)
 const cartDiscountPercent = ref(0)
 const lastReceipt = ref('')
-const settings = ref(getInitialDemoSettings())
-const registeredToolsCount = ref(0)
-const activityItems = ref<DemoActivityItem[]>([
-  {
-    id: 'commerce-seed',
-    kind: 'system',
-    time: '09:04',
-    title: 'Catalog synced',
-    detail: 'Catalog records include availability, SKU, pricing, and category context.'
-  }
-])
-const unregisterCallbacks: Array<() => void> = []
+const { activityItems, addActivity, registerDemoTool, registeredToolsCount, settings } =
+  useDemoTools({
+    registerTools: registerCommerceTools,
+    seedActivity: [
+      {
+        id: 'commerce-seed',
+        kind: 'system',
+        time: '09:04',
+        title: 'Catalog synced',
+        detail: 'Catalog records include availability, SKU, pricing, and category context.'
+      }
+    ]
+  })
 const cartTotal = computed(function getCartTotal() {
   const subtotal = cart.value.reduce(function sumCart(total, line) {
     return total + line.price * line.quantity
@@ -97,230 +99,206 @@ const metrics = computed<DemoMetric[]>(function getCommerceMetrics() {
   ]
 })
 
-onMounted(function handleMounted() {
-  registerCommerceTools()
-  refreshTools()
-})
-
-onUnmounted(function handleUnmounted() {
-  for (const unregister of unregisterCallbacks) {
-    unregister()
-  }
-})
-
 function registerCommerceTools() {
-  unregisterCallbacks.push(
-    registerTool(
-      defineTool({
-        name: 'search_products',
-        description:
-          'Search the local product catalog and return matching products for the current shopper.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            query: {
-              type: 'string',
-              description: 'Search words for product name or category.'
-            }
-          },
-          required: ['query'],
-          additionalProperties: false
-        },
-        annotations: {
-          readOnlyHint: true
-        },
-        execute(input) {
-          const query = String(input.query ?? '').toLowerCase()
-          const tokens = getSearchTokens(query)
-          const matches = products.value.filter(function filterProduct(product) {
-            const searchableText =
-              `${product.name} ${product.category} ${product.sku}`.toLowerCase()
-            return tokens.some(function hasToken(token) {
-              return searchableText.includes(token)
-            })
-          })
-          addActivity('ai', 'Catalog searched', `${matches.length} products matched "${query}".`)
-          return matches
-        }
-      })
-    ).unregister
-  )
-
-  unregisterCallbacks.push(
-    registerTool(
-      defineTool({
-        name: 'add_to_cart',
-        description: 'Add a known product to the cart for the current shopping session.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            productId: {
-              type: 'string',
-              description: 'The product ID to add.'
-            },
-            quantity: {
-              type: 'integer',
-              minimum: 1,
-              description: 'How many units to add.'
-            }
-          },
-          required: ['productId', 'quantity'],
-          additionalProperties: false
-        },
-        guard(input) {
-          const product = products.value.find(function hasProduct(item) {
-            return item.id === String(input.productId ?? '')
-          })
-          if (!product) return 'Product is not available in the current catalog.'
-          const requestedQuantity = normalizeCartQuantity(Number(input.quantity ?? 1))
-          const currentQuantity = getCartLineQuantity(product.id)
-          return (
-            currentQuantity + requestedQuantity <= product.available ||
-            'Requested quantity exceeds available stock.'
-          )
-        },
-        execute(input) {
-          const line = addProductToCart(String(input.productId ?? ''), Number(input.quantity ?? 1))
-          if (line) {
-            addActivity('ai', 'Cart line added', `${line.name} quantity is now ${line.quantity}.`)
+  registerDemoTool(
+    defineTool({
+      name: 'search_products',
+      description:
+        'Search the local product catalog and return matching products for the current shopper.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'Search words for product name or category.'
           }
-          return line
-        }
-      })
-    ).unregister
-  )
-
-  unregisterCallbacks.push(
-    registerTool(
-      defineTool({
-        name: 'update_cart_quantity',
-        description: 'Update the quantity for an existing cart line.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            productId: {
-              type: 'string'
-            },
-            quantity: {
-              type: 'integer',
-              minimum: 1
-            }
-          },
-          required: ['productId', 'quantity'],
-          additionalProperties: false
         },
-        guard(input) {
-          const productId = String(input.productId ?? '')
-          const lineExists = cart.value.some(function hasLine(line) {
-            return line.productId === productId
+        required: ['query'],
+        additionalProperties: false
+      },
+      annotations: {
+        readOnlyHint: true
+      },
+      execute(input) {
+        const query = String(input.query ?? '').toLowerCase()
+        const tokens = getSearchTokens(query)
+        const matches = products.value.filter(function filterProduct(product) {
+          const searchableText = `${product.name} ${product.category} ${product.sku}`.toLowerCase()
+          return tokens.some(function hasToken(token) {
+            return searchableText.includes(token)
           })
-          if (!lineExists) return 'Cart line does not exist.'
-          const product = products.value.find(function hasProduct(item) {
-            return item.id === productId
-          })
-          if (!product) return 'Product is not available in the current catalog.'
-          return (
-            normalizeCartQuantity(Number(input.quantity ?? 1)) <= product.available ||
-            'Requested quantity exceeds available stock.'
-          )
-        },
-        execute(input) {
-          updateCartLineQuantity(String(input.productId), Number(input.quantity ?? 1), 'ai')
-          return cart.value
-        }
-      })
-    ).unregister
+        })
+        addActivity('ai', 'Catalog searched', `${matches.length} products matched "${query}".`)
+        return matches
+      }
+    })
   )
 
-  unregisterCallbacks.push(
-    registerTool(
-      defineTool({
-        name: 'remove_from_cart',
-        description: 'Remove a product line from the visible cart.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            productId: {
-              type: 'string'
-            }
+  registerDemoTool(
+    defineTool({
+      name: 'add_to_cart',
+      description: 'Add a known product to the cart for the current shopping session.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          productId: {
+            type: 'string',
+            description: 'The product ID to add.'
           },
-          required: ['productId'],
-          additionalProperties: false
+          quantity: {
+            type: 'integer',
+            minimum: 1,
+            description: 'How many units to add.'
+          }
         },
-        confirmation: {
-          required: true,
-          reason: 'Removing a cart line changes the current order.'
-        },
-        execute(input) {
-          removeCartLine(String(input.productId ?? ''), 'ai')
-          return cart.value
+        required: ['productId', 'quantity'],
+        additionalProperties: false
+      },
+      guard(input) {
+        const product = products.value.find(function hasProduct(item) {
+          return item.id === String(input.productId ?? '')
+        })
+        if (!product) return 'Product is not available in the current catalog.'
+        const requestedQuantity = normalizeCartQuantity(Number(input.quantity ?? 1))
+        const currentQuantity = getCartLineQuantity(product.id)
+        return (
+          currentQuantity + requestedQuantity <= product.available ||
+          'Requested quantity exceeds available stock.'
+        )
+      },
+      execute(input) {
+        const line = addProductToCart(String(input.productId ?? ''), Number(input.quantity ?? 1))
+        if (line) {
+          addActivity('ai', 'Cart line added', `${line.name} quantity is now ${line.quantity}.`)
         }
-      })
-    ).unregister
+        return line
+      }
+    })
   )
 
-  unregisterCallbacks.push(
-    registerTool(
-      defineTool({
-        name: 'apply_cart_discount',
-        description: 'Set the cart discount percentage control.',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            percent: {
-              type: 'number',
-              minimum: 0,
-              maximum: 100
-            }
+  registerDemoTool(
+    defineTool({
+      name: 'update_cart_quantity',
+      description: 'Update the quantity for an existing cart line.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          productId: {
+            type: 'string'
           },
-          required: ['percent'],
-          additionalProperties: false
-        },
-        execute(input) {
-          cartDiscountPercent.value = Math.max(0, Math.min(100, Number(input.percent ?? 0)))
-          addActivity('ai', 'Discount applied', `${cartDiscountPercent.value}% discount applied.`)
-          return {
-            discountPercent: cartDiscountPercent.value,
-            total: cartTotal.value
+          quantity: {
+            type: 'integer',
+            minimum: 1
           }
-        }
-      })
-    ).unregister
+        },
+        required: ['productId', 'quantity'],
+        additionalProperties: false
+      },
+      guard(input) {
+        const productId = String(input.productId ?? '')
+        const lineExists = cart.value.some(function hasLine(line) {
+          return line.productId === productId
+        })
+        if (!lineExists) return 'Cart line does not exist.'
+        const product = products.value.find(function hasProduct(item) {
+          return item.id === productId
+        })
+        if (!product) return 'Product is not available in the current catalog.'
+        return (
+          normalizeCartQuantity(Number(input.quantity ?? 1)) <= product.available ||
+          'Requested quantity exceeds available stock.'
+        )
+      },
+      execute(input) {
+        updateCartLineQuantity(String(input.productId), Number(input.quantity ?? 1), 'ai')
+        return cart.value
+      }
+    })
   )
 
-  unregisterCallbacks.push(
-    registerTool(
-      defineTool({
-        name: 'checkout_cart',
-        description:
-          'Checkout the current cart and clear all cart lines after explicit confirmation.',
-        inputSchema: {
-          type: 'object',
-          properties: {},
-          required: [],
-          additionalProperties: false
-        },
-        confirmation: {
-          required: true,
-          reason: 'Checkout clears the cart and represents a purchase action.'
-        },
-        guard() {
-          return cart.value.length > 0 || 'Cart is empty.'
-        },
-        execute() {
-          const lines = [...cart.value]
-          const total = cartTotal.value
-          lastReceipt.value = `ORD-${Date.now()}`
-          cart.value = []
-          addActivity('ai', 'Checkout completed', `${lastReceipt.value} captured for €${total}.`)
-          return {
-            lines,
-            receiptId: lastReceipt.value,
-            total
+  registerDemoTool(
+    defineTool({
+      name: 'remove_from_cart',
+      description: 'Remove a product line from the visible cart.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          productId: {
+            type: 'string'
           }
+        },
+        required: ['productId'],
+        additionalProperties: false
+      },
+      confirmation: {
+        required: true,
+        reason: 'Removing a cart line changes the current order.'
+      },
+      execute(input) {
+        removeCartLine(String(input.productId ?? ''), 'ai')
+        return cart.value
+      }
+    })
+  )
+
+  registerDemoTool(
+    defineTool({
+      name: 'apply_cart_discount',
+      description: 'Set the cart discount percentage control.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          percent: {
+            type: 'number',
+            minimum: 0,
+            maximum: 100
+          }
+        },
+        required: ['percent'],
+        additionalProperties: false
+      },
+      execute(input) {
+        cartDiscountPercent.value = Math.max(0, Math.min(100, Number(input.percent ?? 0)))
+        addActivity('ai', 'Discount applied', `${cartDiscountPercent.value}% discount applied.`)
+        return {
+          discountPercent: cartDiscountPercent.value,
+          total: cartTotal.value
         }
-      })
-    ).unregister
+      }
+    })
+  )
+
+  registerDemoTool(
+    defineTool({
+      name: 'checkout_cart',
+      description:
+        'Checkout the current cart and clear all cart lines after explicit confirmation.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        required: [],
+        additionalProperties: false
+      },
+      confirmation: {
+        required: true,
+        reason: 'Checkout clears the cart and represents a purchase action.'
+      },
+      guard() {
+        return cart.value.length > 0 || 'Cart is empty.'
+      },
+      execute() {
+        const lines = [...cart.value]
+        const total = cartTotal.value
+        lastReceipt.value = `ORD-${Date.now()}`
+        cart.value = []
+        addActivity('ai', 'Checkout completed', `${lastReceipt.value} captured for €${total}.`)
+        return {
+          lines,
+          receiptId: lastReceipt.value,
+          total
+        }
+      }
+    })
   )
 }
 
@@ -432,10 +410,6 @@ async function checkoutCartFromUi() {
   })
 }
 
-function refreshTools() {
-  registeredToolsCount.value = listTools().length
-}
-
 function getPlannerContext() {
   return {
     cart: cart.value,
@@ -470,22 +444,6 @@ function getRemainingProductQuantity(productId: string): number {
 
 function normalizeCartQuantity(quantity: number): number {
   return Math.max(1, Math.floor(Number.isFinite(quantity) ? quantity : 1))
-}
-
-function addActivity(kind: DemoActivityItem['kind'], title: string, detail: string) {
-  activityItems.value = [
-    {
-      id: `${Date.now()}-${activityItems.value.length}`,
-      kind,
-      time: new Date().toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit'
-      }),
-      title,
-      detail
-    },
-    ...activityItems.value
-  ].slice(0, 7)
 }
 </script>
 
