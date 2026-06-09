@@ -53,6 +53,9 @@ function getIsActive(path: string): boolean {
       <a class="demo-brand" href="/">WebMCP Kit</a>
       <nav class="demo-nav" aria-label="Demo sections">
         <a href="/guide/" aria-current={getIsActive('/guide/') ? 'page' : undefined}>Guide</a>
+        <a href="/developers/" aria-current={getIsActive('/developers/') ? 'page' : undefined}>
+          Developers
+        </a>
         {
           demoRoutes.map(function renderDemoRoute(route) {
             return (

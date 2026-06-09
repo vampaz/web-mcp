@@ -1,0 +1,266 @@
+---
+import DemoLayout from '@/layouts/DemoLayout.astro'
+---
+
+<DemoLayout
+  title="WebMCP Kit Developers"
+  description="Developer onboarding for adding WebMCP tools to an app"
+>
+  <section class="developers-shell">
+    <header class="developers-header">
+      <p>Developer start</p>
+      <h1>Add one safe app action first.</h1>
+      <span>
+        Start with a narrow tool, give it a strict input schema, then verify it from tests or
+        devtools before adding planner complexity.
+      </span>
+    </header>
+
+    <section class="developer-steps" aria-label="Developer onboarding steps">
+      <article>
+        <span>01</span>
+        <h2>Register one tool</h2>
+        <p>Expose one action the current page already owns.</p>
+        <pre><code>import { defineTool, registerTool } from 'webmcp-kit'
+
+registerTool(
+  defineTool({
+    name: 'select_items',
+    description: 'Select visible inventory rows by stable item IDs.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ids: {
+          type: 'array',
+          items: { type: 'string' }
+        }
+      },
+      required: ['ids'],
+      additionalProperties: false
+    },
+    execute(input) {
+      return selectRows(input.ids)
+    }
+  })
+)</code></pre>
+      </article>
+
+      <article>
+        <span>02</span>
+        <h2>Protect mutations</h2>
+        <p>Use confirmation and guards for anything that changes important state.</p>
+        <pre><code>defineTool({
+  name: 'update_selected_invoice_status',
+  description: 'Update the status for selected invoice rows.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      status: {
+        type: 'string',
+        enum: ['draft', 'sent', 'overdue', 'paid', 'void']
+      }
+    },
+    required: ['status'],
+    additionalProperties: false
+  },
+  confirmation: {
+    required: true,
+    reason: 'Changing invoice status mutates business records.'
+  },
+  guard() {
+    return selectedInvoices.length > 0 || 'No invoices are selected.'
+  },
+  execute(input) {
+    return updateSelectedInvoices(input.status)
+  }
+})</code></pre>
+      </article>
+
+      <article>
+        <span>03</span>
+        <h2>Upgrade an existing form</h2>
+        <p>Turn a visible form into a tool without rebuilding the workflow.</p>
+        <pre><code>import { registerFormTool } from 'webmcp-kit'
+
+const form = document.querySelector('form')
+
+if (form) {
+  registerFormTool({
+    form,
+    name: 'create_support_ticket',
+    description: 'Create a support ticket from the visible form.'
+  })
+}</code></pre>
+      </article>
+
+      <article>
+        <span>04</span>
+        <h2>Verify from Playwright</h2>
+        <p>Inspect the registered surface and invoke tools through the app boundary.</p>
+        <pre><code>import {
+  invokeWebMCPTool,
+  waitForWebMCPTool
+} from 'webmcp-kit/testing/playwright'
+
+await waitForWebMCPTool(page, 'select_items')
+
+await invokeWebMCPTool(page, {
+  toolName: 'select_items',
+  input: { ids: ['item_4', 'item_7'] },
+  source: 'planner'
+})</code></pre>
+      </article>
+    </section>
+
+    <section class="developer-checklist" aria-label="Integration checklist">
+      <div>
+        <span>Before adding AI</span>
+        <strong>Make the tool contract boringly clear.</strong>
+      </div>
+      <ul>
+        <li>Tool name is stable and specific.</li>
+        <li>Schema is an object with required fields and no extra properties.</li>
+        <li>IDs come from current page context, not model guesses.</li>
+        <li>Mutating actions require confirmation.</li>
+        <li>Guards reject unavailable records or impossible quantities.</li>
+        <li>Tests cover the success path and at least one blocked path.</li>
+      </ul>
+    </section>
+  </section>
+</DemoLayout>
+
+<style>
+  .developers-shell {
+    display: grid;
+    gap: clamp(1rem, 2vw, 1.5rem);
+    width: min(73.75rem, calc(100% - clamp(1.25rem, 4vw, 2rem)));
+    margin: 0 auto;
+    padding: clamp(1rem, 3vw, 1.5rem) 0 clamp(3rem, 8vw, 5rem);
+  }
+
+  .developers-header {
+    display: grid;
+    gap: 0.65rem;
+    border-bottom: 2px solid var(--demo-blue);
+    padding-bottom: clamp(1rem, 2vw, 1.4rem);
+  }
+
+  .developers-header p,
+  .developers-header h1,
+  .developers-header span,
+  .developer-steps h2,
+  .developer-steps p,
+  .developer-checklist ul {
+    margin: 0;
+  }
+
+  .developers-header p,
+  .developer-steps article > span,
+  .developer-checklist span {
+    color: var(--demo-blue);
+    font-size: 0.76rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .developers-header h1 {
+    color: var(--demo-blue);
+    font-family: var(--demo-font-mono);
+    font-size: clamp(2rem, 5vw, 4.4rem);
+    line-height: 0.92;
+    max-inline-size: 18ch;
+    text-wrap: balance;
+    text-transform: uppercase;
+  }
+
+  .developers-header span {
+    max-inline-size: 60rem;
+    color: var(--demo-muted);
+    font-size: clamp(1rem, 1.5vw, 1.18rem);
+    line-height: 1.55;
+    text-wrap: pretty;
+  }
+
+  .developer-steps {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    border: 1px solid var(--demo-rule-strong);
+    background: var(--demo-rule-strong);
+  }
+
+  .developer-steps article,
+  .developer-checklist {
+    display: grid;
+    min-width: 0;
+    gap: 0.85rem;
+    align-content: start;
+    background: var(--demo-paper-wash);
+    padding: clamp(1rem, 2vw, 1.35rem);
+  }
+
+  .developer-steps h2,
+  .developer-checklist strong {
+    color: var(--demo-ink);
+    font-size: clamp(1.35rem, 2.4vw, 2rem);
+    line-height: 1.08;
+    text-wrap: balance;
+  }
+
+  .developer-steps p {
+    color: var(--demo-muted);
+    line-height: 1.45;
+  }
+
+  .developer-steps pre {
+    overflow: auto;
+    margin: 0;
+    border: 1px solid rgba(36, 88, 255, 0.34);
+    background: #14171f;
+    color: #e7ecf4;
+    padding: clamp(0.8rem, 2vw, 1rem);
+    font-family: var(--demo-font-mono);
+    font-size: 0.82rem;
+    line-height: 1.55;
+  }
+
+  .developer-steps code {
+    font: inherit;
+  }
+
+  .developer-checklist {
+    grid-template-columns: minmax(min(100%, 18rem), 0.35fr) minmax(0, 1fr);
+    border: 1px solid var(--demo-rule-strong);
+  }
+
+  .developer-checklist strong {
+    display: block;
+    margin-top: 0.25rem;
+  }
+
+  .developer-checklist ul {
+    display: grid;
+    gap: 0.55rem;
+    padding-left: 1.1rem;
+    color: var(--demo-muted);
+    line-height: 1.45;
+  }
+
+  @media (max-width: 760px) {
+    .developers-shell {
+      width: min(100% - 1.25rem, 73.75rem);
+    }
+
+    .developer-steps,
+    .developer-checklist {
+      grid-template-columns: 1fr;
+    }
+
+    .developer-steps pre,
+    .developer-steps code {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+  }
+</style>
