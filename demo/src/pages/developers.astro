@@ -1,27 +1,7 @@
 ---
 import DemoLayout from '@/layouts/DemoLayout.astro'
----
 
-<DemoLayout
-  title="WebMCP Kit Developers"
-  description="Developer onboarding for adding WebMCP tools to an app"
->
-  <section class="developers-shell">
-    <header class="developers-header">
-      <p>Developer start</p>
-      <h1>Add one safe app action first.</h1>
-      <span>
-        Start with a narrow tool, give it a strict input schema, then verify it from tests or
-        devtools before adding planner complexity.
-      </span>
-    </header>
-
-    <section class="developer-steps" aria-label="Developer onboarding steps">
-      <article>
-        <span>01</span>
-        <h2>Register one tool</h2>
-        <p>Expose one action the current page already owns.</p>
-        <pre><code>import { defineTool, registerTool } from 'webmcp-kit'
+const registerToolSnippet = `import { defineTool, registerTool } from 'webmcp-kit'
 
 registerTool(
   defineTool({
@@ -42,14 +22,9 @@ registerTool(
       return selectRows(input.ids)
     }
   })
-)</code></pre>
-      </article>
+)`
 
-      <article>
-        <span>02</span>
-        <h2>Protect mutations</h2>
-        <p>Use confirmation and guards for anything that changes important state.</p>
-        <pre><code>defineTool({
+const confirmationSnippet = `defineTool({
   name: 'update_selected_invoice_status',
   description: 'Update the status for selected invoice rows.',
   inputSchema: {
@@ -73,14 +48,9 @@ registerTool(
   execute(input) {
     return updateSelectedInvoices(input.status)
   }
-})</code></pre>
-      </article>
+})`
 
-      <article>
-        <span>03</span>
-        <h2>Call the server for secrets</h2>
-        <p>Keep private APIs, payments, email, and database writes behind an app endpoint.</p>
-        <pre><code>import { defineServerTool, registerTool } from 'webmcp-kit'
+const serverToolSnippet = `import { defineServerTool, registerTool } from 'webmcp-kit'
 
 registerTool(
   defineServerTool({
@@ -100,14 +70,9 @@ registerTool(
       reason: 'Sending an invoice emails a customer.'
     }
   })
-)</code></pre>
-      </article>
+)`
 
-      <article>
-        <span>04</span>
-        <h2>Upgrade an existing form</h2>
-        <p>Turn a visible form into a tool without rebuilding the workflow.</p>
-        <pre><code>import { registerFormTool } from 'webmcp-kit'
+const formToolSnippet = `import { registerFormTool } from 'webmcp-kit'
 
 const form = document.querySelector('form')
 
@@ -117,14 +82,9 @@ if (form) {
     name: 'create_support_ticket',
     description: 'Create a support ticket from the visible form.'
   })
-}</code></pre>
-      </article>
+}`
 
-      <article>
-        <span>05</span>
-        <h2>Verify from Playwright</h2>
-        <p>Inspect the registered surface and invoke tools through the app boundary.</p>
-        <pre><code>import {
+const playwrightSnippet = `import {
   invokeWebMCPTool,
   waitForWebMCPTool
 } from 'webmcp-kit/testing/playwright'
@@ -135,7 +95,57 @@ await invokeWebMCPTool(page, {
   toolName: 'select_items',
   input: { ids: ['item_4', 'item_7'] },
   source: 'planner'
-})</code></pre>
+})`
+---
+
+<DemoLayout
+  title="WebMCP Kit Developers"
+  description="Developer onboarding for adding WebMCP tools to an app"
+>
+  <section class="developers-shell">
+    <header class="developers-header">
+      <p>Developer start</p>
+      <h1>Add one safe app action first.</h1>
+      <span>
+        Start with a narrow tool, give it a strict input schema, then verify it from tests or
+        devtools before adding planner complexity.
+      </span>
+    </header>
+
+    <section class="developer-steps" aria-label="Developer onboarding steps">
+      <article>
+        <span>01</span>
+        <h2>Register one tool</h2>
+        <p>Expose one action the current page already owns.</p>
+        <pre><code>{registerToolSnippet}</code></pre>
+      </article>
+
+      <article>
+        <span>02</span>
+        <h2>Protect mutations</h2>
+        <p>Use confirmation and guards for anything that changes important state.</p>
+        <pre><code>{confirmationSnippet}</code></pre>
+      </article>
+
+      <article>
+        <span>03</span>
+        <h2>Call the server for secrets</h2>
+        <p>Keep private APIs, payments, email, and database writes behind an app endpoint.</p>
+        <pre><code>{serverToolSnippet}</code></pre>
+      </article>
+
+      <article>
+        <span>04</span>
+        <h2>Upgrade an existing form</h2>
+        <p>Turn a visible form into a tool without rebuilding the workflow.</p>
+        <pre><code>{formToolSnippet}</code></pre>
+      </article>
+
+      <article>
+        <span>05</span>
+        <h2>Verify from Playwright</h2>
+        <p>Inspect the registered surface and invoke tools through the app boundary.</p>
+        <pre><code>{playwrightSnippet}</code></pre>
       </article>
     </section>
 
@@ -225,6 +235,10 @@ await invokeWebMCPTool(page, {
     align-content: start;
     background: var(--demo-paper-wash);
     padding: clamp(1rem, 2vw, 1.35rem);
+  }
+
+  .developer-steps article:last-child {
+    grid-column: 1 / -1;
   }
 
   .developer-steps h2,
