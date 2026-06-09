@@ -207,6 +207,19 @@ describe('demo pages', () => {
     expect(wrapper.text()).toContain('"quantity": 20')
   })
 
+  it('adds products from individual commerce catalog cards', async () => {
+    const wrapper = mountWithDeps(CommerceDemo, { attachTo: document.body })
+    await flushPromises()
+
+    await wrapper.get('input[aria-label="Quantity for Travel USB-C dock"]').setValue('3')
+    await wrapper.get('button[aria-label="Add Travel USB-C dock to cart"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Travel USB-C dock')
+    expect(wrapper.text()).toContain('3 in cart')
+    expect(wrapper.text()).toContain('€267')
+  })
+
   it('guards and confirms cart checkout', async () => {
     const wrapper = mountWithDeps(CommerceDemo, { attachTo: document.body })
     await flushPromises()
