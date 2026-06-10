@@ -129,6 +129,32 @@ test('selects items through the WebMCP test bridge', async function testSelectIt
 
 The test bridge does not let tests bypass confirmation by passing `confirmed: true`. Confirmed tools still use the app confirmation handler or the browser confirmation fallback.
 
+## Server-Backed Tool
+
+```ts
+import { defineServerTool, objectInputSchema, registerTool, stringParam } from 'webmcp-kit'
+
+registerTool(
+  defineServerTool({
+    name: 'send_invoice',
+    description: 'Send an invoice email from the server.',
+    endpoint: '/api/tools/send-invoice',
+    inputSchema: objectInputSchema(
+      {
+        invoiceId: stringParam({ description: 'Visible invoice ID.' })
+      },
+      { required: ['invoiceId'] }
+    ),
+    confirmation: {
+      required: true,
+      reason: 'Sending an invoice emails a customer.'
+    }
+  })
+)
+```
+
+The browser still validates input and enforces confirmation. Execution posts `{ toolName, input, source }` to the endpoint so secrets, private APIs, and database writes stay server-side.
+
 ## Form Tool
 
 ```ts
@@ -157,4 +183,18 @@ The helper applies `toolname`, `tooldescription`, and official field metadata at
 
 ## Eval Fixtures
 
-See [WebMCP Evals](./evals.md) for starter cases that check tool selection, parameter extraction, call order, and end-to-end user journey success.
+```ts
+import { createHeuristicPlanner } from 'webmcp-kit'
+import { runWebMCPPlannerEvals } from 'webmcp-kit/testing'
+
+const results = await runWebMCPPlannerEvals(createHeuristicPlanner(), tools, [
+  {
+    name: 'product search',
+    message: 'Find laptop stands',
+    expectedToolName: 'search_products',
+    expectedInput: { query: 'laptop stands' }
+  }
+])
+```
+
+See [WebMCP Evals](./evals.md) for planner helper details and starter cases that check tool selection, parameter extraction, call order, and end-to-end user journey success.

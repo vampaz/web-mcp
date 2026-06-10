@@ -144,6 +144,8 @@ setConfirmationHandler(async function confirmTool(tool, input, reason) {
 - `isWebMCPSupported()` checks for native WebMCP registration support.
 - `createBestPlanner()` uses Chrome built-in AI when available, otherwise a deterministic local planner.
 - `defineWebMCPCommandInput()` registers a ready-made `<webmcp-command-input>` web component for planner-driven commands.
+- `defineServerTool()` registers a browser-visible tool whose execution posts to an app-owned server endpoint.
+- `validateToolPlan()` validates single-tool, chained, and planner-outcome plans before execution.
 - `installWebMCPKitTestBridge()` exposes a kit-specific test bridge for Playwright and local QA.
 
 ## Planner Output
@@ -186,6 +188,19 @@ For requests that require multiple app actions, planners can return a bounded ch
 
 Each step is validated against its tool schema before execution. Confirmation is still enforced per tool invocation, so a chained plan cannot bypass approval for mutating tools.
 
+When a request cannot be executed, planners can return a non-executing outcome:
+
+```ts
+{
+  toolName: 'needs_clarification',
+  input: {},
+  confidence: 0,
+  reason: 'Ask which invoice should be marked paid.'
+}
+```
+
+`needs_clarification` returns a blocked result and `no_tools_match` returns an unavailable result. `tool_sequence`, `needs_clarification`, and `no_tools_match` are reserved names; app tools cannot register with those names.
+
 ## Integration Health
 
 Use the health report while wiring WebMCP into an app:
@@ -223,7 +238,7 @@ The devtools overlay shows the same report, so developers can see whether tools 
 The framework subpaths are intentionally thin lifecycle adapters. They register tools through `webmcp-kit` and unregister them when the owning component scope is disposed.
 
 - `webmcp-kit/vue`: `useWebMCPTool()` for Vue effect scopes, with reactive `when` support.
-- `webmcp-kit/react`: `useWebMCPTool()` for React components.
+- `webmcp-kit/react`: `useWebMCPTool()` for React components, with `when` as a boolean derived during render.
 - `webmcp-kit/svelte`: `useWebMCPTool()` for Svelte components, including readable-store `when` support.
 
 See [Vue](./docs/vue.md), [React](./docs/react.md), [Svelte](./docs/svelte.md), and [Framework Extensions](./docs/framework-extensions.md).
@@ -338,6 +353,44 @@ input.configure({
 
 The demo follows this server-endpoint pattern in dev mode and passes an app-owned planner option for its demo-specific deterministic planner. Preview and production can pass the app-owned planner/provider/model to keep those choices hidden from end users. If the consumer provides only one option and Chrome AI is hidden or unavailable, the options panel is not rendered.
 
+For app-owned planner objects, pass `plannerOptions`. Use `initialPlannerOptionId` and `initialModel` to set development defaults without fixing the provider for users. When a planner option exposes `modelOptions`, the selected model option is passed to `createPlanner({ model, modelOption })`, so app-owned planners can attach metadata such as context-window size without adding provider-specific fields to core.
+
+```ts
+interface BrowserLocalAIModelOption {
+  contextWindowSize?: number
+  label: string
+  model: string
+}
+
+const browserLocalAIModels: BrowserLocalAIModelOption[] = [
+  {
+    label: 'Qwen3.5 4B (8k context)',
+    model: 'Qwen3.5-4B-q4f16_1-MLC',
+    contextWindowSize: 8192
+  }
+]
+
+input.configure({
+  initialPlannerOptionId: 'browser-local-ai',
+  plannerOptions: [
+    {
+      id: 'browser-local-ai',
+      label: 'Browser local AI',
+      modelOptions: browserLocalAIModels,
+      createPlanner(options) {
+        const modelOption = options?.modelOption as BrowserLocalAIModelOption | undefined
+
+        return createBrowserLocalAIPlanner({
+          model: options?.model ?? browserLocalAIModels[0].model,
+          contextWindowSize: modelOption?.contextWindowSize
+        })
+      }
+    }
+  ],
+  settingsOpen: false
+})
+```
+
 For app context, assign a property before or after mounting:
 
 ```ts
@@ -395,6 +448,12 @@ Open:
 
 ```txt
 http://localhost:60001/
+```
+
+When using the bundled Caddy TLS dev setup, the default local domain is:
+
+```txt
+https://webmcp.localtest.me:60001/
 ```
 
 The demo exposes invoice, product search, cart, and support-ticket tools. It shows whether the app is running with native WebMCP or fallback mode, then lets you run natural-language commands against the registered tools.

@@ -1,148 +1,67 @@
 # Next Features: Making WebMCP Kit Really Usable
 
-This roadmap prioritizes features that would transform WebMCP Kit from a solid MVP into something teams genuinely depend on day to day. Every item below addresses a friction point that exists in the current API or unlocks a workflow that is currently missing.
+This roadmap starts from the current implementation. The first foundation layer is now in place: runtime input validation, Zod tool definitions, Vue/React/Svelte helpers, app-level confirmation handlers, bounded tool sequences, explicit planner outcomes, and server-backed tools.
 
----
+## Shipped Foundations
 
-## Tier 1 — Foundation Quality (do these first)
+These capabilities are part of the current API and should be treated as baseline behavior:
 
-### 1. Runtime Input Validation
+- Runtime input validation runs before scope, confirmation, guards, and `execute()`.
+- `defineZodTool()` is available from `webmcp-kit/zod` for single-source schema and TypeScript inference.
+- Vue, React, and Svelte helpers register tools with lifecycle cleanup and return `{ unregister, getRegistration }`.
+- `setConfirmationHandler()` lets apps provide their own approval UI, with `window.confirm()` as the browser fallback.
+- Planners can return a single tool, a bounded `tool_sequence`, `needs_clarification`, or `no_tools_match`.
+- `defineServerTool()` lets browser-visible tools delegate execution to an app-owned server endpoint.
+- Planner eval helpers are available from `webmcp-kit/testing`.
 
-**Current state**: `defineTool` validates tool shape at definition time, and quality checks flag weak schemas. But the `execute` handler receives raw, unvalidated input. A poorly-formed or malicious input reaches the handler unchecked.
+## Tier 1 - Planner Reliability
 
-**Needed**: JSON Schema validation runs against the `input` before `execute` is called. If validation fails, the invocation returns `status: 'error'` with a structured message like `"Expected number at /amount, got string"`, and the handler never runs.
+### 1. Richer Agent-Loop Semantics
 
-```ts
-// What developers want:
-const result = await invokeTool({
-  toolName: 'create_invoice',
-  input: { customerName: 123, amount: 'not-a-number' }
-})
-// result.status === 'error'
-// result.error === 'input validation failed: /amount expected number, got string'
-// handler never called — safe by default
-```
+**Current state**: Basic bounded tool sequencing is implemented. A planner can return `toolName: "tool_sequence"` with ordered `steps`; each step is validated, executed in order, and still uses the normal scope, confirmation, guard, and execution path.
 
-This is the single most important safety improvement. Every tool should be validated, always, with no opt-out.
-
-### 2. Zod Adapter For Type-Safe Tool Definitions
-
-**Current state**: Developers write the JSON Schema and TypeScript types separately and keep them in sync by hand.
+**Needed**: Later steps should be able to consume earlier tool outputs in a typed, inspectable way.
 
 ```ts
-// Current: two sources of truth
-defineTool<{ customerName: string; amount: number }>({
-  inputSchema: {
-    properties: {
-      customerName: { type: 'string' },
-      amount: { type: 'number', minimum: 0.01 }
-    }
-    // These must stay in sync with the TypeScript generic — nothing enforces it
-  }
-})
-```
-
-**Needed**: A `defineZodTool` function (or `z.tool()`) that takes a Zod schema and produces both the JSON Schema and the TypeScript type from it. One source of truth.
-
-```ts
-// Proposed: single source of truth
-const createInvoiceTool = defineZodTool({
-  name: 'create_invoice',
-  description: 'Create a draft invoice.',
-  schema: z.object({
-    customerName: z.string().describe('Customer to invoice.'),
-    amount: z.number().min(0.01).describe('Invoice amount in euros.')
-  }),
-  confirmation: { required: true, reason: 'Creates a billable invoice.' },
-  async execute({ customerName, amount }) {
-    // customerName: string, amount: number — fully inferred, no generic needed
-    return createInvoice(customerName, amount)
-  }
-})
-```
-
-This would dramatically reduce boilerplate and eliminate a class of bugs. Ship it as `webmcp-kit/zod` or in core behind an optional peer dependency.
-
-### 3. Reactive Framework Composables
-
-**Current state**: The Vue/React/Svelte docs show manual `onMounted`/`useEffect`/`onMount` recipes. These work for static tools but break down with dynamic state: a tool should register only when the user is on a specific route, or only when an item is selected.
-
-**Needed**: A small set of framework helpers that handle lifecycle, reactive scope, and auto-cleanup.
-
-```ts
-// Vue composable example
-import { useWebMCPTool } from 'webmcp-kit/vue'
-
-useWebMCPTool(createInvoiceTool, {
-  // Tool auto-registers only when on /invoices route
-  when: () => route.path.startsWith('/invoices')
-})
-```
-
-```tsx
-// React hook example
-import { useWebMCPTool } from 'webmcp-kit/react'
-
-useWebMCPTool(createInvoiceTool, {
-  when: () => router.pathname.startsWith('/invoices')
-})
-```
-
-This is the feature that makes the framework story feel real instead of "here's a recipe, you figure out the rest." Framework packages should be thin — delegate everything to core, own only lifecycle — as the FR extensions doc already prescribes.
-
-### 4. Confirmation UI Bridge
-
-**Current state**: The registry calls `window.confirm()` for tools that require confirmation. This is unusable in real apps: it blocks the thread, can't be styled, and provides no context beyond a raw string.
-
-**Needed**: A confirmation provider that the app configures once, globally.
-
-```ts
-import { createWebMCPKit, setConfirmationHandler } from 'webmcp-kit'
-
-setConfirmationHandler(async function onConfirm(tool, input, reason) {
-  // Plug in your own modal, toast, or whatever
-  return await showConfirmationModal({
-    title: `Run ${tool.name}?`,
-    body: reason,
-    preview: JSON.stringify(input, null, 2)
-  })
-})
-```
-
-This should be a single global callback, not per-tool. The registry calls it instead of `window.confirm()`. If unset, fall back to `window.confirm()` (with a console warning in dev).
-
----
-
-## Tier 2 — Agent Workflows (do these next)
-
-### 5. Multi-Tool Planning
-
-**Current state**: Basic bounded tool sequencing is implemented. A planner can return `toolName: "tool_sequence"` with ordered `steps`; each step is validated, executed in order, and still uses the normal guard and confirmation path. This covers direct workflows such as "select Stark Industries invoices, then mark them paid."
-
-**Still needed**: Richer agent-loop semantics where later steps can consume earlier tool outputs, plus explicit `needsClarification` and `noToolsMatch` responses for ambiguous or unsupported requests.
-
-```ts
-interface ToolPlan {
-  toolName: string
-  input: Record<string, unknown>
-  confidence: number
-  reason: string
-  steps?: ToolPlanStep[]
-}
-
 interface ToolPlanStep {
   toolName: string
   input: Record<string, unknown>
   confidence: number
   reason: string
+  inputFrom?: Record<string, string>
 }
 ```
 
-### 6. Tool Composition and Recipes
+This would let a workflow search for a product, pass the selected product ID to `add_to_cart`, then call `checkout_cart` without asking the planner to invent intermediate IDs.
 
-**Current state**: Every tool is a leaf. There is no way to compose tools into higher-level workflows.
+### 2. Structured Error Responses
 
-**Needed**: A `defineRecipe` function that composes existing tools into a named, discoverable sequence.
+**Current state**: Invocation results expose string errors. That is readable, but not enough for planners or test tooling to decide whether a command should retry, ask for clarification, or stop.
+
+**Needed**: Tools should be able to throw or return typed errors.
+
+```ts
+class WebMCPToolError extends Error {
+  code: 'RETRY' | 'BAD_INPUT' | 'UNAUTHORIZED' | 'NOT_FOUND' | 'RATE_LIMITED' | 'INTERNAL'
+  retryable = false
+}
+```
+
+Planner and eval tools could then classify failures without parsing prose.
+
+### 3. Better Planner Outcome UX
+
+**Current state**: `needs_clarification` and `no_tools_match` are valid planner outcomes, and the command input returns blocked or unavailable results for them.
+
+**Needed**: First-class UI affordances for clarification prompts and unsupported requests, including event detail that lets apps render a reply, collect missing fields, and rerun the command.
+
+## Tier 2 - Workflow Authoring
+
+### 4. Tool Composition and Recipes
+
+**Current state**: Tools are atomic, and planners can compose short sequences dynamically.
+
+**Needed**: A `defineRecipe()` helper that makes common workflows explicit and discoverable.
 
 ```ts
 const checkoutRecipe = defineRecipe({
@@ -151,18 +70,16 @@ const checkoutRecipe = defineRecipe({
   steps: [
     { toolName: 'search_products', inputFrom: { query: 'userRequest' } },
     { toolName: 'add_to_cart', inputFrom: { productId: 'steps.0[0].id', quantity: 1 } },
-    { toolName: 'checkout_cart', confirm: true }
+    { toolName: 'checkout_cart' }
   ]
 })
-
-registerTool(checkoutRecipe) // recipes are tools too
 ```
 
-This makes the most common agent use case — "do a multi-step thing for me" — a first-class concept. Recipes can be registered like tools so agents discover them alongside atomic tools.
+Recipes should still execute through the same validation, confirmation, guard, and event pipeline as normal tools.
 
-### 7. Undo / Rollback Support
+### 5. Undo / Rollback Support
 
-**Current state**: Once a destructive tool runs, there is no way back.
+**Current state**: Once a destructive tool runs, WebMCP Kit does not know how to reverse it.
 
 **Needed**: An optional `undo` handler on tool definitions.
 
@@ -179,97 +96,54 @@ defineTool({
 })
 ```
 
-The registry tracks the last `N` invocations per tool. The devtools overlay gets an "Undo" button for undoable tools. If the native WebMCP API eventually exposes undo semantics, the kit already has the metadata.
+The registry could track recent invocations for undoable tools, and the devtools overlay could expose a safe "Undo" action during development.
 
----
+## Tier 3 - Production Operations
 
-## Tier 3 — Production Readiness (medium-term)
+### 6. Observability and Analytics
 
-### 8. Server-Delegated Tools
+**Current state**: The event system can be subscribed to, and events contain enough detail for app-owned audit trails.
 
-**Current state**: All tool handlers run in the browser. Many real actions need server-side execution (calling a payment API, sending email, querying a database).
-
-**Needed**: A way to declare a tool whose handler lives on the server. The frontend registers it as a native/fallback tool, but execution calls a server endpoint.
-
-```ts
-const sendInvoiceTool = defineServerTool({
-  name: 'send_invoice',
-  description: 'Send a finalized invoice to the customer by email.',
-  endpoint: '/api/tools/send-invoice'
-  // Frontend validates the schema and sends input to endpoint
-  // Server handles execution with secrets
-})
-```
-
-This is the single most-requested pattern in real enterprise apps. Most meaningful tools do things that shouldn't happen in a browser.
-
-### 9. Structured Error Responses
-
-**Current state**: Tool errors are strings or generic `Error` objects. An agent can't programmatically decide what to do next.
-
-**Needed**: Tools should throw (or return) typed errors.
-
-```ts
-class WebMCPToolError extends Error {
-  code: 'RETRY' | 'BAD_INPUT' | 'UNAUTHORIZED' | 'NOT_FOUND' | 'RATE_LIMITED' | 'INTERNAL'
-}
-
-// Agent sees:
-{ status: 'error', error: 'No such invoice.', code: 'NOT_FOUND', retryable: false }
-```
-
-Planners can use error codes to decide whether to retry, ask for clarification, or give up. This is critical for agent reliability.
-
-### 10. Observability and Analytics
-
-**Current state**: The event system exists and can be subscribed to, but there's no built-in way to get useful metrics.
-
-**Needed**: An observability helper that turns the event stream into actionable data.
+**Needed**: An observability helper that turns event streams into useful metrics.
 
 ```ts
 import { createToolMetrics } from 'webmcp-kit'
 
 const metrics = createToolMetrics()
-// metrics.invocations.create_invoice.count — total calls
-// metrics.invocations.create_invoice.p50 — median latency
-// metrics.invocations.create_invoice.errorRate — failure ratio
-// metrics.invocations.create_invoice.blockedFromGuard — guard rejections
+metrics.invocations.create_invoice.count
+metrics.invocations.create_invoice.errorRate
 ```
 
-Expose this data in the devtools overlay (per-tool latency histograms, error breakdowns) and make it available programmatically so teams can ship it to their own analytics.
+The same metrics should be visible in devtools and exportable to app-owned analytics after redaction.
 
-### 11. Tool Discovery Manifest
+### 7. Tool Discovery Manifest
 
-**Current state**: Agents can only discover tools on the current page. Multi-page apps, SEO, and offline tool catalogs get nothing.
+**Current state**: Agents can discover tools on the current page through native WebMCP or the fallback registry.
 
-**Needed**: A static manifest endpoint (`/webmcp.json` or `/tools.json`) that lists all tools across the app with their routes/scopes.
+**Needed**: A static or server-rendered manifest endpoint that lists tools across the app with route and scope hints.
 
 ```json
 {
   "tools": [
-    { "name": "create_invoice", "route": "/invoices", "description": "..." },
-    { "name": "search_products", "route": "/products", "description": "..." }
+    { "name": "create_invoice", "route": "/invoices", "description": "Create a draft invoice." },
+    { "name": "search_products", "route": "/products", "description": "Search visible products." }
   ],
-  "generatedAt": "2026-05-14T10:00:00Z"
+  "generatedAt": "2026-06-10T10:00:00Z"
 }
 ```
 
-Generated at build time or served by a lightweight endpoint. Agents can prefetch this before navigating. Lighthouse can consume it for the WebMCP audit. Docs can render it.
+This would help multi-page apps, documentation, and pre-navigation agent workflows.
 
----
+## What Not To Build Yet
 
-## What _Not_ To Build Yet
-
-| Idea                                | Why defer                                                                                                                                    |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Streaming tool results              | Adds complexity; the execute-then-return model is sufficient for most use cases. Revisit when Chrome's WebMCP streaming semantics stabilize. |
-| Cross-tab/origin tool orchestration | Massive scope creep. Tools should be page-scoped.                                                                                            |
-| Built-in rate limiting              | App-level concern. Provide hooks for it but don't enforce policy.                                                                            |
-| Tool-to-OpenAPI generator           | Niche. The OpenAI adapter already covers the main interoperability case.                                                                     |
-| Visual tool builder / no-code       | Not the target audience. This kit is for developers who already have apps.                                                                   |
-
----
+| Idea                                | Why defer                                                                                                                      |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Streaming tool results              | The execute-then-return model is enough for most current workflows. Revisit when browser WebMCP streaming semantics stabilize. |
+| Cross-tab/origin tool orchestration | Tools should remain page-scoped for now.                                                                                       |
+| Built-in rate limiting              | Policy belongs to the app. Provide hooks and metrics first.                                                                    |
+| Tool-to-OpenAPI generator           | Useful, but secondary to planner reliability and workflow authoring.                                                           |
+| Visual tool builder / no-code       | The kit is aimed at developers integrating existing apps.                                                                      |
 
 ## Summary
 
-The immediate priority should be **validation, Zod, composables, and confirmation** — features that fix real pain in every tool definition today. After that, **multi-tool planning and server tools** unlock the workflows that make agent interaction feel genuinely useful rather than demo-only. Everything else builds on those foundations.
+The next useful layer is planner reliability: output-aware sequences, structured errors, and clearer clarification UX. After that, recipes, undo, observability, and manifests make WebMCP Kit easier to operate in larger applications.

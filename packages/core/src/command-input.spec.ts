@@ -1204,6 +1204,61 @@ describe('WebMCP command input', () => {
     expect(receivedModelOption).toBe(hermesModelOption)
   })
 
+  it('keeps the user planner selection when configure() runs again with initial options', async () => {
+    const configureOptions = {
+      endpointOptions: [
+        {
+          label: 'GPT-5.4 mini',
+          model: 'gpt-5.4-mini',
+          provider: 'openai' as const
+        },
+        {
+          label: 'Nemotron 3 Super 120B A12B',
+          model: 'nvidia/nemotron-3-super-120b-a12b:free',
+          provider: 'openrouter' as const
+        }
+      ],
+      initialModel: 'gpt-5.4-mini',
+      initialPlannerOptionId: 'browser-local-ai',
+      initialProvider: 'openai' as const,
+      plannerOptions: [
+        {
+          id: 'browser-local-ai',
+          label: 'Browser local AI',
+          createPlanner(): ToolPlanner {
+            return {
+              name: 'Browser local AI',
+              available: true,
+              status: 'ready',
+              detail: 'Browser planner.',
+              async plan(): Promise<ToolPlan> {
+                throw new Error('Not planned in this spec.')
+              }
+            }
+          }
+        }
+      ]
+    }
+    const element = createCommandInputElement()
+    element.configure(configureOptions)
+    document.body.append(element)
+    await Promise.resolve()
+
+    const provider = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
+    expect(provider?.value).toBe('planner:browser-local-ai')
+
+    provider!.value = 'openrouter'
+    provider!.dispatchEvent(new Event('change', { bubbles: true }))
+    await Promise.resolve()
+
+    element.configure(configureOptions)
+    await Promise.resolve()
+
+    const reconfiguredProvider =
+      element.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
+    expect(reconfiguredProvider?.value).toBe('openrouter')
+  })
+
   it('ignores unknown initialPlannerOptionId values', async () => {
     const element = createCommandInputElement()
     element.configure({

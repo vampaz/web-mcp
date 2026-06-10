@@ -43,21 +43,46 @@ Commerce:
 - Expected input: `{ "query": "laptop stands" }`.
 - Success check: matching products are returned and no cart state changes.
 
-## Suggested Shape
+## Planner Helper API
 
-Keep eval fixtures small and explicit:
+For planner-only checks, import the helper API from `webmcp-kit/testing`:
 
 ```ts
-interface WebMCPEvalCase {
+import { createHeuristicPlanner } from 'webmcp-kit'
+import { runWebMCPPlannerEvals } from 'webmcp-kit/testing'
+
+const results = await runWebMCPPlannerEvals(createHeuristicPlanner(), tools, [
+  {
+    name: 'product search',
+    message: 'Find laptop stands',
+    context: {
+      route: '/commerce'
+    },
+    expectedToolName: 'search_products',
+    expectedInput: { query: 'laptop stands' }
+  }
+])
+
+expect(
+  results.every(function evalPassed(result) {
+    return result.passed
+  })
+).toBe(true)
+```
+
+The helper validates the returned plan against the available tool schemas before checking the expected tool and input. Use `runWebMCPPlannerEvalCase()` for one case when a test needs custom reporting.
+
+```ts
+interface WebMCPPlannerEvalCase {
   name: string
   message: string
-  context: unknown
+  context?: PlannerContext
   expectedToolName: string
-  expectedInput: Record<string, unknown>
+  expectedInput?: Record<string, unknown>
 }
 ```
 
-For planner-backed evals, validate the returned plan against the selected tool schema before checking exact expectations. For chained plans, validate every step and assert the final app state.
+For chained plans, still add an end-to-end test that invokes the plan and asserts the final app state. The planner eval helper checks plan shape and exact top-level expectations; browser or component tests should verify the workflow result.
 
 ## Failure Signals
 

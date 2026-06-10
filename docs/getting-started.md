@@ -82,6 +82,34 @@ if (form) {
 
 `registerFormTool()` applies `toolname` and `tooldescription` to the form, prefers official `toolparamdescription` and `toolparamtitle` field metadata, and infers useful schema details from native inputs such as `email`, `date`, `time`, and `select`.
 
+## Delegate A Tool To The Server
+
+Use `defineServerTool()` when an action needs app-owned secrets, a private API, email, payments, or database access.
+
+```ts
+import { defineServerTool, objectInputSchema, registerTool, stringParam } from 'webmcp-kit'
+
+registerTool(
+  defineServerTool({
+    name: 'send_invoice',
+    description: 'Send an invoice email from the server.',
+    endpoint: '/api/tools/send-invoice',
+    inputSchema: objectInputSchema(
+      {
+        invoiceId: stringParam({ description: 'Visible invoice ID.' })
+      },
+      { required: ['invoiceId'] }
+    ),
+    confirmation: {
+      required: true,
+      reason: 'Sending an invoice emails a customer.'
+    }
+  })
+)
+```
+
+The browser-visible tool still runs validation, scope, confirmation, and guards before posting `{ toolName, input, source }` to the endpoint.
+
 ## Add Devtools
 
 ```ts

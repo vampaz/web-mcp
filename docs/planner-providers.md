@@ -1,6 +1,6 @@
 # Planner Providers
 
-WebMCP Kit can plan tool calls with different model providers. The app still owns tools, schemas, guards, confirmations, and execution. Providers choose which registered tool to call and which JSON input to pass. For requests that need multiple app actions, providers can return a short ordered `tool_sequence`.
+WebMCP Kit can plan tool calls with different model providers. The app still owns tools, schemas, guards, confirmations, and execution. Providers choose which registered tool to call and which JSON input to pass. For requests that need multiple app actions, providers can return a short ordered `tool_sequence`; for requests that cannot run, they can return `needs_clarification` or `no_tools_match`.
 
 ## Production: Server Mode
 
@@ -208,7 +208,47 @@ commandInput.configure({
 })
 ```
 
-`endpointOptions` lets the app provide the concrete planner endpoints it has tested and allows through its server route. Provider-only options such as `auto` and `local` can omit `model`. The command input only renders those choices; it does not own the demo's OpenRouter, OpenAI, Cloudflare, or app-specific planner curation. Use `plannerOptions` for app-owned local planners such as the demo's deterministic planner.
+`endpointOptions` lets the app provide the concrete planner endpoints it has tested and allows through its server route. Provider-only options such as `auto` and `local` can omit `model`. The command input only renders those choices; it does not own the demo's OpenRouter, OpenAI, Cloudflare, or app-specific planner curation.
+
+Use `plannerOptions` for app-owned planners such as a WebLLM browser-local planner or a demo-specific deterministic planner. `initialPlannerOptionId` and `initialModel` set default selections without fixing the provider for the user. `settingsOpen` controls the options disclosure when the command input renders.
+
+```ts
+interface BrowserLocalAIModelOption {
+  contextWindowSize?: number
+  label: string
+  model: string
+}
+
+const browserLocalAIModels: BrowserLocalAIModelOption[] = [
+  {
+    label: 'Qwen3.5 4B (8k context)',
+    model: 'Qwen3.5-4B-q4f16_1-MLC',
+    contextWindowSize: 8192
+  }
+]
+
+commandInput.configure({
+  initialPlannerOptionId: 'browser-local-ai',
+  plannerOptions: [
+    {
+      id: 'browser-local-ai',
+      label: 'Browser local AI',
+      modelOptions: browserLocalAIModels,
+      createPlanner(options) {
+        const modelOption = options?.modelOption as BrowserLocalAIModelOption | undefined
+
+        return createBrowserLocalAIPlanner({
+          model: options?.model ?? browserLocalAIModels[0].model,
+          contextWindowSize: modelOption?.contextWindowSize
+        })
+      }
+    }
+  ],
+  settingsOpen: false
+})
+```
+
+The command input passes the selected `{ model, modelOption }` into `createPlanner()`. Core only requires `label` and `model` on model options, but app-owned arrays can carry extra metadata and recover it with an app-specific type.
 
 For preview or production, pass the selected planner config when the app should own those choices and hide them from users.
 
@@ -275,6 +315,26 @@ Sequence rules:
 - Execution stops on the first blocked, failed, or unavailable step.
 - Confirmation remains per tool, so mutating steps still require approval.
 
+If the request cannot be executed, planners can return a non-executing outcome:
+
+```json
+{
+  "toolName": "needs_clarification",
+  "input": {},
+  "confidence": 0,
+  "reason": "Ask which invoice should be marked paid."
+}
+```
+
+Outcome rules:
+
+- Use `needs_clarification` when the request is plausible but required information is missing from the request and current context.
+- Use `no_tools_match` when none of the available tools can satisfy the request.
+- Do not include `steps` on planner outcomes.
+- `needs_clarification` returns a blocked result from the command input.
+- `no_tools_match` returns an unavailable result from the command input.
+- `tool_sequence`, `needs_clarification`, and `no_tools_match` are reserved tool names.
+
 The handler shape is:
 
 ```ts
@@ -317,4 +377,4 @@ If an app does not provide a planner config, development builds can expose a pro
 - Server endpoint: safer for app-owned keys.
 - User key in browser: simpler, but visible to the page.
 
-WebMCP Kit validates provider output before invocation. If a provider fails, returns malformed JSON, or selects an unknown tool, the planner falls back to deterministic local planning.
+WebMCP Kit validates provider output before invocation. Explicitly selected remote providers surface planning errors instead of silently switching to another provider. The automatic planner can use Chrome built-in AI when available and deterministic local planning when browser AI is unavailable or non-strict Chrome planning fails.

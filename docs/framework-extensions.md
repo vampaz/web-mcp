@@ -19,3 +19,14 @@ Thin optional subpaths should only wrap lifecycle cleanup and delegate all behav
 - `webmcp-kit/vue`
 - `webmcp-kit/react`
 - `webmcp-kit/svelte`
+
+All framework helpers return the same handle:
+
+```ts
+interface UseWebMCPToolResult<TInput, TOutput> {
+  unregister: () => void
+  getRegistration: () => RegisteredTool<TInput, TOutput> | undefined
+}
+```
+
+Vue accepts refs, computed values, and getters for `when`. React accepts a boolean computed during render. Svelte accepts a boolean, function, or readable store.

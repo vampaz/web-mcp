@@ -143,6 +143,51 @@ describe('React useWebMCPTool', () => {
     runtime.cleanup()
   })
 
+  it('evaluates a legacy when getter instead of treating it as truthy', async () => {
+    const runtime = createReactHookRuntime()
+    vi.doMock('react', function mockReact() {
+      return runtime
+    })
+
+    const { useWebMCPTool } = await import('./index')
+    const { defineTool, listTools } = await import('webmcp-kit')
+    const tool = defineTool({
+      name: 'create_ticket',
+      description: 'Create a support ticket from the current React screen.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        required: [],
+        additionalProperties: false
+      },
+      execute() {
+        return {}
+      }
+    })
+
+    runtime.render(function renderHook() {
+      useWebMCPTool(tool, {
+        when: function isUnavailable() {
+          return false
+        } as unknown as boolean
+      })
+    })
+
+    expect(listTools()).toEqual([])
+
+    runtime.render(function renderHook() {
+      useWebMCPTool(tool, {
+        when: function isAvailable() {
+          return true
+        } as unknown as boolean
+      })
+    })
+
+    expect(listTools()).toHaveLength(1)
+
+    runtime.cleanup()
+  })
+
   it('respects a false when option', async () => {
     const runtime = createReactHookRuntime()
     vi.doMock('react', function mockReact() {

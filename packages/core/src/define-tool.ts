@@ -1,5 +1,8 @@
 import type { WebMCPTool } from './interfaces/tool'
+import { plannerOutcomeToolNames } from './plan-validation'
 import { validateJsonSchema } from './schema'
+
+const reservedToolNames = new Set<string>(['tool_sequence', ...plannerOutcomeToolNames])
 
 export function defineTool<TInput = Record<string, unknown>, TOutput = unknown>(
   tool: WebMCPTool<TInput, TOutput>
@@ -13,6 +16,10 @@ export function assertValidTool<TInput = Record<string, unknown>, TOutput = unkn
 ): void {
   if (!tool.name.trim()) {
     throw new Error('Tool name is required.')
+  }
+
+  if (reservedToolNames.has(tool.name)) {
+    throw new Error(`Tool name "${tool.name}" is reserved for planner outcomes and chained plans.`)
   }
 
   if (!tool.description.trim()) {

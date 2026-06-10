@@ -125,6 +125,8 @@ export function defineWebMCPCommandInput(
     private providedPlannerConfig?: PlannerProviderConfig
     private renderedStructureSignature = ''
     private running = false
+    private userSelectedModel = false
+    private userSelectedPlanner = false
     private readonly state: CommandInputRuntimeState = {
       buttonLabel: defaultButtonLabel,
       disabled: false,
@@ -283,7 +285,11 @@ export function defineWebMCPCommandInput(
         }
       }
       if (options.floating !== undefined) this.applyFloatingState(options.floating)
-      if (options.initialProvider !== undefined && !this.state.fixedProvider) {
+      if (
+        options.initialProvider !== undefined &&
+        !this.state.fixedProvider &&
+        !this.userSelectedPlanner
+      ) {
         this.providerWasChosen = true
         this.state.plannerOptionId = undefined
         this.state.provider = options.initialProvider
@@ -297,12 +303,25 @@ export function defineWebMCPCommandInput(
           this.shouldShowChromeAIOption()
         )
       }
-      if (options.initialModel !== undefined && !this.state.fixedModel) {
+      if (
+        options.initialModel !== undefined &&
+        !this.state.fixedModel &&
+        !this.userSelectedPlanner &&
+        !this.userSelectedModel
+      ) {
         this.state.model = options.initialModel
-      } else if (options.endpointOptions !== undefined && !this.state.fixedModel) {
+      } else if (
+        options.endpointOptions !== undefined &&
+        !this.state.fixedModel &&
+        !this.userSelectedModel
+      ) {
         this.state.model = getDefaultModelForProvider(this.state.provider, options.endpointOptions)
       }
-      if (options.initialPlannerOptionId !== undefined && !this.state.fixedProvider) {
+      if (
+        options.initialPlannerOptionId !== undefined &&
+        !this.state.fixedProvider &&
+        !this.userSelectedPlanner
+      ) {
         const initialPlannerOption = this.getPlannerOptionById(options.initialPlannerOptionId)
         if (initialPlannerOption) {
           this.providerWasChosen = true
@@ -742,6 +761,7 @@ export function defineWebMCPCommandInput(
       const plannerOptionId = getPlannerOptionId(target.value)
       const provider = isPlannerProviderKind(target.value) ? target.value : 'auto'
       this.providerWasChosen = true
+      this.userSelectedPlanner = true
       this.state.plannerOptionId = plannerOptionId
       this.state.provider = provider
       this.state.model = plannerOptionId
@@ -756,6 +776,7 @@ export function defineWebMCPCommandInput(
     private handleModelChanged(event: Event) {
       const target = event.target
       if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLSelectElement)) return
+      this.userSelectedModel = true
       this.state.model = target.value
       this.invalidatePlanner()
       void this.refreshPlannerStatus()

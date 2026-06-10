@@ -9,7 +9,7 @@
 
 ## Status Note
 
-This review captured the `feature/mvp-hardening` branch as of 2026-05-13. Since then, the native adapter and form helper have been tightened: native registration now passes `annotations`, unregisters with `AbortSignal` when available, keeps returned-handle cleanup for compatibility, and `registerFormTool()` now prefers official `toolparamdescription` / `toolparamtitle` metadata with richer schema inference for email, date, time, and select fields.
+This is a historical review of the `feature/mvp-hardening` branch as of 2026-05-13, not the current release checklist. Since then, the native adapter and form helper have been tightened; framework helpers now ship as Vue, React, and Svelte subpaths; command input supports planner options, chained plans, and planner outcomes; server-backed tools and planner eval helpers have been added; and the planning docs have been reorganized.
 
 ## Summary
 
@@ -21,14 +21,14 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 
 ## 1. Architecture & Design
 
-| Aspect                      | Assessment                                                                                                                                                                                                                                                 |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Monorepo structure**      | Clean npm workspaces (`packages/core`, `devtools`, `mcp-bridge`, `testing`). Each has proper `package.json`, `tsconfig`, and `exports`.                                                                                                                    |
-| **Framework agnosticism**   | Core package has zero framework dependencies. The Vue demo and Astro integration are layered on top without contaminating core. Framework recipes in `docs/` are documentation only, no separate wrapper packages — per the deferred decision in the plan. |
-| **Separation of concerns**  | `define-tool.ts` (validation), `registry.ts` (fallback store), `native-adapter.ts` (browser API), `planner.ts` (AI routing), `quality.ts` (warnings), `events.ts` (pub/sub), `test-bridge.ts` (test exposure) are all single-responsibility modules.       |
-| **Adapter pattern**         | Clean adapters for OpenAI tools, MCP bridge (JSON-RPC), and Markdown/JSON catalog export. Each is independent and optional.                                                                                                                                |
-| **Progressive enhancement** | Native WebMCP is used when available; fallback registry always runs in parallel. This is the right strategy for an emerging browser API.                                                                                                                   |
-| **Planner abstraction**     | `ToolPlanner` interface is well-designed — status, availability, and fallback are first-class. The heuristic planner provides sensible defaults for basic commands while AI planners handle semantic queries.                                              |
+| Aspect                      | Assessment                                                                                                                                                                                                                                           |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Monorepo structure**      | Clean npm workspaces (`packages/core`, `devtools`, `mcp-bridge`, `testing`). Each has proper `package.json`, `tsconfig`, and `exports`.                                                                                                              |
+| **Framework agnosticism**   | Core package has zero framework dependencies. Vue, React, and Svelte helpers live in thin subpaths that delegate registration to core. The Vue demo and Astro integration are layered on top without contaminating core.                             |
+| **Separation of concerns**  | `define-tool.ts` (validation), `registry.ts` (fallback store), `native-adapter.ts` (browser API), `planner.ts` (AI routing), `quality.ts` (warnings), `events.ts` (pub/sub), `test-bridge.ts` (test exposure) are all single-responsibility modules. |
+| **Adapter pattern**         | Clean adapters for OpenAI tools, MCP bridge (JSON-RPC), and Markdown/JSON catalog export. Each is independent and optional.                                                                                                                          |
+| **Progressive enhancement** | Native WebMCP is used when available; fallback registry always runs in parallel. This is the right strategy for an emerging browser API.                                                                                                             |
+| **Planner abstraction**     | `ToolPlanner` interface is well-designed — status, availability, and fallback are first-class. The heuristic planner provides sensible defaults for basic commands while AI planners handle semantic queries.                                        |
 
 **Points to address:**
 
@@ -56,7 +56,7 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 
 - **`devtools.ts`**: A self-contained vanilla-TS overlay with its own CSS. Subscribes to kit events, renders tool cards with prompt previews, sample generation, invocation history with replay. The `invocationId` tracking correctly correlates concurrent calls. Clean use of event delegation.
 
-- **`planner.ts` / `heuristic-planner.ts`**: Robust. Handles Chrome AI session lifecycle (availability → create → prompt), with graceful fallback to generic schema/context heuristics on any failure. Remote planners validate responses before returning. Server endpoint errors are surfaced in fallback reasons.
+- **`planner.ts` / `heuristic-planner.ts`**: Robust. Handles Chrome AI session lifecycle (availability -> create -> prompt), validates remote provider output, and supports explicit `needs_clarification` / `no_tools_match` planner outcomes. Strict or explicitly selected remote providers surface planning errors instead of silently switching providers.
 
 - **`mcp-bridge/index.ts`**: Proper JSON-RPC 2.0 implementation with `tools/list` and `tools/call`. Confirmation is passed through as a param. Good.
 
@@ -105,16 +105,16 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 
 ## 4. Security
 
-| Concern                      | Status                                                                                                                                                                                                                   |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **User-key visibility**      | ✅ Clearly documented. The demo sidebar warns: "the key is visible to this browser page." The PRD and planner docs repeat this.                                                                                          |
-| **Server mode for secrets**  | ✅ App-owned keys use server endpoints. The `plan.ts` endpoint never exposes secrets to the browser.                                                                                                                     |
-| **Input validation**         | ✅ `defineTool` validates schemas at registration. `invokeTool` and the native wrapper validate tool input against schema before execution. Handlers should still treat inputs as untrusted and normalize domain values. |
-| **Confirmation enforcement** | ✅ `invokeTool` blocks actions without confirmation. The devtools overlay uses `window.confirm()`. MCP/test bridge callers cannot bypass confirmation with request params.                                               |
-| **Guard execution**          | ✅ Guards run after scope/confirmation checks and before execution. Both `false` and string (reason) returns are handled.                                                                                                |
-| **Event data**               | ✅ Events include tool name and timestamp but no input/output by default. `detail` contains invocation data but is only visible through the subscription API, not transmitted.                                           |
-| **Devtools secrets**         | ✅ Invocation history shows input/output in the DOM, which is appropriate for a dev tool. Not exposed in production builds.                                                                                              |
-| **Cloudflare binding mode**  | ✅ Available in local, preview, and production deployments through the server endpoint and Cloudflare `AI` binding.                                                                                                      |
+| Concern                      | Status                                                                                                                                                                                                                                                                  |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **User-key visibility**      | ✅ Clearly documented. The demo sidebar warns: "the key is visible to this browser page." The PRD and planner docs repeat this.                                                                                                                                         |
+| **Server mode for secrets**  | ✅ App-owned keys use server endpoints. The `plan.ts` endpoint never exposes secrets to the browser.                                                                                                                                                                    |
+| **Input validation**         | ✅ `defineTool` validates schemas at registration. `invokeTool` and the native wrapper validate tool input against schema before execution. Handlers should still treat inputs as untrusted and normalize domain values.                                                |
+| **Confirmation enforcement** | ✅ `invokeTool` blocks actions without confirmation. Devtools invocations use the normal confirmation pipeline, so app handlers run first and browser runtimes fall back to `window.confirm()`. MCP/test bridge callers cannot bypass confirmation with request params. |
+| **Guard execution**          | ✅ Guards run after scope/confirmation checks and before execution. Both `false` and string (reason) returns are handled.                                                                                                                                               |
+| **Event data**               | ✅ Events include tool name and timestamp but no input/output by default. `detail` contains invocation data but is only visible through the subscription API, not transmitted.                                                                                          |
+| **Devtools secrets**         | ✅ Invocation history shows input/output in the DOM, which is appropriate for a dev tool. Not exposed in production builds.                                                                                                                                             |
+| **Cloudflare binding mode**  | ✅ Available in local, preview, and production deployments through the server endpoint and Cloudflare `AI` binding.                                                                                                                                                     |
 
 ### Minor concerns
 
@@ -125,17 +125,17 @@ This branch builds **WebMCP Kit** — a TypeScript monorepo that wraps emerging 
 
 ## 5. Documentation
 
-All 10 planned docs exist and are well-written:
+The documentation set has changed since this review. Current docs to keep aligned:
 
 - `README.md` — Clean, clear positioning ("not a new protocol"), quick start, good examples.
-- `Dev-Docs/PLAN.md` — Exhaustive implementation plan with all phases checked off.
+- `Dev-Docs/command-input-and-demo-refactor-plan.md` — Completed implementation notes for the command input and demo refactor.
 - `Dev-Docs/PRD.md` — Production-quality PRD with personas, functional/non-functional requirements, open questions.
 - `docs/getting-started.md` — First-tool example in plain JS, annotations, and form upgrade path.
 - `docs/browser-support.md` — Native WebMCP, Early Preview status, feature detection, fallback behavior, annotations, and AbortSignal cleanup.
-- `docs/evals.md` — Starter WebMCP eval cases for tool selection, parameter extraction, call order, and user journey success.
+- `docs/evals.md` — Planner eval helper API and starter cases for tool selection, parameter extraction, call order, and user journey success.
 - `docs/security.md` — Untrusted inputs, permissions, confirmations, redaction, audit hooks.
-- `docs/planner-providers.md` — Server mode, user-key mode, Chrome built-in AI, Cloudflare binding, model selection.
-- `docs/vue.md`, `docs/react.md`, `docs/svelte.md`, `docs/astro.md` — Consistent lifecycle-safe registration recipes.
+- `docs/planner-providers.md` — Server mode, user-key mode, Chrome built-in AI, Cloudflare binding, model selection, planner options, sequences, and planner outcomes.
+- `docs/vue.md`, `docs/react.md`, `docs/svelte.md`, `docs/astro.md` — Consistent lifecycle-safe registration helpers and recipes.
 - `docs/framework-extensions.md` — Framework subpath policy.
 
 ---

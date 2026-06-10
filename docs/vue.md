@@ -36,3 +36,12 @@ useWebMCPTool(
 )
 </script>
 ```
+
+The composable returns the same handle shape as the React and Svelte helpers:
+
+```ts
+const supportTool = useWebMCPTool(createTicketTool)
+
+supportTool.getRegistration() // current RegisteredTool or undefined
+supportTool.unregister() // unregister before scope disposal when needed
+```

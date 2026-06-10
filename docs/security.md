@@ -41,6 +41,14 @@ The internal `confirmed: true` invocation flag is only for code paths that alrea
 
 Chained planner output does not change this rule. A `tool_sequence` executes as individual tool invocations, so each mutating step still runs its own guard and confirmation check before execution. If the user rejects a confirmation or a guard blocks a step, the sequence stops and later steps do not run.
 
+Planner outcomes are non-executing. `needs_clarification` returns a blocked command result, and `no_tools_match` returns an unavailable result. They cannot include steps, and app tools cannot use `tool_sequence`, `needs_clarification`, or `no_tools_match` as names.
+
+## Server-Backed Tools
+
+Use `defineServerTool()` for actions that need app-owned secrets, private APIs, payments, email, or database writes. The browser-visible tool still validates input and enforces scope, confirmation, and guards before it posts to the endpoint.
+
+Server endpoints must validate authorization and input again. Treat the browser request as untrusted even when WebMCP Kit already validated it client-side.
+
 ## Guards And Scope
 
 Use guards for input-specific blocking:

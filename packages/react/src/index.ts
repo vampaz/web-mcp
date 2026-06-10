@@ -17,7 +17,7 @@ export function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unknow
   const registration = useRef<RegisteredTool<TInput, TOutput> | undefined>(undefined)
   const registeredTool = useRef<WebMCPTool<TInput, TOutput> | undefined>(undefined)
   const handle = useRef<UseWebMCPToolResult<TInput, TOutput> | undefined>(undefined)
-  const available = options.when === undefined || options.when
+  const available = resolveWhenOption(options.when)
 
   useEffect(
     function syncWebMCPTool() {
@@ -61,4 +61,11 @@ export function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unknow
   }
 
   return handle.current
+}
+
+function resolveWhenOption(when: UseWebMCPToolOptions['when']): boolean {
+  // Legacy JS callers may still pass a getter; it is evaluated once per render.
+  const value = when as boolean | (() => boolean) | undefined
+  if (typeof value === 'function') return Boolean(value())
+  return value === undefined || value
 }
