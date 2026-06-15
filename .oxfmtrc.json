@@ -1,0 +1,10 @@
+{
+  "endOfLine": "lf",
+  "ignorePatterns": [".wrangler/**", "test-results/**", "package-lock.json"],
+  "printWidth": 100,
+  "semi": false,
+  "singleQuote": true,
+  "sortPackageJson": false,
+  "tabWidth": 2,
+  "trailingComma": "none"
+}

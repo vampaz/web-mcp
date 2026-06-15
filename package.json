@@ -1,0 +1,120 @@
+{
+  "name": "webmcp-kit",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "WebMCP tool registration, planners, framework helpers, devtools, and testing helpers for web apps.",
+  "homepage": "https://github.com/vampaz/web-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/vampaz/web-mcp/issues"
+  },
+  "license": "MIT",
+  "author": "Carlos Rodrigues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vampaz/web-mcp.git"
+  },
+  "keywords": [
+    "webmcp",
+    "mcp",
+    "browser-ai",
+    "tools",
+    "agents"
+  ],
+  "sideEffects": false,
+  "files": [
+    "packages/*/README.md",
+    "packages/*/src/**",
+    "!packages/**/__snapshots__",
+    "!packages/**/*.spec.ts",
+    "!packages/**/test-utils",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./packages/core/src/index.ts",
+      "default": "./packages/core/src/index.ts"
+    },
+    "./devtools": {
+      "types": "./packages/devtools/src/index.ts",
+      "default": "./packages/devtools/src/index.ts"
+    },
+    "./mcp-bridge": {
+      "types": "./packages/mcp-bridge/src/index.ts",
+      "default": "./packages/mcp-bridge/src/index.ts"
+    },
+    "./react": {
+      "types": "./packages/react/src/index.ts",
+      "default": "./packages/react/src/index.ts"
+    },
+    "./svelte": {
+      "types": "./packages/svelte/src/index.ts",
+      "default": "./packages/svelte/src/index.ts"
+    },
+    "./testing": {
+      "types": "./packages/testing/src/index.ts",
+      "default": "./packages/testing/src/index.ts"
+    },
+    "./testing/playwright": {
+      "types": "./packages/testing/src/playwright.ts",
+      "default": "./packages/testing/src/playwright.ts"
+    },
+    "./vue": {
+      "types": "./packages/vue/src/index.ts",
+      "default": "./packages/vue/src/index.ts"
+    },
+    "./zod": {
+      "types": "./packages/zod/src/index.ts",
+      "default": "./packages/zod/src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest --run",
+    "test:watch": "vitest --watch",
+    "lint": "oxlint .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check ."
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1.60.0",
+    "react": ">=19.2.6",
+    "svelte": ">=5.55.5",
+    "vue": ">=3.5.34",
+    "zod": ">=4.4.3"
+  },
+  "peerDependenciesMeta": {
+    "@playwright/test": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "svelte": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    },
+    "zod": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^25.9.1",
+    "@types/react": "^19.2.15",
+    "@vue/test-utils": "latest",
+    "jsdom": "^29.1.1",
+    "oxfmt": "^0.52.0",
+    "oxlint": "^1.67.0",
+    "react": "^19.2.6",
+    "svelte": "^5.55.9",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9",
+    "vue": "^3.5.34",
+    "zod": "^4.4.3"
+  },
+  "engines": {
+    "node": ">=24.12.0"
+  }
+}
