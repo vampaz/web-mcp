@@ -7,8 +7,8 @@ import {
   invokeTool,
   registerTool,
   setConfirmationHandler
-} from 'webmcp-kit'
-import { createLocalMCPBridge } from 'webmcp-kit/mcp-bridge'
+} from '@vampaz/webmcp-kit'
+import { createLocalMCPBridge } from '@vampaz/webmcp-kit/mcp-bridge'
 
 describe('cross-surface invocation semantics', () => {
   beforeEach(() => {

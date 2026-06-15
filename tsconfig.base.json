@@ -9,6 +9,19 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "ignoreDeprecations": "6.0",
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@vampaz/webmcp-kit": ["packages/core/src/index.ts"],
+      "@vampaz/webmcp-kit/devtools": ["packages/devtools/src/index.ts"],
+      "@vampaz/webmcp-kit/mcp-bridge": ["packages/mcp-bridge/src/index.ts"],
+      "@vampaz/webmcp-kit/react": ["packages/react/src/index.ts"],
+      "@vampaz/webmcp-kit/svelte": ["packages/svelte/src/index.ts"],
+      "@vampaz/webmcp-kit/testing": ["packages/testing/src/index.ts"],
+      "@vampaz/webmcp-kit/testing/playwright": ["packages/testing/src/playwright.ts"],
+      "@vampaz/webmcp-kit/vue": ["packages/vue/src/index.ts"],
+      "@vampaz/webmcp-kit/zod": ["packages/zod/src/index.ts"]
+    }
   }
 }

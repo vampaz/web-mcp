@@ -4,29 +4,29 @@ WebMCP Kit is a framework-agnostic TypeScript toolkit for exposing app actions t
 
 ## Package Shape
 
-In this repository, the root `webmcp-kit` package is the library. It exposes the core API from the package root plus focused subpath exports:
+In this repository, the root `@vampaz/webmcp-kit` package is the library. It exposes the core API from the package root plus focused subpath exports:
 
-- `webmcp-kit`
-- `webmcp-kit/devtools`
-- `webmcp-kit/testing`
-- `webmcp-kit/mcp-bridge`
-- `webmcp-kit/vue`
-- `webmcp-kit/react`
-- `webmcp-kit/svelte`
-- `webmcp-kit/zod`
+- `@vampaz/webmcp-kit`
+- `@vampaz/webmcp-kit/devtools`
+- `@vampaz/webmcp-kit/testing`
+- `@vampaz/webmcp-kit/mcp-bridge`
+- `@vampaz/webmcp-kit/vue`
+- `@vampaz/webmcp-kit/react`
+- `@vampaz/webmcp-kit/svelte`
+- `@vampaz/webmcp-kit/zod`
 
 The standalone demo app lives in [vampaz/web-mcp-demo](https://github.com/vampaz/web-mcp-demo). During side-by-side local development it consumes this package through `file:../web-mcp`. After publication, apps will install the single library package from npm.
 
 ## Future npm Install
 
 ```sh
-npm install webmcp-kit
+npm install @vampaz/webmcp-kit
 ```
 
 ## Register A Tool
 
 ```ts
-import { defineTool, objectInputSchema, registerTool, stringParam } from 'webmcp-kit'
+import { defineTool, objectInputSchema, registerTool, stringParam } from '@vampaz/webmcp-kit'
 
 const registration = registerTool(
   defineTool({
@@ -61,7 +61,7 @@ Use `annotations.readOnlyHint` for tools that only read or reveal state, and lea
 ## Upgrade A Form
 
 ```ts
-import { registerFormTool } from 'webmcp-kit'
+import { registerFormTool } from '@vampaz/webmcp-kit'
 
 const form = document.querySelector<HTMLFormElement>('form')
 
@@ -87,7 +87,7 @@ if (form) {
 Use `defineServerTool()` when an action needs app-owned secrets, a private API, email, payments, or database access.
 
 ```ts
-import { defineServerTool, objectInputSchema, registerTool, stringParam } from 'webmcp-kit'
+import { defineServerTool, objectInputSchema, registerTool, stringParam } from '@vampaz/webmcp-kit'
 
 registerTool(
   defineServerTool({
@@ -113,7 +113,7 @@ The browser-visible tool still runs validation, scope, confirmation, and guards 
 ## Add Devtools
 
 ```ts
-import { mountDevtoolsOverlay } from 'webmcp-kit/devtools'
+import { mountDevtoolsOverlay } from '@vampaz/webmcp-kit/devtools'
 
 const devtools = mountDevtoolsOverlay({ initiallyOpen: true })
 
@@ -125,7 +125,7 @@ devtools.destroy()
 Apps can use the built-in command input for natural-language planning against registered tools. The app supplies server-backed endpoint options; WebMCP Kit detects Chrome built-in AI from the browser when available.
 
 ```ts
-import { defineWebMCPCommandInput, type WebMCPCommandInputElement } from 'webmcp-kit'
+import { defineWebMCPCommandInput, type WebMCPCommandInputElement } from '@vampaz/webmcp-kit'
 
 defineWebMCPCommandInput()
 
@@ -162,11 +162,11 @@ Use `showChromeAI: false` when a consumer wants to hide the detected local Chrom
 ## Test Tools
 
 ```ts
-import { installWebMCPKitTestBridge } from 'webmcp-kit'
+import { installWebMCPKitTestBridge } from '@vampaz/webmcp-kit'
 
 if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
   installWebMCPKitTestBridge()
 }
 ```
 
-Playwright tests can then import helpers from `webmcp-kit/testing/playwright`.
+Playwright tests can then import helpers from `@vampaz/webmcp-kit/testing/playwright`.

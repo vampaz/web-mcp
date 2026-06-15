@@ -1,4 +1,4 @@
-import { defineTool, type JsonSchema } from 'webmcp-kit'
+import { defineTool, type JsonSchema } from '@vampaz/webmcp-kit'
 import { toJSONSchema } from 'zod'
 import type * as z from 'zod'
 

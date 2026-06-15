@@ -1,10 +1,10 @@
-# webmcp-kit/vue
+# @vampaz/webmcp-kit/vue
 
 Vue lifecycle helper for registering a WebMCP Kit tool while the current effect scope is active. `when` can be a ref, computed value, or getter, and the composable returns `{ unregister, getRegistration }`.
 
 ```ts
-import { defineTool, objectInputSchema, stringParam } from 'webmcp-kit'
-import { useWebMCPTool } from 'webmcp-kit/vue'
+import { defineTool, objectInputSchema, stringParam } from '@vampaz/webmcp-kit'
+import { useWebMCPTool } from '@vampaz/webmcp-kit/vue'
 
 const searchTool = useWebMCPTool(
   defineTool({

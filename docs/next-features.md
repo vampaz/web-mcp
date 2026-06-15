@@ -7,12 +7,12 @@ This roadmap starts from the current implementation. The first foundation layer 
 These capabilities are part of the current API and should be treated as baseline behavior:
 
 - Runtime input validation runs before scope, confirmation, guards, and `execute()`.
-- `defineZodTool()` is available from `webmcp-kit/zod` for single-source schema and TypeScript inference.
+- `defineZodTool()` is available from `@vampaz/webmcp-kit/zod` for single-source schema and TypeScript inference.
 - Vue, React, and Svelte helpers register tools with lifecycle cleanup and return `{ unregister, getRegistration }`.
 - `setConfirmationHandler()` lets apps provide their own approval UI, with `window.confirm()` as the browser fallback.
 - Planners can return a single tool, a bounded `tool_sequence`, `needs_clarification`, or `no_tools_match`.
 - `defineServerTool()` lets browser-visible tools delegate execution to an app-owned server endpoint.
-- Planner eval helpers are available from `webmcp-kit/testing`.
+- Planner eval helpers are available from `@vampaz/webmcp-kit/testing`.
 
 ## Tier 1 - Planner Reliability
 
@@ -107,7 +107,7 @@ The registry could track recent invocations for undoable tools, and the devtools
 **Needed**: An observability helper that turns event streams into useful metrics.
 
 ```ts
-import { createToolMetrics } from 'webmcp-kit'
+import { createToolMetrics } from '@vampaz/webmcp-kit'
 
 const metrics = createToolMetrics()
 metrics.invocations.create_invoice.count

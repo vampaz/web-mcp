@@ -7,7 +7,7 @@ WebMCP Kit can plan tool calls with different model providers. The app still own
 Use server mode when the key belongs to the app or company.
 
 ```ts
-import { createWebMCPKit } from 'webmcp-kit'
+import { createWebMCPKit } from '@vampaz/webmcp-kit'
 
 const kit = await createWebMCPKit({
   planner: {
@@ -143,10 +143,10 @@ Pass the selected planner to `getIntegrationHealthReport({ planner })` during de
 
 ## Web Component Input
 
-`webmcp-kit` also exports a ready-made web component for apps that want a command input without building their own planner UI:
+`@vampaz/webmcp-kit` also exports a ready-made web component for apps that want a command input without building their own planner UI:
 
 ```ts
-import { defineWebMCPCommandInput } from 'webmcp-kit'
+import { defineWebMCPCommandInput } from '@vampaz/webmcp-kit'
 
 defineWebMCPCommandInput()
 ```

@@ -45,11 +45,11 @@ Commerce:
 
 ## Planner Helper API
 
-For planner-only checks, import the helper API from `webmcp-kit/testing`:
+For planner-only checks, import the helper API from `@vampaz/webmcp-kit/testing`:
 
 ```ts
-import { createHeuristicPlanner } from 'webmcp-kit'
-import { runWebMCPPlannerEvals } from 'webmcp-kit/testing'
+import { createHeuristicPlanner } from '@vampaz/webmcp-kit'
+import { runWebMCPPlannerEvals } from '@vampaz/webmcp-kit/testing'
 
 const results = await runWebMCPPlannerEvals(createHeuristicPlanner(), tools, [
   {

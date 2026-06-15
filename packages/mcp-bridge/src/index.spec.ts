@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { clearToolsForTest, defineTool, registerTool, setConfirmationHandler } from 'webmcp-kit'
+import {
+  clearToolsForTest,
+  defineTool,
+  registerTool,
+  setConfirmationHandler
+} from '@vampaz/webmcp-kit'
 
 import { createLocalMCPBridge } from './index'
 

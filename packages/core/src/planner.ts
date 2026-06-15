@@ -554,7 +554,7 @@ function getProviderLabel(config: PlannerProviderConfig): string {
 }
 
 function getDefaultStorageKey(provider: PlannerProviderConfig['provider']): string {
-  return `webmcp-kit:${provider}:api-key`
+  return `@vampaz/webmcp-kit:${provider}:api-key`
 }
 
 async function getServerPlannerError(response: Response): Promise<string> {

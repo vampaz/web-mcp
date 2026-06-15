@@ -1,10 +1,10 @@
-# webmcp-kit/svelte
+# @vampaz/webmcp-kit/svelte
 
 Svelte lifecycle helper for registering a WebMCP Kit tool on mount and unregistering it on destroy. `when` can be a boolean, function, or readable store, and the helper returns `{ unregister, getRegistration }`.
 
 ```ts
-import { defineTool, objectInputSchema, stringParam } from 'webmcp-kit'
-import { useWebMCPTool } from 'webmcp-kit/svelte'
+import { defineTool, objectInputSchema, stringParam } from '@vampaz/webmcp-kit'
+import { useWebMCPTool } from '@vampaz/webmcp-kit/svelte'
 
 const searchTool = useWebMCPTool(
   defineTool({

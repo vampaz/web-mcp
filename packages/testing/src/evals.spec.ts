@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createHeuristicPlanner, defineTool } from 'webmcp-kit'
+import { createHeuristicPlanner, defineTool } from '@vampaz/webmcp-kit'
 
 import { runWebMCPPlannerEvalCase, runWebMCPPlannerEvals } from './evals'
 

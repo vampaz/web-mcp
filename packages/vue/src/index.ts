@@ -1,6 +1,6 @@
 import { onScopeDispose, toValue, watch } from 'vue'
 
-import { registerTool, type RegisteredTool, type WebMCPTool } from 'webmcp-kit'
+import { registerTool, type RegisteredTool, type WebMCPTool } from '@vampaz/webmcp-kit'
 
 import type { UseWebMCPToolOptions, UseWebMCPToolResult } from './interfaces/webmcp-tool'
 

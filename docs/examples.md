@@ -5,7 +5,7 @@ These examples show the current WebMCP Kit adoption path: expose narrow app acti
 ## Plain TypeScript
 
 ```ts
-import { defineTool, objectInputSchema, registerTool, stringParam } from 'webmcp-kit'
+import { defineTool, objectInputSchema, registerTool, stringParam } from '@vampaz/webmcp-kit'
 
 registerTool(
   defineTool({
@@ -32,8 +32,8 @@ registerTool(
 ```vue
 <script setup lang="ts">
 import { computed } from 'vue'
-import { defineTool } from 'webmcp-kit'
-import { useWebMCPTool } from 'webmcp-kit/vue'
+import { defineTool } from '@vampaz/webmcp-kit'
+import { useWebMCPTool } from '@vampaz/webmcp-kit/vue'
 
 const isCatalogRoute = computed(function getIsCatalogRoute() {
   return window.location.pathname.startsWith('/catalog')
@@ -68,7 +68,7 @@ useWebMCPTool(
 ## Confirmed Checkout
 
 ```ts
-import { defineTool, registerTool, setConfirmationHandler } from 'webmcp-kit'
+import { defineTool, registerTool, setConfirmationHandler } from '@vampaz/webmcp-kit'
 
 registerTool(
   defineTool({
@@ -109,7 +109,7 @@ setConfirmationHandler(async function confirmTool(tool, input, reason) {
 
 ```ts
 import { expect, test } from '@playwright/test'
-import { invokeWebMCPTool, waitForWebMCPTool } from 'webmcp-kit/testing/playwright'
+import { invokeWebMCPTool, waitForWebMCPTool } from '@vampaz/webmcp-kit/testing/playwright'
 
 test('selects items through the WebMCP test bridge', async function testSelectItems({ page }) {
   await page.goto('/')
@@ -132,7 +132,7 @@ The test bridge does not let tests bypass confirmation by passing `confirmed: tr
 ## Server-Backed Tool
 
 ```ts
-import { defineServerTool, objectInputSchema, registerTool, stringParam } from 'webmcp-kit'
+import { defineServerTool, objectInputSchema, registerTool, stringParam } from '@vampaz/webmcp-kit'
 
 registerTool(
   defineServerTool({
@@ -158,7 +158,7 @@ The browser still validates input and enforces confirmation. Execution posts `{ 
 ## Form Tool
 
 ```ts
-import { registerFormTool } from 'webmcp-kit'
+import { registerFormTool } from '@vampaz/webmcp-kit'
 
 const form = document.querySelector<HTMLFormElement>('form')
 
@@ -184,8 +184,8 @@ The helper applies `toolname`, `tooldescription`, and official field metadata at
 ## Eval Fixtures
 
 ```ts
-import { createHeuristicPlanner } from 'webmcp-kit'
-import { runWebMCPPlannerEvals } from 'webmcp-kit/testing'
+import { createHeuristicPlanner } from '@vampaz/webmcp-kit'
+import { runWebMCPPlannerEvals } from '@vampaz/webmcp-kit/testing'
 
 const results = await runWebMCPPlannerEvals(createHeuristicPlanner(), tools, [
   {

@@ -4,7 +4,7 @@ import {
   type ToolPlan,
   type ToolPlanner,
   type WebMCPTool
-} from 'webmcp-kit'
+} from '@vampaz/webmcp-kit'
 
 export interface WebMCPPlannerEvalCase {
   name: string

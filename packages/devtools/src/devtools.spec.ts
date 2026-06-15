@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { clearToolsForTest, defineTool, registerTool } from 'webmcp-kit'
+import { clearToolsForTest, defineTool, registerTool } from '@vampaz/webmcp-kit'
 
 import { mountDevtoolsOverlay } from './devtools'
 

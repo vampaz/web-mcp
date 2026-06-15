@@ -20,7 +20,7 @@ What is in this repo now:
 - Devtools, Playwright helpers, and a local MCP-style bridge for development and testing.
 - A separate Astro + Vue + Cloudflare demo app in [vampaz/web-mcp-demo](https://github.com/vampaz/web-mcp-demo) that exercises planner providers, Cloudflare Workers AI, and fallback behavior.
 
-The npm package is not published from this repository yet. The next release-prep step is to add a minimal build that publishes compiled `dist` output.
+The npm package name is `@vampaz/webmcp-kit`. It is not published yet; `npm run build` prepares the compiled `dist` output used by `npm publish`.
 
 ## How It Fits
 
@@ -62,7 +62,7 @@ flowchart TB
 ## Quick Start
 
 ```ts
-import { defineTool, registerTool } from 'webmcp-kit'
+import { defineTool, registerTool } from '@vampaz/webmcp-kit'
 
 registerTool(
   defineTool({
@@ -89,7 +89,7 @@ registerTool(
 For tools that change important state, add confirmation metadata and configure one app-level approval handler:
 
 ```ts
-import { defineTool, registerTool, setConfirmationHandler } from 'webmcp-kit'
+import { defineTool, registerTool, setConfirmationHandler } from '@vampaz/webmcp-kit'
 
 registerTool(
   defineTool({
@@ -206,7 +206,7 @@ When a request cannot be executed, planners can return a non-executing outcome:
 Use the health report while wiring WebMCP into an app:
 
 ```ts
-import { getIntegrationHealthReport } from 'webmcp-kit'
+import { getIntegrationHealthReport } from '@vampaz/webmcp-kit'
 
 const report = getIntegrationHealthReport({ planner: kit.planner })
 
@@ -235,11 +235,11 @@ The devtools overlay shows the same report, so developers can see whether tools 
 
 ## Framework Helpers
 
-The framework subpaths are intentionally thin lifecycle adapters. They register tools through `webmcp-kit` and unregister them when the owning component scope is disposed.
+The framework subpaths are intentionally thin lifecycle adapters. They register tools through `@vampaz/webmcp-kit` and unregister them when the owning component scope is disposed.
 
-- `webmcp-kit/vue`: `useWebMCPTool()` for Vue effect scopes, with reactive `when` support.
-- `webmcp-kit/react`: `useWebMCPTool()` for React components, with `when` as a boolean derived during render.
-- `webmcp-kit/svelte`: `useWebMCPTool()` for Svelte components, including readable-store `when` support.
+- `@vampaz/webmcp-kit/vue`: `useWebMCPTool()` for Vue effect scopes, with reactive `when` support.
+- `@vampaz/webmcp-kit/react`: `useWebMCPTool()` for React components, with `when` as a boolean derived during render.
+- `@vampaz/webmcp-kit/svelte`: `useWebMCPTool()` for Svelte components, including readable-store `when` support.
 
 See [Vue](./docs/vue.md), [React](./docs/react.md), [Svelte](./docs/svelte.md), and [Framework Extensions](./docs/framework-extensions.md).
 
@@ -260,7 +260,7 @@ WebMCP Kit tracks the browser proposal while keeping a local fallback for unsupp
 Developers can pass a planner provider when initializing the kit:
 
 ```ts
-import { createWebMCPKit } from 'webmcp-kit'
+import { createWebMCPKit } from '@vampaz/webmcp-kit'
 
 const kit = await createWebMCPKit({
   planner: {
@@ -300,7 +300,7 @@ In production, the demo keeps planner controls hidden by default. To temporarily
 Apps that want a drop-in natural-language command box can register the framework-agnostic web component:
 
 ```ts
-import { defineWebMCPCommandInput } from 'webmcp-kit'
+import { defineWebMCPCommandInput } from '@vampaz/webmcp-kit'
 
 defineWebMCPCommandInput()
 ```
@@ -394,7 +394,7 @@ input.configure({
 For app context, assign a property before or after mounting:
 
 ```ts
-import type { WebMCPCommandInputElement } from 'webmcp-kit'
+import type { WebMCPCommandInputElement } from '@vampaz/webmcp-kit'
 
 const input = document.querySelector<WebMCPCommandInputElement>('webmcp-command-input')
 
@@ -415,7 +415,7 @@ The component uses the active WebMCP registry, plans against registered tools, i
 Apps can install the test bridge in development or test builds:
 
 ```ts
-import { installWebMCPKitTestBridge } from 'webmcp-kit'
+import { installWebMCPKitTestBridge } from '@vampaz/webmcp-kit'
 
 if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
   installWebMCPKitTestBridge()
@@ -425,7 +425,7 @@ if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
 Playwright tests can then inspect and invoke tools through the page:
 
 ```ts
-import { invokeWebMCPTool, waitForWebMCPTool } from 'webmcp-kit/testing/playwright'
+import { invokeWebMCPTool, waitForWebMCPTool } from '@vampaz/webmcp-kit/testing/playwright'
 
 await waitForWebMCPTool(page, 'select_items')
 await invokeWebMCPTool(page, {
@@ -439,7 +439,7 @@ The test bridge does not accept caller-provided confirmation bypasses. Confirmed
 
 ## Demo App
 
-The standalone demo lives in [vampaz/web-mcp-demo](https://github.com/vampaz/web-mcp-demo). For side-by-side local development, clone it next to this repository so its `webmcp-kit` dependency can resolve from `file:../web-mcp`.
+The standalone demo lives in [vampaz/web-mcp-demo](https://github.com/vampaz/web-mcp-demo). For side-by-side local development, clone it next to this repository so its `@vampaz/webmcp-kit` dependency can resolve from `file:../web-mcp`.
 
 That repo owns the Astro app, Cloudflare Worker config, Workers AI binding, and e2e demo coverage.
 

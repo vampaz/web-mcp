@@ -5,8 +5,8 @@ Use `useWebMCPTool` to register a tool for the current Vue effect scope. The too
 ```vue
 <script setup lang="ts">
 import { computed } from 'vue'
-import { defineTool } from 'webmcp-kit'
-import { useWebMCPTool } from 'webmcp-kit/vue'
+import { defineTool } from '@vampaz/webmcp-kit'
+import { useWebMCPTool } from '@vampaz/webmcp-kit/vue'
 
 const isSupportRoute = computed(function getIsSupportRoute() {
   return window.location.pathname.startsWith('/support')

@@ -5,8 +5,8 @@ Use `useWebMCPTool` to register a tool while the component is mounted. The hook 
 ```tsx
 import { useLocation } from 'react-router'
 
-import { defineTool } from 'webmcp-kit'
-import { useWebMCPTool } from 'webmcp-kit/react'
+import { defineTool } from '@vampaz/webmcp-kit'
+import { useWebMCPTool } from '@vampaz/webmcp-kit/react'
 
 export function CartTools() {
   const location = useLocation()

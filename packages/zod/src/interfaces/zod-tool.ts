@@ -4,7 +4,7 @@ import type {
   ToolContext,
   ToolScopeResult,
   WebMCPTool
-} from 'webmcp-kit'
+} from '@vampaz/webmcp-kit'
 import type * as z from 'zod'
 
 export interface DefineZodToolOptions<TSchema extends z.ZodType, TOutput = unknown> {

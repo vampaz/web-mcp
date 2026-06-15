@@ -24,7 +24,7 @@ describe('Svelte useWebMCPTool', () => {
     })
 
     const { useWebMCPTool } = await import('./index')
-    const { defineTool, listTools } = await import('webmcp-kit')
+    const { defineTool, listTools } = await import('@vampaz/webmcp-kit')
 
     useWebMCPTool(
       defineTool({
@@ -69,7 +69,7 @@ describe('Svelte useWebMCPTool', () => {
 
     const available = writable(false)
     const { useWebMCPTool } = await import('./index')
-    const { defineTool, listTools } = await import('webmcp-kit')
+    const { defineTool, listTools } = await import('@vampaz/webmcp-kit')
 
     useWebMCPTool(
       defineTool({
@@ -114,7 +114,7 @@ describe('Svelte useWebMCPTool', () => {
     })
 
     const { useWebMCPTool } = await import('./index')
-    const { defineTool, listTools } = await import('webmcp-kit')
+    const { defineTool, listTools } = await import('@vampaz/webmcp-kit')
 
     const handle = useWebMCPTool(
       defineTool({

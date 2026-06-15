@@ -1,10 +1,10 @@
-# webmcp-kit/react
+# @vampaz/webmcp-kit/react
 
 React lifecycle helper for registering a WebMCP Kit tool from an effect and unregistering it on cleanup. `when` is a boolean derived during render, and the hook returns `{ unregister, getRegistration }`.
 
 ```ts
-import { defineTool, objectInputSchema, stringParam } from 'webmcp-kit'
-import { useWebMCPTool } from 'webmcp-kit/react'
+import { defineTool, objectInputSchema, stringParam } from '@vampaz/webmcp-kit'
+import { useWebMCPTool } from '@vampaz/webmcp-kit/react'
 
 export function ProductSearchTools() {
   const searchTool = useWebMCPTool(

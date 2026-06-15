@@ -1,9 +1,9 @@
-# webmcp-kit/testing
+# @vampaz/webmcp-kit/testing
 
-Playwright helpers for apps that install `installWebMCPKitTestBridge()` from `webmcp-kit`.
+Playwright helpers for apps that install `installWebMCPKitTestBridge()` from `@vampaz/webmcp-kit`.
 
 ```ts
-import { invokeWebMCPTool, waitForWebMCPTool } from 'webmcp-kit/testing/playwright'
+import { invokeWebMCPTool, waitForWebMCPTool } from '@vampaz/webmcp-kit/testing/playwright'
 
 await waitForWebMCPTool(page, 'select_items')
 await invokeWebMCPTool(page, {
@@ -16,8 +16,8 @@ await invokeWebMCPTool(page, {
 Planner evals can run without a browser:
 
 ```ts
-import { createHeuristicPlanner } from 'webmcp-kit'
-import { runWebMCPPlannerEvals } from 'webmcp-kit/testing'
+import { createHeuristicPlanner } from '@vampaz/webmcp-kit'
+import { runWebMCPPlannerEvals } from '@vampaz/webmcp-kit/testing'
 
 const results = await runWebMCPPlannerEvals(createHeuristicPlanner(), tools, [
   {

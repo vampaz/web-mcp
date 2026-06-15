@@ -1,4 +1,4 @@
-import type { RegisteredTool, WebMCPTool } from 'webmcp-kit'
+import type { RegisteredTool, WebMCPTool } from '@vampaz/webmcp-kit'
 
 export interface UseWebMCPToolOptions {
   when?: boolean

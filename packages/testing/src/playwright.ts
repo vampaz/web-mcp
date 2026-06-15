@@ -4,7 +4,7 @@ import type {
   TestBridgeTool,
   ToolInvocation,
   ToolInvocationResult
-} from 'webmcp-kit'
+} from '@vampaz/webmcp-kit'
 
 export async function getWebMCPRegistrySnapshot(page: Page): Promise<TestBridgeSnapshot> {
   return page.evaluate(function getSnapshot() {

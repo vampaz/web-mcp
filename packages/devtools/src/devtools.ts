@@ -12,7 +12,7 @@ import {
   type ToolInvocationResult,
   type WebMCPKitEvent,
   type WebMCPTool
-} from 'webmcp-kit'
+} from '@vampaz/webmcp-kit'
 
 export interface DevtoolsOverlay {
   refresh: () => void
