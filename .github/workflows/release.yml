@@ -1,0 +1,72 @@
+name: release
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set node version to 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Check npm version
+        run: npm --version
+
+      - run: npm ci
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Run format check
+        run: npm run format:check
+
+      - name: Run typecheck
+        run: npm exec tsc -- --noEmit
+
+      - name: Run tests
+        run: npm run test
+
+      - name: Run build
+        run: npm run build
+
+      - name: Configure npm registry for trusted publishing
+        run: printf 'registry=https://registry.npmjs.org/\n' > ~/.npmrc
+
+      - name: Check if version already published
+        id: npm-check
+        run: |
+          VERSION=$(node --input-type=module -e "import fs from 'node:fs'; const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); process.stdout.write(pkg.version)")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if npm view @vampaz/webmcp-kit@"$VERSION" version >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip if version already published
+        if: steps.npm-check.outputs.published == 'true'
+        run: echo "Version ${{ steps.npm-check.outputs.version }} already published. Skipping npm publish."
+
+      - name: Publish to npm
+        if: steps.npm-check.outputs.published != 'true'
+        run: npm publish --provenance --access public
+        env:
+          NPM_CONFIG_PROVENANCE: true
