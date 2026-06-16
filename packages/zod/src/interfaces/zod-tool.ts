@@ -1,5 +1,6 @@
 import type {
   JsonSchema,
+  ToolAnnotations,
   ToolConfirmation,
   ToolContext,
   ToolScopeResult,
@@ -12,6 +13,7 @@ export interface DefineZodToolOptions<TSchema extends z.ZodType, TOutput = unkno
   description: string
   schema: TSchema
   outputSchema?: JsonSchema
+  annotations?: ToolAnnotations
   confirmation?: ToolConfirmation
   examples?: Array<z.infer<TSchema>>
   scope?: () => ToolScopeResult

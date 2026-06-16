@@ -1,4 +1,3 @@
-import type { Page } from '@playwright/test'
 import type {
   TestBridgeSnapshot,
   TestBridgeTool,
@@ -6,7 +5,23 @@ import type {
   ToolInvocationResult
 } from '@vampaz/webmcp-kit'
 
-export async function getWebMCPRegistrySnapshot(page: Page): Promise<TestBridgeSnapshot> {
+export interface WebMCPTestingPage {
+  evaluate<TResult>(pageFunction: () => TResult | Promise<TResult>): Promise<TResult>
+  evaluate<TArg, TResult>(
+    pageFunction: (arg: TArg) => TResult | Promise<TResult>,
+    arg: TArg
+  ): Promise<TResult>
+  waitForFunction<TArg>(
+    pageFunction: (arg: TArg) => unknown,
+    arg: TArg
+  ): Promise<{
+    jsonValue(): Promise<unknown>
+  }>
+}
+
+export async function getWebMCPRegistrySnapshot(
+  page: WebMCPTestingPage
+): Promise<TestBridgeSnapshot> {
   return page.evaluate(function getSnapshot() {
     const bridge = window.__webMCPKit
     if (!bridge) {
@@ -19,7 +34,7 @@ export async function getWebMCPRegistrySnapshot(page: Page): Promise<TestBridgeS
   })
 }
 
-export async function listWebMCPTools(page: Page): Promise<TestBridgeTool[]> {
+export async function listWebMCPTools(page: WebMCPTestingPage): Promise<TestBridgeTool[]> {
   return page.evaluate(function getTools() {
     const bridge = window.__webMCPKit
     if (!bridge) {
@@ -33,7 +48,7 @@ export async function listWebMCPTools(page: Page): Promise<TestBridgeTool[]> {
 }
 
 export async function invokeWebMCPTool<TOutput = unknown>(
-  page: Page,
+  page: WebMCPTestingPage,
   invocation: ToolInvocation
 ): Promise<ToolInvocationResult<TOutput>> {
   return page.evaluate(function invoke(invocationInPage) {
@@ -48,7 +63,10 @@ export async function invokeWebMCPTool<TOutput = unknown>(
   }, invocation)
 }
 
-export async function waitForWebMCPTool(page: Page, toolName: string): Promise<TestBridgeTool> {
+export async function waitForWebMCPTool(
+  page: WebMCPTestingPage,
+  toolName: string
+): Promise<TestBridgeTool> {
   const handle = await page.waitForFunction(function findTool(name) {
     const bridge = window.__webMCPKit
     if (!bridge) return false
