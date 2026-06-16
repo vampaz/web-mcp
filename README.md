@@ -20,7 +20,7 @@ What is in this repo now:
 - Devtools, Playwright helpers, and a local MCP-style bridge for development and testing.
 - A separate Astro + Vue + Cloudflare demo app in [vampaz/web-mcp-demo](https://github.com/vampaz/web-mcp-demo) that exercises planner providers, Cloudflare Workers AI, and fallback behavior.
 
-The npm package name is `@vampaz/webmcp-kit`. It is not published yet; the `release` GitHub Actions workflow builds and publishes the compiled `dist` output through npm trusted publishing when a new version reaches `master`.
+The npm package name is `@vampaz/webmcp-kit`. Releases publish the compiled `dist` output through npm trusted publishing when a new version reaches `master`.
 
 ## How It Fits
 
@@ -60,6 +60,36 @@ flowchart TB
 ```
 
 ## Quick Start
+
+If you already use Zod, install it alongside the kit and use the `@vampaz/webmcp-kit/zod` subpath to keep the schema and TypeScript input type in one place:
+
+```sh
+npm install @vampaz/webmcp-kit zod
+```
+
+```ts
+import { registerTool } from '@vampaz/webmcp-kit'
+import { defineZodTool } from '@vampaz/webmcp-kit/zod'
+import { z } from 'zod'
+
+registerTool(
+  defineZodTool({
+    name: 'search_products',
+    description: 'Search the local product catalog.',
+    schema: z.object({
+      query: z.string().describe('Product name or category to search for.')
+    }),
+    annotations: {
+      readOnlyHint: true
+    },
+    execute(input) {
+      return searchProducts(input.query)
+    }
+  })
+)
+```
+
+The core package also accepts explicit JSON Schema:
 
 ```ts
 import { defineTool, registerTool } from '@vampaz/webmcp-kit'

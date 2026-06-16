@@ -16,6 +16,7 @@ export function defineZodTool<TSchema extends z.ZodType, TOutput = unknown>(
     description: options.description,
     inputSchema,
     outputSchema: options.outputSchema,
+    annotations: options.annotations,
     confirmation: options.confirmation,
     examples: options.examples,
     scope: options.scope,

@@ -15,15 +15,45 @@ In this repository, the root `@vampaz/webmcp-kit` package is the library. It exp
 - `@vampaz/webmcp-kit/svelte`
 - `@vampaz/webmcp-kit/zod`
 
-The standalone demo app lives in [vampaz/web-mcp-demo](https://github.com/vampaz/web-mcp-demo). During side-by-side local development it consumes this package through `file:../web-mcp`. After publication, apps will install the single library package from npm.
+The standalone demo app lives in [vampaz/web-mcp-demo](https://github.com/vampaz/web-mcp-demo). During side-by-side local development it consumes this package through `file:../web-mcp`. Published apps install the single library package from npm.
 
-## Future npm Install
+## Install
 
 ```sh
 npm install @vampaz/webmcp-kit
 ```
 
 ## Register A Tool
+
+Use `@vampaz/webmcp-kit/zod` when a Zod schema should be the source of truth for runtime validation and TypeScript inference:
+
+```sh
+npm install @vampaz/webmcp-kit zod
+```
+
+```ts
+import { registerTool } from '@vampaz/webmcp-kit'
+import { defineZodTool } from '@vampaz/webmcp-kit/zod'
+import { z } from 'zod'
+
+registerTool(
+  defineZodTool({
+    name: 'search_products',
+    description: 'Search the local product catalog for products matching the shopper request.',
+    schema: z.object({
+      query: z.string().describe('Product name or category to search for.')
+    }),
+    annotations: {
+      readOnlyHint: true
+    },
+    execute(input) {
+      return searchProducts(input.query)
+    }
+  })
+)
+```
+
+The core package also accepts explicit JSON Schema:
 
 ```ts
 import { defineTool, objectInputSchema, registerTool, stringParam } from '@vampaz/webmcp-kit'

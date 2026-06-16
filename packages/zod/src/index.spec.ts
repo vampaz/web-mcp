@@ -88,6 +88,28 @@ describe('defineZodTool', () => {
     expect(execute).not.toHaveBeenCalled()
   })
 
+  it('forwards tool annotations to the core tool definition', () => {
+    const tool = defineZodTool({
+      name: 'search_products',
+      description: 'Search the visible product catalog.',
+      schema: z.object({
+        query: z.string()
+      }),
+      annotations: {
+        readOnlyHint: true,
+        untrustedContentHint: true
+      },
+      execute(input) {
+        return input
+      }
+    })
+
+    expect(tool.annotations).toEqual({
+      readOnlyHint: true,
+      untrustedContentHint: true
+    })
+  })
+
   it('validates nullable fields emitted as anyOf schemas', async () => {
     const execute = vi.fn(function saveNote(input: { note: string | null }) {
       return input

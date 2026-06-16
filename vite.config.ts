@@ -38,15 +38,7 @@ export default defineConfig({
       formats: ['es']
     },
     rollupOptions: {
-      external: [
-        '@playwright/test',
-        '@vampaz/webmcp-kit',
-        'react',
-        'svelte',
-        'svelte/store',
-        'vue',
-        'zod'
-      ]
+      external: ['@vampaz/webmcp-kit', 'react', 'svelte', 'svelte/store', 'vue', 'zod']
     },
     sourcemap: true
   }
