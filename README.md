@@ -22,6 +22,12 @@ What is in this repo now:
 
 The npm package name is `@vampaz/webmcp-kit`. Releases publish the compiled `dist` output through npm trusted publishing when a new version reaches `master`.
 
+## OSS Core And Paid Hosted Services
+
+The package is open source and usable without a WebMCP-issued key. Tool registration, local fallback execution, native WebMCP integration, framework helpers, devtools, testing helpers, deterministic planning, browser-local planning, BYOK/user-key planners, and app-owned server endpoints remain part of the OSS path.
+
+Paid access keys apply only to WebMCP-hosted services that the app explicitly configures, such as a hosted OpenAI planner, hosted analytics, hosted evals, or future WebMCP services. Those keys are publishable browser identifiers, not secrets. They are meant to be sent from static apps directly to WebMCP-hosted APIs while the WebMCP server enforces origin, project, service, quota, rate-limit, revocation, and spend controls.
+
 ## How It Fits
 
 Consumers keep ownership of app state, tools, secrets, and approved planner endpoints. WebMCP Kit provides the browser-facing registration layer, the fallback registry, the command input, diagnostics, tests, and planner clients.

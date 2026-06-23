@@ -1,3 +1,5 @@
+import type { WebMCPHostedPaidServiceMetadata } from './access-key'
+
 export interface JsonSchema {
   type?: string | string[]
   properties?: Record<string, JsonSchema>
@@ -138,6 +140,7 @@ export interface PlannerProviderConfig {
   model?: string
   baseUrl?: string
   auth?: PlannerAuth
+  paidService?: WebMCPHostedPaidServiceMetadata
 }
 
 export interface PlannerRequest {

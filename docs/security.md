@@ -49,6 +49,14 @@ Use `defineServerTool()` for actions that need app-owned secrets, private APIs, 
 
 Server endpoints must validate authorization and input again. Treat the browser request as untrusted even when WebMCP Kit already validated it client-side.
 
+## Publishable WebMCP Access Keys
+
+Any key used directly from the browser is visible in network calls, browser devtools, extensions, and copied frontend bundles. Treat WebMCP browser keys as publishable project identifiers, not secrets. They must be low-privilege, scoped to allowed services and origins, and revocable without touching the app bundle.
+
+Security for WebMCP-hosted paid services comes from server-side controls: key hashing/fingerprints, project and service scope, allowed origins, rate limits, quotas, spend caps, model allowlists, revocation, last-used tracking, and audit events. Do not put provider API keys, signing secrets, account admin tokens, or unrestricted service credentials in browser config.
+
+The OSS kit must continue to work without a WebMCP access key. A missing, invalid, expired, copied, or quota-exhausted publishable key should block only the WebMCP-hosted paid service that needs it, such as hosted OpenAI planning or hosted analytics.
+
 ## Guards And Scope
 
 Use guards for input-specific blocking:

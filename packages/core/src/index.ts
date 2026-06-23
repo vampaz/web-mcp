@@ -28,6 +28,18 @@ export {
 } from './forms'
 export { defineWebMCPCommandInput } from './command-input'
 export type {
+  WebMCPAccessKeyMetadata,
+  WebMCPAccessKeyType,
+  WebMCPAccessValidationFailure,
+  WebMCPAccessValidationResult,
+  WebMCPAccessValidationSuccess,
+  WebMCPHostedPaidServiceMetadata,
+  WebMCPPaidServiceEntitlement,
+  WebMCPPaidServiceEnvironment,
+  WebMCPPaidServiceId,
+  WebMCPPaidServiceQuotaStatus
+} from './interfaces/access-key'
+export type {
   WebMCPCommandErrorEventDetail,
   WebMCPCommandInputConfigureOptions,
   WebMCPCommandInputElement,

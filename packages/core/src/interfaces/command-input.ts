@@ -7,6 +7,7 @@ import type {
   ToolPlanStep,
   ToolPlanner
 } from './tool'
+import type { WebMCPHostedPaidServiceMetadata } from './access-key'
 
 export type WebMCPCommandInputPhase =
   | 'idle'
@@ -19,6 +20,7 @@ export type WebMCPCommandInputPhase =
 export interface WebMCPCommandInputEndpointOption {
   label: string
   model?: string
+  paidService?: WebMCPHostedPaidServiceMetadata
   provider: PlannerProviderKind
 }
 
