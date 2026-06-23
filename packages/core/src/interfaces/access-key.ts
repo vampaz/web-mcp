@@ -34,6 +34,16 @@ export interface WebMCPAccessKeyMetadata {
   services: WebMCPPaidServiceEntitlement[]
 }
 
+export interface WebMCPServiceSessionTokenMetadata {
+  abuseChecks?: string[]
+  expiresAt: string
+  issuedAt: string
+  keyFingerprint: string
+  origin?: string
+  projectId: string
+  serviceId: WebMCPPaidServiceId
+}
+
 export interface WebMCPHostedPaidServiceMetadata {
   endpoint?: string
   label?: string

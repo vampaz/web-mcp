@@ -38,7 +38,8 @@ export type {
   WebMCPPaidServiceEnvironment,
   WebMCPPaidServiceId,
   WebMCPPaidServiceQuotaStatus,
-  WebMCPPaidServicesConfig
+  WebMCPPaidServicesConfig,
+  WebMCPServiceSessionTokenMetadata
 } from './interfaces/access-key'
 export type {
   WebMCPCommandErrorEventDetail,

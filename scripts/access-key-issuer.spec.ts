@@ -83,18 +83,19 @@ describe('access key issuer', () => {
   it('rejects unknown keys', () => {
     const result = issueFixture()
 
-    expect(
-      validateAccessKey({
-        key: 'wmcp_pk_test_unknown99_secret123secret456',
-        origin: 'https://example.com',
-        records: [result.record],
-        serviceId: 'hosted-openai-planner',
-        signingSecret
-      })
-    ).toMatchObject({
+    const validation = validateAccessKey({
+      key: 'wmcp_pk_test_unknown99_secret123secret456',
+      origin: 'https://example.com',
+      records: [result.record],
+      serviceId: 'hosted-openai-planner',
+      signingSecret
+    })
+
+    expect(validation).toMatchObject({
       code: 'unknown-key',
       valid: false
     })
+    expect(JSON.stringify(validation)).not.toContain('secret123secret456')
   })
 
   it('rejects wrong services', () => {

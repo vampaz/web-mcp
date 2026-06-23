@@ -29,6 +29,8 @@ Apps that do not want to operate a backend can call WebMCP-hosted services direc
 
 Hosted OpenAI planning is the first paid service, but the same metadata is intentionally generic enough for analytics, hosted evals, usage dashboards, or later WebMCP services. Missing or invalid keys should disable or fail only the configured hosted paid service. Native WebMCP, deterministic local planning, Chrome built-in AI, browser-local planners, BYOK/user-key providers, and app-owned server endpoints do not require a WebMCP access key.
 
+Some WebMCP-hosted services may optionally mint short-lived service session tokens after validating the publishable key and abuse controls. This is a server-side hardening layer; it does not make browser publishable keys secret and does not require the customer to run a backend.
+
 ## Simple Experiments: User-Key Mode
 
 Use user-key mode when the key belongs to the person using the browser, or for local experiments.

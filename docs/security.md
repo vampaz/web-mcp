@@ -57,6 +57,8 @@ Security for WebMCP-hosted paid services comes from server-side controls: key ha
 
 The OSS kit must continue to work without a WebMCP access key. A missing, invalid, expired, copied, or quota-exhausted publishable key should block only the WebMCP-hosted paid service that needs it, such as hosted OpenAI planning or hosted analytics.
 
+Do not treat `Origin` as a cryptographic proof. Browsers set it for normal cross-origin requests, which is useful for reducing casual copied-key abuse, but non-browser callers can spoof it. Pair origin checks with quotas, per-IP and per-origin throttles, model allowlists, revocation, anomaly detection, and spend caps.
+
 Publishable key lifecycle:
 
 - Show raw keys once at creation, then display only their fingerprint.
@@ -66,6 +68,8 @@ Publishable key lifecycle:
 - Rotate by issuing a new key, updating the app config, and revoking the old key.
 - Support immediate revocation, expiry, last-used tracking, and audit events.
 - Enforce quotas, spend caps, model allowlists, rate limits, and origin checks before calling paid providers.
+
+For stronger abuse resistance, a WebMCP-hosted service can exchange a valid publishable key for a short-lived service session token. The exchange still happens on WebMCP servers after validating the key, origin, rate limits, and optional abuse checks such as captcha or site verification. Session tokens should be scoped to one project, origin, and service, expire quickly, and never upgrade a browser publishable key into account-level authority.
 
 ## Guards And Scope
 
