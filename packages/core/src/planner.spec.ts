@@ -24,7 +24,7 @@ interface WindowWithLanguageModel extends Window {
 describe('planner', () => {
   afterEach(() => {
     delete (window as WindowWithLanguageModel).LanguageModel
-    localStorage.clear()
+    if (typeof localStorage.clear === 'function') localStorage.clear()
     vi.unstubAllGlobals()
   })
 
@@ -895,6 +895,90 @@ describe('planner', () => {
     )
     const fetchOptions = (fetch.mock.calls as unknown as Array<[string, RequestInit]>)[0]?.[1]
     expect(String(fetchOptions?.body)).not.toContain('test-key')
+  })
+
+  it('sends publishable keys only to configured WebMCP hosted paid server endpoints', async () => {
+    const fetch = vi.fn(async () =>
+      Response.json({
+        toolName: 'search_products',
+        input: { query: 'dock' },
+        confidence: 0.88,
+        reason: 'Server planner selected search.'
+      })
+    )
+    vi.stubGlobal('fetch', fetch)
+
+    const planner = await createConfiguredPlanner({
+      auth: {
+        endpoint: 'https://api.webmcp.dev/v1/plan',
+        mode: 'server'
+      },
+      paidService: {
+        requiresAccessKey: true,
+        serviceId: 'hosted-openai-planner'
+      },
+      paidServices: {
+        accessKey: 'wmcp-publishable-test-key'
+      },
+      provider: 'openai'
+    })
+
+    await planner.plan('Find dock products', [
+      {
+        name: 'search_products',
+        description: 'Search products.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute: () => []
+      }
+    ])
+
+    const fetchOptions = (fetch.mock.calls as unknown as Array<[string, RequestInit]>)[0]?.[1]
+    expect(fetchOptions?.headers).toMatchObject({
+      Authorization: 'Bearer wmcp-publishable-test-key',
+      'Content-Type': 'application/json'
+    })
+    expect(String(fetchOptions?.body)).not.toContain('wmcp-publishable-test-key')
+  })
+
+  it('does not send publishable keys to ordinary app-owned server endpoints', async () => {
+    const fetch = vi.fn(async () =>
+      Response.json({
+        toolName: 'search_products',
+        input: { query: 'dock' },
+        confidence: 0.88,
+        reason: 'Server planner selected search.'
+      })
+    )
+    vi.stubGlobal('fetch', fetch)
+
+    const planner = await createConfiguredPlanner({
+      auth: {
+        endpoint: '/api/webmcp/plan',
+        mode: 'server'
+      },
+      paidServices: {
+        accessKey: 'wmcp-publishable-test-key'
+      },
+      provider: 'openai'
+    })
+
+    await planner.plan('Find dock products', [
+      {
+        name: 'search_products',
+        description: 'Search products.',
+        inputSchema: {
+          type: 'object'
+        },
+        execute: () => []
+      }
+    ])
+
+    const fetchOptions = (fetch.mock.calls as unknown as Array<[string, RequestInit]>)[0]?.[1]
+    expect(fetchOptions?.headers).not.toMatchObject({
+      Authorization: expect.any(String)
+    })
   })
 
   it('reports server endpoint error details for explicit providers', async () => {

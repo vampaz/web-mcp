@@ -41,6 +41,11 @@ export interface WebMCPHostedPaidServiceMetadata {
   serviceId: WebMCPPaidServiceId
 }
 
+export interface WebMCPPaidServicesConfig {
+  accessKey?: string
+  services?: WebMCPHostedPaidServiceMetadata[]
+}
+
 export interface WebMCPAccessValidationSuccess {
   fingerprint: string
   metadata: WebMCPAccessKeyMetadata

@@ -1,4 +1,4 @@
-import type { WebMCPHostedPaidServiceMetadata } from './access-key'
+import type { WebMCPHostedPaidServiceMetadata, WebMCPPaidServicesConfig } from './access-key'
 
 export interface JsonSchema {
   type?: string | string[]
@@ -141,6 +141,7 @@ export interface PlannerProviderConfig {
   baseUrl?: string
   auth?: PlannerAuth
   paidService?: WebMCPHostedPaidServiceMetadata
+  paidServices?: WebMCPPaidServicesConfig
 }
 
 export interface PlannerRequest {
