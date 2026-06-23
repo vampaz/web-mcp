@@ -108,6 +108,8 @@ unsubscribe()
 
 Event payloads can include invocation details in `detail`, including tool inputs and outputs for invocation events. Treat event subscribers as trusted application code, and do not forward event details to analytics, logs, or third-party services without redaction.
 
+WebMCP hosted analytics is opt-in. It is not required for OSS usage, does not start automatically, and should use the same publishable paid-service key path as other WebMCP-hosted services. Configure an explicit event-type allowlist and keep event detail disabled unless the app has reviewed and redacted it. Hosted analytics should support deletion/export, retention limits, and project-level disable controls in the admin panel.
+
 ## Demo Admin Toggle
 
 The demo exposes planner provider/model controls when `localStorage.setItem('webmcp:admin', 'true')` is set. This is a **development-only convenience** and is trivially discoverable by any user with browser devtools access. Do not rely on this mechanism for production access control. In production, pass app-owned planner configuration to keep provider/model choices hidden from end users.

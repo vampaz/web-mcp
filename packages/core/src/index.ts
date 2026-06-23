@@ -15,6 +15,12 @@ export {
 export { formatOpenAITool, formatOpenAITools, type OpenAIFunctionTool } from './adapters/openai'
 export { emitWebMCPKitEvent, subscribeWebMCPKitEvents } from './events'
 export {
+  createWebMCPAnalytics,
+  type WebMCPAnalytics,
+  type WebMCPAnalyticsEventType,
+  type WebMCPAnalyticsOptions
+} from './analytics'
+export {
   assertWebMCPIntegration,
   getIntegrationHealthReport,
   type IntegrationHealthOptions
