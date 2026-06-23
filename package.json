@@ -70,6 +70,7 @@
     "prepublishOnly": "npm run build",
     "test": "vitest --run",
     "test:watch": "vitest --watch",
+    "generate:access-key": "node --experimental-strip-types scripts/generate-access-key.ts",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check ."
