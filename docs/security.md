@@ -57,6 +57,16 @@ Security for WebMCP-hosted paid services comes from server-side controls: key ha
 
 The OSS kit must continue to work without a WebMCP access key. A missing, invalid, expired, copied, or quota-exhausted publishable key should block only the WebMCP-hosted paid service that needs it, such as hosted OpenAI planning or hosted analytics.
 
+Publishable key lifecycle:
+
+- Show raw keys once at creation, then display only their fingerprint.
+- Store hashes or HMAC hashes server-side; never store raw browser keys as operational records.
+- Scope keys to customer, project, service, allowed origins, and `test` or `live` environment.
+- Keep test and live keys separate.
+- Rotate by issuing a new key, updating the app config, and revoking the old key.
+- Support immediate revocation, expiry, last-used tracking, and audit events.
+- Enforce quotas, spend caps, model allowlists, rate limits, and origin checks before calling paid providers.
+
 ## Guards And Scope
 
 Use guards for input-specific blocking:
