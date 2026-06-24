@@ -11,6 +11,3 @@ dist
 coverage
 test-results
 .playwright-mcp
-.webmcp-access-issuer.json
-webmcp-access-keys*.json
-*.webmcp-key.json

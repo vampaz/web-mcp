@@ -109,7 +109,6 @@ export function defineWebMCPCommandInput(
     context?: PlannerContext | (() => PlannerContext)
     endpoint?: string
     endpointOptions?: WebMCPCommandInputEndpointOption[]
-    paidServices?: WebMCPCommandInputConfigureOptions['paidServices']
     plannerOptions?: WebMCPCommandInputPlannerOption[]
     showChromeAI = true
     private chromeAIAvailable = false
@@ -274,7 +273,6 @@ export function defineWebMCPCommandInput(
       this.context = options.context ?? this.context
       this.endpoint = options.endpoint ?? this.endpoint
       this.endpointOptions = options.endpointOptions ?? this.endpointOptions
-      this.paidServices = options.paidServices ?? this.paidServices
       this.plannerOptions = options.plannerOptions ?? this.plannerOptions
       if (options.showChromeAI !== undefined) {
         this.showChromeAI = options.showChromeAI
@@ -534,7 +532,7 @@ export function defineWebMCPCommandInput(
       }
 
       const plannerConfig = this.getPlannerConfig()
-      const plannerSignature = JSON.stringify(getPlannerConfigSignature(plannerConfig))
+      const plannerSignature = JSON.stringify(plannerConfig ?? { provider: 'auto' })
       if (this.currentPlanner && this.currentPlannerSignature === plannerSignature)
         return this.currentPlanner
 
@@ -571,13 +569,10 @@ export function defineWebMCPCommandInput(
 
       const model = this.state.fixedModel ?? this.state.model
       const authMode = this.getAuthMode(provider)
-      const endpointOption = this.getEndpointOption(provider, model)
       return {
         provider,
         model: model || undefined,
         baseUrl: this.baseUrl || undefined,
-        paidService: endpointOption?.paidService,
-        paidServices: this.paidServices,
         auth:
           authMode === 'server'
             ? {
@@ -589,15 +584,6 @@ export function defineWebMCPCommandInput(
                 apiKey: this.apiKey || undefined
               }
       }
-    }
-
-    private getEndpointOption(
-      provider: PlannerProviderKind,
-      model: string
-    ): WebMCPCommandInputEndpointOption | undefined {
-      return this.endpointOptions?.find(function findEndpointOption(option) {
-        return option.provider === provider && (option.model ?? '') === (model || '')
-      })
     }
 
     private getAuthMode(provider: PlannerProviderKind): 'none' | 'server' | 'user-key' {
@@ -1034,24 +1020,6 @@ function getStatusLabel(phase: WebMCPCommandInputPhase): string {
   if (phase === 'planning') return 'Planning...'
   if (phase === 'executing') return 'Running...'
   return defaultButtonLabel
-}
-
-function getPlannerConfigSignature(config: PlannerProviderConfig | undefined) {
-  if (!config) return { provider: 'auto' }
-
-  return {
-    auth: config.auth,
-    baseUrl: config.baseUrl,
-    model: config.model,
-    paidService: config.paidService,
-    paidServices: config.paidServices
-      ? {
-          accessKeyConfigured: Boolean(config.paidServices.accessKey),
-          services: config.paidServices.services
-        }
-      : undefined,
-    provider: config.provider
-  }
 }
 
 function assertCustomElementsAvailable() {

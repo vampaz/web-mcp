@@ -15,12 +15,6 @@ export {
 export { formatOpenAITool, formatOpenAITools, type OpenAIFunctionTool } from './adapters/openai'
 export { emitWebMCPKitEvent, subscribeWebMCPKitEvents } from './events'
 export {
-  createWebMCPAnalytics,
-  type WebMCPAnalytics,
-  type WebMCPAnalyticsEventType,
-  type WebMCPAnalyticsOptions
-} from './analytics'
-export {
   assertWebMCPIntegration,
   getIntegrationHealthReport,
   type IntegrationHealthOptions
@@ -33,20 +27,6 @@ export {
   type RegisterFormToolOptions
 } from './forms'
 export { defineWebMCPCommandInput } from './command-input'
-export type {
-  WebMCPAccessKeyMetadata,
-  WebMCPAccessKeyType,
-  WebMCPAccessValidationFailure,
-  WebMCPAccessValidationResult,
-  WebMCPAccessValidationSuccess,
-  WebMCPHostedPaidServiceMetadata,
-  WebMCPPaidServiceEntitlement,
-  WebMCPPaidServiceEnvironment,
-  WebMCPPaidServiceId,
-  WebMCPPaidServiceQuotaStatus,
-  WebMCPPaidServicesConfig,
-  WebMCPServiceSessionTokenMetadata
-} from './interfaces/access-key'
 export type {
   WebMCPCommandErrorEventDetail,
   WebMCPCommandInputConfigureOptions,

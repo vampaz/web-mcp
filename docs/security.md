@@ -49,28 +49,6 @@ Use `defineServerTool()` for actions that need app-owned secrets, private APIs, 
 
 Server endpoints must validate authorization and input again. Treat the browser request as untrusted even when WebMCP Kit already validated it client-side.
 
-## Publishable WebMCP Access Keys
-
-Any key used directly from the browser is visible in network calls, browser devtools, extensions, and copied frontend bundles. Treat WebMCP browser keys as publishable project identifiers, not secrets. They must be low-privilege, scoped to allowed services and origins, and revocable without touching the app bundle.
-
-Security for WebMCP-hosted paid services comes from server-side controls: key hashing/fingerprints, project and service scope, allowed origins, rate limits, quotas, spend caps, model allowlists, revocation, last-used tracking, and audit events. Do not put provider API keys, signing secrets, account admin tokens, or unrestricted service credentials in browser config.
-
-The OSS kit must continue to work without a WebMCP access key. A missing, invalid, expired, copied, or quota-exhausted publishable key should block only the WebMCP-hosted paid service that needs it, such as hosted OpenAI planning or hosted analytics.
-
-Do not treat `Origin` as a cryptographic proof. Browsers set it for normal cross-origin requests, which is useful for reducing casual copied-key abuse, but non-browser callers can spoof it. Pair origin checks with quotas, per-IP and per-origin throttles, model allowlists, revocation, anomaly detection, and spend caps.
-
-Publishable key lifecycle:
-
-- Show raw keys once at creation, then display only their fingerprint.
-- Store hashes or HMAC hashes server-side; never store raw browser keys as operational records.
-- Scope keys to customer, project, service, allowed origins, and `test` or `live` environment.
-- Keep test and live keys separate.
-- Rotate by issuing a new key, updating the app config, and revoking the old key.
-- Support immediate revocation, expiry, last-used tracking, and audit events.
-- Enforce quotas, spend caps, model allowlists, rate limits, and origin checks before calling paid providers.
-
-For stronger abuse resistance, a WebMCP-hosted service can exchange a valid publishable key for a short-lived service session token. The exchange still happens on WebMCP servers after validating the key, origin, rate limits, and optional abuse checks such as captcha or site verification. Session tokens should be scoped to one project, origin, and service, expire quickly, and never upgrade a browser publishable key into account-level authority.
-
 ## Guards And Scope
 
 Use guards for input-specific blocking:
@@ -107,8 +85,6 @@ unsubscribe()
 ```
 
 Event payloads can include invocation details in `detail`, including tool inputs and outputs for invocation events. Treat event subscribers as trusted application code, and do not forward event details to analytics, logs, or third-party services without redaction.
-
-WebMCP hosted analytics is opt-in. It is not required for OSS usage, does not start automatically, and should use the same publishable paid-service key path as other WebMCP-hosted services. Configure an explicit event-type allowlist and keep event detail disabled unless the app has reviewed and redacted it. Hosted analytics should support deletion/export, retention limits, and project-level disable controls in the admin panel.
 
 ## Demo Admin Toggle
 

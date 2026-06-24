@@ -163,7 +163,6 @@ export function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner 
   const serverBindingRequired = requiresServerBinding(config, auth)
   const key = getPlannerApiKey(config.provider, auth)
   const keyRequired = requiresBrowserKey(config, auth)
-  const paidServiceKeyRequired = requiresPaidServiceAccessKey(config)
 
   if (serverBindingRequired) {
     return {
@@ -185,18 +184,6 @@ export function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner 
       detail: `${providerLabel} needs a user API key. In user-key mode the key is stored in the browser and visible to this page.`,
       async plan() {
         throw new Error(`${providerLabel} needs a user API key.`)
-      }
-    }
-  }
-
-  if (paidServiceKeyRequired && !config.paidServices?.accessKey) {
-    return {
-      name: providerLabel,
-      available: false,
-      status: 'needs-key',
-      detail: `${providerLabel} needs a WebMCP publishable access key for ${getPaidServiceLabel(config)}.`,
-      async plan() {
-        throw new Error(`${providerLabel} needs a WebMCP publishable access key.`)
       }
     }
   }
@@ -289,7 +276,9 @@ async function planWithServerEndpoint(
 ): Promise<ToolPlan> {
   const response = await fetch(endpoint, {
     method: 'POST',
-    headers: getServerEndpointHeaders(config),
+    headers: {
+      'Content-Type': 'application/json'
+    },
     body: JSON.stringify({
       provider: config.provider,
       model,
@@ -306,18 +295,6 @@ async function planWithServerEndpoint(
   }
 
   return (await response.json()) as ToolPlan
-}
-
-function getServerEndpointHeaders(config: PlannerProviderConfig): Record<string, string> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json'
-  }
-  const accessKey = config.paidService ? config.paidServices?.accessKey : undefined
-  if (accessKey) {
-    headers.Authorization = `Bearer ${accessKey}`
-  }
-
-  return headers
 }
 
 async function planWithOpenAICompatible(
@@ -519,8 +496,7 @@ function getPlannerApiKey(
 ): string | undefined {
   if (auth.mode !== 'user-key') return undefined
   if (auth.apiKey) return auth.apiKey
-  if (typeof localStorage === 'undefined' || typeof localStorage.getItem !== 'function')
-    return undefined
+  if (typeof localStorage === 'undefined') return undefined
 
   const storageKey = auth.storageKey ?? getDefaultStorageKey(provider)
   return localStorage.getItem(storageKey) ?? undefined
@@ -541,8 +517,6 @@ function requiresServerBinding(config: PlannerProviderConfig, auth: PlannerAuth)
 
 function getRemotePlannerDetail(config: PlannerProviderConfig, auth: PlannerAuth): string {
   const provider = getProviderLabel(config)
-  if (config.paidService)
-    return `${provider} will plan through a WebMCP-hosted paid service; the publishable access key is sent only to that hosted endpoint.`
   if (config.provider === 'cloudflare-binding')
     return `${provider} will plan through ${auth.mode === 'server' ? auth.endpoint : 'a server endpoint'} using a Cloudflare AI binding.`
   if (auth.mode === 'server')
@@ -550,14 +524,6 @@ function getRemotePlannerDetail(config: PlannerProviderConfig, auth: PlannerAuth
   if (auth.mode === 'user-key')
     return `${provider} will plan directly from the browser with a user-provided key. This is convenient but the key is visible to this page.`
   return `${provider} will plan without an API key.`
-}
-
-function requiresPaidServiceAccessKey(config: PlannerProviderConfig): boolean {
-  return Boolean(config.paidService?.requiresAccessKey)
-}
-
-function getPaidServiceLabel(config: PlannerProviderConfig): string {
-  return config.paidService?.label ?? config.paidService?.serviceId ?? 'the selected paid service'
 }
 
 function getOpenAICompatibleBaseUrl(config: PlannerProviderConfig): string {

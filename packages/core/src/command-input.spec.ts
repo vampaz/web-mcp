@@ -361,46 +361,6 @@ describe('WebMCP command input', () => {
     expect(element.shadowRoot?.querySelector('.webmcp-settings')).toBeNull()
   })
 
-  it('marks paid hosted endpoint options as needing an access key without blocking free options', async () => {
-    const element = createCommandInputElement()
-    const paidPlannerEvent = waitForCommandPlanner(element)
-    element.configure({
-      endpoint: 'https://api.webmcp.dev/v1/plan',
-      endpointOptions: [
-        {
-          label: 'GPT-5.4 mini',
-          model: 'gpt-5.4-mini',
-          paidService: {
-            label: 'Hosted OpenAI planner',
-            requiresAccessKey: true,
-            serviceId: 'hosted-openai-planner'
-          },
-          provider: 'openai'
-        },
-        {
-          label: 'Local deterministic',
-          provider: 'local'
-        }
-      ],
-      initialProvider: 'openai'
-    })
-    document.body.append(element)
-    const paidEvent = await paidPlannerEvent
-
-    expect(paidEvent.detail.planner.status).toBe('needs-key')
-    expect(paidEvent.detail.planner.detail).toContain('publishable access key')
-
-    const plannerEvent = waitForCommandPlanner(element)
-    const provider = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
-    if (!provider) throw new Error('Expected provider control.')
-    provider.value = 'local'
-    provider.dispatchEvent(new Event('change', { bubbles: true }))
-    const event = await plannerEvent
-
-    expect(event.detail.planner.status).toBe('fallback')
-    expect(event.detail.planner.name).toBe('Local heuristic planner')
-  })
-
   it('shows provider and model controls from consumer endpoint options', async () => {
     const element = createCommandInputElement()
     element.configure({
