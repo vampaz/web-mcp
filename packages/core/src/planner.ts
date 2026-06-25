@@ -496,10 +496,24 @@ function getPlannerApiKey(
 ): string | undefined {
   if (auth.mode !== 'user-key') return undefined
   if (auth.apiKey) return auth.apiKey
-  if (typeof localStorage === 'undefined') return undefined
+  const storage = getBrowserStorage()
+  if (!storage) return undefined
 
   const storageKey = auth.storageKey ?? getDefaultStorageKey(provider)
-  return localStorage.getItem(storageKey) ?? undefined
+  return storage.getItem(storageKey) ?? undefined
+}
+
+function getBrowserStorage(): Storage | undefined {
+  const storage =
+    typeof window !== 'undefined'
+      ? window.localStorage
+      : typeof localStorage !== 'undefined'
+        ? localStorage
+        : undefined
+
+  if (!storage || typeof storage.getItem !== 'function') return undefined
+
+  return storage
 }
 
 function requiresBrowserKey(config: PlannerProviderConfig, auth: PlannerAuth): boolean {

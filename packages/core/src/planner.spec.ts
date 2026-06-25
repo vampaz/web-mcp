@@ -24,7 +24,7 @@ interface WindowWithLanguageModel extends Window {
 describe('planner', () => {
   afterEach(() => {
     delete (window as WindowWithLanguageModel).LanguageModel
-    localStorage.clear()
+    window.localStorage.clear()
     vi.unstubAllGlobals()
   })
 
