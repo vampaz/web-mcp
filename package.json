@@ -1,6 +1,6 @@
 {
   "name": "@vampaz/webmcp-kit",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "type": "module",
   "description": "WebMCP tool registration, planners, framework helpers, devtools, and testing helpers for web apps.",
   "homepage": "https://github.com/vampaz/web-mcp#readme",
@@ -68,8 +68,8 @@
     "build": "vite build",
     "prepare": "npm run build",
     "prepublishOnly": "npm run build",
-    "test": "vitest --run",
-    "test:watch": "vitest --watch",
+    "test": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--no-webstorage\" vitest --run",
+    "test:watch": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--no-webstorage\" vitest --watch",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check ."

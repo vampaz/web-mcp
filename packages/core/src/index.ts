@@ -27,6 +27,7 @@ export {
   type RegisterFormToolOptions
 } from './forms'
 export { defineWebMCPCommandInput } from './command-input'
+export { createHostedOpenAIPlanner, type HostedOpenAIPlannerOptions } from './hosted-openai-planner'
 export type {
   WebMCPCommandErrorEventDetail,
   WebMCPCommandInputConfigureOptions,
