@@ -20,7 +20,7 @@ What is in this repo now:
 - Devtools, Playwright helpers, and a local MCP-style bridge for development and testing.
 - A separate Astro + Vue + Cloudflare demo app in [vampaz/web-mcp-demo](https://github.com/vampaz/web-mcp-demo) that exercises planner providers, Cloudflare Workers AI, and fallback behavior.
 
-The npm package name is `@vampaz/webmcp-kit`. Releases publish the compiled `dist` output through npm trusted publishing when a new version reaches `master`.
+The npm package name is `@vampaz/webmcp-kit`. Releases publish the compiled `dist` output to npm and GitHub Packages, then create a GitHub release tagged with the package version, when a new version reaches `master`.
 
 ## How It Fits
 
