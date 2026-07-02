@@ -5,15 +5,25 @@ import type {
   ToolPlanner,
   WebMCPTool
 } from './interfaces/tool'
+import type {
+  WebMCPCommandInputPlannerModelOption,
+  WebMCPCommandInputPlannerOption
+} from './interfaces/command-input'
 import { getErrorMessage } from './confirmation'
 import { toolPlanSchema, validateToolPlan } from './plan-validation'
 
 export interface HostedOpenAIPlannerOptions {
   accessKey?: string
+  baseUrl?: string
   browserChallengeSiteKey?: string
-  endpoint: string
+  endpoint?: string
   model: string
   sessionEndpoint?: string
+}
+
+interface ResolvedHostedOpenAIPlannerOptions extends HostedOpenAIPlannerOptions {
+  endpoint: string
+  sessionEndpoint: string
 }
 
 interface PaidAccessSession {
@@ -57,9 +67,12 @@ interface TurnstileRenderOptions {
 const hostedOpenAIPlannerServiceId = 'hosted-openai-planner'
 const turnstileScriptSrc = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
 const sessionRefreshSkewMs = 30 * 1000
+const defaultPlanEndpointPath = '/api/webmcp/plan'
+const defaultSessionEndpointPath = '/api/webmcp/session'
 let turnstileScriptPromise: Promise<void> | undefined
 
-export function createHostedOpenAIPlanner(options: HostedOpenAIPlannerOptions): ToolPlanner {
+export function createHostedOpenAIPlanner(rawOptions: HostedOpenAIPlannerOptions): ToolPlanner {
+  const options = resolveHostedOpenAIPlannerOptions(rawOptions)
   if (!options.accessKey) {
     return {
       available: false,
@@ -111,10 +124,74 @@ export function createHostedOpenAIPlanner(options: HostedOpenAIPlannerOptions): 
   }
 }
 
+export interface HostedOpenAIPlannerOptionConfig {
+  accessKey?: string
+  baseUrl?: string
+  browserChallengeSiteKey?: string
+  endpoint?: string
+  id?: string
+  label?: string
+  model?: string
+  modelOptions?: WebMCPCommandInputPlannerModelOption[]
+  sessionEndpoint?: string
+}
+
+export function createHostedOpenAIPlannerOption(
+  config: HostedOpenAIPlannerOptionConfig
+): WebMCPCommandInputPlannerOption {
+  return {
+    id: config.id ?? 'hosted-openai',
+    label: config.label ?? 'Hosted OpenAI',
+    modelOptions: config.modelOptions,
+    createPlanner(options) {
+      const model = options?.model ?? config.model ?? config.modelOptions?.[0]?.model
+      if (!model) {
+        throw new Error(
+          'Hosted OpenAI planner option needs a model: pass "model" or a non-empty "modelOptions".'
+        )
+      }
+
+      return createHostedOpenAIPlanner({
+        accessKey: config.accessKey,
+        baseUrl: config.baseUrl,
+        browserChallengeSiteKey: config.browserChallengeSiteKey,
+        endpoint: config.endpoint,
+        model,
+        sessionEndpoint: config.sessionEndpoint
+      })
+    }
+  }
+}
+
+function resolveHostedOpenAIPlannerOptions(
+  options: HostedOpenAIPlannerOptions
+): ResolvedHostedOpenAIPlannerOptions {
+  return {
+    ...options,
+    endpoint: resolveHostedEndpoint(options.baseUrl, options.endpoint, defaultPlanEndpointPath),
+    sessionEndpoint: resolveHostedEndpoint(
+      options.baseUrl,
+      options.sessionEndpoint,
+      defaultSessionEndpointPath
+    )
+  }
+}
+
+function resolveHostedEndpoint(
+  baseUrl: string | undefined,
+  explicitEndpoint: string | undefined,
+  defaultPath: string
+): string {
+  if (explicitEndpoint) return explicitEndpoint
+  if (!baseUrl) return defaultPath
+
+  return `${baseUrl.replace(/\/+$/, '')}${defaultPath}`
+}
+
 async function requestHostedPlan(input: {
   context: PlannerContext
   message: string
-  options: HostedOpenAIPlannerOptions
+  options: ResolvedHostedOpenAIPlannerOptions
   signal?: AbortSignal
   token: string
   tools: WebMCPTool[]
@@ -138,14 +215,14 @@ async function requestHostedPlan(input: {
 }
 
 async function getPaidAccessSession(
-  options: HostedOpenAIPlannerOptions,
+  options: ResolvedHostedOpenAIPlannerOptions,
   currentSession: PaidAccessSession | null,
   signal?: AbortSignal
 ): Promise<PaidAccessSession> {
   if (currentSession && isPaidAccessSessionFresh(currentSession)) return currentSession
 
   const turnstileToken = await getBrowserChallengeToken(options)
-  const response = await fetch(options.sessionEndpoint ?? '/api/webmcp/session', {
+  const response = await fetch(options.sessionEndpoint, {
     body: JSON.stringify({
       accessKey: options.accessKey,
       model: options.model,

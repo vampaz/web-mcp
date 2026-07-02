@@ -1,5 +1,6 @@
 import {
   validateToolPlan,
+  type AnyWebMCPTool,
   type PlannerContext,
   type ToolPlan,
   type ToolPlanner,
@@ -24,14 +25,15 @@ export interface WebMCPPlannerEvalResult {
 
 export async function runWebMCPPlannerEvalCase(
   planner: ToolPlanner,
-  tools: WebMCPTool[],
+  tools: readonly AnyWebMCPTool[],
   testCase: WebMCPPlannerEvalCase
 ): Promise<WebMCPPlannerEvalResult> {
   const errors: string[] = []
+  const plannerTools = tools as unknown as WebMCPTool[]
 
   try {
-    const plan = await planner.plan(testCase.message, tools, testCase.context ?? {})
-    collectPlanErrors(plan, tools, testCase, errors)
+    const plan = await planner.plan(testCase.message, plannerTools, testCase.context ?? {})
+    collectPlanErrors(plan, plannerTools, testCase, errors)
 
     return {
       name: testCase.name,
@@ -52,7 +54,7 @@ export async function runWebMCPPlannerEvalCase(
 
 export async function runWebMCPPlannerEvals(
   planner: ToolPlanner,
-  tools: WebMCPTool[],
+  tools: readonly AnyWebMCPTool[],
   testCases: WebMCPPlannerEvalCase[]
 ): Promise<WebMCPPlannerEvalResult[]> {
   const results: WebMCPPlannerEvalResult[] = []

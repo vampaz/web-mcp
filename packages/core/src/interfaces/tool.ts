@@ -23,9 +23,23 @@ export interface ToolScopeResult {
   reason?: string
 }
 
+export interface ConfirmationTool {
+  name: string
+  description: string
+  inputSchema: JsonSchema
+  confirmation?: ToolConfirmation
+}
+
+export type ConfirmationHandler = (
+  tool: ConfirmationTool,
+  input: unknown,
+  reason: string
+) => boolean | Promise<boolean>
+
 export interface ToolConfirmation {
   required: boolean
   reason: string
+  handler?: ConfirmationHandler
 }
 
 export interface ToolAnnotations {
@@ -49,6 +63,23 @@ export interface WebMCPTool<TInput = Record<string, unknown>, TOutput = unknown>
   scope?: () => ToolScopeResult
   guard?: (input: TInput) => boolean | string | Promise<boolean | string>
   execute: (input: TInput, context: ToolContext) => Promise<TOutput> | TOutput
+}
+
+/**
+ * A supertype of every WebMCPTool<TInput, TOutput>, usable for heterogeneous
+ * tool lists without erasing per-tool input typing at the definition site.
+ */
+export interface AnyWebMCPTool {
+  name: string
+  description: string
+  inputSchema: JsonSchema
+  outputSchema?: JsonSchema
+  annotations?: ToolAnnotations
+  confirmation?: ToolConfirmation
+  examples?: unknown[]
+  scope?: () => ToolScopeResult
+  guard?: (input: never) => boolean | string | Promise<boolean | string>
+  execute: (input: never, context: ToolContext) => Promise<unknown> | unknown
 }
 
 export interface RegisteredTool<TInput = Record<string, unknown>, TOutput = unknown> {
@@ -91,10 +122,22 @@ export interface ToolInvocation<TInput = Record<string, unknown>> {
   source?: ToolContext['source']
 }
 
+export type ToolInvocationErrorCode =
+  | 'confirmation_denied'
+  | 'confirmation_failed'
+  | 'execution_failed'
+  | 'guard_blocked'
+  | 'guard_failed'
+  | 'invalid_input'
+  | 'not_registered'
+  | 'scope_failed'
+  | 'scope_unavailable'
+
 export interface ToolInvocationResult<TOutput = unknown> {
   invocationId?: string
   toolName: string
   status: 'success' | 'error' | 'blocked' | 'unavailable'
+  code?: ToolInvocationErrorCode
   output?: TOutput
   error?: string
   durationMs: number

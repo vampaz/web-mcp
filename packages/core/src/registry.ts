@@ -1,4 +1,5 @@
 import { assertValidTool } from './define-tool'
+import { isDevelopmentEnvironment } from './environment'
 import { emitWebMCPKitEvent } from './events'
 import type {
   RegisteredTool,
@@ -20,6 +21,7 @@ export function registerTool<TInput = Record<string, unknown>, TOutput = unknown
   assertValidTool(tool)
 
   if (registeredTools.has(tool.name)) {
+    warnAboutDuplicateRegistration(tool.name)
     registeredTools.get(tool.name)?.unregister()
   }
 
@@ -31,6 +33,9 @@ export function registerTool<TInput = Record<string, unknown>, TOutput = unknown
     mode: nativeRegistration ? 'native-and-fallback' : 'fallback',
     warnings,
     unregister() {
+      // Stale handles must not remove a newer registration for the same name.
+      if (registeredTools.get(tool.name) !== (registration as RegisteredTool)) return
+
       nativeRegistration?.unregister?.()
       registeredTools.delete(tool.name)
       emitWebMCPKitEvent({
@@ -50,6 +55,14 @@ export function registerTool<TInput = Record<string, unknown>, TOutput = unknown
   })
 
   return registration
+}
+
+export function unregisterTool(name: string): boolean {
+  const registration = registeredTools.get(name)
+  if (!registration) return false
+
+  registration.unregister()
+  return true
 }
 
 export function listTools(): RegisteredTool[] {
@@ -83,7 +96,8 @@ export async function invokeTool<TOutput = unknown>(
       'error',
       startedAt,
       undefined,
-      `Tool "${invocation.toolName}" is not registered.`
+      `Tool "${invocation.toolName}" is not registered.`,
+      'not_registered'
     )
   }
 
@@ -127,4 +141,12 @@ export function clearToolsForTest(): void {
 
 function createInvocationId(): string {
   return `invocation_${Date.now()}_${Math.random().toString(16).slice(2)}`
+}
+
+function warnAboutDuplicateRegistration(toolName: string): void {
+  if (!isDevelopmentEnvironment()) return
+
+  console.warn(
+    `[WebMCP Kit] Tool "${toolName}" was already registered; replacing the previous registration. Call unregisterTool("${toolName}") first to silence this warning.`
+  )
 }

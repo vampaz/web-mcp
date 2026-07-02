@@ -1,13 +1,23 @@
-import type { WebMCPTool } from './interfaces/tool'
+import type { InferToolInput } from './interfaces/schema-inference'
+import type { JsonSchema, WebMCPTool } from './interfaces/tool'
 import { plannerOutcomeToolNames } from './plan-validation'
 import { validateJsonSchema } from './schema'
 
 const reservedToolNames = new Set<string>(['tool_sequence', ...plannerOutcomeToolNames])
 
+export type SchemaTypedWebMCPTool<TSchema extends JsonSchema, TOutput = unknown> = Omit<
+  WebMCPTool<InferToolInput<TSchema>, TOutput>,
+  'inputSchema'
+> & { inputSchema: TSchema }
+
+export function defineTool<const TSchema extends JsonSchema, TOutput = unknown>(
+  tool: SchemaTypedWebMCPTool<TSchema, TOutput>
+): WebMCPTool<InferToolInput<TSchema>, TOutput>
 export function defineTool<TInput = Record<string, unknown>, TOutput = unknown>(
   tool: WebMCPTool<TInput, TOutput>
-): WebMCPTool<TInput, TOutput> {
-  assertValidTool(tool)
+): WebMCPTool<TInput, TOutput>
+export function defineTool(tool: object): object {
+  assertValidTool(tool as WebMCPTool<never, unknown>)
   return tool
 }
 

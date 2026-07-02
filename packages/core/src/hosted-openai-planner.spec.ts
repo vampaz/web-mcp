@@ -219,3 +219,58 @@ function createSelectItemsTool(): WebMCPTool {
     name: 'select_items'
   }
 }
+
+describe('hosted endpoint resolution', function describeHostedEndpointResolution() {
+  afterEach(function cleanup() {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('derives plan and session endpoints from a base URL', async function testBaseUrlDerivation() {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({
+          expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+          token: 'wmcp_session.test.signature',
+          tokenType: 'Bearer'
+        })
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          confidence: 0.91,
+          input: { ids: ['item_8'] },
+          reason: 'Selected water.',
+          toolName: 'select_items'
+        })
+      )
+    vi.stubGlobal('fetch', fetch)
+
+    const planner = createHostedOpenAIPlanner({
+      accessKey: paidAccessKey,
+      baseUrl: 'https://webmcp.example/',
+      model: 'gpt-5.4-mini'
+    })
+    await planner.plan('Select water', [createSelectItemsTool()], {})
+
+    expect(fetch).toHaveBeenNthCalledWith(
+      1,
+      'https://webmcp.example/api/webmcp/session',
+      expect.objectContaining({ method: 'POST' })
+    )
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
+      'https://webmcp.example/api/webmcp/plan',
+      expect.objectContaining({ method: 'POST' })
+    )
+  })
+
+  it('defaults to same-origin endpoints without a base URL', function testDefaultEndpoints() {
+    const planner = createHostedOpenAIPlanner({
+      accessKey: paidAccessKey,
+      model: 'gpt-5.4-mini'
+    })
+
+    expect(planner.status).toBe('ready')
+  })
+})

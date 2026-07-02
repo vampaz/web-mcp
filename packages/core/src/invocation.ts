@@ -1,5 +1,10 @@
 import { requestToolConfirmation } from './confirmation'
-import type { ToolContext, ToolInvocationResult, WebMCPTool } from './interfaces/tool'
+import type {
+  ToolContext,
+  ToolInvocationErrorCode,
+  ToolInvocationResult,
+  WebMCPTool
+} from './interfaces/tool'
 import { formatJsonValueValidationError, validateJsonValue } from './schema'
 
 export interface ToolInvocationPipelineOptions {
@@ -21,7 +26,8 @@ export async function invokeToolPipeline<TInput, TOutput>(
       'error',
       startedAt,
       undefined,
-      formatJsonValueValidationError(inputValidationErrors)
+      formatJsonValueValidationError(inputValidationErrors),
+      'invalid_input'
     )
   }
 
@@ -33,7 +39,8 @@ export async function invokeToolPipeline<TInput, TOutput>(
         'unavailable',
         startedAt,
         undefined,
-        availability.reason ?? 'Tool is not available in the current state.'
+        availability.reason ?? 'Tool is not available in the current state.',
+        'scope_unavailable'
       )
     }
   } catch (error) {
@@ -42,7 +49,8 @@ export async function invokeToolPipeline<TInput, TOutput>(
       'error',
       startedAt,
       undefined,
-      error instanceof Error ? error.message : 'Tool scope failed.'
+      error instanceof Error ? error.message : 'Tool scope failed.',
+      'scope_failed'
     )
   }
 
@@ -56,7 +64,8 @@ export async function invokeToolPipeline<TInput, TOutput>(
         'error',
         startedAt,
         undefined,
-        error instanceof Error ? error.message : 'Confirmation handler failed.'
+        error instanceof Error ? error.message : 'Confirmation handler failed.',
+        'confirmation_failed'
       )
     }
   }
@@ -67,7 +76,8 @@ export async function invokeToolPipeline<TInput, TOutput>(
       'blocked',
       startedAt,
       undefined,
-      tool.confirmation.reason
+      tool.confirmation.reason,
+      'confirmation_denied'
     )
   }
 
@@ -80,7 +90,8 @@ export async function invokeToolPipeline<TInput, TOutput>(
         'blocked',
         startedAt,
         undefined,
-        typeof guardResult === 'string' ? guardResult : 'Tool guard blocked invocation.'
+        typeof guardResult === 'string' ? guardResult : 'Tool guard blocked invocation.',
+        'guard_blocked'
       )
     }
   } catch (error) {
@@ -89,7 +100,8 @@ export async function invokeToolPipeline<TInput, TOutput>(
       'error',
       startedAt,
       undefined,
-      error instanceof Error ? error.message : 'Tool guard failed.'
+      error instanceof Error ? error.message : 'Tool guard failed.',
+      'guard_failed'
     )
   }
 
@@ -104,7 +116,8 @@ export async function invokeToolPipeline<TInput, TOutput>(
       'error',
       startedAt,
       undefined,
-      error instanceof Error ? error.message : 'Tool invocation failed.'
+      error instanceof Error ? error.message : 'Tool invocation failed.',
+      'execution_failed'
     )
   }
 }
@@ -114,11 +127,13 @@ export function createInvocationResult<TOutput>(
   status: ToolInvocationResult['status'],
   startedAt: number,
   output?: TOutput,
-  error?: string
+  error?: string,
+  code?: ToolInvocationErrorCode
 ): ToolInvocationResult<TOutput> {
   return {
     toolName,
     status,
+    code,
     output,
     error,
     durationMs: Math.round(performance.now() - startedAt)

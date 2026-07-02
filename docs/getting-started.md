@@ -23,6 +23,28 @@ The standalone demo app lives in [vampaz/web-mcp-demo](https://github.com/vampaz
 npm install @vampaz/webmcp-kit
 ```
 
+## One-Call Setup
+
+`initWebMCP()` covers the common wiring in a single call: it registers your tools, defines the `<webmcp-command-input>` element (creating a floating one when the page has none), and configures a hosted planner when you pass a publishable key:
+
+```ts
+import { defineTool, initWebMCP } from '@vampaz/webmcp-kit'
+
+const handle = initWebMCP({
+  accessKey: import.meta.env.VITE_WEBMCP_PUBLISHABLE_KEY,
+  baseUrl: 'https://webmcp.conekto.eu',
+  model: 'gpt-5.4-mini',
+  context: () => ({ route: location.pathname }),
+  tools: [
+    /* defineTool(...) definitions */
+  ]
+})
+
+// Later: handle.destroy() unregisters the tools and removes a created element.
+```
+
+The rest of this guide covers the same pieces individually for apps that need finer control.
+
 ## Register A Tool
 
 Use `@vampaz/webmcp-kit/zod` when a Zod schema should be the source of truth for runtime validation and TypeScript inference:

@@ -1,4 +1,5 @@
-export { defineTool } from './define-tool'
+export { defineTool, type SchemaTypedWebMCPTool } from './define-tool'
+export type { InferToolInput } from './interfaces/schema-inference'
 export {
   getErrorMessage,
   setConfirmationHandler,
@@ -27,7 +28,13 @@ export {
   type RegisterFormToolOptions
 } from './forms'
 export { defineWebMCPCommandInput } from './command-input'
-export { createHostedOpenAIPlanner, type HostedOpenAIPlannerOptions } from './hosted-openai-planner'
+export {
+  createHostedOpenAIPlanner,
+  createHostedOpenAIPlannerOption,
+  type HostedOpenAIPlannerOptionConfig,
+  type HostedOpenAIPlannerOptions
+} from './hosted-openai-planner'
+export { initWebMCP, type InitWebMCPOptions, type WebMCPInitHandle } from './init'
 export type {
   WebMCPCommandErrorEventDetail,
   WebMCPCommandInputConfigureOptions,
@@ -44,6 +51,7 @@ export type {
   WebMCPCommandStepEventDetail
 } from './interfaces/command-input'
 export type {
+  AnyWebMCPTool,
   IntegrationDiagnostic,
   IntegrationHealthReport,
   JsonSchema,
@@ -58,6 +66,7 @@ export type {
   ToolAnnotations,
   ToolContext,
   ToolInvocation,
+  ToolInvocationErrorCode,
   ToolInvocationResult,
   ToolPlan,
   ToolPlanStep,
@@ -90,7 +99,8 @@ export {
   getTool,
   invokeTool,
   listTools,
-  registerTool
+  registerTool,
+  unregisterTool
 } from './registry'
 export { formatJsonValueValidationError, validateJsonSchema, validateJsonValue } from './schema'
 export {

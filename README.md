@@ -61,7 +61,39 @@ flowchart TB
 
 ## Quick Start
 
-If you already use Zod, install it alongside the kit and use the `@vampaz/webmcp-kit/zod` subpath to keep the schema and TypeScript input type in one place:
+The fastest path is `initWebMCP()`: one call registers your tools, defines the `<webmcp-command-input>` element (creating a floating one if the page has none), and wires the hosted planner from a publishable key:
+
+```ts
+import { defineTool, initWebMCP } from '@vampaz/webmcp-kit'
+
+initWebMCP({
+  accessKey: import.meta.env.VITE_WEBMCP_PUBLISHABLE_KEY,
+  baseUrl: 'https://webmcp.conekto.eu',
+  model: 'gpt-5.4-mini',
+  context: () => ({ page: 'products', visibleProducts: getVisibleProducts() }),
+  tools: [
+    defineTool({
+      name: 'search_products',
+      description: 'Search the local product catalog.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' }
+        },
+        required: ['query'],
+        additionalProperties: false
+      },
+      execute(input) {
+        return searchProducts(input.query)
+      }
+    })
+  ]
+})
+```
+
+Plan and session endpoints are derived from `baseUrl` (`/api/webmcp/plan` and `/api/webmcp/session`). Omit `accessKey` to keep the element's default planner behavior, pass `target` to use an element you placed in your own markup, and call the returned handle's `destroy()` to tear everything down.
+
+`defineTool()` infers the `execute` and `guard` input types from the `inputSchema` literal — `input.query` above is typed `string` without generics or casts. If you already use Zod, install it alongside the kit and use the `@vampaz/webmcp-kit/zod` subpath to keep the schema and TypeScript input type in one place:
 
 ```sh
 npm install @vampaz/webmcp-kit zod
@@ -89,7 +121,7 @@ registerTool(
 )
 ```
 
-The core package also accepts explicit JSON Schema:
+The core package also accepts explicit JSON Schema. Input types are inferred from the schema literal; pass an explicit generic (`defineTool<MyInput>({ ... })`) to opt out:
 
 ```ts
 import { defineTool, registerTool } from '@vampaz/webmcp-kit'
@@ -110,7 +142,7 @@ registerTool(
       readOnlyHint: true
     },
     execute(input) {
-      return searchProducts(String(input.query))
+      return searchProducts(input.query)
     }
   })
 )
@@ -160,13 +192,26 @@ setConfirmationHandler(async function confirmTool(tool, input, reason) {
 })
 ```
 
+A tool can also bring its own approval UI. A `confirmation.handler` takes precedence over the global handler for that tool only:
+
+```ts
+confirmation: {
+  required: true,
+  reason: 'Checkout charges the customer.',
+  handler: (tool, input, reason) => showCheckoutReviewSheet(input)
+}
+```
+
 ## Core API
 
+- `initWebMCP(options)` is the one-call setup: registers tools, defines and locates (or creates) the command input element, and wires a hosted planner from an access key.
 - `createWebMCPKit(options)` initializes the kit and optional planner provider.
-- `defineTool(tool)` validates and preserves a typed tool definition.
-- `registerTool(tool)` registers with native WebMCP when available and always stores the tool in the fallback registry. Native registration passes through WebMCP `annotations` such as `readOnlyHint` and unregisters with `AbortSignal` when supported by the browser.
+- `defineTool(tool)` validates and preserves a typed tool definition, inferring the input type from the `inputSchema` literal.
+- `registerTool(tool)` registers with native WebMCP when available and always stores the tool in the fallback registry. Native registration passes through WebMCP `annotations` such as `readOnlyHint` and unregisters with `AbortSignal` when supported by the browser. Re-registering an existing name replaces it and logs a non-production warning.
+- `unregisterTool(name)` removes a registration by name and returns whether one existed.
 - `invokeTool({ toolName, input, confirmed })` invokes fallback-registered tools for devtools, tests, and demos.
-- `setConfirmationHandler(handler)` configures one global async confirmation provider for tools with `confirmation.required`.
+- `setConfirmationHandler(handler)` configures one global async confirmation provider for tools with `confirmation.required`; a per-tool `confirmation.handler` overrides it.
+- `createHostedOpenAIPlannerOption(config)` returns a ready-made planner option for the command input's `plannerOptions` list.
 - `listTools()` returns active registrations.
 - `getRegistrySnapshot()` returns support mode, tool count, and registered tools.
 - `getIntegrationHealthReport()` returns developer-facing diagnostics for missing tools, weak schemas, missing confirmation handlers, unavailable tools, and planner status.
@@ -230,6 +275,66 @@ When a request cannot be executed, planners can return a non-executing outcome:
 ```
 
 `needs_clarification` returns a blocked result and `no_tools_match` returns an unavailable result. `tool_sequence`, `needs_clarification`, and `no_tools_match` are reserved names; app tools cannot register with those names.
+
+## Invocation Pipeline
+
+Every invocation — from planners, devtools, tests, or the MCP bridge — runs the same pipeline in this order:
+
+1. **Schema validation**: the input is validated against `inputSchema`. Failures return `status: 'error'`, `code: 'invalid_input'` before any tool code runs.
+2. **Scope**: `scope()` runs synchronously and answers "is this tool usable in the current app state?" Returning `{ available: false, reason }` yields `status: 'unavailable'`, `code: 'scope_unavailable'`.
+3. **Confirmation**: when `confirmation.required` is set and the invocation is not already confirmed, the per-tool `confirmation.handler` (or the global handler) is awaited. A denial yields `status: 'blocked'`, `code: 'confirmation_denied'`.
+4. **Guard**: `guard(input)` runs with the validated, typed input and answers "is this specific input acceptable right now?" It may be async. Returning `false` or a string reason yields `status: 'blocked'`, `code: 'guard_blocked'`; returning `true` (or anything else truthy) allows execution.
+5. **Execute**: `execute(input, context)` runs. Thrown errors yield `status: 'error'`, `code: 'execution_failed'`.
+
+`ToolInvocationResult.code` distinguishes every non-success outcome:
+
+| code                  | status        | meaning                                     |
+| --------------------- | ------------- | ------------------------------------------- |
+| `invalid_input`       | `error`       | Input failed schema validation.             |
+| `scope_unavailable`   | `unavailable` | `scope()` reported the tool unavailable.    |
+| `scope_failed`        | `error`       | `scope()` threw.                            |
+| `confirmation_denied` | `blocked`     | The confirmation handler denied the action. |
+| `confirmation_failed` | `error`       | The confirmation handler threw.             |
+| `guard_blocked`       | `blocked`     | `guard()` rejected the input.               |
+| `guard_failed`        | `error`       | `guard()` threw.                            |
+| `execution_failed`    | `error`       | `execute()` threw.                          |
+| `not_registered`      | `error`       | No tool with that name is registered.       |
+
+## Server Tool Wire Format
+
+`defineServerTool()` tools execute by POSTing JSON to your endpoint:
+
+```txt
+POST <endpoint>
+Content-Type: application/json
+
+{ "toolName": "send_invoice", "input": { "invoiceId": "inv_104" }, "source": "planner" }
+```
+
+The endpoint should return the tool output as JSON (`204 No Content` maps to `undefined`). Non-2xx responses fail the invocation; an `{ "error": "..." }` body becomes the error message. Schema validation, scope, confirmation, and guard all run in the browser before the request is sent — treat the endpoint as untrusted-input territory and validate again server-side.
+
+## Custom Planners
+
+Anything that satisfies the `ToolPlanner` interface can drive the command input:
+
+```ts
+import type { ToolPlanner } from '@vampaz/webmcp-kit'
+
+const planner: ToolPlanner = {
+  name: 'My planner',
+  available: true,
+  status: 'ready', // 'ready' | 'downloadable' | 'downloading' | 'unavailable' | 'fallback' | 'needs-key'
+  detail: 'Plans through my own backend.',
+  async plan(message, tools, context, options) {
+    // Return a ToolPlan: { toolName, input, confidence, reason, steps? }
+    // Throw for planner failures; use validateToolPlan(plan, tools) before returning.
+    return myBackendPlan(message, tools, context, options?.signal)
+  },
+  dispose() {
+    // Optional: release resources when the planner is replaced.
+  }
+}
+```
 
 ## Integration Health
 
@@ -439,6 +544,25 @@ if (input) {
 ```
 
 The component uses the active WebMCP registry, plans against registered tools, invokes the returned step or bounded `tool_sequence`, and emits `webmcp-command-plan`, `webmcp-command-step`, `webmcp-command-result`, and `webmcp-command-error` events. `run(message, { signal })` accepts an `AbortSignal` for cancelling commands before planning or between sequence steps; remote planner fetches receive the same signal.
+
+### Theming
+
+The element's shadow styles read CSS custom properties from the host, so apps can theme it from regular page CSS:
+
+```css
+webmcp-command-input {
+  --webmcp-accent: #2458ff; /* buttons, focus, active states */
+  --webmcp-accent-dark: #141414; /* accent on dark surfaces */
+  --webmcp-dark: #141414; /* dark panel surfaces */
+  --webmcp-field: #f7f3ec; /* input field background */
+  --webmcp-ink: #141414; /* primary text */
+  --webmcp-line: rgba(36, 88, 255, 0.28); /* borders and rules */
+  --webmcp-muted: #5d5d58; /* secondary text */
+  --webmcp-paper: #fffaf1; /* panel background */
+}
+```
+
+`--webmcp-floating-panel-max-height` constrains the floating panel when your app positions it manually.
 
 ## Playwright Helpers
 

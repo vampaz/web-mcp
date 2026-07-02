@@ -3,9 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineTool } from './define-tool'
 import {
   clearToolsForTest,
+  getTool,
   invokeTool,
   listTools,
   registerTool,
+  unregisterTool,
   setConfirmationHandler
 } from './index'
 
@@ -293,5 +295,217 @@ describe('registry', () => {
       status: 'error',
       error: 'workspace state missing'
     })
+  })
+})
+
+describe('registry hygiene', () => {
+  beforeEach(() => {
+    clearToolsForTest()
+    setConfirmationHandler(undefined)
+  })
+
+  afterEach(() => {
+    setConfirmationHandler(undefined)
+    vi.restoreAllMocks()
+  })
+
+  it('unregisters a tool by name', () => {
+    registerTool(createHygieneTool('select_items'))
+
+    expect(unregisterTool('select_items')).toBe(true)
+    expect(listTools()).toHaveLength(0)
+    expect(unregisterTool('select_items')).toBe(false)
+  })
+
+  it('warns when a duplicate registration replaces an existing tool', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    registerTool(createHygieneTool('select_items'))
+    registerTool(createHygieneTool('select_items'))
+
+    expect(listTools()).toHaveLength(1)
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('Tool "select_items" was already registered')
+    )
+  })
+})
+
+describe('invocation result codes', () => {
+  beforeEach(() => {
+    clearToolsForTest()
+    setConfirmationHandler(undefined)
+  })
+
+  afterEach(() => {
+    setConfirmationHandler(undefined)
+  })
+
+  it('reports not_registered for unknown tools', async () => {
+    const result = await invokeTool({ toolName: 'missing_tool', input: {} })
+
+    expect(result.status).toBe('error')
+    expect(result.code).toBe('not_registered')
+  })
+
+  it('reports invalid_input for schema violations', async () => {
+    registerTool(createHygieneTool('select_items'))
+
+    const result = await invokeTool({ toolName: 'select_items', input: { ids: 'oops' } })
+
+    expect(result.status).toBe('error')
+    expect(result.code).toBe('invalid_input')
+  })
+
+  it('reports guard_blocked when a guard rejects', async () => {
+    registerTool({
+      ...createHygieneTool('select_items'),
+      guard() {
+        return 'Items are not visible.'
+      }
+    })
+
+    const result = await invokeTool({ toolName: 'select_items', input: { ids: [] } })
+
+    expect(result.status).toBe('blocked')
+    expect(result.code).toBe('guard_blocked')
+  })
+
+  it('reports scope_unavailable when a tool is out of scope', async () => {
+    registerTool({
+      ...createHygieneTool('select_items'),
+      scope() {
+        return { available: false, reason: 'Not on this page.' }
+      }
+    })
+
+    const result = await invokeTool({ toolName: 'select_items', input: { ids: [] } })
+
+    expect(result.status).toBe('unavailable')
+    expect(result.code).toBe('scope_unavailable')
+  })
+
+  it('reports confirmation_denied when the handler denies', async () => {
+    setConfirmationHandler(() => false)
+    registerTool({
+      ...createHygieneTool('select_items'),
+      confirmation: { required: true, reason: 'Selection changes workspace state.' }
+    })
+
+    const result = await invokeTool({ toolName: 'select_items', input: { ids: [] } })
+
+    expect(result.status).toBe('blocked')
+    expect(result.code).toBe('confirmation_denied')
+  })
+
+  it('reports execution_failed when execute throws', async () => {
+    registerTool({
+      ...createHygieneTool('select_items'),
+      execute() {
+        throw new Error('workspace state missing')
+      }
+    })
+
+    const result = await invokeTool({ toolName: 'select_items', input: { ids: [] } })
+
+    expect(result.status).toBe('error')
+    expect(result.code).toBe('execution_failed')
+  })
+})
+
+describe('per-tool confirmation handlers', () => {
+  beforeEach(() => {
+    clearToolsForTest()
+    setConfirmationHandler(undefined)
+  })
+
+  afterEach(() => {
+    setConfirmationHandler(undefined)
+  })
+
+  it('prefers the tool confirmation handler over the global handler', async () => {
+    const globalHandler = vi.fn(() => true)
+    const toolHandler = vi.fn(() => true)
+    setConfirmationHandler(globalHandler)
+    registerTool({
+      ...createHygieneTool('select_items'),
+      confirmation: {
+        required: true,
+        reason: 'Selection changes workspace state.',
+        handler: toolHandler
+      }
+    })
+
+    const result = await invokeTool({ toolName: 'select_items', input: { ids: [] } })
+
+    expect(result.status).toBe('success')
+    expect(toolHandler).toHaveBeenCalledTimes(1)
+    expect(globalHandler).not.toHaveBeenCalled()
+  })
+
+  it('blocks with confirmation_denied when the tool handler denies', async () => {
+    registerTool({
+      ...createHygieneTool('select_items'),
+      confirmation: {
+        required: true,
+        reason: 'Selection changes workspace state.',
+        handler: () => false
+      }
+    })
+
+    const result = await invokeTool({ toolName: 'select_items', input: { ids: [] } })
+
+    expect(result.status).toBe('blocked')
+    expect(result.code).toBe('confirmation_denied')
+  })
+})
+
+function createHygieneTool(name: string) {
+  return defineTool({
+    name,
+    description: 'Select checklist items by stable ID.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ids: {
+          type: 'array',
+          items: { type: 'string' }
+        }
+      },
+      required: ['ids'],
+      additionalProperties: false
+    },
+    execute(input) {
+      return input.ids
+    }
+  })
+}
+
+describe('stale unregister handles', () => {
+  beforeEach(() => {
+    clearToolsForTest()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('ignores stale handles after a name is re-registered', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const first = registerTool(createHygieneTool('select_items'))
+    const second = registerTool(createHygieneTool('select_items'))
+
+    first.unregister()
+
+    expect(listTools()).toHaveLength(1)
+    expect(getTool('select_items')).toBe(second)
+  })
+
+  it('keeps unregister idempotent', () => {
+    const registration = registerTool(createHygieneTool('select_items'))
+
+    registration.unregister()
+    registration.unregister()
+
+    expect(listTools()).toHaveLength(0)
   })
 })

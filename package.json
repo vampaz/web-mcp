@@ -22,7 +22,8 @@
   ],
   "sideEffects": false,
   "files": [
-    "dist"
+    "dist",
+    "docs"
   ],
   "main": "./dist/index.js",
   "types": "./dist/packages/core/src/index.d.ts",
