@@ -179,7 +179,7 @@ if (form) {
 }
 ```
 
-The helper applies `toolname`, `tooldescription`, and official field metadata attributes such as `toolparamdescription`.
+The helper applies `toolname`, `tooldescription`, and official field metadata attributes such as `toolparamdescription`. The returned registration removes the tool and restores the previous form attributes when `unregister()` is called.
 
 ## Eval Fixtures
 

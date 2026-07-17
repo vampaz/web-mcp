@@ -1,6 +1,6 @@
 import { defineTool } from './define-tool'
 import type { JsonSchema, RegisteredTool, WebMCPTool } from './interfaces/tool'
-import { registerTool } from './registry'
+import { registerToolWithCleanup, unregisterTool } from './registry'
 
 export interface RegisterFormToolOptions<TOutput = FormData> {
   form: HTMLFormElement
@@ -21,30 +21,86 @@ export type FormInput = Record<string, string | number | boolean | string[]>
 export function registerFormTool<TOutput = FormData>(
   options: RegisterFormToolOptions<TOutput>
 ): RegisteredTool<FormInput, TOutput> {
+  const restoreDraftAttributes = createFormToolAttributeRestorer(options.form, options.fields)
+  applyFormToolOptions(options)
+
+  let inputSchema: JsonSchema
+  try {
+    inputSchema = inferFormInputSchema(options.form)
+  } finally {
+    restoreDraftAttributes()
+  }
+
+  const tool = defineTool<FormInput, TOutput>({
+    name: options.name,
+    description: options.description,
+    inputSchema,
+    confirmation: options.confirmation,
+    execute(input) {
+      fillForm(options.form, input)
+      if (!options.form.checkValidity()) {
+        throw new Error('Form input does not satisfy native validation constraints.')
+      }
+
+      if (options.execute) {
+        return options.execute(input, options.form)
+      }
+
+      return new FormData(options.form) as TOutput
+    }
+  })
+
+  unregisterTool(options.name)
+  const restoreAttributes = createFormToolAttributeRestorer(options.form, options.fields)
+  applyFormToolOptions(options)
+
+  try {
+    return registerToolWithCleanup(tool, restoreAttributes, 'declarative')
+  } catch (error) {
+    restoreAttributes()
+    throw error
+  }
+}
+
+function applyFormToolOptions<TOutput>(options: RegisterFormToolOptions<TOutput>): void {
   options.form.setAttribute('toolname', options.name)
   options.form.setAttribute('tooldescription', options.description)
   applyFormToolFieldOptions(options.form, options.fields)
+}
 
-  return registerTool(
-    defineTool<FormInput, TOutput>({
-      name: options.name,
-      description: options.description,
-      inputSchema: inferFormInputSchema(options.form),
-      confirmation: options.confirmation,
-      execute(input) {
-        fillForm(options.form, input)
-        if (!options.form.checkValidity()) {
-          throw new Error('Form input does not satisfy native validation constraints.')
-        }
+function createFormToolAttributeRestorer(
+  form: HTMLFormElement,
+  fields: RegisterFormToolOptions['fields']
+): () => void {
+  const snapshots: Array<[Element, string, string | null]> = [
+    [form, 'toolname', form.getAttribute('toolname')],
+    [form, 'tooldescription', form.getAttribute('tooldescription')]
+  ]
 
-        if (options.execute) {
-          return options.execute(input, options.form)
-        }
+  for (const name of Object.keys(fields ?? {})) {
+    const field = form.elements.namedItem(name)
+    const elements = field instanceof RadioNodeList ? Array.from(field) : [field]
 
-        return new FormData(options.form) as TOutput
+    for (const element of elements) {
+      if (!(element instanceof Element)) continue
+      snapshots.push([element, 'toolparamtitle', element.getAttribute('toolparamtitle')])
+      snapshots.push([
+        element,
+        'toolparamdescription',
+        element.getAttribute('toolparamdescription')
+      ])
+    }
+  }
+
+  return function restoreFormToolAttributes() {
+    for (const [element, attribute, value] of snapshots) {
+      if (value === null) {
+        element.removeAttribute(attribute)
+      } else {
+        element.setAttribute(attribute, value)
       }
-    })
-  )
+    }
+  }
 }
 
 export function inferFormInputSchema(form: HTMLFormElement): JsonSchema {

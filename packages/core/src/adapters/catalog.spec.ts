@@ -95,6 +95,7 @@ function createRegistration(
     tool,
     mode: 'fallback',
     warnings: [],
+    ready: Promise.resolve(),
     unregister() {}
   }
 }

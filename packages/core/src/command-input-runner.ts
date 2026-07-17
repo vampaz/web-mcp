@@ -36,6 +36,7 @@ export async function invokePlannedSteps(
     result = await invokeTool({
       toolName: step.toolName,
       input: step.input,
+      signal,
       source: 'planner'
     })
     dispatchStepEvent({

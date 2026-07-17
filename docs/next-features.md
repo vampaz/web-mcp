@@ -1,18 +1,20 @@
 # Next Features: Making WebMCP Kit Really Usable
 
-This roadmap starts from the current implementation. The first foundation layer is now in place: runtime input validation, Zod tool definitions, Vue/React/Svelte helpers, app-level confirmation handlers, bounded tool sequences, explicit planner outcomes, and server-backed tools.
+This roadmap starts from the current implementation. The first foundation layer is now in place: runtime input and output validation, Zod tool definitions, Vue/React/Svelte helpers, app-level confirmation handlers, scope-aware planning, bounded tool sequences, explicit planner outcomes, server-backed tools, and repeatable planner eval suites.
 
 ## Shipped Foundations
 
 These capabilities are part of the current API and should be treated as baseline behavior:
 
 - Runtime input validation runs before scope, confirmation, guards, and `execute()`.
+- Declared `outputSchema` values are validated before an invocation reports success.
 - `defineZodTool()` is available from `@vampaz/webmcp-kit/zod` for single-source schema and TypeScript inference.
 - Vue, React, and Svelte helpers register tools with lifecycle cleanup and return `{ unregister, getRegistration }`.
 - `setConfirmationHandler()` lets apps provide their own approval UI, with `window.confirm()` as the browser fallback.
+- The command input excludes scope-unavailable tools before asking a planner to choose an action.
 - Planners can return a single tool, a bounded `tool_sequence`, `needs_clarification`, or `no_tools_match`.
 - `defineServerTool()` lets browser-visible tools delegate execution to an app-owned server endpoint.
-- Planner eval helpers are available from `@vampaz/webmcp-kit/testing`.
+- Planner eval helpers, including repeated runs and minimum pass-rate summaries, are available from `@vampaz/webmcp-kit/testing`.
 
 ## Tier 1 - Planner Reliability
 

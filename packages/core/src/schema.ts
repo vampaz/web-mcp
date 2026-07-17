@@ -17,8 +17,11 @@ export function validateJsonValue(value: unknown, schema: JsonSchema, path = '')
   return errors
 }
 
-export function formatJsonValueValidationError(errors: string[]): string {
-  return `input validation failed: ${errors.join(' ')}`
+export function formatJsonValueValidationError(
+  errors: string[],
+  subject: 'input' | 'output' = 'input'
+): string {
+  return `${subject} validation failed: ${errors.join(' ')}`
 }
 
 export function validateJsonSchema(schema: JsonSchema, path = 'schema'): string[] {
@@ -40,6 +43,7 @@ function validateSchemaNode(schema: unknown, path: string, errors: string[]): vo
   validateRequired(node, path, errors)
   validateItems(node, path, errors)
   validateAnyOf(node, path, errors)
+  validateOneOf(node, path, errors)
   validateEnum(node, path, errors)
   validateNumberKeyword(node.minimum, `${path}.minimum`, errors)
   validateNumberKeyword(node.maximum, `${path}.maximum`, errors)
@@ -129,6 +133,19 @@ function validateAnyOf(schema: JsonSchema, path: string, errors: string[]): void
   }
 }
 
+function validateOneOf(schema: JsonSchema, path: string, errors: string[]): void {
+  if (schema.oneOf === undefined) return
+
+  if (!Array.isArray(schema.oneOf) || schema.oneOf.length === 0) {
+    errors.push(`${path}.oneOf must be a non-empty array of schemas.`)
+    return
+  }
+
+  for (const [index, oneOfSchema] of schema.oneOf.entries()) {
+    validateSchemaNode(oneOfSchema, `${path}.oneOf[${index}]`, errors)
+  }
+}
+
 function validateEnum(schema: JsonSchema, path: string, errors: string[]): void {
   if (schema.enum === undefined) return
 
@@ -194,11 +211,30 @@ function validateValueNode(
     return
   }
 
+  if (schema.oneOf && countMatchingSchemas(value, schema.oneOf) !== 1) {
+    errors.push(`${formatValuePath(path)} did not match exactly one allowed schema.`)
+    return
+  }
+
+  validateConstValue(value, schema, path, errors)
   validateEnumValue(value, schema, path, errors)
   validateObjectValue(value, schema, path, errors)
   validateArrayValue(value, schema, path, errors)
   validateNumberValue(value, schema, path, errors)
   validateStringValue(value, schema, path, errors)
+}
+
+function validateConstValue(
+  value: unknown,
+  schema: JsonSchema,
+  path: string,
+  errors: string[]
+): void {
+  if (schema.const === undefined || areJsonValuesEqual(value, schema.const)) return
+
+  errors.push(
+    `${formatValuePath(path)} expected ${formatJsonValue(schema.const)}, got ${formatJsonValue(value)}.`
+  )
 }
 
 function validateEnumValue(
@@ -347,6 +383,12 @@ function validateStringValue(
       `${formatValuePath(path)} expected string matching ${schema.pattern}, got ${formatJsonValue(value)}.`
     )
   }
+
+  if (schema.format !== undefined && !matchesKnownStringFormat(value, schema.format)) {
+    errors.push(
+      `${formatValuePath(path)} expected ${schema.format} format, got ${formatJsonValue(value)}.`
+    )
+  }
 }
 
 function matchesJsonSchemaType(value: unknown, type: string | string[]): boolean {
@@ -369,6 +411,63 @@ function matchesAnyOf(value: unknown, schemas: JsonSchema[]): boolean {
   return schemas.some(function matchesAnyOfSchema(schema) {
     return validateJsonValue(value, schema).length === 0
   })
+}
+
+function countMatchingSchemas(value: unknown, schemas: JsonSchema[]): number {
+  return schemas.filter(function matchesSchema(schema) {
+    return validateJsonValue(value, schema).length === 0
+  }).length
+}
+
+function matchesKnownStringFormat(value: string, format: string): boolean {
+  if (format === 'email') return /^[^\s@]+@[^\s@]+$/.test(value)
+  if (format === 'date') return matchesCalendarDate(value)
+  if (format === 'time') return matchesClockTime(value)
+  if (format === 'date-time') {
+    const parts = value.split('T')
+    return (
+      parts.length === 2 && matchesCalendarDate(parts[0] ?? '') && matchesClockTime(parts[1] ?? '')
+    )
+  }
+  if (format === 'uri') {
+    try {
+      return Boolean(new URL(value).protocol)
+    } catch {
+      return false
+    }
+  }
+
+  return true
+}
+
+function matchesCalendarDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return false
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  if (month < 1 || month > 12) return false
+
+  const daysInMonth = [31, isLeapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  return day >= 1 && day <= (daysInMonth[month - 1] ?? 0)
+}
+
+function matchesClockTime(value: string): boolean {
+  const match = /^(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-](\d{2}):(\d{2}))?$/.exec(value)
+  if (!match) return false
+
+  const hour = Number(match[1])
+  const minute = Number(match[2])
+  const second = match[3] === undefined ? 0 : Number(match[3])
+  const offsetHour = match[4] === undefined ? 0 : Number(match[4])
+  const offsetMinute = match[5] === undefined ? 0 : Number(match[5])
+
+  return hour <= 23 && minute <= 59 && second <= 60 && offsetHour <= 23 && offsetMinute <= 59
+}
+
+function isLeapYear(year: number): boolean {
+  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
 }
 
 function formatExpectedType(type: string | string[]): string {

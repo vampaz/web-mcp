@@ -47,7 +47,8 @@ async function callServerTool<TInput, TOutput>(
       toolName: options.name,
       input,
       source: context.source
-    })
+    }),
+    ...(context.signal ? { signal: context.signal } : {})
   })
 
   if (!response.ok) {

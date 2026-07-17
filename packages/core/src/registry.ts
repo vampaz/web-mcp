@@ -14,9 +14,18 @@ import { getToolWarnings } from './quality'
 import { getSupportLabel, isWebMCPSupported } from './support'
 
 const registeredTools = new Map<string, RegisteredTool>()
+type NativeRegistrationKind = 'declarative' | 'imperative'
 
 export function registerTool<TInput = Record<string, unknown>, TOutput = unknown>(
   tool: WebMCPTool<TInput, TOutput>
+): RegisteredTool<TInput, TOutput> {
+  return registerToolWithCleanup(tool)
+}
+
+export function registerToolWithCleanup<TInput = Record<string, unknown>, TOutput = unknown>(
+  tool: WebMCPTool<TInput, TOutput>,
+  onUnregister?: () => void,
+  nativeRegistrationKind: NativeRegistrationKind = 'imperative'
 ): RegisteredTool<TInput, TOutput> {
   assertValidTool(tool)
 
@@ -25,19 +34,24 @@ export function registerTool<TInput = Record<string, unknown>, TOutput = unknown
     registeredTools.get(tool.name)?.unregister()
   }
 
-  const nativeRegistration = registerNativeTool(tool)
+  const nativeRegistration =
+    nativeRegistrationKind === 'imperative' ? registerNativeTool(tool) : undefined
+  const hasNativeRegistration =
+    nativeRegistrationKind === 'declarative' ? isWebMCPSupported() : Boolean(nativeRegistration)
   const warnings = [...getToolWarnings(tool), ...(nativeRegistration?.warnings ?? [])]
 
   const registration: RegisteredTool<TInput, TOutput> = {
     tool,
-    mode: nativeRegistration ? 'native-and-fallback' : 'fallback',
+    mode: hasNativeRegistration ? 'native-and-fallback' : 'fallback',
     warnings,
+    ready: Promise.resolve(),
     unregister() {
       // Stale handles must not remove a newer registration for the same name.
       if (registeredTools.get(tool.name) !== (registration as RegisteredTool)) return
 
       nativeRegistration?.unregister?.()
       registeredTools.delete(tool.name)
+      onUnregister?.()
       emitWebMCPKitEvent({
         type: 'unregistered',
         toolName: tool.name,
@@ -45,6 +59,21 @@ export function registerTool<TInput = Record<string, unknown>, TOutput = unknown
       })
     }
   }
+
+  registration.ready = nativeRegistration
+    ? nativeRegistration.ready.then(function updateNativeRegistrationMode(registered) {
+        if (registered) return
+        registration.mode = 'fallback'
+        warnings.push('Native WebMCP registration failed; the fallback registry remains active.')
+        if (registeredTools.get(tool.name) !== (registration as RegisteredTool)) return
+        emitWebMCPKitEvent({
+          type: 'registered',
+          toolName: tool.name,
+          timestamp: Date.now(),
+          detail: { mode: registration.mode, warnings }
+        })
+      })
+    : Promise.resolve()
 
   registeredTools.set(tool.name, registration as RegisteredTool)
   emitWebMCPKitEvent({
@@ -67,6 +96,16 @@ export function unregisterTool(name: string): boolean {
 
 export function listTools(): RegisteredTool[] {
   return Array.from(registeredTools.values())
+}
+
+export function listAvailableTools(): RegisteredTool[] {
+  return listTools().filter(function isToolAvailable(registration) {
+    try {
+      return registration.tool.scope?.().available !== false
+    } catch {
+      return false
+    }
+  })
 }
 
 export function getTool(name: string): RegisteredTool | undefined {
@@ -117,6 +156,7 @@ export async function invokeTool<TOutput = unknown>(
   const result = (await invokeToolPipeline(registration.tool, {
     confirmed: invocation.confirmed,
     input: invocation.input,
+    signal: invocation.signal,
     source: invocation.source ?? 'fallback',
     startedAt
   })) as ToolInvocationResult<TOutput>

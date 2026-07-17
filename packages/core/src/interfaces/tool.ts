@@ -4,7 +4,10 @@ export interface JsonSchema {
   required?: string[]
   items?: JsonSchema
   anyOf?: JsonSchema[]
+  oneOf?: JsonSchema[]
   enum?: unknown[]
+  const?: unknown
+  title?: string
   minimum?: number
   maximum?: number
   minItems?: number
@@ -50,6 +53,7 @@ export interface ToolAnnotations {
 
 export interface ToolContext {
   source: 'native' | 'fallback' | 'devtools' | 'planner'
+  signal?: AbortSignal
 }
 
 export interface WebMCPTool<TInput = Record<string, unknown>, TOutput = unknown> {
@@ -86,6 +90,7 @@ export interface RegisteredTool<TInput = Record<string, unknown>, TOutput = unkn
   tool: WebMCPTool<TInput, TOutput>
   mode: 'native-and-fallback' | 'fallback'
   warnings: string[]
+  ready: Promise<void>
   unregister: () => void
 }
 
@@ -120,6 +125,7 @@ export interface ToolInvocation<TInput = Record<string, unknown>> {
   input: TInput
   confirmed?: boolean
   source?: ToolContext['source']
+  signal?: AbortSignal
 }
 
 export type ToolInvocationErrorCode =
@@ -129,6 +135,7 @@ export type ToolInvocationErrorCode =
   | 'guard_blocked'
   | 'guard_failed'
   | 'invalid_input'
+  | 'invalid_output'
   | 'not_registered'
   | 'scope_failed'
   | 'scope_unavailable'

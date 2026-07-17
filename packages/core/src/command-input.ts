@@ -49,7 +49,7 @@ import {
   isPlannerProviderKind
 } from './command-input-options'
 import { createChromeAIPlanner } from './planner'
-import { listTools } from './registry'
+import { listAvailableTools } from './registry'
 
 type CommandInputConstructor = CustomElementConstructor & {
   observedAttributes: string[]
@@ -379,7 +379,7 @@ export function defineWebMCPCommandInput(
       try {
         this.invalidateAutoPlannerBeforeRun()
         const planner = await this.getCurrentPlanner()
-        const tools = listTools().map(function mapRegistration(registration) {
+        const tools = listAvailableTools().map(function mapRegistration(registration) {
           return registration.tool
         })
 

@@ -145,6 +145,52 @@ describe('WebMCP command input', () => {
     })
   })
 
+  it('does not send scope-unavailable tools to the planner', async () => {
+    registerTool(
+      defineTool({
+        name: 'checkout_cart',
+        description: 'Checkout the current cart after the user reviews the order.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          required: [],
+          additionalProperties: false
+        },
+        scope() {
+          return { available: false, reason: 'Cart is empty.' }
+        },
+        execute() {
+          return { checkedOut: true }
+        }
+      })
+    )
+
+    const planner: ToolPlanner = {
+      name: 'Scope-aware planner',
+      available: true,
+      status: 'ready',
+      detail: 'Ready for tests.',
+      async plan(_message, tools) {
+        expect(tools).toEqual([])
+        return {
+          toolName: 'no_tools_match',
+          input: {},
+          confidence: 0,
+          reason: 'No available tools.'
+        }
+      }
+    }
+    const element = createCommandInputElement()
+    element.planner = planner
+    document.body.append(element)
+    await Promise.resolve()
+
+    await expect(element.run('Checkout')).resolves.toMatchObject({
+      toolName: 'no_tools_match',
+      status: 'unavailable'
+    })
+  })
+
   it('marks the run button as planning while the planner is working', async () => {
     const planRequest = createDeferred<ToolPlan>()
     registerTool(

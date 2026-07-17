@@ -208,8 +208,9 @@ confirmation: {
 - `createWebMCPKit(options)` initializes the kit and optional planner provider.
 - `defineTool(tool)` validates and preserves a typed tool definition, inferring the input type from the `inputSchema` literal.
 - `registerTool(tool)` registers with native WebMCP when available and always stores the tool in the fallback registry. Native registration passes through WebMCP `annotations` such as `readOnlyHint` and unregisters with `AbortSignal` when supported by the browser. Re-registering an existing name replaces it and logs a non-production warning.
+- Registration handles expose `ready`, which resolves after asynchronous native registration settles. The fallback registry remains available if native registration fails.
 - `unregisterTool(name)` removes a registration by name and returns whether one existed.
-- `invokeTool({ toolName, input, confirmed })` invokes fallback-registered tools for devtools, tests, and demos.
+- `invokeTool({ toolName, input, confirmed, signal })` invokes fallback-registered tools for devtools, tests, and demos. The optional `AbortSignal` is passed to the tool execution context.
 - `setConfirmationHandler(handler)` configures one global async confirmation provider for tools with `confirmation.required`; a per-tool `confirmation.handler` overrides it.
 - `createHostedOpenAIPlannerOption(config)` returns a ready-made planner option for the command input's `plannerOptions` list.
 - `listTools()` returns active registrations.
@@ -221,7 +222,14 @@ confirmation: {
 - `defineWebMCPCommandInput()` registers a ready-made `<webmcp-command-input>` web component for planner-driven commands.
 - `defineServerTool()` registers a browser-visible tool whose execution posts to an app-owned server endpoint.
 - `validateToolPlan()` validates single-tool, chained, and planner-outcome plans before execution.
+- Tool outputs are validated against `outputSchema` before a successful invocation result is emitted.
 - `installWebMCPKitTestBridge()` exposes a kit-specific test bridge for Playwright and local QA.
+
+## Supported JSON Schema
+
+WebMCP Kit evaluates this schema vocabulary at runtime: primitive and object types, `properties`, `required`, `items`, `additionalProperties`, `enum`, `const`, `anyOf`, `oneOf`, numeric and collection limits, string lengths, and `pattern`. It also accepts `title` and `description` as annotations for browsers, planners, and developer tooling.
+
+The known string formats `email`, `date`, `time`, `date-time`, and `uri` receive built-in runtime checks. Unknown or app-specific format names remain annotations. Use `pattern` or a tool guard when an application needs stricter business-specific validation than the built-in format check.
 
 ## Planner Output
 
@@ -284,7 +292,8 @@ Every invocation — from planners, devtools, tests, or the MCP bridge — runs 
 2. **Scope**: `scope()` runs synchronously and answers "is this tool usable in the current app state?" Returning `{ available: false, reason }` yields `status: 'unavailable'`, `code: 'scope_unavailable'`.
 3. **Confirmation**: when `confirmation.required` is set and the invocation is not already confirmed, the per-tool `confirmation.handler` (or the global handler) is awaited. A denial yields `status: 'blocked'`, `code: 'confirmation_denied'`.
 4. **Guard**: `guard(input)` runs with the validated, typed input and answers "is this specific input acceptable right now?" It may be async. Returning `false` or a string reason yields `status: 'blocked'`, `code: 'guard_blocked'`; returning `true` (or anything else truthy) allows execution.
-5. **Execute**: `execute(input, context)` runs. Thrown errors yield `status: 'error'`, `code: 'execution_failed'`.
+5. **Execute**: `execute(input, context)` runs. Thrown errors yield `status: 'error'`, `code: 'execution_failed'`. When the invocation carries an `AbortSignal`, it is available as `context.signal`.
+6. **Output validation**: when the tool declares `outputSchema`, the returned value is validated before success is reported. Failures return `status: 'error'`, `code: 'invalid_output'` without exposing the invalid value as a successful output.
 
 `ToolInvocationResult.code` distinguishes every non-success outcome:
 
@@ -298,6 +307,7 @@ Every invocation — from planners, devtools, tests, or the MCP bridge — runs 
 | `guard_blocked`       | `blocked`     | `guard()` rejected the input.               |
 | `guard_failed`        | `error`       | `guard()` threw.                            |
 | `execution_failed`    | `error`       | `execute()` threw.                          |
+| `invalid_output`      | `error`       | Output failed schema validation.            |
 | `not_registered`      | `error`       | No tool with that name is registered.       |
 
 ## Server Tool Wire Format
@@ -311,7 +321,7 @@ Content-Type: application/json
 { "toolName": "send_invoice", "input": { "invoiceId": "inv_104" }, "source": "planner" }
 ```
 
-The endpoint should return the tool output as JSON (`204 No Content` maps to `undefined`). Non-2xx responses fail the invocation; an `{ "error": "..." }` body becomes the error message. Schema validation, scope, confirmation, and guard all run in the browser before the request is sent — treat the endpoint as untrusted-input territory and validate again server-side.
+The endpoint should return the tool output as JSON (`204 No Content` maps to `undefined`). Non-2xx responses fail the invocation; an `{ "error": "..." }` body becomes the error message. Schema validation, scope, confirmation, and guard all run in the browser before the request is sent, and a declared `outputSchema` validates the response before success is reported. Invocation cancellation is forwarded to the request. Treat the endpoint as untrusted-input territory and validate again server-side.
 
 ## Custom Planners
 
@@ -543,7 +553,7 @@ if (input) {
 }
 ```
 
-The component uses the active WebMCP registry, plans against registered tools, invokes the returned step or bounded `tool_sequence`, and emits `webmcp-command-plan`, `webmcp-command-step`, `webmcp-command-result`, and `webmcp-command-error` events. `run(message, { signal })` accepts an `AbortSignal` for cancelling commands before planning or between sequence steps; remote planner fetches receive the same signal.
+The component uses the active WebMCP registry, excludes tools whose current `scope()` reports them unavailable, invokes the returned step or bounded `tool_sequence`, and emits `webmcp-command-plan`, `webmcp-command-step`, `webmcp-command-result`, and `webmcp-command-error` events. `run(message, { signal })` accepts an `AbortSignal` for cancelling commands before planning, during signal-aware execution, or between sequence steps; remote planner fetches and server-backed tool requests receive the same signal.
 
 ### Theming
 

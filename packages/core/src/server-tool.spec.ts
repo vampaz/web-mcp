@@ -91,4 +91,41 @@ describe('server tools', () => {
       error: 'send_invoice server endpoint returned 409: Invoice is already paid.'
     })
   })
+
+  it('passes invocation cancellation to the server request', async () => {
+    const fetchTool = vi.fn(async function fetchTool() {
+      return Response.json({ invoiceId: 'inv_1' })
+    })
+    const controller = new AbortController()
+
+    registerTool(
+      defineServerTool({
+        name: 'send_invoice',
+        description: 'Send an invoice email from the server.',
+        endpoint: '/api/tools/send-invoice',
+        fetch: fetchTool,
+        inputSchema: {
+          type: 'object',
+          properties: {
+            invoiceId: { type: 'string' }
+          },
+          required: ['invoiceId'],
+          additionalProperties: false
+        }
+      })
+    )
+
+    await invokeTool({
+      toolName: 'send_invoice',
+      input: { invoiceId: 'inv_1' },
+      signal: controller.signal
+    })
+
+    expect(fetchTool).toHaveBeenCalledWith(
+      '/api/tools/send-invoice',
+      expect.objectContaining({
+        signal: controller.signal
+      })
+    )
+  })
 })

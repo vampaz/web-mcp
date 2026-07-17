@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { defineTool } from './define-tool'
+import { subscribeWebMCPKitEvents } from './events'
 import { setConfirmationHandler } from './index'
 import { clearToolsForTest, registerTool } from './registry'
 import { isWebMCPSupported } from './support'
@@ -78,6 +79,54 @@ describe('native WebMCP adapter', () => {
     registration.unregister()
 
     expect(unregister).toHaveBeenCalledOnce()
+  })
+
+  it('reports asynchronous native registration failures and keeps fallback mode', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(function ignoreWarning() {})
+    const registeredEvents: unknown[] = []
+    const unsubscribe = subscribeWebMCPKitEvents(function collectRegisteredEvents(event) {
+      if (event.type === 'registered') registeredEvents.push(event.detail)
+    })
+    ;(document as DocumentWithModelContext).modelContext = {
+      registerTool: vi.fn(async function rejectNativeRegistration() {
+        throw new Error('Native tool name is already registered.')
+      })
+    }
+
+    const registration = registerTool(
+      defineTool({
+        name: 'search_products',
+        description:
+          'Search the local product catalog and return matching products for the current shopper.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string' }
+          },
+          required: ['query']
+        },
+        execute(input) {
+          return input
+        }
+      })
+    )
+
+    await registration.ready
+    unsubscribe()
+
+    expect(registration.mode).toBe('fallback')
+    expect(registration.warnings).toContain(
+      'Native WebMCP registration failed; the fallback registry remains active.'
+    )
+    expect(registeredEvents).toEqual([
+      expect.objectContaining({ mode: 'native-and-fallback' }),
+      expect.objectContaining({
+        mode: 'fallback',
+        warnings: expect.arrayContaining([
+          'Native WebMCP registration failed; the fallback registry remains active.'
+        ])
+      })
+    ])
   })
 
   it('passes annotations to native WebMCP registration', () => {

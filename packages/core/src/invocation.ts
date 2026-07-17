@@ -10,6 +10,7 @@ import { formatJsonValueValidationError, validateJsonValue } from './schema'
 export interface ToolInvocationPipelineOptions {
   confirmed?: boolean
   input: unknown
+  signal?: AbortSignal
   source: ToolContext['source']
   startedAt?: number
 }
@@ -107,8 +108,22 @@ export async function invokeToolPipeline<TInput, TOutput>(
 
   try {
     const output = await tool.execute(typedInput, {
-      source: options.source
+      source: options.source,
+      ...(options.signal ? { signal: options.signal } : {})
     })
+    if (tool.outputSchema) {
+      const outputValidationErrors = validateJsonValue(output, tool.outputSchema)
+      if (outputValidationErrors.length > 0) {
+        return createInvocationResult<TOutput>(
+          tool.name,
+          'error',
+          startedAt,
+          undefined,
+          formatJsonValueValidationError(outputValidationErrors, 'output'),
+          'invalid_output'
+        )
+      }
+    }
     return createInvocationResult<TOutput>(tool.name, 'success', startedAt, output)
   } catch (error) {
     return createInvocationResult<TOutput>(

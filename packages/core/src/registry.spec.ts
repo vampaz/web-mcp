@@ -410,6 +410,29 @@ describe('invocation result codes', () => {
     expect(result.status).toBe('error')
     expect(result.code).toBe('execution_failed')
   })
+
+  it('reports invalid_output when execute violates the output schema', async () => {
+    registerTool(
+      defineTool({
+        ...createHygieneTool('select_items'),
+        outputSchema: {
+          type: 'array',
+          items: { type: 'string' }
+        },
+        execute() {
+          return [42]
+        }
+      })
+    )
+
+    const result = await invokeTool({ toolName: 'select_items', input: { ids: [] } })
+
+    expect(result).toMatchObject({
+      status: 'error',
+      code: 'invalid_output',
+      error: 'output validation failed: /0 expected string, got integer.'
+    })
+  })
 })
 
 describe('per-tool confirmation handlers', () => {

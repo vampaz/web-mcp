@@ -21,6 +21,7 @@ Native registration follows the current Chrome WebMCP shape:
 - Tool `annotations`, including `readOnlyHint` and `untrustedContentHint`, are passed to `document.modelContext.registerTool`.
 - Native cleanup uses `AbortSignal` when available, matching Chrome's documented unregister path.
 - Returned native `unregister()` or `dispose()` handles are still honored for compatibility.
+- Registration handles expose a `ready` promise because native registration is asynchronous. The fallback registry is usable immediately, and an asynchronous native failure switches the handle to fallback mode with a warning.
 
 ## Fallback Mode
 

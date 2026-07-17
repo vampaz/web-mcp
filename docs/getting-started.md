@@ -106,7 +106,11 @@ function searchProducts(query: string) {
 registration.unregister()
 ```
 
+`registration.ready` resolves after native registration settles. The fallback registry is usable immediately; if native registration fails asynchronously, the registration switches to fallback mode and records a warning.
+
 When native WebMCP is present, the tool is registered with the browser. The same tool is also available in the local fallback registry for devtools and tests.
+
+Explicit schemas support `anyOf`, `oneOf`, `enum`, and `const` alongside the object, array, string, number, integer, boolean, and null types. The known string formats `email`, `date`, `time`, `date-time`, and `uri` receive built-in checks; custom format names remain annotations.
 
 Use `annotations.readOnlyHint` for tools that only read or reveal state, and leave it unset or `false` for tools that change app state. Mutating tools that affect important state should also use confirmation metadata.
 
@@ -132,7 +136,7 @@ if (form) {
 }
 ```
 
-`registerFormTool()` applies `toolname` and `tooldescription` to the form, prefers official `toolparamdescription` and `toolparamtitle` field metadata, and infers useful schema details from native inputs such as `email`, `date`, `time`, and `select`.
+`registerFormTool()` applies `toolname` and `tooldescription` to the form, prefers official `toolparamdescription` and `toolparamtitle` field metadata, and infers useful schema details from native inputs such as `email`, `date`, `time`, and `select`. In a browser with WebMCP support, those attributes provide the native declarative registration while the kit keeps its fallback registry; the helper does not also submit a duplicate imperative registration. Calling the returned registration's `unregister()` restores the form and field metadata attributes that existed before registration.
 
 ## Delegate A Tool To The Server
 
@@ -174,7 +178,7 @@ devtools.destroy()
 
 ## Add A Command Input
 
-Apps can use the built-in command input for natural-language planning against registered tools. The app supplies server-backed endpoint options; WebMCP Kit detects Chrome built-in AI from the browser when available.
+Apps can use the built-in command input for natural-language planning against currently scope-available registered tools. The app supplies server-backed endpoint options; WebMCP Kit detects Chrome built-in AI from the browser when available.
 
 ```ts
 import { defineWebMCPCommandInput, type WebMCPCommandInputElement } from '@vampaz/webmcp-kit'

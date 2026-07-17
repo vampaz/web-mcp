@@ -3,7 +3,8 @@ import type { JsonSchema } from './tool'
 /**
  * Derives the TypeScript input type from a JSON Schema literal, covering the
  * schema subset validated by validateJsonSchema(): object/properties/required,
- * string, number, integer, boolean, null, array/items, anyOf, and enum.
+ * string, number, integer, boolean, null, array/items, anyOf, oneOf, const,
+ * and enum.
  *
  * Wide schemas (values not written as literals in source) fall back to
  * Record<string, unknown>, matching the historical defineTool() default.
@@ -14,15 +15,19 @@ export type InferToolInput<TSchema extends JsonSchema> = UnknownToRecord<
 
 type UnknownToRecord<T> = [unknown] extends [T] ? Record<string, unknown> : T
 
-type InferJsonSchemaType<S> = S extends { enum: readonly (infer E)[] }
-  ? E
-  : S extends { anyOf: readonly (infer A)[] }
-    ? InferJsonSchemaType<A>
-    : S extends { type: infer T }
-      ? T extends readonly string[]
-        ? InferNamedType<T[number], S>
-        : InferNamedType<T, S>
-      : unknown
+type InferJsonSchemaType<S> = S extends { const: infer C }
+  ? C
+  : S extends { enum: readonly (infer E)[] }
+    ? E
+    : S extends { anyOf: readonly (infer A)[] }
+      ? InferJsonSchemaType<A>
+      : S extends { oneOf: readonly (infer O)[] }
+        ? InferJsonSchemaType<O>
+        : S extends { type: infer T }
+          ? T extends readonly string[]
+            ? InferNamedType<T[number], S>
+            : InferNamedType<T, S>
+          : unknown
 
 type InferNamedType<T, S> = T extends 'string'
   ? string

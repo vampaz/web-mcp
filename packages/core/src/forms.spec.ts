@@ -1,17 +1,33 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { clearToolsForTest, invokeTool } from './registry'
+import { clearToolsForTest, invokeTool, listTools } from './registry'
 import { inferFormInputSchema, registerFormTool } from './forms'
+
+interface DocumentWithModelContext extends Document {
+  modelContext?: {
+    registerTool?: ReturnType<typeof vi.fn>
+  }
+}
+
+interface NavigatorWithModelContext extends Navigator {
+  modelContext?: {
+    registerTool?: ReturnType<typeof vi.fn>
+  }
+}
 
 describe('form helpers', () => {
   beforeEach(() => {
     clearToolsForTest()
     document.body.innerHTML = ''
+    delete (document as DocumentWithModelContext).modelContext
+    delete (navigator as NavigatorWithModelContext).modelContext
   })
 
   afterEach(() => {
     clearToolsForTest()
     document.body.innerHTML = ''
+    delete (document as DocumentWithModelContext).modelContext
+    delete (navigator as NavigatorWithModelContext).modelContext
   })
 
   it('infers schema from named form fields', () => {
@@ -80,6 +96,94 @@ describe('form helpers', () => {
       subject: 'Billing',
       body: 'Cannot access invoices.'
     })
+  })
+
+  it('uses native declarative form registration without registering the same tool imperatively', () => {
+    const registerNativeTool = vi.fn()
+    ;(document as DocumentWithModelContext).modelContext = {
+      registerTool: registerNativeTool
+    }
+    document.body.innerHTML = `
+      <form>
+        <input name="subject" />
+      </form>
+    `
+
+    const form = document.querySelector('form')
+    if (!form) throw new Error('Expected test form.')
+
+    const registration = registerFormTool({
+      form,
+      name: 'create_support_ticket',
+      description: 'Create a support ticket from the visible support form.'
+    })
+
+    expect(form.getAttribute('toolname')).toBe('create_support_ticket')
+    expect(registration.mode).toBe('native-and-fallback')
+    expect(registerNativeTool).not.toHaveBeenCalled()
+  })
+
+  it('removes declarative attributes when a form tool is unregistered', () => {
+    document.body.innerHTML = `
+      <form data-existing="true">
+        <label>Email <input name="email" type="email" /></label>
+      </form>
+    `
+
+    const form = document.querySelector('form')
+    const email = document.querySelector('input')
+    if (!form || !email) throw new Error('Expected test form.')
+
+    const registration = registerFormTool({
+      form,
+      name: 'send_support_reply',
+      description: 'Send a support reply to the visible customer email address.',
+      fields: {
+        email: {
+          title: 'Customer email',
+          description: 'Email address that receives the support reply.'
+        }
+      }
+    })
+
+    registration.unregister()
+
+    expect(form.hasAttribute('toolname')).toBe(false)
+    expect(form.hasAttribute('tooldescription')).toBe(false)
+    expect(email.hasAttribute('toolparamtitle')).toBe(false)
+    expect(email.hasAttribute('toolparamdescription')).toBe(false)
+    expect(form.getAttribute('data-existing')).toBe('true')
+  })
+
+  it('keeps an existing form tool when a replacement definition is invalid', () => {
+    document.body.innerHTML = `
+      <form>
+        <label>Subject <input name="subject" /></label>
+      </form>
+    `
+
+    const form = document.querySelector('form')
+    if (!form) throw new Error('Expected test form.')
+
+    const existing = registerFormTool({
+      form,
+      name: 'create_support_ticket',
+      description: 'Create a support ticket from the visible support form.'
+    })
+
+    expect(function registerInvalidReplacement() {
+      registerFormTool({
+        form,
+        name: 'create_support_ticket',
+        description: ''
+      })
+    }).toThrow('Tool "create_support_ticket" must include a description.')
+
+    expect(listTools()).toEqual([existing])
+    expect(form.getAttribute('toolname')).toBe('create_support_ticket')
+    expect(form.getAttribute('tooldescription')).toBe(
+      'Create a support ticket from the visible support form.'
+    )
   })
 
   it('passes numeric form input through to custom execute handlers', async () => {
@@ -382,7 +486,8 @@ describe('form helpers', () => {
       })
     ).resolves.toMatchObject({
       status: 'error',
-      error: 'Form input does not satisfy native validation constraints.'
+      code: 'invalid_input',
+      error: 'input validation failed: /email expected email format, got "not-an-email".'
     })
   })
 

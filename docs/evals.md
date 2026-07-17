@@ -49,7 +49,7 @@ For planner-only checks, import the helper API from `@vampaz/webmcp-kit/testing`
 
 ```ts
 import { createHeuristicPlanner } from '@vampaz/webmcp-kit'
-import { runWebMCPPlannerEvals } from '@vampaz/webmcp-kit/testing'
+import { runWebMCPPlannerEvals, runWebMCPPlannerEvalSuite } from '@vampaz/webmcp-kit/testing'
 
 const results = await runWebMCPPlannerEvals(createHeuristicPlanner(), tools, [
   {
@@ -73,16 +73,43 @@ expect(
 The helper validates the returned plan against the available tool schemas before checking the expected tool and input. Use `runWebMCPPlannerEvalCase()` for one case when a test needs custom reporting.
 
 ```ts
-interface WebMCPPlannerEvalCase {
+interface WebMCPPlannerEvalCaseBase {
   name: string
   message: string
   context?: PlannerContext
-  expectedToolName: string
   expectedInput?: Record<string, unknown>
+  expectedInputSubset?: Record<string, unknown>
+  expectedSteps?: Array<{
+    toolName: string
+    inputSubset?: Record<string, unknown>
+  }>
 }
+
+type WebMCPPlannerEvalCase = WebMCPPlannerEvalCaseBase &
+  (
+    | { expectedToolName: string; expectedOutcome?: never }
+    | {
+        expectedToolName?: never
+        expectedOutcome: 'needs_clarification' | 'no_tools_match'
+      }
+  )
 ```
 
-For chained plans, still add an end-to-end test that invokes the plan and asserts the final app state. The planner eval helper checks plan shape and exact top-level expectations; browser or component tests should verify the workflow result.
+Set exactly one of `expectedToolName` or `expectedOutcome` on each case. Pass at least one case to a suite; an empty suite has no evaluation signal.
+
+Use `runWebMCPPlannerEvalSuite()` when model output can vary. It repeats every case and applies a minimum pass-rate threshold while retaining the individual plans, errors, and durations in a serializable summary.
+
+```ts
+const summary = await runWebMCPPlannerEvalSuite(planner, tools, cases, {
+  runsPerCase: 5,
+  minimumPassRate: 0.8
+})
+
+expect(summary.passed).toBe(true)
+console.log(JSON.stringify(summary, null, 2))
+```
+
+For chained plans, use `expectedSteps` to check tool order and important input fields. Still add an end-to-end test that invokes the plan and asserts the final app state.
 
 ## Failure Signals
 

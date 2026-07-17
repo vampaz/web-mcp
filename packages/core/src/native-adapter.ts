@@ -8,6 +8,7 @@ interface NativeRegistrationHandle {
 }
 
 export interface NativeToolRegistration {
+  ready: Promise<boolean>
   unregister?: () => void
   warnings: string[]
 }
@@ -22,7 +23,7 @@ export function registerNativeTool<TInput = Record<string, unknown>, TOutput = u
   const abortController = new AbortController()
 
   try {
-    const handle = registerTool.call(
+    const returnedHandle = registerTool.call(
       modelContext,
       {
         name: tool.name,
@@ -42,15 +43,27 @@ export function registerNativeTool<TInput = Record<string, unknown>, TOutput = u
         }
       },
       { signal: abortController.signal }
-    ) as NativeRegistrationHandle | undefined
+    ) as NativeRegistrationHandle | Promise<NativeRegistrationHandle | undefined> | undefined
+    let handle = isPromiseLike(returnedHandle) ? undefined : returnedHandle
+    let active = true
+    const ready = isPromiseLike(returnedHandle)
+      ? Promise.resolve(returnedHandle)
+          .then(function storeNativeHandle(resolvedHandle) {
+            handle = resolvedHandle
+            if (!active) unregisterNativeHandle(handle)
+            return true
+          })
+          .catch(function handleNativeRegistrationFailure(error) {
+            console.warn('[WebMCP Kit] Native registration failed; using fallback registry.', error)
+            return false
+          })
+      : Promise.resolve(true)
 
     return {
+      ready,
       unregister() {
-        if (handle?.unregister) {
-          handle.unregister()
-        } else {
-          handle?.dispose?.()
-        }
+        active = false
+        unregisterNativeHandle(handle)
         abortController.abort()
       },
       warnings: []
@@ -59,4 +72,16 @@ export function registerNativeTool<TInput = Record<string, unknown>, TOutput = u
     console.warn('[WebMCP Kit] Native registration failed; using fallback registry.', error)
     return undefined
   }
+}
+
+function unregisterNativeHandle(handle: NativeRegistrationHandle | undefined): void {
+  if (handle?.unregister) {
+    handle.unregister()
+  } else {
+    handle?.dispose?.()
+  }
+}
+
+function isPromiseLike(value: unknown): value is PromiseLike<NativeRegistrationHandle | undefined> {
+  return Boolean(value && typeof (value as PromiseLike<unknown>).then === 'function')
 }

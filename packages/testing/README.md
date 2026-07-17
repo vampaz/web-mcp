@@ -30,3 +30,7 @@ const results = await runWebMCPPlannerEvals(createHeuristicPlanner(), tools, [
 
 expect(results.every((result) => result.passed)).toBe(true)
 ```
+
+Use `runWebMCPPlannerEvalSuite()` for repeated model-backed runs with a minimum pass rate. Cases can assert planner outcomes, partial inputs, and ordered chained-plan steps. The returned summary is JSON-serializable for CI artifacts.
+
+Each case should define exactly one of `expectedToolName` or `expectedOutcome`, and suites should contain at least one case.

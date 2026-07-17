@@ -37,6 +37,8 @@ setConfirmationHandler(async function confirmTool(tool, input, reason) {
 
 WebMCP Kit enforces confirmation before execution in both fallback and native wrapper paths. If no handler is configured, browser runtimes fall back to `window.confirm()`.
 
+When a tool declares `outputSchema`, WebMCP Kit validates the returned value before reporting a successful invocation. Treat an `invalid_output` result as a tool implementation failure; do not pass that output to another tool or UI assertion.
+
 The internal `confirmed: true` invocation flag is only for code paths that already performed approval inside the trusted app boundary. Public bridges and test helpers must not accept caller-provided confirmation bypasses; they should rely on `setConfirmationHandler()` or the browser confirmation fallback.
 
 Chained planner output does not change this rule. A `tool_sequence` executes as individual tool invocations, so each mutating step still runs its own guard and confirmation check before execution. If the user rejects a confirmation or a guard blocks a step, the sequence stops and later steps do not run.
@@ -48,6 +50,8 @@ Planner outcomes are non-executing. `needs_clarification` returns a blocked comm
 Use `defineServerTool()` for actions that need app-owned secrets, private APIs, payments, email, or database writes. The browser-visible tool still validates input and enforces scope, confirmation, and guards before it posts to the endpoint.
 
 Server endpoints must validate authorization and input again. Treat the browser request as untrusted even when WebMCP Kit already validated it client-side.
+
+Invocation cancellation is passed to server-backed tools as an `AbortSignal`. Forward it through downstream fetches so a cancelled command does not continue unnecessary work.
 
 ## Guards And Scope
 
@@ -69,6 +73,8 @@ scope() {
   }
 }
 ```
+
+The built-in command input omits scope-unavailable tools from the planner request. Scope is checked again during invocation so a tool cannot execute after the relevant app state changes.
 
 ## Audit Hooks
 
