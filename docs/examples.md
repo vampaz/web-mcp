@@ -31,13 +31,10 @@ registerTool(
 
 ```vue
 <script setup lang="ts">
-import { computed } from 'vue'
 import { defineTool } from '@vampaz/webmcp-kit'
 import { useWebMCPTool } from '@vampaz/webmcp-kit/vue'
 
-const isCatalogRoute = computed(function getIsCatalogRoute() {
-  return window.location.pathname.startsWith('/catalog')
-})
+const props = defineProps<{ isCatalogRoute: boolean }>()
 
 useWebMCPTool(
   defineTool({
@@ -59,11 +56,15 @@ useWebMCPTool(
     }
   }),
   {
-    when: isCatalogRoute
+    when: function available() {
+      return props.isCatalogRoute
+    }
   }
 )
 </script>
 ```
+
+The parent derives `isCatalogRoute` from its router. `searchProducts()` is an application-owned function. These are integration snippets; the complete [counter assistant module](./examples/counter-assistant.ts) is typechecked against the package artifact.
 
 ## Confirmed Checkout
 
@@ -165,8 +166,8 @@ const form = document.querySelector<HTMLFormElement>('form')
 if (form) {
   registerFormTool({
     form,
-    name: 'create_support_ticket',
-    description: 'Create a support ticket from the visible support request form.',
+    name: 'prepare_support_ticket',
+    description: 'Fill and validate the visible support request form without submitting it.',
     fields: {
       subject: {
         description: 'Short issue summary.'
@@ -179,7 +180,7 @@ if (form) {
 }
 ```
 
-The helper applies `toolname`, `tooldescription`, and official field metadata attributes such as `toolparamdescription`. The returned registration removes the tool and restores the previous form attributes when `unregister()` is called.
+The helper applies `toolname`, `tooldescription`, and official field metadata attributes such as `toolparamdescription`. Through the kit invocation path, the default execution fills fields and returns `FormData`; it does not submit the form. To create a ticket, supply `execute(input, form)` that calls the application's submission action, plus required confirmation. Native declarative form submission remains a separate browser path, so the form's submit handler must enforce application authorization and approval. The returned registration removes the tool and restores the previous form attributes when `unregister()` is called.
 
 ## Eval Fixtures
 

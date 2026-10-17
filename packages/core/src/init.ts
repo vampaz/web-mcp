@@ -46,13 +46,15 @@ export interface WebMCPInitHandle {
  * One-call setup: registers tools, defines and locates (or creates) the
  * command input element, and wires a planner.
  *
- * With an `accessKey`, planning runs through the hosted OpenAI planner using
- * endpoints derived from `baseUrl`. Without one, the element keeps its own
- * default planner behavior.
+ * An explicit `planner` takes precedence. Otherwise, `accessKey` requires
+ * `model` and creates a hosted OpenAI planner with endpoints derived from
+ * `baseUrl`. Without either, the element keeps its own planner behavior.
  *
  * Tool names must be unique and must not collide with already-registered
- * tools. A throwing call leaves no side effects behind, and `destroy()`
- * restores the confirmation handler that was active before this call.
+ * tools. Failed setup removes registrations and elements added by that call.
+ * `destroy()` performs the same cleanup and restores the previous confirmation
+ * handler unless application code replaced it. Custom-element definition is
+ * permanent; configuration on a reused element is not restored.
  */
 export function initWebMCP(options: InitWebMCPOptions = {}): WebMCPInitHandle {
   if (typeof document === 'undefined') {

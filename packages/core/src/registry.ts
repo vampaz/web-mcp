@@ -155,6 +155,9 @@ export async function invokeTool<TOutput = unknown>(
 
   const result = (await invokeToolPipeline(registration.tool, {
     confirmed: invocation.confirmed,
+    isCurrent() {
+      return registeredTools.get(invocation.toolName) === registration
+    },
     input: invocation.input,
     signal: invocation.signal,
     source: invocation.source ?? 'fallback',

@@ -33,23 +33,23 @@ Fallback mode keeps tools in an in-memory registry. It is useful for:
 - provider planning experiments
 - catalog exports
 
-Fallback mode is not the same as native browser-agent access. It does not give the browser agent new powers; it only gives your app a development and testing surface.
+Fallback mode exposes tools to application-controlled callers, including production assistants, devtools, and tests. It does not enable native browser-agent discovery in a browser that lacks WebMCP.
 
 ## Chrome Built-In AI
 
-The demo can use Chrome built-in AI through `window.LanguageModel` when available. Requests should specify an output language. WebMCP Kit uses English output for planner calls so Chrome can optimize quality and safety checks.
+The kit's Chrome planner uses `window.LanguageModel` when available. It declares English text input and output. The local lab uses its configured LM Studio model; it does not automatically switch to browser AI.
 
 The command input adds Chrome built-in AI to the provider selector when the browser exposes an available `LanguageModel` API. Consumers can hide that option with `showChromeAI: false`.
 
-If Chrome built-in AI is unavailable, downloadable, or still initializing, the planner can fall back to local heuristics or a configured provider.
+The automatic planner uses local heuristics when Chrome AI is unavailable. Downloadable or downloading Chrome models remain selected and initialize from a user command. Non-strict Chrome planning can fall back to heuristics on failure. Explicit Chrome selection and strict conversational planning report failure without substituting another provider.
 
-## Browser-Local Demo Models
+## Application-Owned Browser Models
 
-The demo can configure the command input with an app-owned WebLLM planner that downloads and runs a small model in the browser. This path requires WebGPU. It is separate from the kit's built-in provider configuration: the demo owns the WebLLM dependency and passes a `ToolPlanner` directly to the command input.
+An application can configure the command input with a custom browser-local planner. For example, a WebLLM integration owns its model download and WebGPU requirements. The application installs that dependency and passes a `ToolPlanner` to the kit. WebMCP Kit does not bundle WebLLM or download a model on import.
 
 ## Inspecting Tools
 
-During development or preview deployments, mount `@vampaz/webmcp-kit/devtools` to inspect registered tools, warnings, prompt previews, sample inputs, and invocation history. The demo gates the overlay behind `import.meta.env.DEV || import.meta.env.PUBLIC_WEBMCP_PREVIEW === 'true'`.
+During development or preview deployments, mount `@vampaz/webmcp-kit/devtools` to inspect registered tools, warnings, prompt previews, sample inputs, and invocation history. The consuming application owns the environment/access gate and must deliberately mount the overlay; the kit and local lab do not mount it automatically.
 
 ## Chrome And Lighthouse Inspection
 
@@ -62,3 +62,11 @@ Useful references:
 - [Chrome WebMCP best practices](https://developer.chrome.com/docs/ai/webmcp/best-practices)
 - [Chrome WebMCP evals](https://developer.chrome.com/docs/ai/webmcp/evals)
 - [When to use WebMCP and MCP](https://developer.chrome.com/docs/ai/webmcp/compare-mcp)
+
+## Pi and chat prerequisites
+
+Core fallback needs neither native WebMCP nor Pi. The independent chat accepts an application controller and does not require Pi or a framework. Chat uses Custom Elements, Shadow DOM, and ResizeObserver; popup mode also uses the Popover API. Embedded Pi requires a secure context, service workers, IndexedDB, Web Locks, and an explicitly configured conversational model. Missing prerequisites produce an error; persistent history never silently becomes in-memory history. Use the TLS plugin's advertised HTTPS domain for development and see [operations](./operations.md#browser-prerequisites) for deployment checks.
+
+The source suite selects Chromium with native WebMCP disabled, Firefox, and WebKit for portable storage/chat checks. Chromium additionally tests worker termination through CDP. A separate `native-chromium` project enables the real WebMCP API and asserts discovery/invocation/cancellation. Mocked native unit tests are separate evidence. `test:lmstudio` is a separate real-model lane.
+
+Tests on 2026-10-17 use Playwright 1.64.1: Chromium 156.0.8078.4, Firefox 157.0, and WebKit 27.2. Browser results and any local platform limitations are recorded in the implementation evidence; configured projects do not imply passing tests. No minimum browser version beyond these tested prerequisites is claimed.

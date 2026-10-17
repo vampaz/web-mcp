@@ -9,6 +9,7 @@ import { formatJsonValueValidationError, validateJsonValue } from './schema'
 
 export interface ToolInvocationPipelineOptions {
   confirmed?: boolean
+  isCurrent?: () => boolean
   input: unknown
   signal?: AbortSignal
   source: ToolContext['source']
@@ -32,34 +33,65 @@ export async function invokeToolPipeline<TInput, TOutput>(
     )
   }
 
-  try {
-    const availability = tool.scope?.()
-    if (availability && !availability.available) {
+  const schema = JSON.stringify(tool.inputSchema)
+
+  function checkAvailability(): ToolInvocationResult<TOutput> | undefined {
+    if (options.signal?.aborted) {
+      return createInvocationResult<TOutput>(
+        tool.name,
+        'error',
+        startedAt,
+        undefined,
+        'Tool invocation was cancelled.',
+        'cancelled'
+      )
+    }
+    if (options.isCurrent?.() === false || JSON.stringify(tool.inputSchema) !== schema) {
       return createInvocationResult<TOutput>(
         tool.name,
         'unavailable',
         startedAt,
         undefined,
-        availability.reason ?? 'Tool is not available in the current state.',
-        'scope_unavailable'
+        'The tool changed. Start a new request.',
+        'tool_changed'
       )
     }
-  } catch (error) {
-    return createInvocationResult<TOutput>(
-      tool.name,
-      'error',
-      startedAt,
-      undefined,
-      error instanceof Error ? error.message : 'Tool scope failed.',
-      'scope_failed'
-    )
+    try {
+      const availability = tool.scope?.()
+      if (availability && !availability.available) {
+        return createInvocationResult<TOutput>(
+          tool.name,
+          'unavailable',
+          startedAt,
+          undefined,
+          availability.reason ?? 'Tool is not available in the current state.',
+          'scope_unavailable'
+        )
+      }
+    } catch (error) {
+      return createInvocationResult<TOutput>(
+        tool.name,
+        'error',
+        startedAt,
+        undefined,
+        error instanceof Error ? error.message : 'Tool scope failed.',
+        'scope_failed'
+      )
+    }
   }
+
+  const initialFailure = checkAvailability()
+  if (initialFailure) return initialFailure
 
   let confirmed = options.confirmed === true || !tool.confirmation?.required
   if (!confirmed) {
     try {
-      confirmed = await requestToolConfirmation(tool, options.input)
+      confirmed = await waitForInvocation(
+        requestToolConfirmation(tool, options.input, options.signal),
+        options.signal
+      )
     } catch (error) {
+      if (options.signal?.aborted) return checkAvailability()!
       return createInvocationResult<TOutput>(
         tool.name,
         'error',
@@ -70,6 +102,9 @@ export async function invokeToolPipeline<TInput, TOutput>(
       )
     }
   }
+
+  const approvalFailure = checkAvailability()
+  if (approvalFailure) return approvalFailure
 
   if (tool.confirmation?.required && !confirmed) {
     return createInvocationResult<TOutput>(
@@ -84,7 +119,10 @@ export async function invokeToolPipeline<TInput, TOutput>(
 
   const typedInput = options.input as TInput
   try {
-    const guardResult = await tool.guard?.(typedInput)
+    const guardResult = await waitForInvocation(
+      Promise.resolve(tool.guard?.(typedInput)),
+      options.signal
+    )
     if (typeof guardResult === 'string' || guardResult === false) {
       return createInvocationResult<TOutput>(
         tool.name,
@@ -96,6 +134,7 @@ export async function invokeToolPipeline<TInput, TOutput>(
       )
     }
   } catch (error) {
+    if (options.signal?.aborted) return checkAvailability()!
     return createInvocationResult<TOutput>(
       tool.name,
       'error',
@@ -105,6 +144,9 @@ export async function invokeToolPipeline<TInput, TOutput>(
       'guard_failed'
     )
   }
+
+  const executionFailure = checkAvailability()
+  if (executionFailure) return executionFailure
 
   try {
     const output = await tool.execute(typedInput, {
@@ -153,4 +195,18 @@ export function createInvocationResult<TOutput>(
     error,
     durationMs: Math.round(performance.now() - startedAt)
   }
+}
+
+function waitForInvocation<T>(pending: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return pending
+  return new Promise(function wait(resolve, reject) {
+    function abort() {
+      reject(new Error('Tool invocation was cancelled.'))
+    }
+    signal.addEventListener('abort', abort, { once: true })
+    pending.then(resolve, reject).finally(function cleanup() {
+      signal.removeEventListener('abort', abort)
+    })
+    if (signal.aborted) abort()
+  })
 }

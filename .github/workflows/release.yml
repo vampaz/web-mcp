@@ -31,7 +31,7 @@ jobs:
       - name: Check npm version
         run: npm --version
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       - name: Run lint
         run: npm run lint
@@ -45,8 +45,37 @@ jobs:
       - name: Run tests
         run: npm run test
 
+      - name: Typecheck demo
+        run: npm run typecheck:demo
+
+      - name: Check API documentation
+        run: npm run docs:api:check
+
+      - name: Install test browsers
+        run: npm exec playwright -- install --with-deps chromium firefox webkit
+
+      - name: Prepare trusted TLS on this disposable runner
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcap2-bin libnss3-tools openssl
+          sudo setcap cap_net_bind_service=+ep "$(readlink -f "$(command -v node)")"
+          node --experimental-strip-types scripts/setup-test-tls.ts
+
+      - name: Run deterministic browser tests
+        run: npm run test:e2e
+
       - name: Run build
         run: npm run build
+
+      - name: Pack unpublished artifact
+        run: npm run pack:package
+
+      - name: Test package consumers before publication
+        run: npm run test:package
+
+      - name: Stop test TLS proxy
+        if: always()
+        run: npm exec -- vite-local-tls proxy stop
 
       - name: Configure npm registry for trusted publishing
         run: printf 'registry=https://registry.npmjs.org/\n' > ~/.npmrc
@@ -69,7 +98,7 @@ jobs:
 
       - name: Publish to npm
         if: steps.npm-check.outputs.published != 'true'
-        run: npm publish --provenance --access public
+        run: npm publish ./artifacts/webmcp-kit.tgz --provenance --access public
         env:
           NPM_CONFIG_PROVENANCE: true
 
@@ -97,7 +126,7 @@ jobs:
 
       - name: Publish to GitHub Packages
         if: steps.github-packages-check.outputs.published != 'true'
-        run: npm publish --registry=https://npm.pkg.github.com
+        run: npm publish ./artifacts/webmcp-kit.tgz --registry=https://npm.pkg.github.com
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

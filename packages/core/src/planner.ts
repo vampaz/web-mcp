@@ -9,7 +9,8 @@ import type {
 } from './interfaces/tool'
 import { getErrorMessage } from './confirmation'
 import { planWithHeuristics } from './heuristic-planner'
-import { toolPlanSchema, validateToolPlan } from './plan-validation'
+import { createToolPlanSchema, validateToolPlan } from './plan-validation'
+import { PlannerRequestLimitError, serializePlannerRequest } from './planner-request'
 
 interface LanguageModelSession {
   prompt: (message: string, options?: ChromeAIPromptOptions) => Promise<string>
@@ -46,6 +47,7 @@ interface ChromeAIOptions {
 
 interface ChromeAIPromptOptions {
   responseConstraint?: unknown
+  signal?: AbortSignal
 }
 
 const chromeAITextOptions = {
@@ -157,6 +159,16 @@ export async function createConfiguredPlanner(
 }
 
 export function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner {
+  if (
+    config.maxTokens !== undefined &&
+    (!Number.isSafeInteger(config.maxTokens) || config.maxTokens < 1 || config.maxTokens > 65536)
+  )
+    throw new Error('maxTokens must be an integer between 1 and 65536.')
+  if (
+    config.temperature !== undefined &&
+    (!Number.isFinite(config.temperature) || config.temperature < 0 || config.temperature > 2)
+  )
+    throw new Error('temperature must be between 0 and 2.')
   const providerLabel = getProviderLabel(config)
   const model = config.model ?? getDefaultModel(config)
   const auth = config.auth ?? { mode: 'none' }
@@ -189,6 +201,7 @@ export function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner 
   }
 
   return {
+    capabilities: { conversation: true },
     name: providerLabel,
     available: true,
     status: 'ready',
@@ -212,10 +225,11 @@ export function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner 
           options
         )
         throwIfAborted(options?.signal)
-        validateToolPlan(plan, tools)
+        validateToolPlan(plan, tools, { singleStep: options?.singleStep })
         return plan
       } catch (error) {
         throwIfAborted(options?.signal)
+        if (error instanceof PlannerRequestLimitError) throw error
         throw new Error(`${providerLabel} could not plan this command (${getErrorMessage(error)})`)
       }
     }
@@ -226,10 +240,16 @@ async function planWithChromeAI(
   session: LanguageModelSession,
   message: string,
   tools: WebMCPTool[],
-  context: PlannerContext = {}
+  context: PlannerContext = {},
+  options?: PlannerRunOptions
 ): Promise<ToolPlan> {
-  const response = await session.prompt(createPlannerPrompt(message, tools, context), {
-    responseConstraint: toolPlanSchema
+  throwIfAborted(options?.signal)
+  const prompt = createPlannerPrompt(message, tools, context, options?.singleStep)
+  const responseConstraint = createToolPlanSchema(tools, options?.singleStep)
+  serializePlannerRequest({ prompt, responseConstraint }, options?.maxRequestBytes)
+  const response = await session.prompt(prompt, {
+    responseConstraint,
+    ...(options?.signal ? { signal: options.signal } : {})
   })
 
   return parseToolPlanJson(response, 'Chrome built-in AI')
@@ -279,14 +299,18 @@ async function planWithServerEndpoint(
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      provider: config.provider,
-      model,
-      message,
-      tools: createToolCatalog(tools),
-      context,
-      responseSchema: toolPlanSchema
-    }),
+    body: serializePlannerRequest(
+      {
+        provider: config.provider,
+        model,
+        message,
+        tools: createToolCatalog(tools),
+        context,
+        responseSchema: createToolPlanSchema(tools, options?.singleStep),
+        ...(options?.singleStep ? { singleStep: true } : {})
+      },
+      options?.maxRequestBytes
+    ),
     signal: options?.signal
   })
 
@@ -323,14 +347,30 @@ async function planWithOpenAICompatible(
   const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({
-      model,
-      messages: createPlannerMessages(message, tools, context),
-      response_format: {
-        type: 'json_object'
+    body: serializePlannerRequest(
+      {
+        model,
+        messages: createPlannerMessages(message, tools, context, options?.singleStep),
+        response_format:
+          config.responseFormat === 'json_schema'
+            ? {
+                type: 'json_schema',
+                json_schema: {
+                  name: 'webmcp_plan',
+                  schema: createToolPlanSchema(tools, options?.singleStep)
+                }
+              }
+            : {
+                type: 'json_object'
+              },
+        temperature: config.temperature ?? 0,
+        ...(config.maxTokens !== undefined ? { max_tokens: config.maxTokens } : {}),
+        ...(config.reasoningEffort !== undefined
+          ? { reasoning_effort: config.reasoningEffort }
+          : {})
       },
-      temperature: 0
-    }),
+      options?.maxRequestBytes
+    ),
     signal: options?.signal
   })
 
@@ -339,24 +379,32 @@ async function planWithOpenAICompatible(
   }
 
   const payload = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>
+    choices?: Array<{ message?: { content?: string }; finish_reason?: string }>
   }
+  if (payload.choices?.[0]?.finish_reason === 'length')
+    throw new Error('provider reached the output token limit')
   const content = payload.choices?.[0]?.message?.content
   if (!content) throw new Error('provider returned no message content')
 
   return parseToolPlanJson(content, getProviderLabel(config))
 }
 
-function createPlannerMessages(message: string, tools: WebMCPTool[], context: PlannerContext) {
+function createPlannerMessages(
+  message: string,
+  tools: WebMCPTool[],
+  context: PlannerContext,
+  singleStep = false
+) {
   return [
     {
       role: 'system',
-      content:
-        'Choose one app tool, a short ordered tool_sequence, needs_clarification, or no_tools_match. Return only JSON with toolName, input, confidence, reason, and optional steps.'
+      content: singleStep
+        ? 'Choose exactly one next app tool, needs_clarification, or no_tools_match. Never return tool_sequence or steps. Return only JSON with toolName, input, confidence, and reason.'
+        : 'Choose one app tool, a short ordered tool_sequence, needs_clarification, or no_tools_match. Return only JSON with toolName, input, confidence, reason, and optional steps.'
     },
     {
       role: 'user',
-      content: createPlannerPrompt(message, tools, context)
+      content: createPlannerPrompt(message, tools, context, singleStep)
     }
   ]
 }
@@ -364,18 +412,21 @@ function createPlannerMessages(message: string, tools: WebMCPTool[], context: Pl
 function createPlannerPrompt(
   message: string,
   tools: WebMCPTool[],
-  context: PlannerContext
+  context: PlannerContext,
+  singleStep = false
 ): string {
   return [
     `User request: ${message}`,
     `Current app context:\n${JSON.stringify(context, null, 2)}`,
     `Available tools:\n${JSON.stringify(createToolCatalog(tools), null, 2)}`,
     'Choose the best tool and exact parameters from the current app context. Prefer stable IDs from context over labels.',
-    'If the request requires multiple app actions, return a chained plan with toolName "tool_sequence", input {}, and steps ordered by dependency. Use at most 5 steps. Each step must use one available tool and must be executable after the previous step updates app state.',
+    singleStep
+      ? 'Choose only the next unfinished action. Return one tool invocation, never a sequence or steps. Wait for the actual result before planning another action. Never invent future tool results or placeholders.'
+      : 'If the request requires multiple app actions, return a chained plan with toolName "tool_sequence", input {}, and steps ordered by dependency. Use at most 5 steps. Each step must use one available tool and must be executable after the previous step updates app state.',
     'If the request is missing required information that is not present in context, return {"toolName":"needs_clarification","input":{},"confidence":0,"reason":"Ask for the missing information."}.',
     'If none of the available tools can satisfy the request, return {"toolName":"no_tools_match","input":{},"confidence":0,"reason":"Explain what kind of app action is available instead."}.',
     'Return only valid JSON matching this schema:',
-    JSON.stringify(toolPlanSchema, null, 2)
+    JSON.stringify(createToolPlanSchema(tools, singleStep), null, 2)
   ].join('\n\n')
 }
 
@@ -401,6 +452,7 @@ function createActiveChromePlanner(
   let session: LanguageModelSession | undefined
 
   return {
+    capabilities: { conversation: strict },
     name: 'Chrome built-in AI',
     available: true,
     status,
@@ -414,12 +466,13 @@ function createActiveChromePlanner(
       try {
         throwIfAborted(options?.signal)
         session ??= await createChromeAISession(languageModel)
-        const plan = await planWithChromeAI(session, message, tools, context)
-        validateToolPlan(plan, tools)
+        const plan = await planWithChromeAI(session, message, tools, context, options)
+        validateToolPlan(plan, tools, { singleStep: options?.singleStep })
         throwIfAborted(options?.signal)
         return plan
       } catch (error) {
         throwIfAborted(options?.signal)
+        if (error instanceof PlannerRequestLimitError) throw error
         if (strict)
           throw new Error(
             `Chrome built-in AI could not plan this command (${getErrorMessage(error)})`

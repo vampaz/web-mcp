@@ -9,29 +9,34 @@
 
 ## Project Shape
 
-WebMCP Kit is an ESM-only TypeScript npm workspace for exposing app actions as WebMCP tools. It progressively uses native browser WebMCP and Chrome built-in AI, with local fallback registries and planners for unsupported browsers and tests.
+WebMCP Kit is one ESM-only TypeScript npm package with multiple public entry points. The `packages/` directories organize its source; they are not independently installed npm workspaces. The kit exposes app actions through native browser WebMCP, with local registries and planners for unsupported browsers and tests.
 
 - `packages/core`: tool definitions, registry, planners, schema validation, events, confirmation handling, native adapter, test bridge.
+- `packages/pi`: persistent conversation runtime, page controller, registry tool host, and service-worker entry point.
+- `packages/chat`: framework-neutral chat custom element driven by a supplied controller.
 - `packages/devtools`: in-page tool inspection/invocation overlay.
-- `packages/testing`: Playwright bridge helpers.
+- `packages/testing`: planner evaluations and Playwright bridge helpers.
 - `packages/mcp-bridge`: local MCP-style bridge over registered tools.
 - `packages/zod`: Zod-to-WebMCP tool helper.
 - `packages/vue`, `packages/react`, `packages/svelte`: thin lifecycle helpers around core `registerTool()`.
 - `tests/integration`: cross-package integration coverage.
+- `tests/package`: isolated consumers of the packed npm artifact.
+- `apps/demo`: local Vue lab and deterministic browser fixtures, served over trusted HTTPS.
 - `docs`: user-facing docs; keep examples aligned with source behavior.
 
 ## Environment
 
 - Node: `24.12.0` from `.nvmrc`.
-- Package manager: npm workspaces with checked-in `package-lock.json`.
+- Package manager: npm with a root `package.json` and checked-in `package-lock.json`.
 - Do not use `npx`; use package scripts or `npm exec <tool> -- ...`.
 - No npm `min-release-age` rule is configured.
+- Always use the TLS plugin's advertised HTTPS development domain for browser checks and fixtures. Do not create or navigate to an HTTP alternative when the plugin is available.
 
 ## Style
 
 - TypeScript strict mode, ESM imports/exports, single quotes.
 - Prefer function declarations over function expressions assigned to `const`/`let`.
-- Use workspace imports such as `@vampaz/webmcp-kit`.
+- Use public package imports such as `@vampaz/webmcp-kit`.
 - Package-local shared interfaces go in `packages/<name>/src/interfaces`.
 - CSS should be fluid and responsive; fixed dimensions need a concrete reason.
 
@@ -45,7 +50,7 @@ WebMCP Kit is an ESM-only TypeScript npm workspace for exposing app actions as W
 - Use `setConfirmationHandler()` for app approval UI. Preserve fallback/native/MCP confirmation enforcement; `window.confirm()` is only a fallback when no handler exists.
 - Use `scope()` for current-state availability and `guard()` for input-specific blocking.
 - Never expose secrets or hidden server values through inputs, planner context, events, logs, docs examples, or browser user-key flows.
-- Planner behavior should remain progressive: native/Chrome AI when available, deterministic fallback when not.
+- Automatic command planning prefers Chrome AI when available, with deterministic fallback otherwise. Explicit provider selection and the conversational Pi runtime must report provider failures without silently switching providers.
 
 ## Framework Helpers
 
@@ -58,7 +63,10 @@ WebMCP Kit is an ESM-only TypeScript npm workspace for exposing app actions as W
 
 - Unit/integration tests: `npm run test`
 - Single test file: `npm run test -- path/to/file.spec.ts`
-- Typecheck: `npm exec tsc -- --noEmit`
+- Typecheck: `npm run typecheck`; lab: `npm run typecheck:demo`
+- Browser tests: `npm run test:e2e`; real-model checks are separate: `npm run test:lmstudio`
+- Generated API reference: `npm run docs:api:check`
+- Authorized packaging checks: build once, then `npm run pack:package` and `npm run test:package`. See `docs/operations.md`.
 - Do not add arbitrary Playwright timeouts; use locators, assertions, or `page.waitForSelector`.
 - After changing a test, run that test.
 - Vue component tests should use `mountWithDeps()`.
