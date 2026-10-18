@@ -11,3 +11,7 @@ dist
 coverage
 test-results
 .playwright-mcp
+
+artifacts
+playwright-report
+apps/demo/.vite

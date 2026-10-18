@@ -11,6 +11,7 @@ export interface ToolPlanValidationTool {
 
 export interface ToolPlanValidationOptions {
   messageStyle?: 'provider' | 'server'
+  singleStep?: boolean
 }
 
 export const toolPlanSchema = {
@@ -40,6 +41,32 @@ export const toolPlanSchema = {
   additionalProperties: false
 } satisfies JsonSchema
 
+export function createToolPlanSchema(
+  tools: ToolPlanValidationTool[],
+  singleStep = false
+): JsonSchema {
+  if (!singleStep) return toolPlanSchema
+  const properties: Record<string, JsonSchema> = { ...toolPlanSchema.properties }
+  delete properties.steps
+  return {
+    ...toolPlanSchema,
+    properties: {
+      ...properties,
+      toolName: {
+        type: 'string',
+        enum: [
+          ...tools
+            .map(function name(tool) {
+              return tool.name
+            })
+            .filter(Boolean),
+          ...plannerOutcomeToolNames
+        ]
+      }
+    }
+  }
+}
+
 export function validateToolPlan(
   plan: unknown,
   tools: ToolPlanValidationTool[],
@@ -49,6 +76,11 @@ export function validateToolPlan(
 
   if (!plan || typeof plan !== 'object') throw new Error(messages.invalidPlan)
   const typedPlan = plan as Partial<ToolPlan>
+  if (
+    options.singleStep &&
+    (typedPlan.steps !== undefined || typedPlan.toolName === 'tool_sequence')
+  )
+    throw new Error('provider returned a sequence for a single-step request')
   if (typeof typedPlan.toolName !== 'string') throw new Error(messages.invalidToolName)
   if (!typedPlan.input || typeof typedPlan.input !== 'object' || Array.isArray(typedPlan.input)) {
     throw new Error(messages.invalidInput)

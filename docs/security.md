@@ -26,20 +26,25 @@ Configure one app-level confirmation handler so tools can use your modal or appr
 ```ts
 import { setConfirmationHandler } from '@vampaz/webmcp-kit'
 
-setConfirmationHandler(async function confirmTool(tool, input, reason) {
+setConfirmationHandler(async function confirmTool(tool, input, reason, context) {
   return showConfirmationModal({
     title: `Run ${tool.name}?`,
     body: reason,
-    preview: JSON.stringify(input, null, 2)
+    preview: JSON.stringify(input, null, 2),
+    signal: context?.signal
   })
 })
 ```
 
 WebMCP Kit enforces confirmation before execution in both fallback and native wrapper paths. If no handler is configured, browser runtimes fall back to `window.confirm()`.
 
+`showConfirmationModal()` is application code: resolve its promise with the user's decision and close it when the signal aborts. The [complete dialog example](./examples/counter-assistant.ts) handles cancellation and replacement approvals. Native declarative form submissions do not use the imperative wrapper; enforce approval in the form's actual submission handler as well.
+
 When a tool declares `outputSchema`, WebMCP Kit validates the returned value before reporting a successful invocation. Treat an `invalid_output` result as a tool implementation failure; do not pass that output to another tool or UI assertion.
 
 The internal `confirmed: true` invocation flag is only for code paths that already performed approval inside the trusted app boundary. Public bridges and test helpers must not accept caller-provided confirmation bypasses; they should rely on `setConfirmationHandler()` or the browser confirmation fallback.
+
+Approval does not freeze application state. The kit rechecks registration identity, schema, scope, and cancellation across asynchronous approval and guard boundaries. Server authorization must still use current state. Cancellation after an action starts does not guarantee rollback or prove that a failed response means the action failed.
 
 Chained planner output does not change this rule. A `tool_sequence` executes as individual tool invocations, so each mutating step still runs its own guard and confirmation check before execution. If the user rejects a confirmation or a guard blocks a step, the sequence stops and later steps do not run.
 
@@ -87,11 +92,16 @@ const unsubscribe = subscribeWebMCPKitEvents(function handleEvent(event) {
   console.log(event.type, event.toolName)
 })
 
+// Call during teardown:
 unsubscribe()
 ```
 
 Event payloads can include invocation details in `detail`, including tool inputs and outputs for invocation events. Treat event subscribers as trusted application code, and do not forward event details to analytics, logs, or third-party services without redaction.
 
-## Demo Admin Toggle
+## Conversation data and application identity
 
-The demo exposes planner provider/model controls when `localStorage.setItem('webmcp:admin', 'true')` is set. This is a **development-only convenience** and is trivially discoverable by any user with browser devtools access. Do not rely on this mechanism for production access control. In production, pass app-owned planner configuration to keep provider/model choices hidden from end users.
+Pi stores conversation data in origin-local IndexedDB, partitioned by explicit namespace, owner, and conversation IDs. `ownerId` is not authentication or encryption. Use the current application identity, destroy old controllers on account changes, and apply a retention policy. Keep secrets and hidden server values out of context, inputs, results, history, and diagnostics. See [operations](./operations.md#csp-endpoints-and-application-security) for storage, CSP, and worker boundaries.
+
+## Developer controls
+
+A browser local-storage toggle for provider controls is a development convenience, not access control. The in-repository lab configures LM Studio through server-side environment variables; its visible Presentation selector only changes chat layout. In production, supply app-owned planner configuration and enforce provider permissions on the server. Hiding a control does not authorize or protect the underlying endpoint.

@@ -2,6 +2,8 @@
 
 WebMCP Kit is a local-first TypeScript toolkit for exposing real web app actions as safe, typed WebMCP tools. It lets apps register narrow actions with schemas, guards, confirmations, and lifecycle cleanup, then progressively connects those tools to native browser WebMCP, local devtools, tests, and planner-driven demos.
 
+Developer documentation: [integration walkthrough](./docs/integration.md), [architecture and diagrams](./docs/architecture.md), [full API reference](./docs/api-reference.md), [runtime contracts](./docs/api-behavior.md), and [operations](./docs/operations.md). The [documentation index](./docs/README.md) links framework guides and runnable examples.
+
 ## Status
 
 This repository is an early MVP. Chrome WebMCP and Chrome built-in AI are emerging browser capabilities, so the kit is designed as progressive enhancement:
@@ -18,9 +20,22 @@ What is in this repo now:
 - Core tool registration, native WebMCP wrapping, fallback invocation, validation, confirmations, events, planners, and form helpers.
 - Optional Vue, React, and Svelte lifecycle helpers that delegate to core registration.
 - Devtools, Playwright helpers, and a local MCP-style bridge for development and testing.
+- A headless Pi conversation runtime, independent chat UI, and an in-repository Vite + Vue integration lab.
 - A separate Astro + Vue + Cloudflare demo app in [vampaz/web-mcp-demo](https://github.com/vampaz/web-mcp-demo) that exercises planner providers, Cloudflare Workers AI, and fallback behavior.
 
 The npm package name is `@vampaz/webmcp-kit`. Releases publish the compiled `dist` output to npm and GitHub Packages, then create a GitHub release tagged with the package version, when a new version reaches `master`.
+
+## Independent package surfaces
+
+The Pi and chat subpaths require version `0.2.0` or newer. Before that release reaches your registry, use the local lab or a verified tarball. See the [release procedure](./docs/operations.md#release-procedure).
+
+The package separates core (`@vampaz/webmcp-kit`), the headless [Pi harness](./docs/pi.md) (`/pi`), and the framework-neutral [chat UI](./docs/chat.md) (`/chat`). `/pi/worker` installs an application-compiled service worker. Pi peers are optional; core and chat with a supplied controller do not load them.
+
+Run the in-repository [local lab](./apps/demo/README.md) with `npm ci --ignore-scripts` and `npm run dev:demo`. It opens in Chat, with tabs ordered Chat, Harness, Core. Harness and Chat use a developer-selected LM Studio model. Ordinary browser fixtures and real-model checks are separate suites. Package fixtures consume an unpublished tarball with source aliases disabled.
+
+The library has no unconditional runtime npm dependencies. Framework, Zod, and Pi integrations declare optional peers; install the peers for the features your application uses. The same packages are development dependencies here so the repository can build and test every integration. See the [complete dependency map](./docs/getting-started.md#dependency-model).
+
+The existing standalone demo remains an independent consumer. Its later adoption follows the [integration guide](./docs/demo-integration.md). Extension/account work is a subsequent deliverable.
 
 ## How It Fits
 
@@ -213,14 +228,14 @@ confirmation: {
 - `invokeTool({ toolName, input, confirmed, signal })` invokes fallback-registered tools for devtools, tests, and demos. The optional `AbortSignal` is passed to the tool execution context.
 - `setConfirmationHandler(handler)` configures one global async confirmation provider for tools with `confirmation.required`; a per-tool `confirmation.handler` overrides it.
 - `createHostedOpenAIPlannerOption(config)` returns a ready-made planner option for the command input's `plannerOptions` list.
-- `listTools()` returns active registrations.
+- `listTools()` returns current registrations, including tools whose scope is unavailable.
 - `getRegistrySnapshot()` returns support mode, tool count, and registered tools.
 - `getIntegrationHealthReport()` returns developer-facing diagnostics for missing tools, weak schemas, missing confirmation handlers, unavailable tools, and planner status.
 - `assertWebMCPIntegration()` throws when the current integration has blocking errors.
 - `isWebMCPSupported()` checks for native WebMCP registration support.
 - `createBestPlanner()` uses Chrome built-in AI when available, otherwise a deterministic local planner.
 - `defineWebMCPCommandInput()` registers a ready-made `<webmcp-command-input>` web component for planner-driven commands.
-- `defineServerTool()` registers a browser-visible tool whose execution posts to an app-owned server endpoint.
+- `defineServerTool()` creates a tool definition whose execution posts to an app-owned server endpoint. Register it with `registerTool()` or a framework helper.
 - `validateToolPlan()` validates single-tool, chained, and planner-outcome plans before execution.
 - Tool outputs are validated against `outputSchema` before a successful invocation result is emitted.
 - `installWebMCPKitTestBridge()` exposes a kit-specific test bridge for Playwright and local QA.
@@ -291,24 +306,26 @@ Every invocation — from planners, devtools, tests, or the MCP bridge — runs 
 1. **Schema validation**: the input is validated against `inputSchema`. Failures return `status: 'error'`, `code: 'invalid_input'` before any tool code runs.
 2. **Scope**: `scope()` runs synchronously and answers "is this tool usable in the current app state?" Returning `{ available: false, reason }` yields `status: 'unavailable'`, `code: 'scope_unavailable'`.
 3. **Confirmation**: when `confirmation.required` is set and the invocation is not already confirmed, the per-tool `confirmation.handler` (or the global handler) is awaited. A denial yields `status: 'blocked'`, `code: 'confirmation_denied'`.
-4. **Guard**: `guard(input)` runs with the validated, typed input and answers "is this specific input acceptable right now?" It may be async. Returning `false` or a string reason yields `status: 'blocked'`, `code: 'guard_blocked'`; returning `true` (or anything else truthy) allows execution.
+4. **Guard**: `guard(input)` runs with the validated, typed input and answers "is this specific input acceptable right now?" It may be async. Returning `false` or any string yields `status: 'blocked'`, `code: 'guard_blocked'`; return `true` to allow execution.
 5. **Execute**: `execute(input, context)` runs. Thrown errors yield `status: 'error'`, `code: 'execution_failed'`. When the invocation carries an `AbortSignal`, it is available as `context.signal`.
 6. **Output validation**: when the tool declares `outputSchema`, the returned value is validated before success is reported. Failures return `status: 'error'`, `code: 'invalid_output'` without exposing the invalid value as a successful output.
 
 `ToolInvocationResult.code` distinguishes every non-success outcome:
 
-| code                  | status        | meaning                                     |
-| --------------------- | ------------- | ------------------------------------------- |
-| `invalid_input`       | `error`       | Input failed schema validation.             |
-| `scope_unavailable`   | `unavailable` | `scope()` reported the tool unavailable.    |
-| `scope_failed`        | `error`       | `scope()` threw.                            |
-| `confirmation_denied` | `blocked`     | The confirmation handler denied the action. |
-| `confirmation_failed` | `error`       | The confirmation handler threw.             |
-| `guard_blocked`       | `blocked`     | `guard()` rejected the input.               |
-| `guard_failed`        | `error`       | `guard()` threw.                            |
-| `execution_failed`    | `error`       | `execute()` threw.                          |
-| `invalid_output`      | `error`       | Output failed schema validation.            |
-| `not_registered`      | `error`       | No tool with that name is registered.       |
+| code                  | status        | meaning                                                            |
+| --------------------- | ------------- | ------------------------------------------------------------------ |
+| `invalid_input`       | `error`       | Input failed schema validation.                                    |
+| `cancelled`           | `error`       | Cancellation was observed before execution.                        |
+| `tool_changed`        | `unavailable` | Registration or schema changed while awaiting approval or a guard. |
+| `scope_unavailable`   | `unavailable` | `scope()` reported the tool unavailable.                           |
+| `scope_failed`        | `error`       | `scope()` threw.                                                   |
+| `confirmation_denied` | `blocked`     | The confirmation handler denied the action.                        |
+| `confirmation_failed` | `error`       | The confirmation handler threw.                                    |
+| `guard_blocked`       | `blocked`     | `guard()` rejected the input.                                      |
+| `guard_failed`        | `error`       | `guard()` threw.                                                   |
+| `execution_failed`    | `error`       | `execute()` threw.                                                 |
+| `invalid_output`      | `error`       | Output failed schema validation.                                   |
+| `not_registered`      | `error`       | No tool with that name is registered.                              |
 
 ## Server Tool Wire Format
 
@@ -436,9 +453,7 @@ await createWebMCPKit({
 
 See [Planner Providers](./docs/planner-providers.md) for OpenRouter, OpenAI, OpenAI-compatible, Cloudflare Workers AI, Chrome built-in AI, and local fallback examples.
 
-The demo also exposes `cloudflare-binding` in local, preview, and production deployments: a server-endpoint-only mode where the browser selects from approved Cloudflare Workers AI models and the Astro Cloudflare runtime endpoint uses an `AI` binding.
-
-In production, the demo keeps planner controls hidden by default. To temporarily expose the provider/model controls in a browser, set `localStorage.setItem('webmcp:admin', 'true')` and reload the page.
+The `cloudflare-binding` provider requires an application-owned server endpoint backed by an `AI` binding. The separate [Astro/Cloudflare demo](https://github.com/vampaz/web-mcp-demo) owns its provider selection, permissions, and deployment setup. The local package lab uses LM Studio instead.
 
 ## Ready-Made Command Input
 
@@ -496,7 +511,7 @@ input.configure({
 })
 ```
 
-The demo follows this server-endpoint pattern in dev mode and passes an app-owned planner option for its demo-specific deterministic planner. Preview and production can pass the app-owned planner/provider/model to keep those choices hidden from end users. If the consumer provides only one option and Chrome AI is hidden or unavailable, the options panel is not rendered.
+Applications can pass an app-owned planner/provider/model to fix those choices and hide the corresponding controls. The options panel is hidden when neither the provider nor the model control offers a choice. A single planner option can still expose a model selector when it supplies multiple models. The local lab demonstrates the separate chat component and configures its model through server-side environment variables.
 
 For app-owned planner objects, pass `plannerOptions`. Use `initialPlannerOptionId` and `initialModel` to set development defaults without fixing the provider for users. When a planner option exposes `modelOptions`, the selected model option is passed to `createPlanner({ model, modelOption })`, so app-owned planners can attach metadata such as context-window size without adding provider-specific fields to core.
 
@@ -603,15 +618,19 @@ The test bridge does not accept caller-provided confirmation bypasses. Confirmed
 
 ## Demo App
 
-The standalone demo lives in [vampaz/web-mcp-demo](https://github.com/vampaz/web-mcp-demo). For side-by-side local development, clone it next to this repository so its `@vampaz/webmcp-kit` dependency can resolve from `file:../web-mcp`.
+The standalone demo lives in [vampaz/web-mcp-demo](https://github.com/vampaz/web-mcp-demo). Follow that repository's setup when working on it. The in-repository [local lab](./apps/demo/README.md) runs independently and does not need a sibling checkout. Verify integrations against the packed artifact before release.
 
 That repo owns the Astro app, Cloudflare Worker config, Workers AI binding, and e2e demo coverage.
 
 ## Development
 
 ```sh
+npm ci --ignore-scripts
+npm run dev:demo
 npm run test
-npm exec tsc -- --noEmit
+npm run typecheck
+npm run typecheck:demo
+npm run docs:api:check
 ```
 
-Production builds are intentionally not part of the normal verification loop yet.
+Open the TLS plugin's advertised HTTPS URL for the lab. Use tests and typechecks during ordinary implementation. Packaging verification uses one build, pack, and consumer-test pass after the source and documentation are ready; see [operations](./docs/operations.md#validation-in-this-repository) for the full commands.

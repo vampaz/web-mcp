@@ -2,6 +2,8 @@
 
 WebMCP Kit can plan tool calls with different model providers. The app still owns tools, schemas, guards, confirmations, and execution. Providers choose which registered tool to call and which JSON input to pass. For requests that need multiple app actions, providers can return a short ordered `tool_sequence`; for requests that cannot run, they can return `needs_clarification` or `no_tools_match`.
 
+Sequences belong to the command-input contract. The [Pi harness](./pi.md) requests one next action and replans after actual results. Model identifiers below are examples; choose models allowed and tested by your endpoint. They are not a claim of current provider availability or pricing.
+
 ## Production: Server Mode
 
 Use server mode when the key belongs to the app or company.
@@ -22,6 +24,51 @@ const kit = await createWebMCPKit({
 ```
 
 The browser sends the planning request to `endpoint`. The server or Worker stores the provider secret and calls OpenRouter, OpenAI, Cloudflare Workers AI, or another provider. This is the right mode for public apps and SaaS products.
+
+### Server request and response contract
+
+`createRemotePlanner()` with `auth.mode: 'server'` sends a JSON POST with the following shape. This interface describes the wire format; it is not an exported kit interface.
+
+```ts
+import type { JsonSchema, PlannerContext, PlannerProviderKind } from '@vampaz/webmcp-kit'
+
+interface PlannerEndpointRequest {
+  provider: PlannerProviderKind
+  model: string
+  message: string
+  tools: Array<{ name: string; description: string; inputSchema: JsonSchema }>
+  context: PlannerContext
+  responseSchema: JsonSchema
+  singleStep?: true
+}
+```
+
+The client sends `Content-Type: application/json` and forwards cancellation to `fetch()`. This factory does not add a bearer token or a custom credentials option. Prefer a same-origin endpoint that uses the application's existing session and request protections. A cross-origin deployment must deliberately implement the required CORS and authentication policy.
+
+On success, return a JSON `ToolPlan` directly, not an OpenAI completion envelope or `{ plan: ... }` wrapper. Use a non-2xx status for failure; a JSON `{ "error": "User-safe explanation" }` body supplies an error message. The client validates the plan against the offered tools before execution.
+
+The endpoint must authenticate and authorize the caller, bound and validate the request body, restrict provider/model selection, enforce quotas, and keep provider credentials on the server. Treat schemas, tool descriptions, context, and messages as untrusted input. Tool descriptions are planning data, not instructions to bypass server policy. The endpoint plans; it does not execute application tools.
+
+Use the supplied `responseSchema` as the output contract and validate the model result. For ordinary commands, the contract permits one action, a sequence of 1–5 actions, or a non-executing outcome. With `singleStep: true`, return exactly one action or outcome; `steps` and `tool_sequence` are invalid. Do not infer the result of an action the application has not run.
+
+For Pi, the catalog includes `pi_reply` with a text input schema. It is the runtime's reply operation, not an application mutation. Return it only when it is offered and use actual context/results to compose the answer. `needs_clarification` and `no_tools_match` become assistant text using their `reason` field.
+
+```json
+{
+  "toolName": "pi_reply",
+  "input": { "text": "The counter is now 7." },
+  "confidence": 1,
+  "reason": "The completed read returned 7."
+}
+```
+
+Pi supplies fresh application context and a bounded conversation transcript. Preserve that information when building the model prompt. The kit limits the browser's serialized request; the server must separately bound its own added prompt, model context window, response size, and execution time. Do not silently retry with another provider when the selected provider fails.
+
+### Hosted publishable-key mode
+
+`createHostedOpenAIPlanner()` uses a separate session contract. It sends `{ accessKey, model, serviceId: 'hosted-openai-planner', turnstileToken? }` to `sessionEndpoint`, expecting `{ token, tokenType: 'Bearer', expiresAt }`. It then sends the planning body above to `endpoint` with `Authorization: Bearer <token>`. Sessions refresh when fewer than 30 seconds remain; a 403 clears the cached session for a later request, without replaying the failed plan automatically.
+
+By default, `baseUrl` supplies `/api/webmcp/session` and `/api/webmcp/plan`; explicit endpoint options override those paths. `browserChallengeSiteKey`, the `webmcp-turnstile-site-key` meta tag, or an application `window.webmcpCreateTurnstileToken` callback can supply challenge setup. The hosted server must support this protocol and the same single-step contract. A publishable access key is distinct from a provider secret. See the [API reference](./api-reference.md#hostedopenaiplanneroptions) for the factory's exact options.
 
 ## Simple Experiments: User-Key Mode
 
@@ -77,14 +124,13 @@ await createWebMCPKit({
   planner: {
     provider: 'openai-compatible',
     model: 'qwen-coder',
-    baseUrl: 'http://localhost:1234/v1',
-    auth: {
-      mode: 'user-key',
-      apiKey: localEndpointKey
-    }
+    baseUrl: '/local-model/v1',
+    auth: { mode: 'none' }
   }
 })
 ```
+
+The application must implement `/local-model/v1` as a same-origin HTTPS proxy to the intended model service. Open the development domain advertised by the TLS plugin. The browser must not use a separate HTTP model origin. Configure authentication on the proxy when needed and keep shared provider secrets there.
 
 Cloudflare Workers AI through the Astro Cloudflare adapter binding:
 
@@ -101,41 +147,7 @@ await createWebMCPKit({
 })
 ```
 
-The demo includes `/api/webmcp/plan` for server planning. For `provider: 'cloudflare-binding'`, it uses the Astro Cloudflare adapter and expects a Cloudflare runtime with `env.AI`. For `provider: 'openrouter'`, it uses `OPENROUTER_API_KEY` from the server environment when OpenRouter is selected.
-For `provider: 'openai'`, it uses `OPENAI_API_KEY` from the server environment when OpenAI is selected.
-
-For local development, keep Wrangler authentication in an ignored project `.env` file instead of relying on the global interactive OAuth refresh token:
-
-```sh
-cp .env.example .env
-```
-
-Then fill in `CLOUDFLARE_API_TOKEN`. `CLOUDFLARE_ACCOUNT_ID` is already present in the demo repo's `.env.example`. Add `OPENAI_API_KEY` or `OPENROUTER_API_KEY` only if you want to use those provider modes. This keeps `npm run dev` and remote AI bindings on stable project-local credentials while avoiding committed secrets.
-
-Keep `.dev.vars` for Worker runtime values only. Do not put `CLOUDFLARE_API_TOKEN` there; Wrangler reads system authentication from the process environment / `.env`, while `.dev.vars` is loaded into the local Worker runtime.
-
-Cloudflare binding mode for local development and preview deployments:
-
-```ts
-await createWebMCPKit({
-  planner: {
-    provider: 'cloudflare-binding',
-    model: '@cf/zai-org/glm-4.7-flash',
-    auth: {
-      mode: 'server',
-      endpoint: '/api/webmcp/plan'
-    }
-  }
-})
-```
-
-This mode is intentionally endpoint-only. The browser never receives a Cloudflare token; it sends the selected model and planning payload to the app endpoint. The standalone demo app is configured with `@astrojs/cloudflare` and `wrangler.toml`; `wrangler.toml` uses the Astro Cloudflare adapter entrypoint, declares the `AI` binding with `remote = true`, and Astro enables remote bindings by default, so local development, preview deployments, and production deployments use the real Cloudflare Workers AI binding.
-
-For local binding mode, start the dev server normally:
-
-```sh
-npm run dev
-```
+Cloudflare binding mode is endpoint-only. The application implements the endpoint with its server-side binding and the request contract above. The kit does not deploy a server, create a binding, or configure credentials. For the separate Astro/Cloudflare demo's setup, follow that [repository's instructions](https://github.com/vampaz/web-mcp-demo). The in-repository Vite lab uses its own local-model proxy and [configuration](../apps/demo/README.md).
 
 When a provider is explicitly selected, WebMCP Kit uses that provider. It does not silently switch the command to deterministic local planning.
 
@@ -169,7 +181,7 @@ commandInput.configure({
 })
 ```
 
-In local development, omit fixed `provider` and `model` values and pass the endpoint options your app supports if you want the command input to expose planner controls. If the app passes only one endpoint option, the options panel stays hidden because there is nothing to choose.
+In local development, omit fixed `provider` and `model` values and pass the endpoint options your app supports if you want the command input to expose planner controls. With only one endpoint option and no additional planner options, the panel stays hidden when Chrome AI is hidden or unavailable. Available Chrome AI adds another choice unless `showChromeAI` is false.
 
 ```ts
 commandInput.configure({
@@ -252,7 +264,7 @@ The command input passes the selected `{ model, modelOption }` into `createPlann
 
 For preview or production, pass the selected planner config when the app should own those choices and hide them from users.
 
-The Cloudflare binding default is `@cf/zai-org/glm-4.7-flash` because it returned reliable JSON plans in the demo acceptance checks while keeping the local binding flow fast. The server endpoint first asks for JSON output, then retries without `response_format` when a Workers AI model rejects that option.
+The library's configured Cloudflare binding default is `@cf/zai-org/glm-4.7-flash`; the application server must still allow and support that model. Provider-specific output-format support and any retry policy belong to that server. They are not supplied by the kit's endpoint client.
 
 ## Custom App Planners
 
@@ -265,7 +277,7 @@ commandInput.configure({
 })
 ```
 
-This is the right shape for app-owned experiments such as the demo's browser-local WebLLM planner. The kit receives a `ToolPlanner`; the app owns the model dependency, loading policy, browser requirements, and prompt strategy.
+This is the shape for an app-owned browser-local planner, including a WebLLM integration. The kit receives a `ToolPlanner`; the app owns the model dependency, loading policy, browser requirements, and prompt strategy. The local lab's configured planner uses its LM Studio proxy.
 
 ## Tool Sequences
 
@@ -335,40 +347,7 @@ Outcome rules:
 - `no_tools_match` returns an unavailable result from the command input.
 - `tool_sequence`, `needs_clarification`, and `no_tools_match` are reserved tool names.
 
-The handler shape is:
-
-```ts
-interface Env {
-  AI: Ai
-}
-
-export default {
-  async fetch(request: Request, env: Env) {
-    const body = (await request.json()) as {
-      model: string
-      message: string
-      tools: unknown[]
-      context: unknown
-    }
-
-    const result = await env.AI.run(body.model, {
-      messages: [
-        {
-          role: 'system',
-          content: 'Return only a JSON WebMCP tool plan.'
-        },
-        {
-          role: 'user',
-          content: JSON.stringify(body)
-        }
-      ],
-      temperature: 0
-    })
-
-    return Response.json(JSON.parse(result.response))
-  }
-}
-```
+Implement the endpoint's authentication, validation, model policy, and response contract described in [server mode](#server-request-and-response-contract). A raw `request.json()` cast followed by an unrestricted model call is not a complete server integration.
 
 ## Devtools Selection
 

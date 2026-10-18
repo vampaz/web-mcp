@@ -10,7 +10,8 @@ import type {
   WebMCPCommandInputPlannerOption
 } from './interfaces/command-input'
 import { getErrorMessage } from './confirmation'
-import { toolPlanSchema, validateToolPlan } from './plan-validation'
+import { createToolPlanSchema, validateToolPlan } from './plan-validation'
+import { serializePlannerRequest } from './planner-request'
 
 export interface HostedOpenAIPlannerOptions {
   accessKey?: string
@@ -89,6 +90,7 @@ export function createHostedOpenAIPlanner(rawOptions: HostedOpenAIPlannerOptions
   let paidAccessSession: PaidAccessSession | null = null
 
   return {
+    capabilities: { conversation: true },
     available: true,
     detail: 'Hosted OpenAI will plan through the WebMCP paid endpoint.',
     name: 'Hosted OpenAI',
@@ -99,13 +101,23 @@ export function createHostedOpenAIPlanner(rawOptions: HostedOpenAIPlannerOptions
       context: PlannerContext = {},
       runOptions?: PlannerRunOptions
     ) {
+      const body = serializePlannerRequest(
+        {
+          context,
+          message,
+          model: options.model,
+          provider: 'openai',
+          responseSchema: createToolPlanSchema(tools, runOptions?.singleStep),
+          ...(runOptions?.singleStep ? { singleStep: true } : {}),
+          tools: createHostedToolCatalog(tools)
+        },
+        runOptions?.maxRequestBytes
+      )
       paidAccessSession = await getPaidAccessSession(options, paidAccessSession, runOptions?.signal)
       const response = await requestHostedPlan({
-        context,
-        message,
+        body,
         options,
         signal: runOptions?.signal,
-        tools,
         token: paidAccessSession.token
       })
 
@@ -118,7 +130,7 @@ export function createHostedOpenAIPlanner(rawOptions: HostedOpenAIPlannerOptions
       }
 
       const plan = (await response.json()) as ToolPlan
-      validateToolPlan(plan, tools)
+      validateToolPlan(plan, tools, { singleStep: runOptions?.singleStep })
       return plan
     }
   }
@@ -189,22 +201,13 @@ function resolveHostedEndpoint(
 }
 
 async function requestHostedPlan(input: {
-  context: PlannerContext
-  message: string
+  body: string
   options: ResolvedHostedOpenAIPlannerOptions
   signal?: AbortSignal
   token: string
-  tools: WebMCPTool[]
 }): Promise<Response> {
   return fetch(input.options.endpoint, {
-    body: JSON.stringify({
-      context: input.context,
-      message: input.message,
-      model: input.options.model,
-      provider: 'openai',
-      responseSchema: toolPlanSchema,
-      tools: createHostedToolCatalog(input.tools)
-    }),
+    body: input.body,
     headers: {
       Authorization: `Bearer ${input.token}`,
       'Content-Type': 'application/json'

@@ -1,0 +1,397 @@
+import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context'
+import { Type } from '@earendil-works/pi-ai'
+import { createRegistry, defineExtension, defineTool, Harness } from '@earendil-works/pi-durable'
+import type { Conversation, ConversationWatch, ConversationView } from '@earendil-works/pi-durable'
+import type {
+  PiController,
+  PiError,
+  PiRuntimeOptions,
+  PiSnapshot,
+  PiTurnOutcome
+} from './interfaces/controller'
+import { abortable, jsonBytes, piError, PiFailure } from './errors'
+import { createPiModels, piModel } from './model-adapter'
+import { planPiRound } from './planner-adapter'
+import { normalizeMessages, lastTurnState } from './recovery'
+import type { PiToolCatalog } from './interfaces/host'
+import { piSessionKey, resolvePiLimits } from './session'
+import { clearPiStorage, openPiStorage } from './storage'
+
+const context = BACKGROUND_CONTEXT
+
+export async function openRuntime(options: PiRuntimeOptions): Promise<PiController> {
+  const key = piSessionKey(options.session)
+  const limits = resolvePiLimits(options.limits)
+  if (typeof indexedDB === 'undefined' || typeof navigator === 'undefined' || !navigator.locks)
+    throw new PiFailure(
+      'unsupported',
+      'Durable chat requires IndexedDB and Web Locks in a secure browser context.'
+    )
+  let snapshot: PiSnapshot = { state: 'loading', messages: [] }
+  const listeners = new Set<(snapshot: PiSnapshot) => void>()
+  let controller: AbortController | undefined
+  let active: Promise<PiTurnOutcome> | undefined
+  let closed = false
+  let clearing = false
+  let clearOperation: Promise<void> | undefined
+
+  function publish(next: PiSnapshot) {
+    snapshot = structuredClone(next)
+    for (const listener of listeners) {
+      try {
+        listener(structuredClone(snapshot))
+      } catch {
+        /* A subscriber cannot interrupt persistence. */
+      }
+    }
+  }
+
+  async function withLock<T>(operation: () => Promise<T>): Promise<T> {
+    return navigator.locks.request(key, { ifAvailable: true }, async function locked(lock) {
+      if (!lock)
+        throw new PiFailure(
+          'conversation_busy',
+          'This conversation is open in an active operation. Wait for the other chat to finish.'
+        )
+      return operation()
+    })
+  }
+
+  async function run(text?: string, signal = new AbortController().signal): Promise<PiTurnOutcome> {
+    let harness: Harness | undefined
+    let conversation: Conversation | undefined
+    let watch: ConversationWatch | undefined
+    let accepting = false
+    let failure: PiError | undefined
+    let interrupted = false
+    let aborting: Promise<void> | undefined
+    let toolCalls = 0
+    function abort() {
+      accepting = false
+      aborting ??= conversation?.abort(context)
+    }
+    try {
+      return await withLock(async function operate() {
+        try {
+          signal.throwIfAborted()
+          let catalog = await abortable(options.host.discover(signal), signal)
+          const registry = createRegistry()
+          function installCatalog(roundCatalog: PiToolCatalog) {
+            registry.install(
+              defineExtension({
+                name: 'webmcp-kit',
+                tools: roundCatalog.tools.map(function adapt(tool) {
+                  return defineTool({
+                    name: tool.name,
+                    description: tool.description,
+                    parameters: Type.Unsafe<Record<string, unknown>>(tool.inputSchema),
+                    replay: 'unsafe',
+                    async execute(input, _api, execution) {
+                      try {
+                        if (!accepting)
+                          throw new PiFailure('stale_document', 'The turn is no longer active.')
+                        if (++toolCalls > limits.maxToolCalls)
+                          throw new PiFailure(
+                            'limit_reached',
+                            'This turn reached its tool limit. Send a new request to continue.'
+                          )
+                        const currentSignal = AbortSignal.any([
+                          signal,
+                          ...(execution.abortSignal ? [execution.abortSignal] : [])
+                        ])
+                        const current = await abortable(
+                          options.host.discover(currentSignal),
+                          currentSignal
+                        )
+                        if (current.revision !== roundCatalog.revision)
+                          throw new PiFailure(
+                            'stale_document',
+                            'The tool catalog changed. Send a new request.'
+                          )
+                        const result = await abortable(
+                          options.host.invoke(
+                            { name: tool.name, input, revision: roundCatalog.revision },
+                            currentSignal
+                          ),
+                          currentSignal
+                        )
+                        if (
+                          !result ||
+                          result.toolName !== tool.name ||
+                          !['success', 'error', 'blocked', 'unavailable'].includes(result.status)
+                        )
+                          throw new PiFailure(
+                            'tool_failed',
+                            'The tool returned an invalid outcome. Check application state before continuing.'
+                          )
+                        if (jsonBytes(result) > limits.maxRequestBytes)
+                          throw new PiFailure(
+                            'limit_reached',
+                            'The tool result exceeds the request budget. The action may have completed; check application state.'
+                          )
+                        if (result.status !== 'success')
+                          failure = {
+                            code:
+                              result.code === 'confirmation_denied'
+                                ? 'action_denied'
+                                : 'tool_failed',
+                            message: result.error ?? 'The action did not succeed.'
+                          }
+                        else {
+                          // Pi captures its offered tools before the next model request.
+                          try {
+                            const next = await abortable(
+                              options.host.discover(currentSignal),
+                              currentSignal
+                            )
+                            if (next.revision !== catalog.revision) {
+                              installCatalog(next)
+                              catalog = next
+                            }
+                          } catch (error) {
+                            // Preserve the known action result even when discovering its next context fails.
+                            failure = piError(error, 'tool_failed')
+                          }
+                        }
+                        return {
+                          output: [{ type: 'text' as const, text: JSON.stringify(result) }],
+                          isError: result.status !== 'success',
+                          ...(failure ? { control: { terminate: true as const } } : {})
+                        }
+                      } catch (error) {
+                        failure = piError(error, 'tool_failed')
+                        return {
+                          output: [{ type: 'text' as const, text: failure.message }],
+                          isError: true,
+                          control: { terminate: true as const }
+                        }
+                      }
+                    }
+                  })
+                })
+              })
+            )
+          }
+          installCatalog(catalog)
+          const models = createPiModels(async function plan(messages, requestSignal) {
+            if (!accepting)
+              throw new PiFailure(
+                'stale_document',
+                'An interrupted turn cannot request another action.'
+              )
+            const currentSignal = AbortSignal.any([
+              signal,
+              ...(requestSignal ? [requestSignal] : [])
+            ])
+            try {
+              const current = await abortable(options.host.discover(currentSignal), currentSignal)
+              if (current.revision !== catalog.revision)
+                throw new PiFailure(
+                  'stale_document',
+                  'The tool catalog changed. Send a new request.'
+                )
+              return await planPiRound(
+                options.planner,
+                messages,
+                current.tools,
+                await abortable(options.host.context(currentSignal), currentSignal),
+                currentSignal,
+                limits.maxRequestBytes
+              )
+            } catch (error) {
+              failure = piError(error)
+              throw error
+            }
+          })
+          const storage = await openPiStorage(key, limits.maxHistoryBytes)
+          try {
+            harness = await Harness.open(
+              storage,
+              {
+                models,
+                registry,
+                settings: {
+                  toolExecution: 'sequential',
+                  retry: { enabled: false },
+                  compaction: { enabled: false },
+                  stream: { timeoutMs: 120000, maxRetries: 0 }
+                }
+              },
+              context
+            )
+          } catch (error) {
+            await storage.close(context)
+            throw error
+          }
+          conversation = await harness.root(context, {
+            agent: {
+              model: piModel,
+              thinkingLevel: 'off',
+              instructions:
+                'Assist using current application tools and context. Replan after each result. Never replay abandoned actions. Application validation and approval are authoritative.'
+            }
+          })
+          watch = await conversation.watch(context)
+          const previousTurn = lastTurnState(watch.value)
+          interrupted = previousTurn === 'started' || previousTurn === 'interrupted'
+          await watch.stop()
+          watch = undefined
+          // Abort before enabling any planner or page request on recovery.
+          await conversation.abort(context)
+          if (previousTurn === 'started')
+            await conversation.submit(
+              { type: 'write', entry: { kind: 'webmcp.turn.interrupted' } },
+              context
+            )
+          signal.addEventListener('abort', abort, { once: true })
+          watch = await conversation.watch(context)
+          function update(view: ConversationView) {
+            publish({
+              state: signal.aborted
+                ? 'stopping'
+                : text !== undefined
+                  ? 'running'
+                  : interrupted
+                    ? 'interrupted'
+                    : 'idle',
+              messages: normalizeMessages(view)
+            })
+          }
+          update(watch.value)
+          watch.start(async function changed(view) {
+            update(view)
+          })
+          if (text !== undefined) {
+            signal.throwIfAborted()
+            await conversation.submit(
+              { type: 'write', entry: { kind: 'webmcp.turn.started' } },
+              context
+            )
+            accepting = true
+            const submission = await conversation.submit(
+              { type: 'input', content: text, requestId: crypto.randomUUID(), whenBusy: 'reject' },
+              context
+            )
+            await submission.wait(context)
+            accepting = false
+            await aborting
+            await conversation.submit(
+              {
+                type: 'write',
+                entry: { kind: signal.aborted ? 'webmcp.turn.interrupted' : 'webmcp.turn.finished' }
+              },
+              context
+            )
+          }
+          await watch.stop()
+          watch = undefined
+          const current = await conversation.watch(context)
+          const messages = normalizeMessages(current.value)
+          await current.stop()
+          const wasInterrupted = signal.aborted || (text === undefined && interrupted)
+          publish({
+            state: wasInterrupted ? 'interrupted' : failure ? 'error' : 'idle',
+            messages,
+            ...(failure && !signal.aborted ? { error: failure } : {})
+          })
+          return {
+            status: wasInterrupted ? 'interrupted' : failure ? 'error' : 'completed',
+            ...(failure && !signal.aborted ? { error: failure } : {})
+          }
+        } finally {
+          accepting = false
+          signal.removeEventListener('abort', abort)
+          try {
+            await aborting
+            await watch?.stop()
+          } finally {
+            await harness?.close(context)
+          }
+        }
+      })
+    } catch (error) {
+      const outcome: PiTurnOutcome = signal.aborted
+        ? { status: 'interrupted' }
+        : { status: 'error', error: piError(error, 'storage_failed') }
+      publish({
+        ...snapshot,
+        state: signal.aborted ? 'interrupted' : 'error',
+        error: outcome.error
+      })
+      return outcome
+    }
+  }
+
+  const api: PiController = {
+    getSnapshot() {
+      return structuredClone(snapshot)
+    },
+    subscribe(listener) {
+      listeners.add(listener)
+      listener(structuredClone(snapshot))
+      return function unsubscribe() {
+        listeners.delete(listener)
+      }
+    },
+    async send(text) {
+      if (closed || active || clearing)
+        return {
+          status: 'error',
+          error: {
+            code: 'conversation_busy',
+            message: closed
+              ? 'This conversation has closed.'
+              : 'Wait for the current operation to finish.'
+          }
+        }
+      if (typeof text !== 'string' || !text.trim() || text.length > 16000)
+        return {
+          status: 'error',
+          error: { code: 'configuration', message: 'Enter a message of 1–16000 characters.' }
+        }
+      controller = new AbortController()
+      active = run(text.trim(), controller.signal)
+      publish({ ...snapshot, state: 'running', error: undefined })
+      try {
+        return await active
+      } finally {
+        active = undefined
+        controller = undefined
+      }
+    },
+    async stop() {
+      if (!active) return
+      publish({ ...snapshot, state: 'stopping' })
+      controller?.abort()
+      await active
+    },
+    async clear() {
+      if (closed || active || clearing)
+        throw new PiFailure('conversation_busy', 'Stop the current turn before clearing chat.')
+      clearing = true
+      clearOperation = withLock(function clear() {
+        return clearPiStorage(key)
+      })
+      try {
+        await clearOperation
+        publish({ state: 'idle', messages: [] })
+      } catch (error) {
+        publish({ ...snapshot, state: 'error', error: piError(error, 'storage_failed') })
+        throw error
+      } finally {
+        clearing = false
+        clearOperation = undefined
+      }
+    },
+    async destroy() {
+      if (closed) return
+      closed = true
+      await api.stop()
+      await clearOperation?.catch(function settled() {})
+      publish({ ...snapshot, state: 'closed' })
+      listeners.clear()
+    }
+  }
+  await run()
+  return api
+}

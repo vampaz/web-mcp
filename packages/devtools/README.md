@@ -7,5 +7,6 @@ import { mountDevtoolsOverlay } from '@vampaz/webmcp-kit/devtools'
 
 const devtools = mountDevtoolsOverlay({ initiallyOpen: true })
 
+// Call during teardown:
 devtools.destroy()
 ```

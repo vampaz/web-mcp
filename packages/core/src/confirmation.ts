@@ -21,14 +21,17 @@ export function getConfirmationHandler(): ConfirmationHandler | undefined {
 
 export async function requestToolConfirmation(
   tool: ConfirmationTool,
-  input: unknown
+  input: unknown,
+  signal?: AbortSignal
 ): Promise<boolean> {
   const reason = tool.confirmation?.reason ?? 'Confirm this action?'
   const handler = tool.confirmation?.handler ?? confirmationHandler
 
   if (handler) {
     try {
-      return await handler(tool, input, reason)
+      return await (signal
+        ? handler(tool, input, reason, { signal })
+        : handler(tool, input, reason))
     } catch (error) {
       throw new Error(`Confirmation handler failed: ${getErrorMessage(error)}`)
     }

@@ -36,7 +36,8 @@ export interface ConfirmationTool {
 export type ConfirmationHandler = (
   tool: ConfirmationTool,
   input: unknown,
-  reason: string
+  reason: string,
+  context?: { signal: AbortSignal }
 ) => boolean | Promise<boolean>
 
 export interface ToolConfirmation {
@@ -129,6 +130,8 @@ export interface ToolInvocation<TInput = Record<string, unknown>> {
 }
 
 export type ToolInvocationErrorCode =
+  | 'cancelled'
+  | 'tool_changed'
   | 'confirmation_denied'
   | 'confirmation_failed'
   | 'execution_failed'
@@ -188,6 +191,10 @@ export interface PlannerProviderConfig {
   model?: string
   baseUrl?: string
   auth?: PlannerAuth
+  responseFormat?: 'json_object' | 'json_schema'
+  maxTokens?: number
+  temperature?: number
+  reasoningEffort?: 'none' | 'low' | 'medium' | 'high'
 }
 
 export interface PlannerRequest {
@@ -198,9 +205,13 @@ export interface PlannerRequest {
 
 export interface PlannerRunOptions {
   signal?: AbortSignal
+  singleStep?: boolean
+  /** Maximum UTF-8 bytes in the serialized planner request, including prompt/schema overhead. */
+  maxRequestBytes?: number
 }
 
 export interface ToolPlanner {
+  capabilities?: { conversation: boolean }
   name: string
   available: boolean
   status: 'ready' | 'downloadable' | 'downloading' | 'unavailable' | 'fallback' | 'needs-key'

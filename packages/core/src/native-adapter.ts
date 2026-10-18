@@ -21,6 +21,7 @@ export function registerNativeTool<TInput = Record<string, unknown>, TOutput = u
   if (!registerTool) return undefined
 
   const abortController = new AbortController()
+  let active = true
 
   try {
     const returnedHandle = registerTool.call(
@@ -30,9 +31,13 @@ export function registerNativeTool<TInput = Record<string, unknown>, TOutput = u
         description: tool.description,
         inputSchema: tool.inputSchema,
         annotations: tool.annotations,
-        async execute(input: TInput) {
+        async execute(input: TInput, options?: { signal?: AbortSignal }) {
           const result = await invokeToolPipeline(tool, {
             input,
+            signal: options?.signal,
+            isCurrent() {
+              return active
+            },
             source: 'native'
           })
           if (result.status !== 'success') {
@@ -45,7 +50,6 @@ export function registerNativeTool<TInput = Record<string, unknown>, TOutput = u
       { signal: abortController.signal }
     ) as NativeRegistrationHandle | Promise<NativeRegistrationHandle | undefined> | undefined
     let handle = isPromiseLike(returnedHandle) ? undefined : returnedHandle
-    let active = true
     const ready = isPromiseLike(returnedHandle)
       ? Promise.resolve(returnedHandle)
           .then(function storeNativeHandle(resolvedHandle) {

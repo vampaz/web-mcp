@@ -1,0 +1,44 @@
+name: checks
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm run typecheck:demo
+      - run: npm run docs:api:check
+      - run: npm run test
+      - run: npm exec playwright -- install --with-deps chromium firefox webkit
+      - name: Prepare trusted TLS on this disposable runner
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcap2-bin libnss3-tools openssl
+          sudo setcap cap_net_bind_service=+ep "$(readlink -f "$(command -v node)")"
+          node --experimental-strip-types scripts/setup-test-tls.ts
+      - run: npm run test:e2e
+      - run: npm run build
+      - run: npm run pack:package
+      - run: npm run test:package
+      - name: Stop test TLS proxy
+        if: always()
+        run: npm exec -- vite-local-tls proxy stop
+      - uses: actions/upload-artifact@v7
+        with:
+          name: webmcp-kit-package
+          path: artifacts/webmcp-kit.*
+          if-no-files-found: error

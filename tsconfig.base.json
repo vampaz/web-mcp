@@ -13,6 +13,7 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
+      "@/*": ["apps/demo/src/*"],
       "@vampaz/webmcp-kit": ["packages/core/src/index.ts"],
       "@vampaz/webmcp-kit/devtools": ["packages/devtools/src/index.ts"],
       "@vampaz/webmcp-kit/mcp-bridge": ["packages/mcp-bridge/src/index.ts"],
@@ -21,7 +22,10 @@
       "@vampaz/webmcp-kit/testing": ["packages/testing/src/index.ts"],
       "@vampaz/webmcp-kit/testing/playwright": ["packages/testing/src/playwright.ts"],
       "@vampaz/webmcp-kit/vue": ["packages/vue/src/index.ts"],
-      "@vampaz/webmcp-kit/zod": ["packages/zod/src/index.ts"]
+      "@vampaz/webmcp-kit/zod": ["packages/zod/src/index.ts"],
+      "@vampaz/webmcp-kit/pi": ["packages/pi/src/index.ts"],
+      "@vampaz/webmcp-kit/pi/worker": ["packages/pi/src/worker.ts"],
+      "@vampaz/webmcp-kit/chat": ["packages/chat/src/index.ts"]
     }
   }
 }

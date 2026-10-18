@@ -28,6 +28,100 @@ describe('planner', () => {
     vi.unstubAllGlobals()
   })
 
+  it('constrains and validates a single-step request without changing bounded Planner mode', async function test() {
+    const fetch = vi.fn(async function respond(
+      _url: string | URL | Request,
+      _options?: RequestInit
+    ) {
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  toolName: 'tool_sequence',
+                  input: {},
+                  confidence: 1,
+                  reason: 'Batch',
+                  steps: [{ toolName: 'read_value', input: {}, confidence: 1, reason: 'Read' }]
+                })
+              }
+            }
+          ]
+        })
+      )
+    })
+    vi.stubGlobal('fetch', fetch)
+    const planner = await createConfiguredPlanner({
+      provider: 'openai-compatible',
+      baseUrl: '/local/v1',
+      responseFormat: 'json_schema'
+    })
+    const tools = [
+      createTool('read_value', 'Read the visible value.', {
+        type: 'object',
+        properties: {},
+        additionalProperties: false
+      })
+    ]
+    await expect(planner.plan('Read', tools, {}, { singleStep: true })).rejects.toThrow(
+      'single-step'
+    )
+    const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))
+    expect(body.response_format.json_schema.schema.properties.steps).toBeUndefined()
+    expect(body.response_format.json_schema.schema.properties.toolName.enum).toContain('read_value')
+    expect(body.response_format.json_schema.schema.properties.toolName.enum).not.toContain(
+      'tool_sequence'
+    )
+    expect(body.messages[0].content).toContain('exactly one')
+    expect((await planner.plan('Read', tools)).toolName).toBe('tool_sequence')
+  })
+
+  it('sends the explicit JSON schema format required by LM Studio', async function test() {
+    const fetch = vi.fn(async function respond(
+      _url: string | URL | Request,
+      _options?: RequestInit
+    ) {
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  toolName: 'no_tools_match',
+                  input: {},
+                  confidence: 0,
+                  reason: 'No application tools'
+                })
+              }
+            }
+          ]
+        })
+      )
+    })
+    vi.stubGlobal('fetch', fetch)
+    const planner = await createConfiguredPlanner({
+      provider: 'openai-compatible',
+      baseUrl: 'http://127.0.0.1:1234/v1',
+      model: 'configured',
+      responseFormat: 'json_schema',
+      maxTokens: 1024,
+      temperature: 0.2,
+      reasoningEffort: 'none'
+    })
+    await planner.plan('Hello', [])
+    expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)).response_format).toMatchObject({
+      type: 'json_schema',
+      json_schema: { name: 'webmcp_plan', schema: { type: 'object' } }
+    })
+    expect(planner.capabilities?.conversation).toBe(true)
+    expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toMatchObject({
+      max_tokens: 1024,
+      temperature: 0.2,
+      reasoning_effort: 'none'
+    })
+  })
+
   it('uses a deterministic fallback planner without Chrome built-in AI', async () => {
     const planner = await createBestPlanner()
     const plan = await planner.plan('Create an invoice for Acme for 250 euros', [
@@ -137,6 +231,63 @@ describe('planner', () => {
     expect(plan.toolName).toBe('add_to_cart')
     expect(plan.input.quantity).toBe(10)
     expect(plan.reason).toContain('Used deterministic fallback')
+  })
+
+  it('does not start Chrome inference after cancellation during session creation', async function test() {
+    let activate!: (session: { prompt: () => Promise<string> }) => void
+    const prompt = vi.fn(async function reply() {
+      return JSON.stringify({
+        toolName: 'no_tools_match',
+        input: {},
+        confidence: 0,
+        reason: 'None'
+      })
+    })
+    ;(window as WindowWithLanguageModel).LanguageModel = {
+      async availability() {
+        return 'available'
+      },
+      create() {
+        return new Promise(function pending(resolve) {
+          activate = resolve
+        })
+      }
+    }
+    const planner = await createChromeAIPlanner(true)
+    const controller = new AbortController()
+    const pending = planner.plan('Read', [], {}, { signal: controller.signal })
+    controller.abort()
+    activate({ prompt })
+    await expect(pending).rejects.toThrow('cancelled')
+    expect(prompt).not.toHaveBeenCalled()
+    planner.dispose?.()
+  })
+
+  it('passes request cancellation to Chrome inference', async function test() {
+    const prompt = vi.fn(async function reply(_message: string, _options?: unknown) {
+      return JSON.stringify({
+        toolName: 'no_tools_match',
+        input: {},
+        confidence: 0,
+        reason: 'None'
+      })
+    })
+    ;(window as WindowWithLanguageModel).LanguageModel = {
+      async availability() {
+        return 'available'
+      },
+      async create() {
+        return { prompt }
+      }
+    }
+    const planner = await createChromeAIPlanner(true)
+    const controller = new AbortController()
+    await planner.plan('Read', [], {}, { signal: controller.signal })
+    expect(prompt).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ signal: controller.signal })
+    )
+    planner.dispose?.()
   })
 
   it('does not fall back when Chrome AI is explicitly selected', async () => {

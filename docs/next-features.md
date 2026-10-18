@@ -2,7 +2,9 @@
 
 This roadmap starts from the current implementation. The first foundation layer is now in place: runtime input and output validation, Zod tool definitions, Vue/React/Svelte helpers, app-level confirmation handlers, scope-aware planning, bounded tool sequences, explicit planner outcomes, server-backed tools, and repeatable planner eval suites.
 
-## Shipped Foundations
+This file contains proposals, not additional exports. Version `0.2.0` adds the implemented [Pi](./pi.md) and [chat](./chat.md) surfaces. Use the [API reference](./api-reference.md) to distinguish implemented APIs from the illustrative proposals below.
+
+## Existing foundations
 
 These capabilities are part of the current API and should be treated as baseline behavior:
 
@@ -20,7 +22,7 @@ These capabilities are part of the current API and should be treated as baseline
 
 ### 1. Richer Agent-Loop Semantics
 
-**Current state**: Basic bounded tool sequencing is implemented. A planner can return `toolName: "tool_sequence"` with ordered `steps`; each step is validated, executed in order, and still uses the normal scope, confirmation, guard, and execution path.
+**Current state**: The command input supports bounded tool sequencing. A planner can return `toolName: "tool_sequence"` with ordered `steps`; each step is validated, executed in order, and still uses the normal scope, confirmation, guard, and execution path. Pi already replans from actual tool results one action at a time. The proposal below concerns explicit data references inside a preplanned command sequence.
 
 **Needed**: Later steps should be able to consume earlier tool outputs in a typed, inspectable way.
 
@@ -38,7 +40,7 @@ This would let a workflow search for a product, pass the selected product ID to 
 
 ### 2. Structured Error Responses
 
-**Current state**: Invocation results expose string errors. That is readable, but not enough for planners or test tooling to decide whether a command should retry, ask for clarification, or stop.
+**Current state**: Invocation results already expose a typed `ToolInvocationErrorCode` alongside an error string. These classify kit-level validation, availability, approval, guard, and execution failures. They do not represent application-specific error categories or authorize retries.
 
 **Needed**: Tools should be able to throw or return typed errors.
 
