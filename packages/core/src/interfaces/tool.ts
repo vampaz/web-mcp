@@ -184,7 +184,7 @@ export type PlannerProviderKind =
 export type PlannerAuth =
   | { mode: 'none' }
   | { mode: 'server'; endpoint: string }
-  | { mode: 'user-key'; apiKey?: string; storageKey?: string; allowInProduction?: boolean }
+  | { mode: 'user-key'; apiKey?: string; storageKey?: string }
 
 export interface PlannerProviderConfig {
   provider: PlannerProviderKind

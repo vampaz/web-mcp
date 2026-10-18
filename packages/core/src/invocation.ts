@@ -21,7 +21,20 @@ export async function invokeToolPipeline<TInput, TOutput>(
   options: ToolInvocationPipelineOptions
 ): Promise<ToolInvocationResult<TOutput>> {
   const startedAt = options.startedAt ?? performance.now()
-  const inputValidationErrors = validateJsonValue(options.input, tool.inputSchema)
+  let input: unknown
+  try {
+    input = structuredClone(options.input)
+  } catch {
+    return createInvocationResult<TOutput>(
+      tool.name,
+      'error',
+      startedAt,
+      undefined,
+      'Tool input must be serializable data.',
+      'invalid_input'
+    )
+  }
+  const inputValidationErrors = validateJsonValue(input, tool.inputSchema)
   if (inputValidationErrors.length > 0) {
     return createInvocationResult<TOutput>(
       tool.name,
@@ -87,7 +100,7 @@ export async function invokeToolPipeline<TInput, TOutput>(
   if (!confirmed) {
     try {
       confirmed = await waitForInvocation(
-        requestToolConfirmation(tool, options.input, options.signal),
+        requestToolConfirmation(tool, input, options.signal),
         options.signal
       )
     } catch (error) {
@@ -117,7 +130,7 @@ export async function invokeToolPipeline<TInput, TOutput>(
     )
   }
 
-  const typedInput = options.input as TInput
+  const typedInput = input as TInput
   try {
     const guardResult = await waitForInvocation(
       Promise.resolve(tool.guard?.(typedInput)),

@@ -355,7 +355,7 @@ describe('form helpers', () => {
         status: {
           type: 'string',
           description: 'Status',
-          enum: ['new', 'resolved']
+          enum: ['', 'new', 'resolved']
         }
       },
       required: ['email'],
@@ -388,7 +388,7 @@ describe('form helpers', () => {
           type: 'string',
           minLength: 4,
           maxLength: 40,
-          pattern: '[A-Za-z ]+',
+          pattern: '^(?:[A-Za-z ]+)$',
           description: 'Subject'
         },
         amount: {
@@ -456,6 +456,57 @@ describe('form helpers', () => {
     const priority = form.elements.namedItem('priority')
     expect(priority).toBeInstanceOf(RadioNodeList)
     expect((priority as RadioNodeList).value).toBe('high')
+  })
+
+  it('exposes only editable fields and keeps prototype-named fields as own properties', async function test() {
+    document.body.innerHTML = `<form>
+      <input name="locked" value="original" readonly required>
+      <input name="disabled" disabled required>
+      <fieldset disabled><input name="nested" required></fieldset>
+      <input name="token" type="hidden" value="private">
+      <input name="attachment" type="file">
+      <input name="reset" type="reset">
+      <input name="__proto__" value="safe">
+      <select name="status"><option value="">None</option><option value="active">Active</option>
+        <optgroup disabled><option value="blocked">Blocked</option></optgroup></select>
+    </form>`
+    const form = document.querySelector('form')!
+    const schema = inferFormInputSchema(form)
+    expect(Object.keys(schema.properties!)).toEqual(['__proto__', 'status'])
+    expect(schema.required).toEqual([])
+    expect(schema.properties?.status).toMatchObject({ enum: ['', 'active'] })
+    registerFormTool({ form, name: 'set_fields', description: 'Set the editable form fields.' })
+    expect(
+      await invokeTool({ toolName: 'set_fields', input: { locked: 'changed' } })
+    ).toMatchObject({ code: 'invalid_input' })
+    expect(await invokeTool({ toolName: 'set_fields', input: { status: '' } })).toMatchObject({
+      status: 'success'
+    })
+    form.querySelector('select')!.disabled = true
+    expect(await invokeTool({ toolName: 'set_fields', input: { status: 'active' } })).toMatchObject(
+      { status: 'error' }
+    )
+    expect(form.querySelector('select')!.value).toBe('')
+  })
+
+  it('fills checkbox groups and validates full HTML patterns before changing fields', async function test() {
+    document.body.innerHTML = `<form>
+      <input name="code" pattern="[A-Z]+" value="OLD">
+      <input name="tags" type="checkbox" value="a" checked>
+      <input name="tags" type="checkbox" value="b">
+    </form>`
+    const form = document.querySelector('form')!
+    registerFormTool({ form, name: 'set_fields', description: 'Set the editable form fields.' })
+    expect(
+      await invokeTool({ toolName: 'set_fields', input: { code: 'ABC123', tags: ['b'] } })
+    ).toMatchObject({ code: 'invalid_input' })
+    expect(form.querySelector('input')!.value).toBe('OLD')
+    const result = await invokeTool<FormData>({
+      toolName: 'set_fields',
+      input: { code: 'NEW', tags: ['b'] }
+    })
+    expect(result.status).toBe('success')
+    expect(result.output?.getAll('tags')).toEqual(['b'])
   })
 
   it('blocks form execution when native validity fails after filling', async () => {

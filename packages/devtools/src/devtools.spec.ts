@@ -157,6 +157,8 @@ describe('devtools overlay', () => {
 
     invoiceInput.value = JSON.stringify({ amount: 42 })
     invoiceInput.dispatchEvent(new Event('input', { bubbles: true }))
+    invoiceInput.focus()
+    invoiceInput.setSelectionRange(2, 4)
     searchInput.value = JSON.stringify({ query: 'dock' })
     searchButton.click()
     await flushPromises()
@@ -165,6 +167,10 @@ describe('devtools overlay', () => {
       document.querySelector<HTMLTextAreaElement>('textarea[data-tool-name="create_invoice"]')
         ?.value
     ).toBe(JSON.stringify({ amount: 42 }))
+    expect(document.activeElement).toBe(
+      document.querySelector('textarea[data-tool-name="create_invoice"]')
+    )
+    expect((document.activeElement as HTMLTextAreaElement).selectionStart).toBe(2)
 
     overlay.destroy()
   })
@@ -256,6 +262,30 @@ describe('devtools overlay', () => {
     expect(document.body.textContent).toContain('No WebMCP tools are registered')
     expect(document.body.textContent).toContain('Register a tool with registerTool()')
 
+    overlay.destroy()
+  })
+
+  it('keeps the inspector usable with quoted tool names and non-JSON results', async function test() {
+    registerTool(
+      defineTool({
+        name: 'read_"quoted',
+        description: 'Read a value that cannot be serialized to JSON.',
+        inputSchema: { type: 'object', properties: {} },
+        execute() {
+          return 1n
+        }
+      })
+    )
+    const overlay = mountDevtoolsOverlay()
+    expect(document.querySelector('textarea')?.getAttribute('aria-label')).toBe(
+      'read_"quoted input JSON'
+    )
+    document.querySelector<HTMLButtonElement>('[data-action="invoke"]')!.click()
+    await flushPromises()
+    expect(document.body.textContent).toContain('cannot be displayed as JSON')
+    expect(function refresh() {
+      overlay.refresh()
+    }).not.toThrow()
     overlay.destroy()
   })
 })

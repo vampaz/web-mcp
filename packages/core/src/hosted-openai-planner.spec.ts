@@ -195,6 +195,67 @@ describe('createHostedOpenAIPlanner', function describeHostedOpenAIPlanner() {
       turnstileToken: 'turnstile-token'
     })
   })
+
+  it('allows another challenge-script request after a failed load', async function test() {
+    const planner = createHostedOpenAIPlanner({
+      accessKey: paidAccessKey,
+      browserChallengeSiteKey: 'site-key',
+      model: 'test-model'
+    })
+    const pending = planner.plan('Select water', [createSelectItemsTool()], {})
+    const rejected = expect(pending).rejects.toThrow('script failed to load')
+    await vi.waitFor(function scriptReady() {
+      expect(document.querySelector('script[src*="turnstile"]')).not.toBeNull()
+    })
+    const first = document.querySelector('script[src*="turnstile"]')!
+    first.dispatchEvent(new Event('error'))
+    await rejected
+    expect(first.isConnected).toBe(false)
+    const retry = planner.plan('Select water', [createSelectItemsTool()], {})
+    const retryRejected = expect(retry).rejects.toThrow('script failed to load')
+    await vi.waitFor(function scriptReady() {
+      expect(document.querySelector('script[src*="turnstile"]')).not.toBeNull()
+    })
+    const second = document.querySelector('script[src*="turnstile"]')!
+    expect(second).not.toBe(first)
+    second.dispatchEvent(new Event('error'))
+    await retryRejected
+  })
+
+  it('cancels pending browser challenges and removes the widget', async function test() {
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    window.turnstile = {
+      render: vi.fn(function render() {
+        return 'pending-widget'
+      }),
+      execute: vi.fn(),
+      remove: vi.fn(),
+      reset: vi.fn()
+    }
+    const planner = createHostedOpenAIPlanner({
+      accessKey: paidAccessKey,
+      browserChallengeSiteKey: 'site-key',
+      model: 'test-model'
+    })
+    const controller = new AbortController()
+    const pending = planner.plan(
+      'Select water',
+      [createSelectItemsTool()],
+      {},
+      { signal: controller.signal }
+    )
+    const rejected = expect(pending).rejects.toThrow()
+    await vi.waitFor(function challengeStarted() {
+      expect(window.turnstile!.execute).toHaveBeenCalled()
+    })
+    const container = vi.mocked(window.turnstile.render).mock.calls[0]![0]
+    controller.abort()
+    await rejected
+    expect(window.turnstile.remove).toHaveBeenCalledWith('pending-widget')
+    expect(container.isConnected).toBe(false)
+    expect(fetch).not.toHaveBeenCalled()
+  })
 })
 
 function createSelectItemsTool(): WebMCPTool {

@@ -50,6 +50,7 @@ import {
 } from './command-input-options'
 import { createChromeAIPlanner } from './planner'
 import { listAvailableTools } from './registry'
+import { validateToolPlan } from './plan-validation'
 
 type CommandInputConstructor = CustomElementConstructor & {
   observedAttributes: string[]
@@ -125,6 +126,7 @@ export function defineWebMCPCommandInput(
     private providedPlannerConfig?: PlannerProviderConfig
     private renderedStructureSignature = ''
     private running = false
+    private activeCommand?: AbortController
     private userSelectedModel = false
     private userSelectedPlanner = false
     private readonly state: CommandInputRuntimeState = {
@@ -378,16 +380,23 @@ export function defineWebMCPCommandInput(
 
       try {
         this.invalidateAutoPlannerBeforeRun()
+        const controller = new AbortController()
+        this.activeCommand = controller
+        const signal = options.signal
+          ? AbortSignal.any([controller.signal, options.signal])
+          : controller.signal
         const planner = await this.getCurrentPlanner()
         const tools = listAvailableTools().map(function mapRegistration(registration) {
           return registration.tool
         })
 
         this.setPhase('planning')
-        throwIfAborted(options.signal)
+        throwIfAborted(signal)
         const plan = await planner.plan(command, tools, this.getPlannerContext(), {
-          signal: options.signal
+          signal
         })
+        throwIfAborted(signal)
+        validateToolPlan(plan, tools)
         this.dispatchPlanEvent(command, plan, planner)
         this.setPhase('executing')
 
@@ -395,7 +404,7 @@ export function defineWebMCPCommandInput(
           plan,
           this.setActiveToolName.bind(this),
           (detail) => this.dispatchStepEvent(command, detail),
-          options.signal
+          signal
         )
         this.setPhase(result.status === 'success' ? 'completed' : 'failed')
         this.dispatchResultEvent(command, plan, result)
@@ -412,6 +421,7 @@ export function defineWebMCPCommandInput(
           durationMs: 0
         }
       } finally {
+        this.activeCommand = undefined
         this.running = false
         this.renderIfConnected()
       }
@@ -651,6 +661,7 @@ export function defineWebMCPCommandInput(
     }
 
     private invalidatePlanner() {
+      this.activeCommand?.abort()
       this.plannerRevision += 1
       this.plannerLoadId += 1
       this.disposeCreatedPlanner()

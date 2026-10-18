@@ -112,7 +112,8 @@ describe('WebMCP command input', () => {
         query: 'dock'
       },
       {
-        source: 'planner'
+        source: 'planner',
+        signal: expect.any(AbortSignal)
       }
     )
   })
@@ -363,6 +364,44 @@ describe('WebMCP command input', () => {
     })
     expect(plan).not.toHaveBeenCalled()
   })
+
+  it.each(['disconnect', 'reconfigure'] as const)(
+    'does not execute a late plan after %s',
+    async function test(action) {
+      let finish!: (plan: ToolPlan) => void
+      const execute = vi.fn()
+      registerTool(
+        defineTool({
+          name: 'read_items',
+          description: 'Read visible items.',
+          inputSchema: { type: 'object' },
+          execute
+        })
+      )
+      const element = createCommandInputElement()
+      element.planner = {
+        name: 'Pending planner',
+        available: true,
+        status: 'ready',
+        detail: 'Pending',
+        plan: vi.fn(function pending() {
+          return new Promise<ToolPlan>(function wait(resolve) {
+            finish = resolve
+          })
+        })
+      }
+      document.body.append(element)
+      const pending = element.run('Read items')
+      await vi.waitFor(function planning() {
+        expect(finish).toBeTypeOf('function')
+      })
+      if (action === 'disconnect') element.remove()
+      else element.configure({ provider: 'local' })
+      finish({ toolName: 'read_items', input: {}, confidence: 1, reason: 'Read' })
+      expect(await pending).toMatchObject({ status: 'error', error: 'Command was cancelled.' })
+      expect(execute).not.toHaveBeenCalled()
+    }
+  )
 
   it('hides provider and model controls when both are initialized by attributes', async () => {
     const element = createCommandInputElement()
@@ -1060,7 +1099,7 @@ describe('WebMCP command input', () => {
     })
   })
 
-  it('keeps commands usable when selected Chrome built-in AI is unavailable', async () => {
+  it('reports an unavailable explicitly selected Chrome planner without falling back', async () => {
     registerTool(
       defineTool({
         name: 'add_to_cart',
@@ -1088,12 +1127,8 @@ describe('WebMCP command input', () => {
     const result = await element.run('Add ten keyboards to the cart.')
 
     expect(result).toMatchObject({
-      status: 'success',
-      toolName: 'add_to_cart',
-      output: {
-        productId: 'Add ten keyboards to the cart.',
-        quantity: 10
-      }
+      status: 'error',
+      error: 'Chrome built-in AI is unavailable.'
     })
   })
 
