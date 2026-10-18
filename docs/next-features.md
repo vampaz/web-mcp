@@ -2,7 +2,7 @@
 
 This roadmap starts from the current implementation. The first foundation layer is now in place: runtime input and output validation, Zod tool definitions, Vue/React/Svelte helpers, app-level confirmation handlers, scope-aware planning, bounded tool sequences, explicit planner outcomes, server-backed tools, and repeatable planner eval suites.
 
-This file contains proposals, not additional exports. The current checkout also includes unreleased [Pi](./pi.md) and [chat](./chat.md) surfaces. Use the [API reference](./api-reference.md) to distinguish implemented APIs from the illustrative proposals below.
+This file contains proposals, not additional exports. Version `0.2.0` adds the implemented [Pi](./pi.md) and [chat](./chat.md) surfaces. Use the [API reference](./api-reference.md) to distinguish implemented APIs from the illustrative proposals below.
 
 ## Existing foundations
 

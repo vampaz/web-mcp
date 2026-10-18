@@ -4,10 +4,10 @@
 
 `@vampaz/webmcp-kit/pi` provides a headless, persistent conversation controller. Core remains responsible for application validation, scope, guards, approval, and execution. Pi requests exactly one action, receives its actual result, refreshes context, and chooses the next step. Bounded Planner mode keeps its separate sequence contract.
 
-These subpaths are unreleased. Use the repository lab or its verified tarball during development. After publication, install the optional runtime peers explicitly:
+These subpaths require version `0.2.0` or newer. Before that release reaches your registry, use the verified tarball described in the [integration guide](./integration.md#1-choose-the-integration). For registry installation, include the optional runtime peers explicitly:
 
 ```sh
-npm install @vampaz/webmcp-kit @earendil-works/pi-durable@^1.3.0 @earendil-works/pi-ai@^1.3.0 @earendil-works/chord@^1.3.0
+npm install @vampaz/webmcp-kit@^0.2.0 @earendil-works/pi-durable@^1.3.0 @earendil-works/pi-ai@^1.3.0 @earendil-works/chord@^1.3.0
 ```
 
 Core and chat with an application-supplied controller require none of these peers. Importing `/pi` does not start a worker, access storage, or contact a model. Public controller types do not contain Pi or Chord types.

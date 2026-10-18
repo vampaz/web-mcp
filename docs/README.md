@@ -2,7 +2,7 @@
 
 WebMCP Kit exposes application actions through one registry and invocation pipeline. Add a planner for commands, a Pi controller for persistent conversations, and the chat component when you want a supplied interface.
 
-The `/pi`, `/pi/worker`, and `/chat` additions are currently unreleased. The guides describe this checkout. Use a verified local tarball until a release containing these exports is published. Installing an older registry version will not provide these APIs.
+The `/pi`, `/pi/worker`, and `/chat` additions require version `0.2.0` or newer. Before that release reaches your registry, use a verified local tarball. Installing an older version will not provide these APIs.
 
 ## Start here
 

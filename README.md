@@ -27,7 +27,7 @@ The npm package name is `@vampaz/webmcp-kit`. Releases publish the compiled `dis
 
 ## Independent package surfaces
 
-The new Pi and chat subpaths are unreleased. Use the local lab or a verified unpublished tarball until publication.
+The Pi and chat subpaths require version `0.2.0` or newer. Before that release reaches your registry, use the local lab or a verified tarball. See the [release procedure](./docs/operations.md#release-procedure).
 
 The package separates core (`@vampaz/webmcp-kit`), the headless [Pi harness](./docs/pi.md) (`/pi`), and the framework-neutral [chat UI](./docs/chat.md) (`/chat`). `/pi/worker` installs an application-compiled service worker. Pi peers are optional; core and chat with a supplied controller do not load them.
 

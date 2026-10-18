@@ -87,6 +87,19 @@ Run `npm audit` for advisories and `npm audit signatures` for registry verificat
 
 `npm run test:lmstudio` is a separate real-model suite. Configure the lab's documented local provider first and run it only when model inference is intended. It does not substitute for deterministic regression coverage. See the [repository lab README](../apps/demo/README.md) for provider configuration and browser commands; repository-only files are not included in the npm tarball.
 
+## Release procedure
+
+The npm version must be new: the release workflow skips a version already present in the registry. Version `0.2.0` introduces the Pi and chat entry points; `0.1.0` does not contain them.
+
+1. Finish the review and validation above on the release branch, including the packed consumer tests. Check the manifest and lockfile versions together.
+2. Check `npm view @vampaz/webmcp-kit versions --json` and confirm the candidate version is unused. A registry or authentication error does not establish that a version is available.
+3. Verify the npm trusted publisher permits publishing from `vampaz/web-mcp`, workflow `release.yml`, on GitHub-hosted runners. The workflow requires `id-token: write`; a local npm login is not used by this release path.
+4. After authorization to release, merge the reviewed revision into `master`. The workflow also permits manual runs on `master`, for recovery. Publication runs are not cancelled when another commit arrives.
+5. Wait for validation, npm publication, GitHub Packages publication, and GitHub release creation. A partial failure needs inspection before rerunning; a successful npm publication cannot be overwritten.
+6. Verify the registry version, provenance, and installed exports. Downstream applications can then replace a temporary Git or tarball dependency with the published version, update their lockfiles, and rerun consumer checks before deployment.
+
+The workflow builds once, tests `artifacts/webmcp-kit.tgz`, and publishes that tarball to both registries. Do not substitute a fresh working-directory pack after the consumer tests. Keep release authorization, CI success, registry publication, and downstream production verification separate.
+
 ## Troubleshooting
 
 | Symptom                                      | Inspect and correct                                                                                                                                          |

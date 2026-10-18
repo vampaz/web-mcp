@@ -2,7 +2,7 @@
 
 [Documentation index](./README.md) · [Complete integration](./integration.md) · [API reference](./api-reference.md)
 
-This subpath is unreleased; use the repository lab or its verified tarball during development.
+This subpath requires version `0.2.0` or newer. Before that release reaches your registry, use the repository lab or its verified tarball.
 
 `@vampaz/webmcp-kit/chat` defines `<webmcp-chat>` explicitly. It imports controller types only. It can render a fake or application-owned `PiController` without installing the Pi peers or a UI framework. Imports are safe during server rendering; call `defineWebMCPChat()` in the browser.
 

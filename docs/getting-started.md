@@ -17,9 +17,9 @@ In this repository, the root `@vampaz/webmcp-kit` package is the library. It exp
 - `@vampaz/webmcp-kit/react`
 - `@vampaz/webmcp-kit/svelte`
 - `@vampaz/webmcp-kit/zod`
-- `@vampaz/webmcp-kit/pi` (unreleased)
-- `@vampaz/webmcp-kit/pi/worker` (unreleased)
-- `@vampaz/webmcp-kit/chat` (unreleased)
+- `@vampaz/webmcp-kit/pi` (since `0.2.0`)
+- `@vampaz/webmcp-kit/pi/worker` (since `0.2.0`)
+- `@vampaz/webmcp-kit/chat` (since `0.2.0`)
 
 The directories under `packages/` are source modules in this one npm package, not separate npm workspaces. The [local lab](../apps/demo/README.md) runs from this repository. The standalone demo app lives in [vampaz/web-mcp-demo](https://github.com/vampaz/web-mcp-demo) and has its own setup. Published apps install the single library package from npm.
 
@@ -57,7 +57,7 @@ The remaining development dependencies serve these repository tasks:
 | Linting and formatting                  | `oxlint`, `oxfmt`                                                          |
 | Local HTTPS and secure browser fixtures | `@vampaz/vite-plugin-local-tls`                                            |
 
-Version constraints live in `package.json`; exact installed versions live in `package-lock.json`. Use `npm ci --ignore-scripts` to reproduce the development tree without running the package's prepare build. See [Pi installation](./integration.md#1-choose-the-integration) for the currently unreleased runtime and [operations](./operations.md#validation-in-this-repository) for consumer verification.
+Version constraints live in `package.json`; exact installed versions live in `package-lock.json`. Use `npm ci --ignore-scripts` to reproduce the development tree without running the package's prepare build. See [Pi installation](./integration.md#1-choose-the-integration) for runtime installation and [operations](./operations.md#validation-in-this-repository) for consumer verification.
 
 ## One-Call Setup
 
