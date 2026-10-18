@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 
 import { setConfirmationHandler } from './confirmation'
 import { defineTool } from './define-tool'
+import type { ConfirmationHandler } from './interfaces/tool'
 import { clearToolsForTest, invokeTool, registerTool, unregisterTool } from './registry'
 
 afterEach(function cleanup() {
@@ -36,6 +37,39 @@ function setup() {
     }
   }
 }
+
+it('executes the input shown for approval even if the caller changes it', async function test() {
+  let approve!: (value: boolean) => void
+  const execute = vi.fn(function execute(input: { amount: number }) {
+    return input.amount
+  })
+  registerTool(
+    defineTool({
+      name: 'pay_invoice',
+      description: 'Pay the approved invoice amount.',
+      inputSchema: {
+        type: 'object',
+        properties: { amount: { type: 'number', maximum: 100 } },
+        required: ['amount'],
+        additionalProperties: false
+      },
+      confirmation: { required: true, reason: 'Pay this amount?' },
+      execute
+    })
+  )
+  const confirm = vi.fn<ConfirmationHandler>(function confirm() {
+    return new Promise<boolean>(function pending(resolve) {
+      approve = resolve
+    })
+  })
+  setConfirmationHandler(confirm)
+  const input = { amount: 10 }
+  const pending = invokeTool({ toolName: 'pay_invoice', input })
+  input.amount = 1000
+  expect(confirm.mock.calls[0]?.[1]).toEqual({ amount: 10 })
+  approve(true)
+  expect(await pending).toMatchObject({ status: 'success', output: 10 })
+})
 
 it('cancels a pending approval even when the handler ignores cancellation', async function test() {
   const fixture = setup()

@@ -450,6 +450,8 @@ function createActiveChromePlanner(
   strict = false
 ): ToolPlanner {
   let session: LanguageModelSession | undefined
+  let pendingSession: Promise<LanguageModelSession> | undefined
+  let disposed = false
 
   return {
     capabilities: { conversation: strict },
@@ -465,13 +467,29 @@ function createActiveChromePlanner(
     ) {
       try {
         throwIfAborted(options?.signal)
-        session ??= await createChromeAISession(languageModel)
+        if (disposed) throw new Error('The planner was disposed.')
+        pendingSession ??= createChromeAISession(languageModel)
+          .then(function created(value) {
+            if (disposed) {
+              disposeChromeAISession(value)
+              throw new Error('The planner was disposed.')
+            }
+            session = value
+            return value
+          })
+          .catch(function failed(error) {
+            pendingSession = undefined
+            throw error
+          })
+        session = await pendingSession
         const plan = await planWithChromeAI(session, message, tools, context, options)
+        if (disposed) throw new Error('The planner was disposed.')
         validateToolPlan(plan, tools, { singleStep: options?.singleStep })
         throwIfAborted(options?.signal)
         return plan
       } catch (error) {
         throwIfAborted(options?.signal)
+        if (disposed) throw new Error('The planner was disposed.')
         if (error instanceof PlannerRequestLimitError) throw error
         if (strict)
           throw new Error(
@@ -485,6 +503,7 @@ function createActiveChromePlanner(
       }
     },
     dispose() {
+      disposed = true
       disposeChromeAISession(session)
       session = undefined
     }
@@ -549,11 +568,13 @@ function getPlannerApiKey(
 ): string | undefined {
   if (auth.mode !== 'user-key') return undefined
   if (auth.apiKey) return auth.apiKey
-  const storage = getBrowserStorage()
-  if (!storage) return undefined
-
-  const storageKey = auth.storageKey ?? getDefaultStorageKey(provider)
-  return storage.getItem(storageKey) ?? undefined
+  try {
+    const storage = getBrowserStorage()
+    const storageKey = auth.storageKey ?? getDefaultStorageKey(provider)
+    return storage?.getItem(storageKey) ?? undefined
+  } catch {
+    return undefined
+  }
 }
 
 function getBrowserStorage(): Storage | undefined {

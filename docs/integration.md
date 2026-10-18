@@ -6,22 +6,21 @@ This walkthrough adds a persistent assistant to an existing HTTPS application. T
 
 ## 1. Choose the integration
 
-| Need                                      | Install and initialize                                                |
-| ----------------------------------------- | --------------------------------------------------------------------- |
-| Expose existing app actions               | Core and `registerTool()` or a framework helper                       |
-| Execute short natural-language commands   | Core plus a planner and `<webmcp-command-input>`                      |
-| Persistent conversations with your own UI | `/pi`, optional runtime peers, and an application worker              |
-| Persistent conversations with supplied UI | The preceding setup plus `/chat`                                      |
-| Use chat with your own controller         | `/chat` and an implementation of `PiController`; no Pi peers required |
+| Need                                      | Install and initialize                           |
+| ----------------------------------------- | ------------------------------------------------ |
+| Expose existing app actions               | Core and `registerTool()` or a framework helper  |
+| Execute short natural-language commands   | Core plus a planner and `<webmcp-command-input>` |
+| Persistent conversations with your own UI | `/pi` and an application worker                  |
+| Persistent conversations with supplied UI | The preceding setup plus `/chat`                 |
+| Use chat with your own controller         | `/chat` and an implementation of `PiController`  |
 
-The Pi/chat exports require version `0.2.0` or newer. Before that release reaches your registry, produce a reviewed artifact from the Kit repository with `npm run build` followed by `npm run pack:package`. In your application, install that artifact:
+Install `0.2.1` or newer. npm installs the Pi runtime libraries automatically:
 
 ```sh
-npm install /absolute/path/to/web-mcp/artifacts/webmcp-kit.tgz
-npm install @earendil-works/pi-durable@^1.3.0 @earendil-works/pi-ai@^1.3.0 @earendil-works/chord@^1.3.0
+npm install @vampaz/webmcp-kit@^0.2.1
 ```
 
-After publication, replace the tarball path with `@vampaz/webmcp-kit@^0.2.0` or a reviewed newer version. Do not use a source alias as proof that the published package works. Keep the kit dependency deduplicated so the page's tool definitions, framework helpers, and harness use one registry.
+For local package development, use the verified tarball described in [operations](./operations.md#validation-in-this-repository). Do not use a source alias as proof that the published package works. Keep the kit dependency deduplicated so the page's tool definitions, framework helpers, and harness use one registry.
 
 The package's Node requirement for tooling is `>=24.12.0`; this repository pins its development baseline in `.nvmrc`. Browser execution requires the APIs listed in [operations](./operations.md#browser-prerequisites). Framework and Zod peers are needed only for those subpaths. The [dependency model](./getting-started.md#dependency-model) maps every feature to its peers and separates application runtime requirements from repository tooling.
 

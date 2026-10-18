@@ -90,7 +90,7 @@ function getToolDiagnostics(tools: RegisteredTool[]): IntegrationDiagnostic[] {
       })
     }
 
-    if (tool.confirmation?.required && !confirmationConfigured) {
+    if (tool.confirmation?.required && !tool.confirmation.handler && !confirmationConfigured) {
       diagnostics.push({
         id: `missing-confirmation-handler:${tool.name}`,
         severity: 'warning',

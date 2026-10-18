@@ -30,7 +30,7 @@ export async function createCommandInputPlanner(
   config: PlannerProviderConfig | undefined
 ): Promise<ToolPlanner> {
   if (!config) return createBestPlanner()
-  if (config.provider === 'chrome-built-in') return createChromeAIPlanner(false)
+  if (config.provider === 'chrome-built-in') return createChromeAIPlanner(true)
   if (config.provider === 'local') return createHeuristicPlanner()
 
   return createConfiguredPlanner(config)

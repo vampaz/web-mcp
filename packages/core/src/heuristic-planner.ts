@@ -1,4 +1,5 @@
 import type { JsonSchema, PlannerContext, ToolPlan, WebMCPTool } from './interfaces/tool'
+import { validateJsonValue } from './schema'
 
 const numberWords = new Map([
   ['one', 1],
@@ -61,10 +62,13 @@ export function planWithHeuristics(
   }
 
   const input = createInputFromSchema(selectedTool.inputSchema, message, context)
-  if (hasMissingRequiredArrayInput(selectedTool.inputSchema, input)) {
+  if (
+    hasMissingRequiredArrayInput(selectedTool.inputSchema, input) ||
+    validateJsonValue(input, selectedTool.inputSchema).length > 0
+  ) {
     return createPlannerOutcome(
       'needs_clarification',
-      'The request matched a tool, but the current app context did not contain the required item IDs.'
+      'The request matched a tool, but the request and current app context did not supply valid required inputs.'
     )
   }
 
@@ -156,7 +160,7 @@ function createInputFromSchema(
 ): Record<string, unknown> {
   if (schema.type !== 'object' || !schema.properties) return {}
 
-  const input: Record<string, unknown> = {}
+  const input: Record<string, unknown> = Object.create(null)
   const required = new Set(schema.required ?? [])
 
   for (const [key, propertySchema] of Object.entries(schema.properties)) {
@@ -206,6 +210,7 @@ function createInputValue(
 
   if (schema.type === 'string' || schema.type === undefined) {
     const contextValue = findContextValueForKey(key, message, context)
+    if (isIdKey(key)) return contextValue
     if (contextValue !== undefined) return contextValue
     if (isQueryKey(key)) return cleanQuery(message)
     if (isStatusKey(key)) return getStatusFromMessage(message)
@@ -273,11 +278,10 @@ function findBestContextObject(
   context: PlannerContext
 ): { id: string } | undefined {
   const objects = findContextObjects(context)
-  return (
-    objects.find(function objectMatchesMessage(item) {
-      return contextObjectMatchesMessage(item, message)
-    }) ?? objects[0]
-  )
+  const matches = objects.filter(function objectMatchesMessage(item) {
+    return contextObjectMatchesMessage(item, message)
+  })
+  return matches.length === 1 ? matches[0] : undefined
 }
 
 function findContextObjects(context: PlannerContext): Array<{ id: string; text: string }> {

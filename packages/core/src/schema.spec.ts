@@ -221,6 +221,52 @@ describe('schema validation', () => {
     ).toEqual(['/lineItems/1/quantity expected integer, got number.'])
   })
 
+  it('checks own properties when validating required and extra fields', function ownProperties() {
+    const schema = {
+      type: 'object',
+      properties: { value: { type: 'string' } },
+      required: ['value'],
+      additionalProperties: false
+    }
+    expect(
+      validateJsonValue(JSON.parse('{"value":"ok","__proto__":{},"constructor":7}'), schema)
+    ).toEqual(['/__proto__ is not allowed.', '/constructor is not allowed.'])
+    expect(validateJsonValue(Object.create({ value: 'inherited' }), schema)).toEqual([
+      '/value is required.'
+    ])
+    expect(validateJsonSchema({ properties: {}, required: ['constructor'] })).toEqual([
+      'schema.required includes "constructor", but schema.properties does not define it.'
+    ])
+    expect(
+      validateJsonValue(JSON.parse('{"constructor":"wrong"}'), {
+        type: 'object',
+        additionalProperties: { type: 'number' }
+      })
+    ).toEqual(['/constructor expected number, got string.'])
+  })
+
+  it('compares object constants and enums independently of property order', function equality() {
+    const value = { b: [2, { d: 4, c: 3 }], a: 1 }
+    const expected = { a: 1, b: [2, { c: 3, d: 4 }] }
+    expect(validateJsonValue(value, { const: expected })).toEqual([])
+    expect(validateJsonValue(value, { enum: [expected] })).toEqual([])
+    expect(validateJsonValue({ ...value, a: 2 }, { const: expected })).not.toEqual([])
+    expect(validateJsonValue([2, 1], { const: [1, 2] })).not.toEqual([])
+    expect(validateJsonValue({}, { const: [] })).not.toEqual([])
+  })
+
+  it('counts Unicode code points for string length constraints', function unicodeLength() {
+    expect(validateJsonValue('😀', { type: 'string', pattern: '^.$' })).toEqual([])
+    expect(validateJsonValue('é', { type: 'string', pattern: '^\\p{Letter}+$' })).toEqual([])
+    expect(validateJsonValue('😀', { type: 'string', minLength: 1, maxLength: 1 })).toEqual([])
+    expect(validateJsonValue('😀', { type: 'string', minLength: 2 })).toEqual([
+      '/ expected string length >= 2, got 1.'
+    ])
+    expect(validateJsonValue('😀a', { type: 'string', maxLength: 1 })).toEqual([
+      '/ expected string length <= 1, got 2.'
+    ])
+  })
+
   it('validates array length constraints', () => {
     expect(
       validateJsonValue([], {

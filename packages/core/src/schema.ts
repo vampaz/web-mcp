@@ -106,7 +106,7 @@ function validateRequired(schema: JsonSchema, path: string, errors: string[]): v
       continue
     }
 
-    if (schema.properties && !(requiredName in schema.properties)) {
+    if (schema.properties && !Object.hasOwn(schema.properties, requiredName)) {
       errors.push(
         `${path}.required includes "${requiredName}", but ${path}.properties does not define it.`
       )
@@ -179,7 +179,7 @@ function validatePatternKeyword(value: unknown, path: string, errors: string[]):
   }
 
   try {
-    new RegExp(value)
+    new RegExp(value, 'u')
   } catch {
     errors.push(`${path} must be a valid regular expression.`)
   }
@@ -265,14 +265,14 @@ function validateObjectValue(
   if (!isJsonObject(value)) return
 
   for (const requiredName of schema.required ?? []) {
-    if (!(requiredName in value)) {
+    if (!Object.hasOwn(value, requiredName)) {
       errors.push(`${formatValuePath(appendValuePath(path, requiredName))} is required.`)
     }
   }
 
   const properties = schema.properties ?? {}
   for (const [propertyName, propertySchema] of Object.entries(properties)) {
-    if (propertyName in value) {
+    if (Object.hasOwn(value, propertyName)) {
       validateValueNode(
         value[propertyName],
         propertySchema,
@@ -284,7 +284,7 @@ function validateObjectValue(
 
   if (schema.additionalProperties === false) {
     for (const propertyName of Object.keys(value)) {
-      if (!(propertyName in properties)) {
+      if (!Object.hasOwn(properties, propertyName)) {
         errors.push(`${formatValuePath(appendValuePath(path, propertyName))} is not allowed.`)
       }
     }
@@ -293,7 +293,7 @@ function validateObjectValue(
 
   if (schema.additionalProperties && typeof schema.additionalProperties === 'object') {
     for (const propertyName of Object.keys(value)) {
-      if (!(propertyName in properties)) {
+      if (!Object.hasOwn(properties, propertyName)) {
         validateValueNode(
           value[propertyName],
           schema.additionalProperties,
@@ -365,20 +365,21 @@ function validateStringValue(
   errors: string[]
 ): void {
   if (typeof value !== 'string') return
+  const length = Array.from(value).length
 
-  if (schema.minLength !== undefined && value.length < schema.minLength) {
+  if (schema.minLength !== undefined && length < schema.minLength) {
     errors.push(
-      `${formatValuePath(path)} expected string length >= ${schema.minLength}, got ${value.length}.`
+      `${formatValuePath(path)} expected string length >= ${schema.minLength}, got ${length}.`
     )
   }
 
-  if (schema.maxLength !== undefined && value.length > schema.maxLength) {
+  if (schema.maxLength !== undefined && length > schema.maxLength) {
     errors.push(
-      `${formatValuePath(path)} expected string length <= ${schema.maxLength}, got ${value.length}.`
+      `${formatValuePath(path)} expected string length <= ${schema.maxLength}, got ${length}.`
     )
   }
 
-  if (schema.pattern !== undefined && !new RegExp(schema.pattern).test(value)) {
+  if (schema.pattern !== undefined && !new RegExp(schema.pattern, 'u').test(value)) {
     errors.push(
       `${formatValuePath(path)} expected string matching ${schema.pattern}, got ${formatJsonValue(value)}.`
     )
@@ -505,5 +506,23 @@ function formatJsonValue(value: unknown): string {
 }
 
 function areJsonValuesEqual(left: unknown, right: unknown): boolean {
-  return JSON.stringify(left) === JSON.stringify(right)
+  if (left === right) return true
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return (
+      Array.isArray(left) &&
+      Array.isArray(right) &&
+      left.length === right.length &&
+      left.every(function equalItem(value, index) {
+        return areJsonValuesEqual(value, right[index])
+      })
+    )
+  }
+  if (!isJsonObject(left) || !isJsonObject(right)) return false
+  const keys = Object.keys(left)
+  return (
+    keys.length === Object.keys(right).length &&
+    keys.every(function equalProperty(key) {
+      return Object.hasOwn(right, key) && areJsonValuesEqual(left[key], right[key])
+    })
+  )
 }

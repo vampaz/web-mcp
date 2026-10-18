@@ -13,9 +13,6 @@ registerTool({
 })
 assert.equal((await invokeTool({ toolName: 'read_value', input: {} })).output, 7)
 assert.throws(function missing() {
-  import.meta.resolve('@earendil-works/pi-durable')
-})
-assert.throws(function missing() {
   import.meta.resolve('vue')
 })
 console.log('core-only passed')

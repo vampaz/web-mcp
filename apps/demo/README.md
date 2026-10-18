@@ -37,7 +37,7 @@ The model suite covers tool discovery, answer, read, confirmed write, result-dep
 
 The checks workflow builds and packs an unpublished artifact, then runs `npm run test:package` before publication. Download its `artifacts/webmcp-kit.tgz` and matching `.json` metadata to run the same checks locally. `WEBMCP_PACKAGE_TARBALL` can point to another `.tgz` with adjacent metadata. The test rejects stale sources and mismatched bytes. It never silently builds the library.
 
-Package fixtures install the tarball in isolated temporary directories, with source aliases disabled. They check core-only and chat-only installs without Pi peers, declarations, a Vite + Vue consumer, an application-compiled worker under `/nested/`, inline/popup chat over trusted HTTPS, and one page registry. Applications, local credentials, fixtures, and plans are excluded from the tarball. Root repository rules govern any explicitly requested local packaging build.
+Package fixtures install the tarball in isolated temporary directories, with source aliases disabled. They check core and chat without framework peers, declarations, a Vite + Vue consumer without explicit Pi dependencies, an application-compiled worker under `/nested/`, inline/popup chat over trusted HTTPS, and one page registry. Applications, local credentials, fixtures, and plans are excluded from the tarball. Root repository rules govern any explicitly requested local packaging build.
 
 Storage fixtures are available only on the explicit test server. The local lab uses its own IndexedDB namespace and does not touch the standalone demo's history.
 

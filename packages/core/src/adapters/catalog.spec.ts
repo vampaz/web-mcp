@@ -49,6 +49,18 @@ describe('tool catalog adapter', () => {
     expect(markdown).toContain('- Confirmation: Adding a product changes cart state.')
     expect(markdown).toContain('"productId"')
   })
+
+  it('marks a failing scope unavailable without losing the rest of the catalog', function test() {
+    const registration = createRegistration()
+    registration.tool.scope = function unavailable() {
+      throw new Error('Document closed')
+    }
+    expect(
+      createToolCatalog([registration, createRegistration()]).tools.map(function state(tool) {
+        return tool.available
+      })
+    ).toEqual([false, true])
+  })
 })
 
 function createRegistration(

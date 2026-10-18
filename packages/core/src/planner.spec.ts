@@ -225,7 +225,9 @@ describe('planner', () => {
     }
 
     const planner = await createChromeAIPlanner()
-    const plan = await planner.plan('Add ten keyboards to the cart.', [createCartTool()])
+    const plan = await planner.plan('Add ten keyboards to the cart.', [createCartTool()], {
+      products: [{ id: 'keyboard', name: 'Keyboard' }]
+    })
 
     expect(planner.available).toBe(true)
     expect(plan.toolName).toBe('add_to_cart')
@@ -261,6 +263,53 @@ describe('planner', () => {
     await expect(pending).rejects.toThrow('cancelled')
     expect(prompt).not.toHaveBeenCalled()
     planner.dispose?.()
+  })
+
+  it('shares pending Chrome sessions and destroys sessions that finish after disposal', async function test() {
+    let activate!: (session: { prompt: () => Promise<string>; destroy: () => void }) => void
+    const create = vi.fn(function create() {
+      return new Promise<{ prompt: () => Promise<string>; destroy: () => void }>(
+        function pending(resolve) {
+          activate = resolve
+        }
+      )
+    })
+    ;(window as WindowWithLanguageModel).LanguageModel = {
+      availability: async () => 'available',
+      create
+    }
+    const planner = await createChromeAIPlanner()
+    const first = planner.plan('Find products', [])
+    const second = planner.plan('Find products', [])
+    const results = Promise.allSettled([first, second])
+    planner.dispose?.()
+    const prompt = vi.fn()
+    const destroy = vi.fn()
+    activate({ prompt, destroy })
+    expect(
+      (await results).map(function status(value) {
+        return value.status
+      })
+    ).toEqual(['rejected', 'rejected'])
+    expect(create).toHaveBeenCalledOnce()
+    expect(destroy).toHaveBeenCalledOnce()
+    expect(prompt).not.toHaveBeenCalled()
+  })
+
+  it('asks for clarification instead of guessing an unmatched or ambiguous object ID', async function test() {
+    const planner = createHeuristicPlanner()
+    for (const products of [
+      [{ id: 'a', name: 'Apple' }],
+      [
+        { id: 'a', name: 'Keyboard A' },
+        { id: 'b', name: 'Keyboard B' }
+      ]
+    ]) {
+      const plan = await planner.plan('Add a keyboard to the cart', [createCartTool()], {
+        products
+      })
+      expect(plan.toolName).toBe('needs_clarification')
+    }
   })
 
   it('passes request cancellation to Chrome inference', async function test() {
@@ -452,7 +501,7 @@ describe('planner', () => {
       input: {},
       confidence: 0,
       reason:
-        'The request matched a tool, but the current app context did not contain the required item IDs.'
+        'The request matched a tool, but the request and current app context did not supply valid required inputs.'
     })
   })
 

@@ -1,6 +1,7 @@
 import { defineTool } from './define-tool'
 import type { JsonSchema, RegisteredTool, WebMCPTool } from './interfaces/tool'
 import { registerToolWithCleanup, unregisterTool } from './registry'
+import { formatJsonValueValidationError, validateJsonValue } from './schema'
 
 export interface RegisterFormToolOptions<TOutput = FormData> {
   form: HTMLFormElement
@@ -37,6 +38,8 @@ export function registerFormTool<TOutput = FormData>(
     inputSchema,
     confirmation: options.confirmation,
     execute(input) {
+      const errors = validateJsonValue(input, inferFormInputSchema(options.form))
+      if (errors.length) throw new Error(formatJsonValueValidationError(errors))
       fillForm(options.form, input)
       if (!options.form.checkValidity()) {
         throw new Error('Form input does not satisfy native validation constraints.')
@@ -104,7 +107,7 @@ function createFormToolAttributeRestorer(
 }
 
 export function inferFormInputSchema(form: HTMLFormElement): JsonSchema {
-  const properties: Record<string, JsonSchema> = {}
+  const properties: Record<string, JsonSchema> = Object.create(null)
   const required: string[] = []
   const fields = Array.from(form.elements).filter(isNamedField)
   const seenNames = new Set<string>()
@@ -148,14 +151,23 @@ function inferFieldSchema(
   if (field instanceof HTMLInputElement && field.type === 'checkbox') {
     return {
       type: 'boolean',
+      ...(field.required ? { const: true } : {}),
       description: getFieldDescription(field)
     }
+  }
+
+  if (field instanceof HTMLInputElement && field.type === 'radio') {
+    return { type: 'string', enum: [field.value], description: getFieldDescription(field) }
   }
 
   if (field instanceof HTMLSelectElement) {
     const options = Array.from(field.options)
       .filter(function isEnabledOption(option) {
-        return !option.disabled && option.value !== ''
+        return (
+          !option.disabled &&
+          !(option.parentElement instanceof HTMLOptGroupElement && option.parentElement.disabled) &&
+          (!field.required || field.multiple || option.value !== '')
+        )
       })
       .map(function mapOption(option) {
         return option.value
@@ -216,15 +228,37 @@ function inferFieldGroupSchema(
   field: RadioNodeList,
   firstField: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
 ): JsonSchema {
+  const fields = Array.from(field).filter(isNamedField)
+  if (fields.length === 1) return inferFieldSchema(fields[0]!)
+  const checkboxes = fields.filter(function checkbox(element) {
+    return element instanceof HTMLInputElement && element.type === 'checkbox'
+  })
+  if (checkboxes.length === fields.length) {
+    return {
+      type: 'array',
+      items: {
+        type: 'string',
+        enum: checkboxes.map(function value(element) {
+          return element.value
+        })
+      },
+      description: getFieldDescription(firstField)
+    }
+  }
   const radioOptions = Array.from(field)
     .filter(function isEnabledRadioOption(element): element is HTMLInputElement {
-      return element instanceof HTMLInputElement && element.type === 'radio' && !element.disabled
+      return (
+        element instanceof HTMLInputElement && element.type === 'radio' && isNamedField(element)
+      )
     })
     .map(function mapRadioOption(element) {
       return element.value
     })
 
-  if (radioOptions.length === 0) return inferFieldSchema(firstField)
+  if (radioOptions.length !== fields.length)
+    throw new Error(
+      `Form field "${firstField.name}" repeats a name outside a radio or checkbox group.`
+    )
 
   return {
     type: 'string',
@@ -267,17 +301,26 @@ function applyFormToolFieldOptions(
 
 function fillForm(form: HTMLFormElement, input: FormInput): void {
   for (const [name, value] of Object.entries(input)) {
-    const field = form.elements.namedItem(name)
+    let field = form.elements.namedItem(name)
     if (!field) continue
 
     if (field instanceof RadioNodeList) {
-      field.value = Array.isArray(value) ? (value[0] ?? '') : String(value)
-      dispatchRadioGroupEvents(field)
-      continue
+      const fields = Array.from(field).filter(isNamedField)
+      if (fields.length === 1) field = fields[0]!
+      else {
+        for (const item of fields) {
+          if (!(item instanceof HTMLInputElement)) continue
+          item.checked = Array.isArray(value)
+            ? value.includes(item.value)
+            : item.value === String(value)
+          if (item.type === 'checkbox' || item.checked) dispatchFieldEvents(item)
+        }
+        continue
+      }
     }
 
-    if (field instanceof HTMLInputElement && field.type === 'checkbox') {
-      field.checked = Boolean(value)
+    if (field instanceof HTMLInputElement && ['checkbox', 'radio'].includes(field.type)) {
+      field.checked = field.type === 'checkbox' ? Boolean(value) : field.value === String(value)
       dispatchFieldEvents(field)
       continue
     }
@@ -326,7 +369,9 @@ function getStringConstraints(
   return {
     ...(field.minLength >= 0 ? { minLength: field.minLength } : {}),
     ...(field.maxLength >= 0 ? { maxLength: field.maxLength } : {}),
-    ...(field instanceof HTMLInputElement && field.pattern ? { pattern: field.pattern } : {})
+    ...(field instanceof HTMLInputElement && field.pattern
+      ? { pattern: `^(?:${field.pattern})$` }
+      : {})
   }
 }
 
@@ -336,7 +381,7 @@ function isRequiredField(
 ): boolean {
   if (namedField instanceof RadioNodeList) {
     return Array.from(namedField).some(function hasRequiredField(element) {
-      return isFormControl(element) && element.required
+      return isFormControl(element) && isNamedField(element) && element.required
     })
   }
 
@@ -351,16 +396,6 @@ function isFormControl(
     element instanceof HTMLTextAreaElement ||
     element instanceof HTMLSelectElement
   )
-}
-
-function dispatchRadioGroupEvents(field: RadioNodeList): void {
-  for (let index = 0; index < field.length; index += 1) {
-    const item = field.item(index)
-    if (item instanceof HTMLInputElement && item.checked) {
-      dispatchFieldEvents(item)
-      return
-    }
-  }
 }
 
 function dispatchFieldEvents(
@@ -411,6 +446,12 @@ function isNamedField(
       element instanceof HTMLTextAreaElement ||
       element instanceof HTMLSelectElement) &&
     Boolean(element.name) &&
+    !element.matches(':disabled') &&
+    !('readOnly' in element && element.readOnly) &&
+    element.type !== 'hidden' &&
+    element.type !== 'file' &&
+    element.type !== 'reset' &&
+    element.type !== 'image' &&
     element.type !== 'submit' &&
     element.type !== 'button'
   )

@@ -48,7 +48,15 @@ export function createToolCatalog(
   return {
     title: options.title ?? 'WebMCP Tool Catalog',
     tools: registrations.map(function mapRegistration(registration) {
-      const availability = registration.tool.scope?.()
+      let availability: ToolScopeResult | undefined
+      try {
+        availability = registration.tool.scope?.()
+      } catch (error) {
+        availability = {
+          available: false,
+          reason: error instanceof Error ? error.message : 'Tool scope failed.'
+        }
+      }
 
       return {
         name: registration.tool.name,

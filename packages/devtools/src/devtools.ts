@@ -437,9 +437,7 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
     }
 
     if (action === 'sample') {
-      const textarea = root.querySelector<HTMLTextAreaElement>(
-        `textarea[data-tool-name="${targetElement.dataset.toolName}"]`
-      )
+      const textarea = findInput(String(targetElement.dataset.toolName))
       const registration = listTools().find(
         (item) => item.tool.name === targetElement.dataset.toolName
       )
@@ -491,6 +489,11 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
   }
 
   function render() {
+    const active = root.contains(document.activeElement) ? document.activeElement : null
+    const selection =
+      active instanceof HTMLTextAreaElement
+        ? ([active.selectionStart, active.selectionEnd] as const)
+        : undefined
     const registrations = listTools()
     const healthReport = getIntegrationHealthReport()
     pruneDraftInputs(registrations)
@@ -539,7 +542,7 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
               <summary>Prompt preview</summary>
               <pre>${escapeHtml(createPromptPreview(registration.tool.name, registration.tool.description, registration.tool.inputSchema))}</pre>
             </details>
-            <textarea data-tool-name="${escapeAttribute(registration.tool.name)}">${escapeHtml(getDraftInput(registration.tool))}</textarea>
+            <textarea aria-label="${escapeAttribute(registration.tool.name)} input JSON" data-tool-name="${escapeAttribute(registration.tool.name)}">${escapeHtml(getDraftInput(registration.tool))}</textarea>
             <div class="wmk-devtools__actions">
               <button type="button" data-action="invoke" data-tool-name="${escapeAttribute(registration.tool.name)}">Invoke</button>
               <button type="button" data-action="sample" data-tool-name="${escapeAttribute(registration.tool.name)}">Sample</button>
@@ -558,7 +561,7 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
                     (item) => `
             <article class="wmk-devtools__history-item">
               <span>${escapeHtml(item.toolName)} - ${escapeHtml(item.status)} - ${escapeHtml(item.detail)}${item.durationMs === undefined ? '' : ` - ${item.durationMs}ms`}</span>
-              <pre>${escapeHtml(JSON.stringify({ input: item.input, output: item.output }, null, 2))}</pre>
+              <pre>${escapeHtml(formatHistoryData(item))}</pre>
               <button type="button" data-action="replay" data-history-id="${item.id}">Replay</button>
             </article>
           `
@@ -568,12 +571,25 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
         </div>
       </div>
     `
+    if (active instanceof HTMLTextAreaElement) {
+      const input = findInput(active.dataset.toolName ?? '')
+      input?.focus({ preventScroll: true })
+      if (selection) input?.setSelectionRange(...selection)
+    } else if (active instanceof HTMLButtonElement) {
+      Array.from(root.querySelectorAll('button'))
+        .find(function same(button) {
+          return (
+            button.dataset.action === active.dataset.action &&
+            button.dataset.toolName === active.dataset.toolName &&
+            button.dataset.historyId === active.dataset.historyId
+          )
+        })
+        ?.focus({ preventScroll: true })
+    }
   }
 
   async function invokeFromOverlay(toolName: string, replayInput?: Record<string, unknown>) {
-    const textarea = root.querySelector<HTMLTextAreaElement>(
-      `textarea[data-tool-name="${toolName}"]`
-    )
+    const textarea = findInput(toolName)
     if (textarea) draftInputs.set(toolName, textarea.value)
     const parsedInput = replayInput
       ? ({ ok: true, input: replayInput } as const)
@@ -589,6 +605,12 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
       source: 'devtools'
     } satisfies ToolInvocation
     await invokeTool(invocation)
+  }
+
+  function findInput(toolName: string): HTMLTextAreaElement | undefined {
+    return Array.from(root.querySelectorAll('textarea')).find(function matches(input) {
+      return input.dataset.toolName === toolName
+    })
   }
 
   function parseInput(
@@ -743,13 +765,21 @@ function isMutationTool(tool: WebMCPTool): boolean {
 }
 
 function createSampleInput(schema: JsonSchema): Record<string, unknown> {
-  const sample: Record<string, unknown> = {}
+  const sample: Record<string, unknown> = Object.create(null)
 
   for (const [key, propertySchema] of Object.entries(schema.properties ?? {})) {
     sample[key] = createSampleValue(key, propertySchema)
   }
 
   return sample
+}
+
+function formatHistoryData(item: HistoryItem): string {
+  try {
+    return JSON.stringify({ input: item.input, output: item.output }, null, 2)
+  } catch {
+    return 'This tool result cannot be displayed as JSON.'
+  }
 }
 
 function createSampleValue(key: string, schema: JsonSchema): unknown {

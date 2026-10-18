@@ -101,6 +101,7 @@ export function createHostedOpenAIPlanner(rawOptions: HostedOpenAIPlannerOptions
       context: PlannerContext = {},
       runOptions?: PlannerRunOptions
     ) {
+      runOptions?.signal?.throwIfAborted()
       const body = serializePlannerRequest(
         {
           context,
@@ -130,6 +131,7 @@ export function createHostedOpenAIPlanner(rawOptions: HostedOpenAIPlannerOptions
       }
 
       const plan = (await response.json()) as ToolPlan
+      runOptions?.signal?.throwIfAborted()
       validateToolPlan(plan, tools, { singleStep: runOptions?.singleStep })
       return plan
     }
@@ -222,9 +224,10 @@ async function getPaidAccessSession(
   currentSession: PaidAccessSession | null,
   signal?: AbortSignal
 ): Promise<PaidAccessSession> {
+  signal?.throwIfAborted()
   if (currentSession && isPaidAccessSessionFresh(currentSession)) return currentSession
 
-  const turnstileToken = await getBrowserChallengeToken(options)
+  const turnstileToken = await getBrowserChallengeToken(options, signal)
   const response = await fetch(options.sessionEndpoint, {
     body: JSON.stringify({
       accessKey: options.accessKey,
@@ -247,27 +250,34 @@ async function getPaidAccessSession(
 }
 
 async function getBrowserChallengeToken(
-  options: HostedOpenAIPlannerOptions
+  options: HostedOpenAIPlannerOptions,
+  signal?: AbortSignal
 ): Promise<string | undefined> {
   if (typeof window === 'undefined') return undefined
-  const providedToken = await window.webmcpCreateTurnstileToken?.({
-    model: options.model,
-    serviceId: hostedOpenAIPlannerServiceId
-  })
+  const providedToken = await waitForChallenge(
+    Promise.resolve(
+      window.webmcpCreateTurnstileToken?.({
+        model: options.model,
+        serviceId: hostedOpenAIPlannerServiceId
+      })
+    ),
+    signal
+  )
   if (providedToken) return providedToken
 
   const siteKey = options.browserChallengeSiteKey ?? getTurnstileSiteKey()
   if (!siteKey) return undefined
 
-  return createTurnstileToken(siteKey)
+  return createTurnstileToken(siteKey, signal)
 }
 
 function isPaidAccessSessionFresh(session: PaidAccessSession): boolean {
   return Date.parse(session.expiresAt) - sessionRefreshSkewMs > Date.now()
 }
 
-async function createTurnstileToken(siteKey: string): Promise<string> {
-  await loadTurnstileScript()
+async function createTurnstileToken(siteKey: string, signal?: AbortSignal): Promise<string> {
+  await waitForChallenge(loadTurnstileScript(), signal)
+  signal?.throwIfAborted()
 
   return new Promise(function createToken(resolve, reject) {
     const container = document.createElement('div')
@@ -276,36 +286,61 @@ async function createTurnstileToken(siteKey: string): Promise<string> {
 
     let widgetId = ''
     function cleanup() {
+      signal?.removeEventListener('abort', abort)
       if (widgetId) window.turnstile?.remove?.(widgetId)
       container.remove()
     }
-
-    widgetId =
-      window.turnstile?.render(container, {
-        'error-callback': function handleError() {
-          cleanup()
-          reject(new Error('Browser challenge failed.'))
-        },
-        'expired-callback': function handleExpired() {
-          cleanup()
-          reject(new Error('Browser challenge expired.'))
-        },
-        callback: function handleToken(token) {
-          cleanup()
-          resolve(token)
-        },
-        execution: 'execute',
-        sitekey: siteKey,
-        size: 'invisible'
-      }) ?? ''
-
-    if (!widgetId) {
+    function abort() {
       cleanup()
-      reject(new Error('Browser challenge is unavailable.'))
-      return
+      reject(signal?.reason)
     }
+    signal?.addEventListener('abort', abort, { once: true })
 
-    window.turnstile?.execute(widgetId)
+    try {
+      widgetId =
+        window.turnstile?.render(container, {
+          'error-callback': function handleError() {
+            cleanup()
+            reject(new Error('Browser challenge failed.'))
+          },
+          'expired-callback': function handleExpired() {
+            cleanup()
+            reject(new Error('Browser challenge expired.'))
+          },
+          callback: function handleToken(token) {
+            cleanup()
+            resolve(token)
+          },
+          execution: 'execute',
+          sitekey: siteKey,
+          size: 'invisible'
+        }) ?? ''
+
+      if (!widgetId) {
+        cleanup()
+        reject(new Error('Browser challenge is unavailable.'))
+        return
+      }
+
+      window.turnstile?.execute(widgetId)
+    } catch (error) {
+      cleanup()
+      reject(error)
+    }
+  })
+}
+
+function waitForChallenge<T>(pending: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return pending
+  return new Promise(function wait(resolve, reject) {
+    function abort() {
+      reject(signal!.reason)
+    }
+    signal!.addEventListener('abort', abort, { once: true })
+    pending.then(resolve, reject).finally(function cleanup() {
+      signal!.removeEventListener('abort', abort)
+    })
+    if (signal!.aborted) abort()
   })
 }
 
@@ -322,6 +357,7 @@ function loadTurnstileScript(): Promise<void> {
         resolve()
       })
       existingScript.addEventListener('error', function handleError() {
+        existingScript.remove()
         turnstileScriptPromise = undefined
         reject(new Error('Browser challenge script failed to load.'))
       })
@@ -336,6 +372,7 @@ function loadTurnstileScript(): Promise<void> {
       resolve()
     })
     script.addEventListener('error', function handleError() {
+      script.remove()
       turnstileScriptPromise = undefined
       reject(new Error('Browser challenge script failed to load.'))
     })

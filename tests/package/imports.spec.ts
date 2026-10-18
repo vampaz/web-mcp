@@ -14,11 +14,17 @@ it('keeps the tarball limited to published code and documentation', async functi
   expect(stdout).not.toMatch(/\.env|\.spec\.|test-utils/)
   expect(stdout).toContain('package/dist/pi/worker.js')
   const { stdout: raw } = await run('tar', ['-xOf', artifact, 'package/package.json'])
-  expect(JSON.parse(raw).peerDependenciesMeta['@earendil-works/pi-durable'].optional).toBe(true)
+  const manifest = JSON.parse(raw)
+  expect(Object.keys(manifest.dependencies).sort()).toEqual([
+    '@earendil-works/chord',
+    '@earendil-works/pi-ai',
+    '@earendil-works/pi-durable'
+  ])
+  expect(Object.keys(manifest.peerDependencies).sort()).toEqual(['react', 'svelte', 'vue', 'zod'])
 })
 
 it.each(['core-only', 'chat-only'])(
-  '%s resolves declarations and runs without Pi or framework peers',
+  '%s resolves declarations and runs without framework peers',
   async function imports(name) {
     const fixture = await installFixture(name)
     try {

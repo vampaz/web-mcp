@@ -9,8 +9,8 @@ This guide explains runtime behavior. The generated reference lists all public e
 | Import                      | Main API                                                          | Additional peer                                   |
 | --------------------------- | ----------------------------------------------------------------- | ------------------------------------------------- |
 | `@vampaz/webmcp-kit`        | Tools, registry, validation, planners, command input, diagnostics | None                                              |
-| `/pi`                       | `createPiHarness`, `createPiRuntime`, `createRegistryToolHost`    | Pi Durable, Pi AI, Chord when running Pi          |
-| `/pi/worker`                | `installPiServiceWorker`                                          | Pi Durable, Pi AI, Chord                          |
+| `/pi`                       | `createPiHarness`, `createPiRuntime`, `createRegistryToolHost`    | None; runtime dependencies install with the kit   |
+| `/pi/worker`                | `installPiServiceWorker`                                          | None; runtime dependencies install with the kit   |
 | `/chat`                     | `defineWebMCPChat`, `WebMCPChatElement`, `WebMCPChatOptions`      | None when supplied a controller                   |
 | `/vue`, `/react`, `/svelte` | `useWebMCPTool` and framework-specific types                      | The selected framework                            |
 | `/zod`                      | `defineZodTool`                                                   | Zod 4                                             |
@@ -45,7 +45,7 @@ The reserved core names are `tool_sequence`, `needs_clarification`, and `no_tool
 
 ## Invocation, approval, and results
 
-`invokeTool({ toolName, input, source?, signal?, confirmed? })` returns a `ToolInvocationResult`. Default source is `fallback`. The normal path validates input, checks availability, asks for approval, checks the guard, executes, and validates output. Cancellation and stale registration/schema/scope checks run again across asynchronous approval and guard boundaries.
+`invokeTool({ toolName, input, source?, signal?, confirmed? })` returns a `ToolInvocationResult`. Default source is `fallback`. The normal path copies the input, validates it, checks availability, asks for approval, checks the guard, executes, and validates output. Changes to the caller's input during approval cannot change the copied invocation. Input must support structured cloning. Cancellation and stale registration/schema/scope checks run again across asynchronous approval and guard boundaries.
 
 `setConfirmationHandler(handler)` installs the application's global approval UI. A tool's own `confirmation.handler` takes precedence. Handlers receive `(tool, input, reason, context?)`; when supplied, `context.signal` tells the UI to close a cancelled request. Passing `undefined` removes the global handler. Without a handler, the browser uses `window.confirm()`; without a browser confirmation API, approval is denied.
 
@@ -76,6 +76,8 @@ Successful results contain `status: 'success'`, `toolName`, `output`, and `durat
 
 `inferFormInputSchema(form)` reads supported native form constraints. `registerFormTool(options)` registers a form-backed tool, fills fields, and checks native validity. Its default execution returns `FormData`; it does not automatically submit an HTTP request. Provide `execute(input, form)` to call the application's submit path. Unregistering restores the declarative attributes installed by the helper. For conversation tools, return a small JSON-safe result instead of `FormData`.
 
+Only named, editable controls become inputs. Disabled controls, disabled fieldsets, read-only fields, hidden inputs, file inputs, and action buttons are excluded. Single checkboxes use booleans; checkbox groups and multiple selects use arrays. Radio groups use one string. Other repeated field names are unsupported. Optional dropdowns can select an enabled empty option. HTML patterns match the whole field. The helper rechecks the current form schema before filling; native validation still checks constraints outside the supported schema subset. The default `FormData` can include existing hidden values, so do not forward it to a model.
+
 `defineServerTool(options)` creates a definition; call `registerTool()` or a framework helper to register it. Its `endpoint`, optional `headers`, and optional `fetch` determine the request. Server tools POST `{ toolName, input, source }` as JSON. A successful response must contain JSON, or use status 204 for `undefined`. A non-2xx response fails the invocation. The browser forwards cancellation, but the server must independently authenticate, authorize, validate, and enforce idempotency where needed.
 
 `defineZodTool({ schema, ...toolOptions })` derives JSON Schema from Zod and parses input with Zod before execution. Unsupported Zod transformations/schema constructs can fail conversion; use schemas representable by the kit's JSON Schema subset. Keep Zod installed as an explicit peer.
@@ -94,7 +96,7 @@ Successful results contain `status: 'success'`, `toolName`, `output`, and `durat
 | `createHostedOpenAIPlanner(options)`      | Uses hosted session and planning endpoints; requires the host's supported access/session setup.                                                                                                                                                                                                                                          |
 | `createHostedOpenAIPlannerOption(config)` | Wraps hosted planning as a command-input option with model choices.                                                                                                                                                                                                                                                                      |
 
-`PlannerProviderConfig` selects `provider`, optional `model` and `baseUrl`, and `auth`. Server auth sends requests to an application endpoint. User-key mode exposes the key to the browser and is restricted in production unless explicitly allowed. Browser-local storage of a user key is not a place for application secrets.
+`PlannerProviderConfig` selects `provider`, optional `model` and `baseUrl`, and `auth`. Server auth sends requests to an application endpoint. User-key mode exposes the person's key to the browser in every environment. The application owns permission to offer this mode. Browser-local storage of a user key is not a place for application secrets. The unused `allowInProduction` option was removed; it never enforced a production restriction.
 
 OpenAI-compatible configuration supports `responseFormat` (`json_object` by default or `json_schema`), `maxTokens` (1–65,536), `temperature` (0–2; default 0), and optional `reasoningEffort`. These provider-specific settings apply to direct OpenAI-compatible requests; a server endpoint owns its own model policy. Truncated output with finish reason `length` fails planning.
 
@@ -120,6 +122,8 @@ App-supplied `planner`, `provider`, or `model` fixes those choices. `plannerOpti
 | `webmcp-command-panel-toggle` | `open`                                                                          |
 
 Events bubble and cross the shadow boundary. `run()` can return `undefined` when no command executes; inspect events/results rather than assuming a resolved promise means success. See the [README command-input examples](../README.md#ready-made-command-input) for provider controls and CSS properties.
+
+Removing the command element or changing its planner configuration cancels its pending command. Explicit Chrome AI selection reports browser AI failures. Only automatic or explicitly non-strict Chrome planning permits heuristic fallback.
 
 ## Pi controller and custom hosts
 
