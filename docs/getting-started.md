@@ -31,21 +31,32 @@ npm install @vampaz/webmcp-kit
 
 ## Dependency model
 
-The [root manifest](../package.json) has no unconditional `dependencies`. Every external runtime import is declared in `peerDependencies`; `peerDependenciesMeta` marks those peers optional because each belongs to a specific integration. npm does not install optional peers automatically. Install the peers for the imports you use as dependencies of your application.
+From `0.2.1`, the [root manifest](../package.json) declares `@earendil-works/chord`, `@earendil-works/pi-ai`, and `@earendil-works/pi-durable` as normal `dependencies`. npm installs these internal runtime libraries with the kit and removes them on uninstall when no other dependency needs them. Consumers install and update the kit, without managing its internal libraries separately.
 
-| Import or feature                                                   | Runtime packages supplied by the application                                   |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Core, `/devtools`, `/mcp-bridge`, `/testing`, `/testing/playwright` | None                                                                           |
-| `/chat` with an application-supplied controller                     | None                                                                           |
-| `/react`                                                            | `react`                                                                        |
-| `/svelte`                                                           | `svelte`                                                                       |
-| `/vue`                                                              | `vue`                                                                          |
-| `/zod`                                                              | `zod`                                                                          |
-| Pi runtime and `/pi/worker`                                         | `@earendil-works/chord`, `@earendil-works/pi-ai`, `@earendil-works/pi-durable` |
+Framework and Zod adapters use optional `peerDependencies` because they integrate with libraries chosen and owned by the application. Install only the peers for the adapters you use:
 
-Optional means unnecessary when that feature is unused. It does not mean a selected integration can run without its peers. The Pi runtime's peers have their own transitive dependencies. Core and chat with an application-supplied controller do not load that runtime. The Playwright helpers accept a structurally compatible page supplied by the caller; the kit does not import Playwright at runtime.
+| Import or feature                                                   | Runtime packages supplied by the application                    |
+| ------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Core, `/devtools`, `/mcp-bridge`, `/testing`, `/testing/playwright` | None                                                            |
+| `/chat` with an application-supplied controller                     | None                                                            |
+| `/react`                                                            | `react`                                                         |
+| `/svelte`                                                           | `svelte`                                                        |
+| `/vue`                                                              | `vue`                                                           |
+| `/zod`                                                              | `zod`                                                           |
+| Pi runtime and `/pi/worker`                                         | None; npm installs the kit's runtime dependencies automatically |
 
-The same seven peer packages also appear in this repository's `devDependencies` so development, builds, declarations, and tests can exercise every entry point. This does not install two copies or make consumers install the repository's development tools. See [npm's optional-peer behavior](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/#peerdependenciesmeta).
+Optional means unnecessary when that adapter is unused. It does not mean a selected adapter can run without its peer. The Pi dependencies are installed for every kit consumer, but core and chat with an application-supplied controller do not load the Pi runtime. The Playwright helpers accept a structurally compatible page supplied by the caller; the kit does not import Playwright at runtime.
+
+The four framework and Zod peers also appear in this repository's `devDependencies` so development, builds, declarations, and tests can exercise every adapter. Consumers do not install the repository's development tools. See [npm's dependency declarations](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/#dependencies) and [optional-peer behavior](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/#peerdependenciesmeta).
+
+If you followed the `0.2.0` instructions and added the three internal libraries directly, first upgrade the kit to `0.2.1` or newer. Then remove those direct declarations, provided your application does not import the libraries itself:
+
+```sh
+npm install @vampaz/webmcp-kit@^0.2.1
+npm uninstall @earendil-works/chord @earendil-works/pi-ai @earendil-works/pi-durable
+```
+
+npm keeps the copies required by the kit as transitive dependencies. To remove the kit later, run `npm uninstall @vampaz/webmcp-kit`.
 
 The remaining development dependencies serve these repository tasks:
 

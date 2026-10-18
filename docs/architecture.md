@@ -41,7 +41,7 @@ flowchart TB
 | `/chat`           | Text-only transcript and controls bound to a supplied controller                                  | Only after defining, mounting, and configuring the element |
 | Framework helpers | Register tools in a framework lifecycle                                                           | When the helper runs in its documented lifecycle           |
 
-Core and chat can be consumed without Pi's runtime peers. `/chat` imports controller types only. A fake or application-owned controller can drive the same component. The page's default tool host uses the existing core registry; it does not create a second registry inside the worker.
+Core and chat do not load the Pi runtime. npm installs the kit's Pi dependencies automatically, while `/chat` imports controller types only. A fake or application-owned controller can drive the same component. The page's default tool host uses the existing core registry; it does not create a second registry inside the worker.
 
 ## One conversational turn
 

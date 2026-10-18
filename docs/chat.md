@@ -2,9 +2,9 @@
 
 [Documentation index](./README.md) · [Complete integration](./integration.md) · [API reference](./api-reference.md)
 
-This subpath requires version `0.2.0` or newer. Before that release reaches your registry, use the repository lab or its verified tarball.
+This subpath was introduced in `0.2.0`. Use `0.2.1` or newer for automatic Pi runtime dependency installation when connecting chat to the kit's Pi harness.
 
-`@vampaz/webmcp-kit/chat` defines `<webmcp-chat>` explicitly. It imports controller types only. It can render a fake or application-owned `PiController` without installing the Pi peers or a UI framework. Imports are safe during server rendering; call `defineWebMCPChat()` in the browser.
+`@vampaz/webmcp-kit/chat` defines `<webmcp-chat>` explicitly. It imports controller types only. It can render a fake or application-owned `PiController` without loading the Pi runtime or installing a UI framework. Imports are safe during server rendering; call `defineWebMCPChat()` in the browser.
 
 ```ts
 import { defineWebMCPChat, type WebMCPChatElement } from '@vampaz/webmcp-kit/chat'

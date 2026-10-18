@@ -81,7 +81,7 @@ npm run test:package
 
 `pack:package` writes `artifacts/webmcp-kit.tgz` and adjacent JSON metadata. The source digest includes package sources, declarations' configuration, package manifests, README, and documentation. Consumer checks reject an artifact whose digest or bytes differ. `test:package` never rebuilds the library; it compiles the isolated consumer's worker from the installed tarball.
 
-The package suite checks distribution contents, strict consumer declarations, core/chat imports without optional Pi peers, SSR imports, one shared registry, and a nested worker on trusted HTTPS. It also typechecks the shipped [integration example](./examples/counter-assistant.ts). Source aliases are disabled in these consumers.
+The package suite checks distribution contents, strict consumer declarations, core/chat imports without framework peers, SSR imports, one shared registry, and a nested worker on trusted HTTPS. The Pi consumer installs the kit without declaring its internal runtime libraries. The suite also typechecks the shipped [integration example](./examples/counter-assistant.ts). Source aliases are disabled in these consumers.
 
 Run `npm audit` for advisories and `npm audit signatures` for registry verification after dependency changes. These checks answer different questions from runtime tests. The checks workflow validates and tests a tarball before uploading it. The release workflow validates a fresh artifact and publishes those tested bytes. Neither local checks nor a build prove publication or deployment.
 
@@ -102,23 +102,23 @@ The workflow builds once, tests `artifacts/webmcp-kit.tgz`, and publishes that t
 
 ## Troubleshooting
 
-| Symptom                                      | Inspect and correct                                                                                                                                          |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `/pi` or `/chat` cannot be resolved          | The installed release may predate these exports. Use the reviewed tarball described in the integration guide, or a release that actually contains them.      |
-| Missing Pi runtime peer                      | Install the three optional Pi runtime peers explicitly when using the Pi runtime. Chat with a supplied controller does not need them.                        |
-| No tools discovered                          | Check component mounting, `when`, `scope()`, stable names, and duplicate copies of the kit. Use `listTools()` and the integration health report in the page. |
-| Native registration fails but fallback works | Await registration `ready`, inspect `warnings`, and detect the actual browser API. Fallback availability does not prove native registration.                 |
-| Worker registration or activation fails      | Check the HTTPS certificate, same origin, non-root scope, base path, compiled asset, MIME type, CSP, and root PWA caching.                                   |
-| Page loads an old worker                     | Recompile the wrapper, verify the deployed asset and registration, then reload. Stop active work before updating a development registration.                 |
-| `configuration` or `unsupported`             | Check session fields, limits, browser capabilities, and conversational planner availability. Handle initialization rejection in the host.                    |
-| `conversation_busy`                          | Another controller/tab owns the operation. Wait for it to finish or stop it through its own UI. Do not automatically steal or retry the action.              |
-| `stale_document`                             | Cancellation or catalog/document change invalidated the request. Rediscover current state for a new user turn.                                               |
-| `transport_failed` after a mutation          | The action may have executed before its reply was lost. Inspect actual app/server state before any new attempt.                                              |
-| `action_denied`                              | The user declined. Leave the turn stopped and allow a new explicit request.                                                                                  |
-| `provider_failed`                            | Inspect the endpoint and model response, permissions, truncation, and `singleStep` contract. Do not silently substitute another model.                       |
-| `limit_reached`                              | Reduce context/result size, choose valid bounded limits, or clear history when appropriate. Automatic compaction is disabled.                                |
-| `storage_failed` or missing history          | Check browser storage settings, quota, eviction, account partition, and blocked database operations. Persistence is not guaranteed by the browser.           |
-| Popup is clipped or unavailable              | Verify Popover API support, `ResizeObserver`, and the production CSP. Use the documented CSS variables and test small/zoomed viewports.                      |
-| Stop returns but a server action completed   | Cancellation is cooperative after dispatch. Use application-specific idempotency and state checks; Stop is not rollback.                                     |
+| Symptom                                      | Inspect and correct                                                                                                                                                        |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/pi` or `/chat` cannot be resolved          | The installed release may predate these exports. Use the reviewed tarball described in the integration guide, or a release that actually contains them.                    |
+| Missing Pi runtime dependency                | Upgrade to `0.2.1` or newer and reinstall the kit. npm installs the runtime dependencies automatically. See the dependency model for removing direct `0.2.0` declarations. |
+| No tools discovered                          | Check component mounting, `when`, `scope()`, stable names, and duplicate copies of the kit. Use `listTools()` and the integration health report in the page.               |
+| Native registration fails but fallback works | Await registration `ready`, inspect `warnings`, and detect the actual browser API. Fallback availability does not prove native registration.                               |
+| Worker registration or activation fails      | Check the HTTPS certificate, same origin, non-root scope, base path, compiled asset, MIME type, CSP, and root PWA caching.                                                 |
+| Page loads an old worker                     | Recompile the wrapper, verify the deployed asset and registration, then reload. Stop active work before updating a development registration.                               |
+| `configuration` or `unsupported`             | Check session fields, limits, browser capabilities, and conversational planner availability. Handle initialization rejection in the host.                                  |
+| `conversation_busy`                          | Another controller/tab owns the operation. Wait for it to finish or stop it through its own UI. Do not automatically steal or retry the action.                            |
+| `stale_document`                             | Cancellation or catalog/document change invalidated the request. Rediscover current state for a new user turn.                                                             |
+| `transport_failed` after a mutation          | The action may have executed before its reply was lost. Inspect actual app/server state before any new attempt.                                                            |
+| `action_denied`                              | The user declined. Leave the turn stopped and allow a new explicit request.                                                                                                |
+| `provider_failed`                            | Inspect the endpoint and model response, permissions, truncation, and `singleStep` contract. Do not silently substitute another model.                                     |
+| `limit_reached`                              | Reduce context/result size, choose valid bounded limits, or clear history when appropriate. Automatic compaction is disabled.                                              |
+| `storage_failed` or missing history          | Check browser storage settings, quota, eviction, account partition, and blocked database operations. Persistence is not guaranteed by the browser.                         |
+| Popup is clipped or unavailable              | Verify Popover API support, `ResizeObserver`, and the production CSP. Use the documented CSS variables and test small/zoomed viewports.                                    |
+| Stop returns but a server action completed   | Cancellation is cooperative after dispatch. Use application-specific idempotency and state checks; Stop is not rollback.                                                   |
 
 Subscribe to controller snapshots for state and errors. Core events may contain input and output data; redact diagnostics before logging them. Capture the package version/artifact digest, browser features, worker URL/scope, session partition identifiers appropriate for logging, and error code when reporting a failure. Do not include credentials or private conversation contents by default.

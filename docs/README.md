@@ -2,24 +2,24 @@
 
 WebMCP Kit exposes application actions through one registry and invocation pipeline. Add a planner for commands, a Pi controller for persistent conversations, and the chat component when you want a supplied interface.
 
-The `/pi`, `/pi/worker`, and `/chat` additions require version `0.2.0` or newer. Before that release reaches your registry, use a verified local tarball. Installing an older version will not provide these APIs.
+The `/pi`, `/pi/worker`, and `/chat` additions were introduced in `0.2.0`. Install `0.2.1` or newer so npm also installs their runtime dependencies automatically.
 
 ## Start here
 
-| Task                                                         | Guide                                                     |
-| ------------------------------------------------------------ | --------------------------------------------------------- |
-| Integrate tools, a worker, and chat into an application      | [Integration walkthrough](./integration.md)               |
-| Understand execution, persistence, and ownership             | [Architecture and diagrams](./architecture.md)            |
-| Look up defaults, errors, events, and lifecycle behavior     | [API behavior](./api-behavior.md)                         |
-| Find every exported function, overload, interface, and type  | [Complete API reference](./api-reference.md)              |
-| Prepare HTTPS, worker assets, CSP, tests, and deployment     | [Operations and troubleshooting](./operations.md)         |
-| Add core tools without a conversation runtime                | [Getting started](./getting-started.md)                   |
-| Choose runtime peers and understand development dependencies | [Dependency model](./getting-started.md#dependency-model) |
-| Choose a planner and implement a server endpoint             | [Planner providers](./planner-providers.md)               |
-| Run a headless persistent conversation                       | [Pi harness](./pi.md)                                     |
-| Configure inline or popup chat and its styles                | [Chat UI](./chat.md)                                      |
-| Set approval and authorization boundaries                    | [Security](./security.md)                                 |
-| Evaluate planner behavior                                    | [Planner evaluations](./evals.md)                         |
+| Task                                                                   | Guide                                                     |
+| ---------------------------------------------------------------------- | --------------------------------------------------------- |
+| Integrate tools, a worker, and chat into an application                | [Integration walkthrough](./integration.md)               |
+| Understand execution, persistence, and ownership                       | [Architecture and diagrams](./architecture.md)            |
+| Look up defaults, errors, events, and lifecycle behavior               | [API behavior](./api-behavior.md)                         |
+| Find every exported function, overload, interface, and type            | [Complete API reference](./api-reference.md)              |
+| Prepare HTTPS, worker assets, CSP, tests, and deployment               | [Operations and troubleshooting](./operations.md)         |
+| Add core tools without a conversation runtime                          | [Getting started](./getting-started.md)                   |
+| Understand runtime dependencies, optional peers, and development tools | [Dependency model](./getting-started.md#dependency-model) |
+| Choose a planner and implement a server endpoint                       | [Planner providers](./planner-providers.md)               |
+| Run a headless persistent conversation                                 | [Pi harness](./pi.md)                                     |
+| Configure inline or popup chat and its styles                          | [Chat UI](./chat.md)                                      |
+| Set approval and authorization boundaries                              | [Security](./security.md)                                 |
+| Evaluate planner behavior                                              | [Planner evaluations](./evals.md)                         |
 
 ## Frameworks and runnable examples
 

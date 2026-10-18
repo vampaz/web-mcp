@@ -2,7 +2,7 @@
 
 Adopt the published package only after the local lab, real-model lane, isolated package fixtures, and review gate pass. This repository's implementation does not edit the sibling demo.
 
-1. Install the reviewed kit version and explicit Pi 1.3 peers. Verify all three imports and the worker entry from the tarball rather than sibling source aliases.
+1. Install a reviewed kit version from `0.2.1` onward; npm installs its Pi runtime dependencies automatically. Verify all three imports and the worker entry from the tarball rather than sibling source aliases.
 2. Replace the duplicate Pi loop, model bridge, page connection, and IndexedDB implementation with `/pi`. Retain application-owned tool registration, current safe context, guards, confirmation UI, and model configuration.
 3. Compile a small `/pi/worker` wrapper into a dedicated same-origin URL/scope. Preserve the application's PWA worker. Confirm the page can connect without being controlled by the Pi scope.
 4. Replace the duplicated conversation renderer with `/chat`. Configure text, controller, CSS properties, and `mode: 'popup'` in code. The package supplies the draggable launcher and resizable panel; remove the duplicate demo popup shell when adopting it. Keep account/provider/model UI in the host. Keep existing bounded Planner mode independent.

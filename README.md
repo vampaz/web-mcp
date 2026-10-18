@@ -27,13 +27,13 @@ The npm package name is `@vampaz/webmcp-kit`. Releases publish the compiled `dis
 
 ## Independent package surfaces
 
-The Pi and chat subpaths require version `0.2.0` or newer. Before that release reaches your registry, use the local lab or a verified tarball. See the [release procedure](./docs/operations.md#release-procedure).
+The Pi and chat subpaths were introduced in `0.2.0`. Use `0.2.1` or newer so npm installs the Pi runtime dependencies automatically. See the [release procedure](./docs/operations.md#release-procedure).
 
-The package separates core (`@vampaz/webmcp-kit`), the headless [Pi harness](./docs/pi.md) (`/pi`), and the framework-neutral [chat UI](./docs/chat.md) (`/chat`). `/pi/worker` installs an application-compiled service worker. Pi peers are optional; core and chat with a supplied controller do not load them.
+The package separates core (`@vampaz/webmcp-kit`), the headless [Pi harness](./docs/pi.md) (`/pi`), and the framework-neutral [chat UI](./docs/chat.md) (`/chat`). `/pi/worker` installs an application-compiled service worker. Core and chat with a supplied controller do not load the Pi runtime.
 
 Run the in-repository [local lab](./apps/demo/README.md) with `npm ci --ignore-scripts` and `npm run dev:demo`. It opens in Chat, with tabs ordered Chat, Harness, Core. Harness and Chat use a developer-selected LM Studio model. Ordinary browser fixtures and real-model checks are separate suites. Package fixtures consume an unpublished tarball with source aliases disabled.
 
-The library has no unconditional runtime npm dependencies. Framework, Zod, and Pi integrations declare optional peers; install the peers for the features your application uses. The same packages are development dependencies here so the repository can build and test every integration. See the [complete dependency map](./docs/getting-started.md#dependency-model).
+Install the kit with `npm install @vampaz/webmcp-kit`. Its Pi runtime libraries are normal dependencies managed by npm; consumers do not install them separately. Framework and Zod integrations use the application's optional peers. See the [complete dependency map](./docs/getting-started.md#dependency-model).
 
 The existing standalone demo remains an independent consumer. Its later adoption follows the [integration guide](./docs/demo-integration.md). Extension/account work is a subsequent deliverable.
 
