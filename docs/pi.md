@@ -157,7 +157,7 @@ Each model request has a two-minute timeout. A turn can span multiple requests a
 
 Entering the browser's back/forward cache stops the active turn while preserving the controller for restoration. A new user request reconnects if necessary. Actual document disposal destroys the controller.
 
-Automatic retry and compaction are disabled. Keep conversations short and use Clear chat when a budget is reached. The initial adapter replays a bounded commit log into Pi's reference store; it is not designed for unlimited histories. The adapter reports neither token streaming nor measured usage; Pi's required zero-valued usage fields are placeholders and must never be billed.
+Automatic retry and compaction are disabled. Keep conversations short and use New chat when a budget is reached. The initial adapter replays a bounded commit log into Pi's reference store; it is not designed for unlimited histories. The adapter reports neither token streaming nor measured usage; Pi's required zero-valued usage fields are placeholders and must never be billed.
 
 The host selects safe context and safe tool outputs. Context is requested afresh per round. After a successful action, Pi refreshes available tools before preparing its next round. A tool that opens an editor can therefore expose the editor's save action in the same turn. Catalog changes while a request or approval is pending still reject the stale action. Never include credentials or hidden server values. Browser storage can be evicted; `navigator.storage.persist()` is an optional host request and cannot guarantee retention.
 

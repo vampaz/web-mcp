@@ -56,14 +56,6 @@ function mount(api: PiController) {
     suggestedPrompts: ['Read the counter']
   })
   document.body.append(element)
-  const dialog = element.shadowRoot!.querySelector('dialog')!
-  // jsdom does not implement dialogs; native focus and Escape are covered in browser tests.
-  dialog.showModal = function showModal() {
-    this.open = true
-  }
-  dialog.close = function close() {
-    this.open = false
-  }
   const presentation = element.shadowRoot!.querySelector<HTMLElement>('.presentation')!
   presentation.showPopover = vi.fn()
   presentation.hidePopover = vi.fn()
@@ -311,7 +303,6 @@ it('does not steal focus when a pending clear finishes', async function test() {
   const clear = element.shadowRoot!.querySelector<HTMLButtonElement>('[data-clear]')!
   clear.focus()
   clear.click()
-  element.shadowRoot!.querySelector<HTMLButtonElement>('[data-confirm-clear]')!.click()
   outside.focus()
   complete()
   await Promise.resolve()
@@ -338,13 +329,11 @@ it('allows clearing an unreadable conversation even when no messages could load'
   fixture.publish({
     state: 'error',
     messages: [],
-    error: { code: 'limit_reached', message: 'Clear chat before continuing.' }
+    error: { code: 'limit_reached', message: 'Start a new chat before continuing.' }
   })
   const clear = element.shadowRoot!.querySelector<HTMLButtonElement>('[data-clear]')!
   expect(clear.disabled).toBe(false)
   clear.click()
-  expect(fixture.api.clear).not.toHaveBeenCalled()
-  element.shadowRoot!.querySelector<HTMLButtonElement>('[data-confirm-clear]')!.click()
   expect(fixture.api.clear).toHaveBeenCalledTimes(1)
 })
 
@@ -505,16 +494,70 @@ it('hides the working indicator when a turn ends before send settles', async fun
   await Promise.resolve()
 })
 
-it('cancels a stale clear confirmation when the controller changes', function test() {
+it('does not change a new controller when a previous chat reset finishes', async function staleReset() {
   const first = controller()
+  let complete!: () => void
+  vi.mocked(first.api.clear).mockReturnValueOnce(
+    new Promise(function pending(resolve) {
+      complete = resolve
+    })
+  )
   first.publish({ state: 'idle', messages: [{ id: 'a', role: 'user', text: 'Keep me' }] })
   const element = mount(first.api)
   element.shadowRoot!.querySelector<HTMLButtonElement>('[data-clear]')!.click()
-  const dialog = element.shadowRoot!.querySelector('dialog')!
-  expect(dialog.open).toBe(true)
   const second = controller()
   element.configure({ harness: second.api })
-  expect(dialog.open).toBe(false)
-  expect(first.api.clear).not.toHaveBeenCalled()
+  const input = element.shadowRoot!.querySelector('textarea')!
+  input.value = 'Draft in the new controller'
+  complete()
+  await Promise.resolve()
+  expect(input.value).toBe('Draft in the new controller')
+  expect(first.api.clear).toHaveBeenCalledOnce()
   expect(second.api.clear).not.toHaveBeenCalled()
+})
+
+it('starts a new chat immediately and resets its draft only after persistence succeeds', async function newChat() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  const input = element.shadowRoot!.querySelector('textarea')!
+  input.value = 'Unsent draft'
+  input.dispatchEvent(new Event('input'))
+  const button = element.shadowRoot!.querySelector<HTMLButtonElement>('[data-clear]')!
+  expect(button.getAttribute('aria-label')).toBe('New chat')
+  expect(button.disabled).toBe(false)
+  expect(element.shadowRoot!.querySelector('dialog')).toBeNull()
+  let complete!: () => void
+  vi.mocked(fixture.api.clear).mockReturnValueOnce(
+    new Promise(function pending(resolve) {
+      complete = resolve
+    })
+  )
+  button.click()
+  expect(fixture.api.clear).toHaveBeenCalledOnce()
+  expect(input.value).toBe('Unsent draft')
+  expect(input.disabled).toBe(true)
+  expect(button.disabled).toBe(true)
+  complete()
+  await Promise.resolve()
+  expect(input.value).toBe('')
+  expect(input.disabled).toBe(false)
+  expect(element.shadowRoot!.querySelector('[role=status]')!.textContent).toBe('New chat started.')
+  expect(element.shadowRoot!.activeElement).toBe(input)
+})
+
+it('keeps history and the draft when starting a new chat fails', async function failedReset() {
+  const fixture = controller()
+  fixture.publish({ state: 'idle', messages: [{ id: 'a', role: 'user', text: 'Saved message' }] })
+  vi.mocked(fixture.api.clear).mockRejectedValueOnce(new Error('Storage is unavailable'))
+  const element = mount(fixture.api)
+  const input = element.shadowRoot!.querySelector('textarea')!
+  input.value = 'Keep this draft'
+  element.shadowRoot!.querySelector<HTMLButtonElement>('[data-clear]')!.click()
+  await Promise.resolve()
+  expect(input.value).toBe('Keep this draft')
+  expect(input.disabled).toBe(false)
+  expect(element.shadowRoot!.querySelector('ol')!.textContent).toContain('Saved message')
+  expect(element.shadowRoot!.querySelector('[role=status]')!.textContent).toBe(
+    'Storage is unavailable'
+  )
 })

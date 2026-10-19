@@ -19,7 +19,7 @@ export class PiBrowserStorage extends MemoryStorage {
     if (this.bytes + size > this.maxBytes)
       throw new PiFailure(
         'limit_reached',
-        'Conversation storage is full. Clear chat before continuing.'
+        'Conversation storage is full. Start a new chat before continuing.'
       )
     try {
       const transaction = this.database.transaction('commits', 'readwrite', {
@@ -33,7 +33,7 @@ export class PiBrowserStorage extends MemoryStorage {
     } catch {
       throw new PiFailure(
         'storage_failed',
-        'Conversation could not be saved. Check browser storage, then reopen or clear chat.'
+        'Conversation could not be saved. Check browser storage, then reopen or start a new chat.'
       )
     }
   }
@@ -59,7 +59,7 @@ export async function openPiStorage(key: string, maxBytes: number): Promise<PiBr
     if (bytes > maxBytes)
       throw new PiFailure(
         'limit_reached',
-        'Stored history exceeds the configured limit. Clear chat or increase the limit.'
+        'Stored history exceeds the configured limit. Start a new chat or increase the limit.'
       )
     const storage = new PiBrowserStorage(database, bytes, maxBytes)
     for (const commit of commits) storage.prepareCommit(commit.writes, commit.seq).apply()

@@ -93,7 +93,7 @@ export function createPeer(
     if (!boundedJson(envelope))
       throw new PiFailure(
         'limit_reached',
-        'The conversation message exceeds the transport limit. Clear chat or reduce the selected context.'
+        'The conversation message exceeds the transport limit. Start a new chat or reduce the selected context.'
       )
     const detached = JSON.parse(JSON.stringify(envelope)) as PiEnvelope
     if (options.sendRequest && (message.op === 'request' || message.op === 'cancel'))

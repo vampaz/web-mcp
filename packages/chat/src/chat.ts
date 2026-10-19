@@ -40,7 +40,6 @@ export function defineWebMCPChat(): void {
     private readonly suggestions: HTMLDivElement
     private readonly limit: HTMLParagraphElement
     private readonly jumpButton: HTMLButtonElement
-    private readonly clearDialog: HTMLDialogElement
     private readonly popup: ChatPopup
 
     constructor() {
@@ -50,7 +49,7 @@ export function defineWebMCPChat(): void {
         <section class="panel" id="${this.instanceId}-panel" aria-labelledby="${this.instanceId}-title">
           <header>
             <div class="identity"><span class="assistant-mark">${icon('M5 5h14v11H10l-5 4V5M9 9h6M9 12h4')}</span><h2 id="${this.instanceId}-title"></h2></div>
-            <div class="header-actions"><button class="icon-button" type="button" data-clear aria-label="Clear chat" title="Clear chat">${icon('M4 7h16M10 3h4l1 4H9l1-4M6 7l1 13h10l1-13M10 11v5M14 11v5')}</button></div>
+            <div class="header-actions"><button class="icon-button" type="button" data-clear aria-label="New chat" title="New chat">${icon('M12 5v14M5 12h14')}</button></div>
           </header>
           <div class="conversation">
             <div class="transcript" tabindex="0" role="log" aria-label="Conversation"><p data-empty></p><ol></ol><p class="working" hidden><span class="visually-hidden">Working…</span><span class="working-dots" aria-hidden="true"><span></span><span></span><span></span></span></p></div>
@@ -67,14 +66,7 @@ export function defineWebMCPChat(): void {
             <p class="limit" id="${this.instanceId}-limit" hidden></p>
           </form>
         </section>
-        </div>
-        <dialog aria-labelledby="${this.instanceId}-clear-title" aria-describedby="${this.instanceId}-clear-description">
-          <form method="dialog">
-            <h2 id="${this.instanceId}-clear-title">Clear this conversation?</h2>
-            <p id="${this.instanceId}-clear-description">This permanently deletes the chat history. Application changes and your current draft are kept.</p>
-            <div class="actions"><button value="cancel" autofocus>Cancel</button><button type="button" data-confirm-clear>Delete conversation</button></div>
-          </form>
-        </dialog>`
+        </div>`
       this.heading = this.root.querySelector('h2')!
       this.status = this.root.querySelector('.status')!
       this.transcript = this.root.querySelector('.transcript')!
@@ -88,7 +80,6 @@ export function defineWebMCPChat(): void {
       this.suggestions = this.root.querySelector('.suggestions')!
       this.limit = this.root.querySelector('.limit')!
       this.jumpButton = this.root.querySelector('.jump-latest')!
-      this.clearDialog = this.root.querySelector('dialog')!
       this.popup = new ChatPopup(
         this,
         this.root.querySelector('.presentation')!,
@@ -111,11 +102,6 @@ export function defineWebMCPChat(): void {
       })
       this.clearButton.addEventListener('click', () => {
         this.clearButton.focus()
-        this.clearDialog.showModal()
-      })
-      this.root.querySelector('[data-confirm-clear]')!.addEventListener('click', () => {
-        this.clearDialog.close()
-        if (this.clearButton.disabled) return
         void this.perform('clear')
       })
       this.transcript.addEventListener('scroll', () => this.updateJump())
@@ -138,7 +124,6 @@ export function defineWebMCPChat(): void {
       this.sending = false
       this.clearing = false
       this.resizeObserver.disconnect()
-      if (this.clearDialog.open) this.clearDialog.close()
       for (const finish of this.focusTrackers) finish()
       this.unsubscribe?.()
       this.unsubscribe = undefined
@@ -157,7 +142,6 @@ export function defineWebMCPChat(): void {
         this.clearing = false
         for (const finish of this.focusTrackers) finish()
       }
-      if (this.clearDialog.open) this.clearDialog.close()
       this.unsubscribe?.()
       this.unsubscribe = undefined
       this.options = { ...options }
@@ -208,7 +192,7 @@ export function defineWebMCPChat(): void {
       this.suggestions.hidden = snapshot.messages.length > 0 || this.input.value.length > 0
       this.working.hidden = !working
       const status = this.clearing
-        ? 'Clearing conversation…'
+        ? 'Starting new chat…'
         : working && !snapshot.error
           ? ''
           : statusText(snapshot)
@@ -220,7 +204,7 @@ export function defineWebMCPChat(): void {
         this.list.setAttribute('aria-busy', busyState)
       const disabled = !this.options || this.options.disabled || snapshot.state === 'closed'
       const tooLong = this.input.value.length > messageLimit
-      this.input.disabled = Boolean(disabled || snapshot.state === 'loading')
+      this.input.disabled = Boolean(disabled || this.clearing || snapshot.state === 'loading')
       this.input.setAttribute('aria-invalid', String(tooLong))
       this.limit.hidden = this.input.value.length < messageLimit * 0.9
       this.limit.textContent = tooLong
@@ -232,9 +216,10 @@ export function defineWebMCPChat(): void {
       this.clearButton.disabled = Boolean(
         disabled ||
         busy ||
-        (!snapshot.messages.length && !['error', 'interrupted'].includes(snapshot.state))
+        (!snapshot.messages.length &&
+          !this.input.value.length &&
+          !['error', 'interrupted'].includes(snapshot.state))
       )
-      if (this.clearButton.disabled && this.clearDialog.open) this.clearDialog.close()
       for (const button of this.suggestions.querySelectorAll('button'))
         button.disabled = Boolean(disabled || busy)
       if (this.isConnected && (!this.initiallyScrolled || nearEnd)) {
@@ -347,14 +332,15 @@ export function defineWebMCPChat(): void {
       try {
         await this.options.harness[action]()
       } catch (error) {
-        errorText = error instanceof Error ? error.message : 'The operation failed.'
+        errorText = (error instanceof Error && error.message) || 'The operation failed.'
       } finally {
         const restoreFocus = finishFocus()
         if (revision === this.revision) {
           this.clearing = false
+          if (action === 'clear' && !errorText) this.input.value = ''
           this.update()
           if (errorText) this.status.textContent = errorText
-          else if (action === 'clear') this.status.textContent = 'Conversation cleared.'
+          else if (action === 'clear') this.status.textContent = 'New chat started.'
           if (restoreFocus && this.isConnected) this.input.focus()
         }
       }

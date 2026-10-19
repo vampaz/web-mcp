@@ -162,6 +162,6 @@ Test the installed artifact with the application's actual routes and authenticat
 5. Switch accounts and confirm storage partitions and tool permissions change.
 6. Open two tabs on the same conversation and verify writer contention is visible.
 7. Test the deployed base path, compiled worker URL, existing PWA, and production CSP over HTTPS.
-8. Exercise keyboard input, popup/inline mode, narrow screens, long output, and Clear chat.
+8. Exercise keyboard input, popup/inline mode, narrow screens, long output, and New chat.
 
 Use a deterministic resolver for repeatable integration tests. Run separately authorized model evaluations against the intended provider. Passing package tests proves packaging and supported fixtures; it does not prove your backend policy or deployed worker path. See [operations](./operations.md) for commands and troubleshooting.
