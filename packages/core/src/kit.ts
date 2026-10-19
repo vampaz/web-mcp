@@ -1,20 +1,20 @@
-import type { PlannerProviderConfig, ToolPlanner } from './interfaces/tool'
-import { createConfiguredPlanner } from './planner'
+import type { ResolverProviderConfig, ToolResolver } from './interfaces/tool'
+import { createConfiguredResolver } from './resolver'
 
 export interface WebMCPKitOptions {
-  planner?: PlannerProviderConfig
+  resolver?: ResolverProviderConfig
 }
 
 export interface WebMCPKit {
-  planner: ToolPlanner
-  plannerConfig?: PlannerProviderConfig
+  resolver: ToolResolver
+  resolverConfig?: ResolverProviderConfig
 }
 
 export async function createWebMCPKit(options: WebMCPKitOptions = {}): Promise<WebMCPKit> {
-  const planner = await createConfiguredPlanner(options.planner)
+  const resolver = await createConfiguredResolver(options.resolver)
 
   return {
-    planner,
-    plannerConfig: options.planner
+    resolver,
+    resolverConfig: options.resolver
   }
 }

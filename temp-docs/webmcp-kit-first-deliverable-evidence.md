@@ -12,7 +12,7 @@ The renewed review fixed all seven vulnerable dependency entries. NCU updated Vi
 
 Three additional runtime defects were reproduced and repaired: an already-aborted RPC could still execute, Chrome AI inference did not receive cancellation, and a late heartbeat failure could interrupt a newer turn. Regression tests failed before the corresponding fixes and passed afterward. The earlier full-review repairs remain included.
 
-Developer documentation now includes an integration walkthrough, architecture/turn/state/deployment diagrams, operational and security guidance, framework lifecycle examples, the server planner wire protocol, and a generated reference for all 12 public entry points and 177 distinct public symbols. Documentation review corrected an HTTP model-origin example, non-reactive route examples, incomplete submission/approval guidance, stale roadmap claims, and missing API/error details. The executable counter-assistant example has cancellation and initialization-cleanup regression coverage and passes a strict typecheck against the installed tarball.
+Developer documentation now includes an integration walkthrough, architecture/turn/state/deployment diagrams, operational and security guidance, framework lifecycle examples, the server resolver wire protocol, and a generated reference for all 12 public entry points and 177 distinct public symbols. Documentation review corrected an HTTP model-origin example, non-reactive route examples, incomplete submission/approval guidance, stale roadmap claims, and missing API/error details. The executable counter-assistant example has cancellation and initialization-cleanup regression coverage and passes a strict typecheck against the installed tarball.
 
 Completed validation for this revision:
 
@@ -35,7 +35,7 @@ The changes remain local, unstaged, and uncommitted. No CI workflow, publication
 
 ## Earlier revision: full local review and fixes
 
-The review covered the tracked diff, untracked implementation, connected callers, tests, documentation, and package workflows. It found and fixed premature whole-turn RPC deadlines, missing runtime cancellation, undercounted serialized planner requests, queued approval-dialog close events, and permanent teardown when a page enters the back/forward cache. Regression coverage includes elapsed-time simulation, transport cancellation, exact UTF-8 body limits, concurrent approvals, and cached-page lifecycle events.
+The review covered the tracked diff, untracked implementation, connected callers, tests, documentation, and package workflows. It found and fixed premature whole-turn RPC deadlines, missing runtime cancellation, undercounted serialized resolver requests, queued approval-dialog close events, and permanent teardown when a page enters the back/forward cache. Regression coverage includes elapsed-time simulation, transport cancellation, exact UTF-8 body limits, concurrent approvals, and cached-page lifecycle events.
 
 The package-consumer browser fixture now uses the TLS plugin's HTTPS URL. Repository guidance requires that domain for development browser checks and fixtures. The temporary HTTP review fixture was stopped.
 
@@ -70,7 +70,7 @@ Completed checks for that revision:
 - Typechecks, lint, formatting, and `git diff --check`: passed.
 - Linux: all 58 browser cases passed across Chromium, Firefox, WebKit, and native Chromium, with no retries. This includes trusted HTTPS/WSS, popup pointer movement and resizing, keyboard controls, clipping, 200% zoom, narrow/short layouts, reconnect, approvals, and preserved drafts/history.
 - macOS: all 41 browser cases passed in Chromium, WebKit, and native Chromium. The full portable/native matrix, including Firefox, is the Linux result above.
-- `npm run test:lmstudio`: all 5 real-model cases passed with the selected Gemma model and fixtures disabled. The confirmed result-dependent write/replan/reload case now uses popup mode. Cancellation asserts the interrupted state and absence of a resumed inference request.
+- `npm run test:lmstudio`: all 5 real-model cases passed with the selected Gemma model and fixtures disabled. The confirmed result-dependent write/re-resolve/reload case now uses popup mode. Cancellation asserts the interrupted state and absence of a resumed inference request.
 - Fresh authorized library build and unpublished pack: passed. All 4 isolated consumer checks passed on both macOS and Linux. The consumer tests both inline and popup mode with a compiled nested worker, one registry, and trusted HTTPS. It waits for the TLS route before browser navigation, including a cold proxy start.
 - npm verification: 302 registry signatures and 106 attestations passed. The audit still reports the same 7 pre-existing findings; the TLS package has no reported advisory in this audit.
 
@@ -87,7 +87,7 @@ The following sections retain earlier implementation history. Their pending-gate
 
 ## Earlier review fixes, 2026-10-17
 
-The follow-up review fixed persistent interruption state, tool refresh after completed actions, rejected draft retention, focus preservation, compact chat height, and the Vite worker setup guide. Tool refresh failures preserve known action results. Catalog changes during planning still reject stale actions. Framework examples now show initialization errors and retain teardown handling.
+The follow-up review fixed persistent interruption state, tool refresh after completed actions, rejected draft retention, focus preservation, compact chat height, and the Vite worker setup guide. Tool refresh failures preserve known action results. Catalog changes during resolution still reject stale actions. Framework examples now show initialization errors and retain teardown handling.
 
 - `npm run test`: 293 tests across 46 files passed, including the actual Pi Durable loop.
 - `npm run typecheck`, `npm run typecheck:demo`, `npm run lint`, and `npm run format:check`: passed.
@@ -138,12 +138,12 @@ Final manual inspection uses the in-app browser. Real model read, app-owned appr
 | Model                  | `google/gemma-4-26b-a4b`                       |
 | Runtime / quantization | MLX, 4-bit                                     |
 | Loaded context         | 32,768 tokens                                  |
-| Planner output         | JSON schema, 1,024 maximum output tokens       |
+| Resolver output        | JSON schema, 1,024 maximum output tokens       |
 | Generation             | Temperature 0.2; reasoning explicitly disabled |
 
-The five completed cases cover tool discovery and an answer; read, confirmed result-dependent write, replan and reload; denied write with no follow-up round; cancellation of actual inference without resume; and headless use with no chat import. No hosted provider, paid credit, fixture replacement, or test retry was used in this lane. Preflight metadata and results remain under ignored `test-results/`.
+The five completed cases cover tool discovery and an answer; read, confirmed result-dependent write, re-resolve and reload; denied write with no follow-up round; cancellation of actual inference without resume; and headless use with no chat import. No hosted provider, paid credit, fixture replacement, or test retry was used in this lane. Preflight metadata and results remain under ignored `test-results/`.
 
-The conversational adapter explicitly requests a single next action. Core's bounded Planner mode retains its sequence contract. Provider failure, invalid output, denial, storage limits, and unknown action outcomes remain visible instead of triggering fallback or automatic retries.
+The conversational adapter explicitly requests a single next action. Core's bounded Resolver mode retains its sequence contract. Provider failure, invalid output, denial, storage limits, and unknown action outcomes remain visible instead of triggering fallback or automatic retries.
 
 ## Unpublished package
 
@@ -152,7 +152,7 @@ Artifact: `artifacts/webmcp-kit.tgz` (approximately 189 KiB), with adjacent `art
 - Source digest: `0dd498821a698d8e49a729ee2ac408b418e99eec0ec1da9ddcc824a9610ab107`
 - Tarball SHA-256: `ffb529479be1f523a0e9d3947a6143fa1917c7682b2a1f6c7a84e397f8297dcd`
 
-The build stamp, current source digest, metadata, and tarball bytes are checked before consumer installation. The tarball excludes apps, credentials, development fixtures, tests, and plans. The release workflow publishes this tested tarball rather than rebuilding different content after validation. No workflow was triggered during this task.
+The build stamp, current source digest, metadata, and tarball bytes are checked before consumer installation. The tarball excludes apps, credentials, development fixtures, tests, and resolutions. The release workflow publishes this tested tarball rather than rebuilding different content after validation. No workflow was triggered during this task.
 
 New optional runtime peers are Pi Durable, Pi AI, and Chord 1.3.0. Test-only additions include Playwright 1.64.1 and fake-indexeddb 6.2.6. Development tooling uses @vitejs/plugin-vue 6.0.10 and vue-tsc 3.3.13; their upstream artifacts, integrity, and MIT licenses were checked. Vue is 3.5.44. npm signature verification passed for 301 signatures and 105 attestations. The final audit reports 7 pre-existing findings; affected dependency versions were compared with the original lockfile. No unrelated dependency upgrades were made.
 

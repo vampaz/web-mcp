@@ -9,12 +9,12 @@ import type {
 import { createModels, createProvider } from '@earendil-works/pi-ai/models'
 import { createAssistantMessageEventStream } from '@earendil-works/pi-ai/utils/event-stream'
 import type { Message } from '@earendil-works/pi-ai'
-import type { ToolPlan } from '@vampaz/webmcp-kit'
+import type { ToolResolution } from '@vampaz/webmcp-kit'
 
-export const piModel = { provider: 'webmcp', modelId: 'configured-planner' }
+export const piModel = { provider: 'webmcp', modelId: 'configured-resolver' }
 
 export function createPiModels(
-  request: (messages: Message[], signal?: AbortSignal) => Promise<ToolPlan>
+  request: (messages: Message[], signal?: AbortSignal) => Promise<ToolResolution>
 ) {
   const models = createModels()
   function stream(_model: Model<Api>, context: TranscriptContext, options?: StreamOptions) {
@@ -27,7 +27,7 @@ export function createPiModels(
       model: piModel.modelId,
       stopReason: 'stop',
       timestamp: Date.now(),
-      // ToolPlanner does not expose usage. These required fields are not displayed as measured usage.
+      // ToolResolver does not expose usage. These required fields are not displayed as measured usage.
       usage: {
         input: 0,
         output: 0,
@@ -43,16 +43,19 @@ export function createPiModels(
 
     async function complete() {
       try {
-        const plan = (await request(context.messages, options?.signal)) as ToolPlan
+        const resolution = (await request(context.messages, options?.signal)) as ToolResolution
         if (
-          plan.toolName === 'pi_reply' ||
-          plan.toolName === 'needs_clarification' ||
-          plan.toolName === 'no_tools_match'
+          resolution.toolName === 'pi_reply' ||
+          resolution.toolName === 'needs_clarification' ||
+          resolution.toolName === 'no_tools_match'
         ) {
           message.content = [
             {
               type: 'text',
-              text: plan.toolName === 'pi_reply' ? String(plan.input.text) : plan.reason
+              text:
+                resolution.toolName === 'pi_reply'
+                  ? String(resolution.input.text)
+                  : resolution.reason
             }
           ]
         } else {
@@ -61,8 +64,8 @@ export function createPiModels(
             {
               type: 'toolCall',
               id: crypto.randomUUID(),
-              name: plan.toolName,
-              arguments: plan.input as JsonObject
+              name: resolution.toolName,
+              arguments: resolution.input as JsonObject
             }
           ]
         }
@@ -93,7 +96,7 @@ export function createPiModels(
       models: [
         {
           id: piModel.modelId,
-          name: 'Configured WebMCP planner',
+          name: 'Configured WebMCP resolver',
           provider: piModel.provider,
           api: 'webmcp',
           baseUrl: '',

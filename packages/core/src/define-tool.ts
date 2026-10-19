@@ -1,9 +1,9 @@
 import type { InferToolInput } from './interfaces/schema-inference'
 import type { JsonSchema, WebMCPTool } from './interfaces/tool'
-import { plannerOutcomeToolNames } from './plan-validation'
+import { resolverOutcomeToolNames } from './resolution-validation'
 import { validateJsonSchema } from './schema'
 
-const reservedToolNames = new Set<string>(['tool_sequence', ...plannerOutcomeToolNames])
+const reservedToolNames = new Set<string>(['tool_sequence', ...resolverOutcomeToolNames])
 
 export type SchemaTypedWebMCPTool<TSchema extends JsonSchema, TOutput = unknown> = Omit<
   WebMCPTool<InferToolInput<TSchema>, TOutput>,
@@ -29,7 +29,9 @@ export function assertValidTool<TInput = Record<string, unknown>, TOutput = unkn
   }
 
   if (reservedToolNames.has(tool.name)) {
-    throw new Error(`Tool name "${tool.name}" is reserved for planner outcomes and chained plans.`)
+    throw new Error(
+      `Tool name "${tool.name}" is reserved for resolver outcomes and chained resolutions.`
+    )
   }
 
   if (!tool.description.trim()) {

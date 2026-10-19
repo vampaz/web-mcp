@@ -9,6 +9,6 @@ export interface PiLimits {
   maxToolCalls?: number
   /** UTF-8 bytes in the durable commit log; default 8 MiB. */
   maxHistoryBytes?: number
-  /** UTF-8 bytes per planner request; default 128 KiB. */
+  /** UTF-8 bytes per resolver request; default 128 KiB. */
   maxRequestBytes?: number
 }

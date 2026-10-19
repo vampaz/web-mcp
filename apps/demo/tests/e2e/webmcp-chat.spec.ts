@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import type { PiSnapshot, PiTurnOutcome } from '@vampaz/webmcp-kit/pi'
 import type { WebMCPChatElement } from '@vampaz/webmcp-kit/chat'
 
-test('sends, confirms, replans, and restores dialogue without replay', async function conversation({
+test('sends, confirms, re-resolves, and restores dialogue without replay', async function conversation({
   page
 }) {
   await page.goto('/?mode=chat')
@@ -72,7 +72,7 @@ test('supports keyboard, narrow layouts, and distinct controls in two instances'
   ).toBe(true)
 })
 
-test('stops planning and reports a failed provider without a fallback', async function faults({
+test('stops resolving and reports a failed provider without a fallback', async function faults({
   page
 }) {
   await page.goto('/?mode=chat')

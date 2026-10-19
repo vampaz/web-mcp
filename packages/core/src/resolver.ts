@@ -1,16 +1,16 @@
 import type {
-  PlannerAuth,
-  PlannerContext,
-  PlannerProviderConfig,
-  PlannerRunOptions,
-  ToolPlan,
-  ToolPlanner,
+  ResolverAuth,
+  ResolverContext,
+  ResolverProviderConfig,
+  ResolverRunOptions,
+  ToolResolution,
+  ToolResolver,
   WebMCPTool
 } from './interfaces/tool'
 import { getErrorMessage } from './confirmation'
-import { planWithHeuristics } from './heuristic-planner'
-import { createToolPlanSchema, validateToolPlan } from './plan-validation'
-import { PlannerRequestLimitError, serializePlannerRequest } from './planner-request'
+import { resolveWithHeuristics } from './heuristic-resolver'
+import { createToolResolutionSchema, validateToolResolution } from './resolution-validation'
+import { ResolverRequestLimitError, serializeResolverRequest } from './resolver-request'
 
 interface LanguageModelSession {
   prompt: (message: string, options?: ChromeAIPromptOptions) => Promise<string>
@@ -65,26 +65,26 @@ const chromeAITextOptions = {
   ]
 } satisfies ChromeAIOptions
 
-export function createHeuristicPlanner(): ToolPlanner {
+export function createHeuristicResolver(): ToolResolver {
   return {
-    name: 'Local heuristic planner',
+    name: 'Local heuristic resolver',
     available: true,
     status: 'fallback',
     detail:
-      'Chrome built-in AI is unavailable, so WebMCP Kit is using deterministic local planning.',
-    async plan(
+      'Chrome built-in AI is unavailable, so WebMCP Kit is using deterministic local resolution.',
+    async resolve(
       message: string,
       tools: WebMCPTool[],
-      context?: PlannerContext,
-      options?: PlannerRunOptions
+      context?: ResolverContext,
+      options?: ResolverRunOptions
     ) {
       throwIfAborted(options?.signal)
-      return planWithHeuristics(message, tools, context)
+      return resolveWithHeuristics(message, tools, context)
     }
   }
 }
 
-export async function createChromeAIPlanner(strict = false): Promise<ToolPlanner> {
+export async function createChromeAIResolver(strict = false): Promise<ToolResolver> {
   const languageModel = getLanguageModel()
 
   if (!languageModel) {
@@ -93,15 +93,15 @@ export async function createChromeAIPlanner(strict = false): Promise<ToolPlanner
       available: false,
       status: 'unavailable',
       detail: 'The browser does not expose the Chrome built-in AI LanguageModel API.',
-      async plan(
+      async resolve(
         message: string,
         tools: WebMCPTool[],
-        context?: PlannerContext,
-        options?: PlannerRunOptions
+        context?: ResolverContext,
+        options?: ResolverRunOptions
       ) {
         throwIfAborted(options?.signal)
         if (strict) throw new Error('Chrome built-in AI is unavailable.')
-        return planWithHeuristics(message, tools, context)
+        return resolveWithHeuristics(message, tools, context)
       }
     }
   }
@@ -109,56 +109,56 @@ export async function createChromeAIPlanner(strict = false): Promise<ToolPlanner
   try {
     const availability = await languageModel.availability(chromeAITextOptions)
     if (availability === 'unavailable') {
-      return createUnavailableChromePlanner(
+      return createUnavailableChromeResolver(
         'Chrome reports that built-in AI is unavailable in this environment.',
         strict
       )
     }
 
     if (availability === 'downloadable' || availability === 'downloading') {
-      return createActiveChromePlanner(
+      return createActiveChromeResolver(
         languageModel,
         availability,
         availability === 'downloadable'
           ? 'Chrome built-in AI can be used after Chrome downloads the model from a user command.'
-          : 'Chrome is downloading the built-in AI model and will plan when the session is ready.',
+          : 'Chrome is downloading the built-in AI model and will resolve when the session is ready.',
         strict
       )
     }
 
-    return createActiveChromePlanner(
+    return createActiveChromeResolver(
       languageModel,
       'ready',
       'Chrome built-in AI is available. The model session will start from the next user command.',
       strict
     )
   } catch {
-    return createUnavailableChromePlanner(
-      'Chrome built-in AI could not create a planning session.',
+    return createUnavailableChromeResolver(
+      'Chrome built-in AI could not create a resolution session.',
       strict
     )
   }
 }
 
-export async function createBestPlanner(): Promise<ToolPlanner> {
-  const chromePlanner = await createChromeAIPlanner()
-  if (chromePlanner.available) return chromePlanner
+export async function createBestResolver(): Promise<ToolResolver> {
+  const chromeResolver = await createChromeAIResolver()
+  if (chromeResolver.available) return chromeResolver
 
-  return createHeuristicPlanner()
+  return createHeuristicResolver()
 }
 
-export async function createConfiguredPlanner(
-  config?: PlannerProviderConfig
-): Promise<ToolPlanner> {
-  if (!config || config.provider === 'auto') return createBestPlanner()
+export async function createConfiguredResolver(
+  config?: ResolverProviderConfig
+): Promise<ToolResolver> {
+  if (!config || config.provider === 'auto') return createBestResolver()
 
-  if (config.provider === 'chrome-built-in') return createChromeAIPlanner(true)
-  if (config.provider === 'local') return createHeuristicPlanner()
+  if (config.provider === 'chrome-built-in') return createChromeAIResolver(true)
+  if (config.provider === 'local') return createHeuristicResolver()
 
-  return createRemotePlanner(config)
+  return createRemoteResolver(config)
 }
 
-export function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner {
+export function createRemoteResolver(config: ResolverProviderConfig): ToolResolver {
   if (
     config.maxTokens !== undefined &&
     (!Number.isSafeInteger(config.maxTokens) || config.maxTokens < 1 || config.maxTokens > 65536)
@@ -173,7 +173,7 @@ export function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner 
   const model = config.model ?? getDefaultModel(config)
   const auth = config.auth ?? { mode: 'none' }
   const serverBindingRequired = requiresServerBinding(config, auth)
-  const key = getPlannerApiKey(config.provider, auth)
+  const key = getResolverApiKey(config.provider, auth)
   const keyRequired = requiresBrowserKey(config, auth)
 
   if (serverBindingRequired) {
@@ -182,7 +182,7 @@ export function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner 
       available: false,
       status: 'unavailable',
       detail: `${providerLabel} needs server endpoint mode so the browser talks to a Worker with an AI binding.`,
-      async plan() {
+      async resolve() {
         throw new Error(`${providerLabel} needs server endpoint mode.`)
       }
     }
@@ -194,7 +194,7 @@ export function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner 
       available: false,
       status: 'needs-key',
       detail: `${providerLabel} needs a user API key. In user-key mode the key is stored in the browser and visible to this page.`,
-      async plan() {
+      async resolve() {
         throw new Error(`${providerLabel} needs a user API key.`)
       }
     }
@@ -205,16 +205,16 @@ export function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner 
     name: providerLabel,
     available: true,
     status: 'ready',
-    detail: getRemotePlannerDetail(config, auth),
-    async plan(
+    detail: getRemoteResolverDetail(config, auth),
+    async resolve(
       message: string,
       tools: WebMCPTool[],
-      context: PlannerContext = {},
-      options?: PlannerRunOptions
+      context: ResolverContext = {},
+      options?: ResolverRunOptions
     ) {
       try {
         throwIfAborted(options?.signal)
-        const plan = await planWithRemoteProvider(
+        const resolution = await resolveWithRemoteProvider(
           config,
           auth,
           key,
@@ -225,34 +225,36 @@ export function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner 
           options
         )
         throwIfAborted(options?.signal)
-        validateToolPlan(plan, tools, { singleStep: options?.singleStep })
-        return plan
+        validateToolResolution(resolution, tools, { singleStep: options?.singleStep })
+        return resolution
       } catch (error) {
         throwIfAborted(options?.signal)
-        if (error instanceof PlannerRequestLimitError) throw error
-        throw new Error(`${providerLabel} could not plan this command (${getErrorMessage(error)})`)
+        if (error instanceof ResolverRequestLimitError) throw error
+        throw new Error(
+          `${providerLabel} could not resolve this command (${getErrorMessage(error)})`
+        )
       }
     }
   }
 }
 
-async function planWithChromeAI(
+async function resolveWithChromeAI(
   session: LanguageModelSession,
   message: string,
   tools: WebMCPTool[],
-  context: PlannerContext = {},
-  options?: PlannerRunOptions
-): Promise<ToolPlan> {
+  context: ResolverContext = {},
+  options?: ResolverRunOptions
+): Promise<ToolResolution> {
   throwIfAborted(options?.signal)
-  const prompt = createPlannerPrompt(message, tools, context, options?.singleStep)
-  const responseConstraint = createToolPlanSchema(tools, options?.singleStep)
-  serializePlannerRequest({ prompt, responseConstraint }, options?.maxRequestBytes)
+  const prompt = createResolverPrompt(message, tools, context, options?.singleStep)
+  const responseConstraint = createToolResolutionSchema(tools, options?.singleStep)
+  serializeResolverRequest({ prompt, responseConstraint }, options?.maxRequestBytes)
   const response = await session.prompt(prompt, {
     responseConstraint,
     ...(options?.signal ? { signal: options.signal } : {})
   })
 
-  return parseToolPlanJson(response, 'Chrome built-in AI')
+  return parseToolResolutionJson(response, 'Chrome built-in AI')
 }
 
 function createChromeAISession(languageModel: LanguageModelApi): Promise<LanguageModelSession> {
@@ -268,45 +270,45 @@ function createChromeAISession(languageModel: LanguageModelApi): Promise<Languag
   })
 }
 
-async function planWithRemoteProvider(
-  config: PlannerProviderConfig,
-  auth: PlannerAuth,
+async function resolveWithRemoteProvider(
+  config: ResolverProviderConfig,
+  auth: ResolverAuth,
   apiKey: string | undefined,
   model: string,
   message: string,
   tools: WebMCPTool[],
-  context: PlannerContext,
-  options?: PlannerRunOptions
-): Promise<ToolPlan> {
+  context: ResolverContext,
+  options?: ResolverRunOptions
+): Promise<ToolResolution> {
   if (auth.mode === 'server') {
-    return planWithServerEndpoint(auth.endpoint, config, model, message, tools, context, options)
+    return resolveWithServerEndpoint(auth.endpoint, config, model, message, tools, context, options)
   }
 
-  return planWithOpenAICompatible(config, apiKey, model, message, tools, context, options)
+  return resolveWithOpenAICompatible(config, apiKey, model, message, tools, context, options)
 }
 
-async function planWithServerEndpoint(
+async function resolveWithServerEndpoint(
   endpoint: string,
-  config: PlannerProviderConfig,
+  config: ResolverProviderConfig,
   model: string,
   message: string,
   tools: WebMCPTool[],
-  context: PlannerContext,
-  options?: PlannerRunOptions
-): Promise<ToolPlan> {
+  context: ResolverContext,
+  options?: ResolverRunOptions
+): Promise<ToolResolution> {
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: serializePlannerRequest(
+    body: serializeResolverRequest(
       {
         provider: config.provider,
         model,
         message,
         tools: createToolCatalog(tools),
         context,
-        responseSchema: createToolPlanSchema(tools, options?.singleStep),
+        responseSchema: createToolResolutionSchema(tools, options?.singleStep),
         ...(options?.singleStep ? { singleStep: true } : {})
       },
       options?.maxRequestBytes
@@ -315,21 +317,21 @@ async function planWithServerEndpoint(
   })
 
   if (!response.ok) {
-    throw new Error(await getServerPlannerError(response))
+    throw new Error(await getServerResolverError(response))
   }
 
-  return (await response.json()) as ToolPlan
+  return (await response.json()) as ToolResolution
 }
 
-async function planWithOpenAICompatible(
-  config: PlannerProviderConfig,
+async function resolveWithOpenAICompatible(
+  config: ResolverProviderConfig,
   apiKey: string | undefined,
   model: string,
   message: string,
   tools: WebMCPTool[],
-  context: PlannerContext,
-  options?: PlannerRunOptions
-): Promise<ToolPlan> {
+  context: ResolverContext,
+  options?: ResolverRunOptions
+): Promise<ToolResolution> {
   const baseUrl = getOpenAICompatibleBaseUrl(config)
   const headers: Record<string, string> = {
     'Content-Type': 'application/json'
@@ -347,17 +349,17 @@ async function planWithOpenAICompatible(
   const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST',
     headers,
-    body: serializePlannerRequest(
+    body: serializeResolverRequest(
       {
         model,
-        messages: createPlannerMessages(message, tools, context, options?.singleStep),
+        messages: createResolverMessages(message, tools, context, options?.singleStep),
         response_format:
           config.responseFormat === 'json_schema'
             ? {
                 type: 'json_schema',
                 json_schema: {
-                  name: 'webmcp_plan',
-                  schema: createToolPlanSchema(tools, options?.singleStep)
+                  name: 'webmcp_resolution',
+                  schema: createToolResolutionSchema(tools, options?.singleStep)
                 }
               }
             : {
@@ -386,13 +388,13 @@ async function planWithOpenAICompatible(
   const content = payload.choices?.[0]?.message?.content
   if (!content) throw new Error('provider returned no message content')
 
-  return parseToolPlanJson(content, getProviderLabel(config))
+  return parseToolResolutionJson(content, getProviderLabel(config))
 }
 
-function createPlannerMessages(
+function createResolverMessages(
   message: string,
   tools: WebMCPTool[],
-  context: PlannerContext,
+  context: ResolverContext,
   singleStep = false
 ) {
   return [
@@ -404,15 +406,15 @@ function createPlannerMessages(
     },
     {
       role: 'user',
-      content: createPlannerPrompt(message, tools, context, singleStep)
+      content: createResolverPrompt(message, tools, context, singleStep)
     }
   ]
 }
 
-function createPlannerPrompt(
+function createResolverPrompt(
   message: string,
   tools: WebMCPTool[],
-  context: PlannerContext,
+  context: ResolverContext,
   singleStep = false
 ): string {
   return [
@@ -421,12 +423,12 @@ function createPlannerPrompt(
     `Available tools:\n${JSON.stringify(createToolCatalog(tools), null, 2)}`,
     'Choose the best tool and exact parameters from the current app context. Prefer stable IDs from context over labels.',
     singleStep
-      ? 'Choose only the next unfinished action. Return one tool invocation, never a sequence or steps. Wait for the actual result before planning another action. Never invent future tool results or placeholders.'
-      : 'If the request requires multiple app actions, return a chained plan with toolName "tool_sequence", input {}, and steps ordered by dependency. Use at most 5 steps. Each step must use one available tool and must be executable after the previous step updates app state.',
+      ? 'Choose only the next unfinished action. Return one tool invocation, never a sequence or steps. Wait for the actual result before choosing another action. Never invent future tool results or placeholders.'
+      : 'If the request requires multiple app actions, return a chained resolution with toolName "tool_sequence", input {}, and steps ordered by dependency. Use at most 5 steps. Each step must use one available tool and must be executable after the previous step updates app state.',
     'If the request is missing required information that is not present in context, return {"toolName":"needs_clarification","input":{},"confidence":0,"reason":"Ask for the missing information."}.',
     'If none of the available tools can satisfy the request, return {"toolName":"no_tools_match","input":{},"confidence":0,"reason":"Explain what kind of app action is available instead."}.',
     'Return only valid JSON matching this schema:',
-    JSON.stringify(createToolPlanSchema(tools, singleStep), null, 2)
+    JSON.stringify(createToolResolutionSchema(tools, singleStep), null, 2)
   ].join('\n\n')
 }
 
@@ -443,12 +445,12 @@ function getLanguageModel(): LanguageModelApi | undefined {
   return (window as WindowWithLanguageModel).LanguageModel
 }
 
-function createActiveChromePlanner(
+function createActiveChromeResolver(
   languageModel: LanguageModelApi,
   status: 'ready' | 'downloadable' | 'downloading',
   detail: string,
   strict = false
-): ToolPlanner {
+): ToolResolver {
   let session: LanguageModelSession | undefined
   let pendingSession: Promise<LanguageModelSession> | undefined
   let disposed = false
@@ -459,20 +461,20 @@ function createActiveChromePlanner(
     available: true,
     status,
     detail,
-    async plan(
+    async resolve(
       message: string,
       tools: WebMCPTool[],
-      context?: PlannerContext,
-      options?: PlannerRunOptions
+      context?: ResolverContext,
+      options?: ResolverRunOptions
     ) {
       try {
         throwIfAborted(options?.signal)
-        if (disposed) throw new Error('The planner was disposed.')
+        if (disposed) throw new Error('The resolver was disposed.')
         pendingSession ??= createChromeAISession(languageModel)
           .then(function created(value) {
             if (disposed) {
               disposeChromeAISession(value)
-              throw new Error('The planner was disposed.')
+              throw new Error('The resolver was disposed.')
             }
             session = value
             return value
@@ -482,23 +484,23 @@ function createActiveChromePlanner(
             throw error
           })
         session = await pendingSession
-        const plan = await planWithChromeAI(session, message, tools, context, options)
-        if (disposed) throw new Error('The planner was disposed.')
-        validateToolPlan(plan, tools, { singleStep: options?.singleStep })
+        const resolution = await resolveWithChromeAI(session, message, tools, context, options)
+        if (disposed) throw new Error('The resolver was disposed.')
+        validateToolResolution(resolution, tools, { singleStep: options?.singleStep })
         throwIfAborted(options?.signal)
-        return plan
+        return resolution
       } catch (error) {
         throwIfAborted(options?.signal)
-        if (disposed) throw new Error('The planner was disposed.')
-        if (error instanceof PlannerRequestLimitError) throw error
+        if (disposed) throw new Error('The resolver was disposed.')
+        if (error instanceof ResolverRequestLimitError) throw error
         if (strict)
           throw new Error(
-            `Chrome built-in AI could not plan this command (${getErrorMessage(error)})`
+            `Chrome built-in AI could not resolve this command (${getErrorMessage(error)})`
           )
 
         return {
-          ...planWithHeuristics(message, tools, context),
-          reason: `Chrome built-in AI could not plan this command (${getErrorMessage(error)}). Used deterministic fallback.`
+          ...resolveWithHeuristics(message, tools, context),
+          reason: `Chrome built-in AI could not resolve this command (${getErrorMessage(error)}). Used deterministic fallback.`
         }
       }
     },
@@ -519,9 +521,9 @@ function disposeChromeAISession(session: LanguageModelSession | undefined): void
   session?.dispose?.()
 }
 
-function parseToolPlanJson(value: string, source: string): ToolPlan {
+function parseToolResolutionJson(value: string, source: string): ToolResolution {
   try {
-    return JSON.parse(normalizeJsonText(value, source)) as ToolPlan
+    return JSON.parse(normalizeJsonText(value, source)) as ToolResolution
   } catch {
     throw new Error(`${source} returned unparseable JSON`)
   }
@@ -543,28 +545,28 @@ export function normalizeJsonText(value: string, source = 'AI'): string {
   throw new Error(`${source} returned non-JSON text: ${trimmedValue.slice(0, 120)}`)
 }
 
-function createUnavailableChromePlanner(detail: string, strict = false): ToolPlanner {
+function createUnavailableChromeResolver(detail: string, strict = false): ToolResolver {
   return {
     name: 'Chrome built-in AI',
     available: false,
     status: 'unavailable',
     detail,
-    async plan(
+    async resolve(
       message: string,
       tools: WebMCPTool[],
-      context?: PlannerContext,
-      options?: PlannerRunOptions
+      context?: ResolverContext,
+      options?: ResolverRunOptions
     ) {
       throwIfAborted(options?.signal)
       if (strict) throw new Error(detail)
-      return planWithHeuristics(message, tools, context)
+      return resolveWithHeuristics(message, tools, context)
     }
   }
 }
 
-function getPlannerApiKey(
-  provider: PlannerProviderConfig['provider'],
-  auth: PlannerAuth
+function getResolverApiKey(
+  provider: ResolverProviderConfig['provider'],
+  auth: ResolverAuth
 ): string | undefined {
   if (auth.mode !== 'user-key') return undefined
   if (auth.apiKey) return auth.apiKey
@@ -590,7 +592,7 @@ function getBrowserStorage(): Storage | undefined {
   return storage
 }
 
-function requiresBrowserKey(config: PlannerProviderConfig, auth: PlannerAuth): boolean {
+function requiresBrowserKey(config: ResolverProviderConfig, auth: ResolverAuth): boolean {
   return (
     auth.mode === 'user-key' &&
     config.provider !== 'chrome-built-in' &&
@@ -599,30 +601,30 @@ function requiresBrowserKey(config: PlannerProviderConfig, auth: PlannerAuth): b
   )
 }
 
-function requiresServerBinding(config: PlannerProviderConfig, auth: PlannerAuth): boolean {
+function requiresServerBinding(config: ResolverProviderConfig, auth: ResolverAuth): boolean {
   return config.provider === 'cloudflare-binding' && auth.mode !== 'server'
 }
 
-function getRemotePlannerDetail(config: PlannerProviderConfig, auth: PlannerAuth): string {
+function getRemoteResolverDetail(config: ResolverProviderConfig, auth: ResolverAuth): string {
   const provider = getProviderLabel(config)
   if (config.provider === 'cloudflare-binding')
-    return `${provider} will plan through ${auth.mode === 'server' ? auth.endpoint : 'a server endpoint'} using a Cloudflare AI binding.`
+    return `${provider} will resolve through ${auth.mode === 'server' ? auth.endpoint : 'a server endpoint'} using a Cloudflare AI binding.`
   if (auth.mode === 'server')
-    return `${provider} will plan through ${auth.endpoint}; provider secrets stay server-side.`
+    return `${provider} will resolve through ${auth.endpoint}; provider secrets stay server-side.`
   if (auth.mode === 'user-key')
-    return `${provider} will plan directly from the browser with a user-provided key. This is convenient but the key is visible to this page.`
-  return `${provider} will plan without an API key.`
+    return `${provider} will resolve directly from the browser with a user-provided key. This is convenient but the key is visible to this page.`
+  return `${provider} will resolve without an API key.`
 }
 
-function getOpenAICompatibleBaseUrl(config: PlannerProviderConfig): string {
+function getOpenAICompatibleBaseUrl(config: ResolverProviderConfig): string {
   if (config.provider === 'openrouter') return config.baseUrl ?? 'https://openrouter.ai/api/v1'
   if (config.provider === 'openai') return config.baseUrl ?? 'https://api.openai.com/v1'
-  if (!config.baseUrl) throw new Error('OpenAI-compatible planning needs baseUrl')
+  if (!config.baseUrl) throw new Error('OpenAI-compatible resolving needs baseUrl')
 
   return config.baseUrl
 }
 
-function getDefaultModel(config: PlannerProviderConfig): string {
+function getDefaultModel(config: ResolverProviderConfig): string {
   if (config.provider === 'openrouter') return 'openrouter/auto'
   if (config.provider === 'openai') return 'gpt-5.4-mini'
   if (config.provider === 'cloudflare-binding') return '@cf/zai-org/glm-4.7-flash'
@@ -630,33 +632,33 @@ function getDefaultModel(config: PlannerProviderConfig): string {
   return 'default'
 }
 
-function getProviderLabel(config: PlannerProviderConfig): string {
+function getProviderLabel(config: ResolverProviderConfig): string {
   if (config.provider === 'openrouter') return 'OpenRouter'
   if (config.provider === 'openai') return 'OpenAI'
   if (config.provider === 'openai-compatible') return 'OpenAI-compatible provider'
   if (config.provider === 'cloudflare-binding') return 'Cloudflare binding'
   if (config.provider === 'chrome-built-in') return 'Chrome built-in AI'
-  if (config.provider === 'local') return 'Local heuristic planner'
+  if (config.provider === 'local') return 'Local heuristic resolver'
 
-  return 'Planner'
+  return 'Resolver'
 }
 
-function getDefaultStorageKey(provider: PlannerProviderConfig['provider']): string {
+function getDefaultStorageKey(provider: ResolverProviderConfig['provider']): string {
   return `@vampaz/webmcp-kit:${provider}:api-key`
 }
 
-async function getServerPlannerError(response: Response): Promise<string> {
+async function getServerResolverError(response: Response): Promise<string> {
   try {
     const payload = (await response.json()) as { error?: string }
-    if (payload.error) return `server planner returned ${response.status}: ${payload.error}`
+    if (payload.error) return `server resolver returned ${response.status}: ${payload.error}`
   } catch {
-    return `server planner returned ${response.status}`
+    return `server resolver returned ${response.status}`
   }
 
-  return `server planner returned ${response.status}`
+  return `server resolver returned ${response.status}`
 }
 
 function throwIfAborted(signal: AbortSignal | undefined): void {
   if (!signal?.aborted) return
-  throw new Error('Planner request was cancelled.')
+  throw new Error('Resolver request was cancelled.')
 }

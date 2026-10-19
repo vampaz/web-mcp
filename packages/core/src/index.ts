@@ -29,24 +29,24 @@ export {
 } from './forms'
 export { defineWebMCPCommandInput } from './command-input'
 export {
-  createHostedOpenAIPlanner,
-  createHostedOpenAIPlannerOption,
-  type HostedOpenAIPlannerOptionConfig,
-  type HostedOpenAIPlannerOptions
-} from './hosted-openai-planner'
+  createHostedOpenAIResolver,
+  createHostedOpenAIResolverOption,
+  type HostedOpenAIResolverOptionConfig,
+  type HostedOpenAIResolverOptions
+} from './hosted-openai-resolver'
 export { initWebMCP, type InitWebMCPOptions, type WebMCPInitHandle } from './init'
 export type {
   WebMCPCommandErrorEventDetail,
   WebMCPCommandInputConfigureOptions,
   WebMCPCommandInputElement,
   WebMCPCommandInputEndpointOption,
-  WebMCPCommandInputPlannerCreateOptions,
-  WebMCPCommandInputPlannerModelOption,
-  WebMCPCommandInputPlannerOption,
+  WebMCPCommandInputResolverCreateOptions,
+  WebMCPCommandInputResolverModelOption,
+  WebMCPCommandInputResolverOption,
   WebMCPCommandInputPhase,
   WebMCPCommandPanelToggleEventDetail,
-  WebMCPCommandPlanEventDetail,
-  WebMCPCommandPlannerEventDetail,
+  WebMCPCommandResolutionEventDetail,
+  WebMCPCommandResolverEventDetail,
   WebMCPCommandResultEventDetail,
   WebMCPCommandStepEventDetail
 } from './interfaces/command-input'
@@ -55,11 +55,11 @@ export type {
   IntegrationDiagnostic,
   IntegrationHealthReport,
   JsonSchema,
-  PlannerContext,
-  PlannerAuth,
-  PlannerProviderConfig,
-  PlannerProviderKind,
-  PlannerRequest,
+  ResolverContext,
+  ResolverAuth,
+  ResolverProviderConfig,
+  ResolverProviderKind,
+  ResolverRequest,
   RegisteredTool,
   RegistrySnapshot,
   ToolConfirmation,
@@ -68,31 +68,31 @@ export type {
   ToolInvocation,
   ToolInvocationErrorCode,
   ToolInvocationResult,
-  ToolPlan,
-  ToolPlanStep,
-  ToolPlanner,
+  ToolResolution,
+  ToolResolutionStep,
+  ToolResolver,
   ToolScopeResult,
   WebMCPKitEvent,
   WebMCPTool
 } from './interfaces/tool'
 export { createWebMCPKit, type WebMCPKit, type WebMCPKitOptions } from './kit'
 export {
-  createBestPlanner,
-  createChromeAIPlanner,
-  createConfiguredPlanner,
-  createHeuristicPlanner,
-  createRemotePlanner,
+  createBestResolver,
+  createChromeAIResolver,
+  createConfiguredResolver,
+  createHeuristicResolver,
+  createRemoteResolver,
   normalizeJsonText
-} from './planner'
+} from './resolver'
 export {
-  isPlannerOutcomeToolName,
-  plannerOutcomeToolNames,
-  toolPlanSchema,
-  validateToolPlan,
-  type PlannerOutcomeToolName,
-  type ToolPlanValidationOptions,
-  type ToolPlanValidationTool
-} from './plan-validation'
+  isResolverOutcomeToolName,
+  resolverOutcomeToolNames,
+  toolResolutionSchema,
+  validateToolResolution,
+  type ResolverOutcomeToolName,
+  type ToolResolutionValidationOptions,
+  type ToolResolutionValidationTool
+} from './resolution-validation'
 export {
   clearToolsForTest,
   getRegistrySnapshot,

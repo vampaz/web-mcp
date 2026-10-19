@@ -6,13 +6,13 @@ This walkthrough adds a persistent assistant to an existing HTTPS application. T
 
 ## 1. Choose the integration
 
-| Need                                      | Install and initialize                           |
-| ----------------------------------------- | ------------------------------------------------ |
-| Expose existing app actions               | Core and `registerTool()` or a framework helper  |
-| Execute short natural-language commands   | Core plus a planner and `<webmcp-command-input>` |
-| Persistent conversations with your own UI | `/pi` and an application worker                  |
-| Persistent conversations with supplied UI | The preceding setup plus `/chat`                 |
-| Use chat with your own controller         | `/chat` and an implementation of `PiController`  |
+| Need                                      | Install and initialize                            |
+| ----------------------------------------- | ------------------------------------------------- |
+| Expose existing app actions               | Core and `registerTool()` or a framework helper   |
+| Execute short natural-language commands   | Core plus a resolver and `<webmcp-command-input>` |
+| Persistent conversations with your own UI | `/pi` and an application worker                   |
+| Persistent conversations with supplied UI | The preceding setup plus `/chat`                  |
+| Use chat with your own controller         | `/chat` and an implementation of `PiController`   |
 
 Install `0.2.1` or newer. npm installs the Pi runtime libraries automatically:
 
@@ -70,21 +70,21 @@ During development, open the HTTPS URL advertised by the existing TLS plugin. Wh
 
 ## 4. Configure model access
 
-This example uses an application-owned planner endpoint. It receives selected tool schemas, the request, and safe current context. Your backend chooses an approved model, keeps provider credentials, validates the request, and returns a `ToolPlan`.
+This example uses an application-owned resolver endpoint. It receives selected tool schemas, the request, and safe current context. Your backend chooses an approved model, keeps provider credentials, validates the request, and returns a `ToolResolution`.
 
 ```ts
-import { createRemotePlanner } from '@vampaz/webmcp-kit'
+import { createRemoteResolver } from '@vampaz/webmcp-kit'
 
-const planner = createRemotePlanner({
+const resolver = createRemoteResolver({
   provider: 'openai',
   model: 'your-server-approved-model',
-  auth: { mode: 'server', endpoint: '/api/webmcp/plan' }
+  auth: { mode: 'server', endpoint: '/api/webmcp/resolve' }
 })
 ```
 
-Replace the example model identifier with one allowed by your server. [Planner providers](./planner-providers.md) describes the endpoint protocol and other providers. For Pi, the server must honor `singleStep: true` and the supplied response schema. It must return exactly one action, a clarification, an unavailable outcome, or the offered `pi_reply` tool. It must not precompute a sequence that depends on unknown results.
+Replace the example model identifier with one allowed by your server. [Resolver providers](./resolver-providers.md) describes the endpoint protocol and other providers. For Pi, the server must honor `singleStep: true` and the supplied response schema. It must return exactly one action, a clarification, an unavailable outcome, or the offered `pi_reply` tool. It must not precompute a sequence that depends on unknown results.
 
-For browser AI, use `await createChromeAIPlanner(true)` and check availability before mounting the assistant. Trigger session/model setup from the required browser user interaction. For local development, the lab's same-origin HTTPS proxy keeps the model service and credentials out of browser configuration. A custom planner needs explicit conversational capability, cancellation, response validation, and serialized-request limits; see [API behavior](./api-behavior.md#setup-and-planner-factories).
+For browser AI, use `await createChromeAIResolver(true)` and check availability before mounting the assistant. Trigger session/model setup from the required browser user interaction. For local development, the lab's same-origin HTTPS proxy keeps the model service and credentials out of browser configuration. A custom resolver needs explicit conversational capability, cancellation, response validation, and serialized-request limits; see [API behavior](./api-behavior.md#setup-and-resolver-factories).
 
 ## 5. Mount the interface and approval UI
 
@@ -109,13 +109,13 @@ Copy the [example module](./examples/counter-assistant.ts) into your client sour
 ```ts
 import { createDialogApproval, mountCounterAssistant } from './counter-assistant'
 
-// `planner` comes from step 4; `signedInUserId` comes from your authenticated application.
+// `resolver` comes from step 4; `signedInUserId` comes from your authenticated application.
 const approval = createDialogApproval(document.querySelector<HTMLDialogElement>('#approval')!)
 const assistant = mountCounterAssistant({
   container: document.querySelector<HTMLElement>('#assistant')!,
   workerScope: `${import.meta.env.BASE_URL}webmcp-pi/`,
   session: { namespace: 'my-app', ownerId: signedInUserId, conversationId: 'counter' },
-  planner,
+  resolver,
   approve: approval.confirm,
   onValue(value) {
     document.querySelector('#counter')!.textContent = String(value)
@@ -133,7 +133,7 @@ try {
 async function teardown() {
   approval.cancel()
   await assistant.destroy()
-  planner.dispose?.()
+  resolver.dispose?.()
 }
 ```
 
@@ -141,9 +141,9 @@ The module uses popup mode. Set `mode: 'inline'` in its `element.configure()` ca
 
 The sample's `ready` promise rejects on initialization failure, and its `destroy()` closes a controller that finishes initialization after teardown. Wire teardown immediately in the framework lifecycle rather than waiting for initialization to finish. Do not destroy the controller merely because a popup closes. To support the back/forward cache in a custom document teardown handler, preserve the controller when `pagehide.persisted` is true; the harness already stops the active turn in that case.
 
-## 6. Own account, route, and planner changes
+## 6. Own account, route, and resolver changes
 
-Destroy the old controller and cancel approval UI before creating a replacement for another account, conversation partition, or planner. Unsubscribe old views and unregister route-owned tools. A supplied planner belongs to the host; the harness does not dispose it automatically.
+Destroy the old controller and cancel approval UI before creating a replacement for another account, conversation partition, or resolver. Unsubscribe old views and unregister route-owned tools. A supplied resolver belongs to the host; the harness does not dispose it automatically.
 
 Use a stable, application-specific namespace and an explicit conversation ID. `ownerId` partitions storage but does not authenticate the user. Never assign legacy anonymous history to the next signed-in account. Clear browser history according to your application's retention policy, including sign-out if required.
 
@@ -157,11 +157,11 @@ Test the installed artifact with the application's actual routes and authenticat
 
 1. Read application state through a registered tool and compare it with the visible UI.
 2. Approve and deny a mutation. Confirm denial prevents execution and another model round.
-3. Cancel during planning and during approval. Confirm the approval UI closes and no later action starts.
+3. Cancel during resolution and during approval. Confirm the approval UI closes and no later action starts.
 4. Reload after an interrupted turn. Confirm history restores and no action is replayed.
 5. Switch accounts and confirm storage partitions and tool permissions change.
 6. Open two tabs on the same conversation and verify writer contention is visible.
 7. Test the deployed base path, compiled worker URL, existing PWA, and production CSP over HTTPS.
 8. Exercise keyboard input, popup/inline mode, narrow screens, long output, and Clear chat.
 
-Use a deterministic planner for repeatable integration tests. Run separately authorized model evaluations against the intended provider. Passing package tests proves packaging and supported fixtures; it does not prove your backend policy or deployed worker path. See [operations](./operations.md) for commands and troubleshooting.
+Use a deterministic resolver for repeatable integration tests. Run separately authorized model evaluations against the intended provider. Passing package tests proves packaging and supported fixtures; it does not prove your backend policy or deployed worker path. See [operations](./operations.md) for commands and troubleshooting.

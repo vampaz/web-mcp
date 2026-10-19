@@ -41,12 +41,12 @@ Inspected local commits: Kit `0f0bd3c56ff58c98a2459f98bc23eb8229c52715`; Legacy 
 | Native and fallback registration         | [registry.ts](/Users/carlosrodrigues/works/web-mcp/packages/core/src/registry.ts), [native-adapter.ts](/Users/carlosrodrigues/works/web-mcp/packages/core/src/native-adapter.ts), and [support.ts](/Users/carlosrodrigues/works/web-mcp/packages/core/src/support.ts) already share application validation and execution. Reuse this boundary. |
 | Pi runtime                               | [pi-assistant.ts](/Users/carlosrodrigues/works/web-mcp-demo/src/workers/pi-assistant.ts) runs Pi Durable in a service worker. [pi-connection.ts](/Users/carlosrodrigues/works/web-mcp-demo/src/utils/pi-connection.ts) handles page requests. The worker URL, pathname scope, and messages are demo-specific.                                  |
 | Persistence and recovery                 | [pi-storage.ts](/Users/carlosrodrigues/works/web-mcp-demo/src/utils/pi-storage.ts) commits an IndexedDB log before applying state. A Web Lock serializes writers. Reopening cancels unfinished work without replaying page actions.                                                                                                            |
-| Model bridge                             | [pi-planner.ts](/Users/carlosrodrigues/works/web-mcp-demo/src/utils/pi-planner.ts) adapts `ToolPlanner`; [pi-model.ts](/Users/carlosrodrigues/works/web-mcp-demo/src/utils/pi-model.ts) adapts its output to Pi. Usage fields are placeholders, not measured token consumption.                                                                |
-| UI coupling                              | [PiAssistant.vue](/Users/carlosrodrigues/works/web-mcp-demo/src/components/PiAssistant.vue) renders Pi-specific state and uses `--demo-*` styles. [DemoShell.vue](/Users/carlosrodrigues/works/web-mcp-demo/src/components/DemoShell.vue) gets the selected planner through the existing command-input controls.                               |
+| Model bridge                             | [pi-resolver.ts](/Users/carlosrodrigues/works/web-mcp-demo/src/utils/pi-resolver.ts) adapts `ToolResolver`; [pi-model.ts](/Users/carlosrodrigues/works/web-mcp-demo/src/utils/pi-model.ts) adapts its output to Pi. Usage fields are placeholders, not measured token consumption.                                                             |
+| UI coupling                              | [PiAssistant.vue](/Users/carlosrodrigues/works/web-mcp-demo/src/components/PiAssistant.vue) renders Pi-specific state and uses `--demo-*` styles. [DemoShell.vue](/Users/carlosrodrigues/works/web-mcp-demo/src/components/DemoShell.vue) gets the selected resolver through the existing command-input controls.                              |
 | Accounts and hosted access               | [auth.ts](/Users/carlosrodrigues/works/web-mcp-demo/src/lib/auth.ts) supplies Better Auth. [session.ts](/Users/carlosrodrigues/works/web-mcp-demo/src/pages/api/webmcp/session.ts) exchanges project publishable keys for short-lived service sessions. This is not extension user login.                                                      |
 | Usage accounting                         | [access-validation.ts](/Users/carlosrodrigues/works/web-mcp-demo/src/lib/paid-services/access-validation.ts) records access events; [schema.ts](/Users/carlosrodrigues/works/web-mcp-demo/src/db/schema.ts) has project policies and keys. Neither provides a user credit ledger.                                                              |
 
-Existing planning documents contain historical checkboxes. Reconcile their relevant work against code; do not use those checkboxes as proof of implemented token accounting.
+Existing resolving documents contain historical checkboxes. Reconcile their relevant work against code; do not use those checkboxes as proof of implemented token accounting.
 
 One prerequisite needs hardening: [invocation.ts](/Users/carlosrodrigues/works/web-mcp/packages/core/src/invocation.ts) checks scope before approval and guards afterward, but does not explicitly recheck scope or abort state immediately before execution. Passing a signal to an application callback does not enforce cancellation when that callback ignores it. Step 1.2 must close this gap before the extracted harness promises to cancel pending actions safely.
 
@@ -74,9 +74,9 @@ The demo owns a service worker wrapper at `apps/demo/webmcp-pi/worker.ts`. In de
 
 #### LM Studio configuration and tests
 
-Reuse core's `createRemotePlanner()` with `provider: 'openai-compatible'`. LM Studio documents `/v1/models` and `/v1/chat/completions` on its [OpenAI-compatible API](https://lmstudio.ai/docs/developer/openai-compat). Its [local server](https://lmstudio.ai/docs/developer/core/server) can run on loopback. No LM Studio SDK or hosted account is required for this development path.
+Reuse core's `createRemoteResolver()` with `provider: 'openai-compatible'`. LM Studio documents `/v1/models` and `/v1/chat/completions` on its [OpenAI-compatible API](https://lmstudio.ai/docs/developer/openai-compat). Its [local server](https://lmstudio.ai/docs/developer/core/server) can run on loopback. No LM Studio SDK or hosted account is required for this development path.
 
-Store developer configuration in ignored `apps/demo/.env.local`, with a checked-in `.env.example`: `LM_STUDIO_BASE_URL` defaults to `http://127.0.0.1:1234/v1`; `LM_STUDIO_MODEL` identifies the developer's loaded local model; `LM_STUDIO_API_TOKEN` is optional when local server authentication is enabled. Validate the selected model and planner output support before enabling model-dependent examples. Do not silently select a different model or download one.
+Store developer configuration in ignored `apps/demo/.env.local`, with a checked-in `.env.example`: `LM_STUDIO_BASE_URL` defaults to `http://127.0.0.1:1234/v1`; `LM_STUDIO_MODEL` identifies the developer's loaded local model; `LM_STUDIO_API_TOKEN` is optional when local server authentication is enabled. Validate the selected model and resolver output support before enabling model-dependent examples. Do not silently select a different model or download one.
 
 The demo's Vite server exposes a development-only `/__lmstudio/v1` proxy to the configured loopback server. Allow only the needed models/completions paths and methods. Bind Vite to loopback, check request origin, and reject arbitrary targets and redirects. The browser receives the local proxy URL and model ID; any LM Studio token stays server-side. Do not forward WebMCP account credentials to LM Studio. This avoids requiring broad LM Studio CORS access; see its [server options](https://lmstudio.ai/docs/cli/serve/server-start).
 
@@ -90,11 +90,11 @@ Later standalone-demo adoption is a separate consumer rollout. Phase 5 prepares 
 
 ### 1. Package boundaries and public contracts
 
-| Primary import            | Proposed API                                                                                         | Responsibility                                                                                                   | Must not own                                                                              |
-| ------------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `@vampaz/webmcp-kit`      | Existing `defineTool`, `registerTool`, `invokeTool`, planner adapters, confirmation and support APIs | Tool definitions, schema validation, availability, guards, confirmation, native registration, local execution    | Pi scheduling, new chat rendering, extension accounts                                     |
-| `@vampaz/webmcp-kit/pi`   | `createPiHarness`, `createPiRuntime`, controller and host interfaces                                 | Pi lifecycle, planner adaptation, tool-result feedback, persistence, cancellation, normalized conversation state | UI, demo data, browser extension credentials, application authorization                   |
-| `@vampaz/webmcp-kit/chat` | `defineWebMCPChat`, `WebMCPChatElement`, UI configuration types                                      | Framework-neutral `<webmcp-chat>` custom element, transcript, composer, Stop, Clear chat, status                 | Provider discovery, model selectors, key entry, account management, tool execution policy |
+| Primary import            | Proposed API                                                                                          | Responsibility                                                                                                    | Must not own                                                                              |
+| ------------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `@vampaz/webmcp-kit`      | Existing `defineTool`, `registerTool`, `invokeTool`, resolver adapters, confirmation and support APIs | Tool definitions, schema validation, availability, guards, confirmation, native registration, local execution     | Pi scheduling, new chat rendering, extension accounts                                     |
+| `@vampaz/webmcp-kit/pi`   | `createPiHarness`, `createPiRuntime`, controller and host interfaces                                  | Pi lifecycle, resolver adaptation, tool-result feedback, persistence, cancellation, normalized conversation state | UI, demo data, browser extension credentials, application authorization                   |
+| `@vampaz/webmcp-kit/chat` | `defineWebMCPChat`, `WebMCPChatElement`, UI configuration types                                       | Framework-neutral `<webmcp-chat>` custom element, transcript, composer, Stop, Clear chat, status                  | Provider discovery, model selectors, key entry, account management, tool execution policy |
 
 `/pi/worker` is a supporting entry that exports `installPiServiceWorker()`. It lets a consuming application compile and serve a same-origin worker wrapper. It is not a fourth product component.
 
@@ -111,8 +111,8 @@ flowchart LR
   Controller --> Pi[Pi Durable runtime]
   Pi --> Host[Tool host]
   Host -->|Application-owned invocation| Core
-  Pi --> Planner[Configured planner adapter]
-  Planner --> Model[Model service]
+  Pi --> Resolver[Configured resolver adapter]
+  Resolver --> Model[Model service]
   Pi --> Storage[IndexedDB commit log and Web Lock]
 ```
 
@@ -120,13 +120,13 @@ The new chat imports only controller types from `/pi`; it must not start or impo
 
 Pi dependencies become optional peer dependencies, with development dependencies for kit tests. Document their explicit installation for `/pi` consumers. A core-only installation and a UI installation using a test controller must work without Pi, Vue, or extension dependencies. Verify the latest compatible Pi/Chord versions at implementation time; the demo baseline uses `1.1.0`.
 
-The existing command-input component still serves bounded Planner mode, including TypeSafe and deterministic demonstrations. It is not the new chat. Keep that working feature. The extracted Pi harness must have no dependency on its hidden DOM or provider-selection events. Do not create compatibility wrappers around the legacy Pi implementation.
+The existing command-input component still serves bounded Resolver mode, including TypeSafe and deterministic demonstrations. It is not the new chat. Keep that working feature. The extracted Pi harness must have no dependency on its hidden DOM or provider-selection events. Do not create compatibility wrappers around the legacy Pi implementation.
 
 ### 2. Harness hosts and lifecycle
 
 Separate the current service worker file into a reusable `runtime.ts` and a small browser host. Two actual hosts need the runtime:
 
-- **Embedded website:** `createPiHarness()` connects the page to the application-supplied service worker. The page runs the existing planner adapter and invokes its own tools. The worker runs Pi and commits history.
+- **Embedded website:** `createPiHarness()` connects the page to the application-supplied service worker. The page runs the existing resolver adapter and invokes its own tools. The worker runs Pi and commits history.
 - **Chrome extension:** `createPiRuntime()` runs in the extension side panel while the panel is open. It uses the same Pi loop and IndexedDB adapter. The Manifest V3 background worker only coordinates extension events and authentication. Closing the side panel cancels work; reopening restores history without continuing actions.
 
 This avoids depending on an indefinitely running extension background worker. Chrome can terminate that worker and requires state to survive outside global variables. This host choice follows the documented [extension service worker lifecycle](https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle).
@@ -135,7 +135,7 @@ Both factories return the same controller contract:
 
 - `getSnapshot()` and `subscribe(listener)` expose normalized messages, tool activity, state, and structured errors. Subscription returns an unsubscribe function.
 - `send(text)` admits one user turn and resolves with its terminal outcome.
-- `stop()` cancels planning and pending approvals. It does not roll back an action already executed.
+- `stop()` cancels resolving and pending approvals. It does not roll back an action already executed.
 - `clear()` clears only this conversation, under its writer lock. It cannot race an active turn.
 - `destroy()` cancels the active turn, settles local pending operations, and releases subscriptions, ports, and local resources; it does not erase history.
 
@@ -143,9 +143,9 @@ Controller states: `loading`, `idle`, `running`, `stopping`, `interrupted`, `err
 
 `PiToolHost` supplies asynchronous tool discovery, current context, and invocation. The embedded host uses the kit's registry and `invokeTool()`. The extension host targets a specific browser document. Neither host accepts a model-supplied `confirmed` flag or invokes a tool's raw `execute()` function.
 
-Keep the current sequential loop, default maximum of 12 tool calls per turn, disabled automatic retry, and disabled automatic compaction. Make the call limit developer-configurable within a documented bound. After each success, refresh context and plan one next step. Bind advertised tools to a catalog revision; removal or a changed schema invalidates pending calls and approvals. Denial, invalid output, failure, cancellation, or a changed target ends the turn. No silent deterministic replacement for a failed conversational model.
+Keep the current sequential loop, default maximum of 12 tool calls per turn, disabled automatic retry, and disabled automatic compaction. Make the call limit developer-configurable within a documented bound. After each success, refresh context and resolve one next step. Bind advertised tools to a catalog revision; removal or a changed schema invalidates pending calls and approvals. Denial, invalid output, failure, cancellation, or a changed target ends the turn. No silent deterministic replacement for a failed conversational model.
 
-The first adapter reuses `ToolPlanner` and the existing Pi bridge. It does not promise token streaming or measured token usage. Replace demo-specific prompt wording and provider-name checks with an explicit adapter capability check. LM Studio uses the existing OpenAI-compatible planner. Existing TypeSafe and deterministic Planner mode remain separate from the conversational harness.
+The first adapter reuses `ToolResolver` and the existing Pi bridge. It does not promise token streaming or measured token usage. Replace demo-specific prompt wording and provider-name checks with an explicit adapter capability check. LM Studio uses the existing OpenAI-compatible resolver. Existing TypeSafe and deterministic Resolver mode remain separate from the conversational harness.
 
 ### 3. Worker installation and message boundaries
 
@@ -167,7 +167,7 @@ An extension key includes WebMCP account ID, target origin, tab-session identity
 
 Retain commit-before-display and a Web Lock per conversation. Test concurrent send, read, clear, worker replacement, and another tab opening the same conversation. Storage failure must stop the operation visibly; do not silently switch to `MemoryStorage` and claim persistence.
 
-Persist dialogue, committed tool outcomes, and recovery state. Do not persist access tokens, provider secrets, raw login responses, or arbitrary hidden page data. Default tool details to collapsed. The host selects safe context and outputs before they reach the planner or transcript.
+Persist dialogue, committed tool outcomes, and recovery state. Do not persist access tokens, provider secrets, raw login responses, or arbitrary hidden page data. Default tool details to collapsed. The host selects safe context and outputs before they reach the resolver or transcript.
 
 On open, abort unfinished Pi tasks before starting a scheduler. Keep completed history, mark the interrupted turn, and require a new user request. If application state changes during an approval, revalidate scope and guards before execution. Navigation, sign-out, account switch, or provider change cancels the active turn and clears pending approvals.
 
@@ -179,14 +179,14 @@ Browser storage eviction can remove history. `navigator.storage.persist()` is an
 
 The developer supplies a controller, title, assistant label, placeholder, empty-state text, optional suggested prompts, disabled state, and CSS custom properties. These are the initial supported options; do not add a plugin system or arbitrary template callbacks.
 
-The host owns mounting, account UI, and planner configuration. The reusable component provides `mode: 'inline' | 'popup'`: inline follows the host layout; popup supplies a draggable launcher and resizable, keyboard-accessible nonmodal panel. Both modes share the same conversation controls and preserve history and drafts when switching. It must work inside a normal page region or the extension side panel, without demo layout tokens or global styles.
+The host owns mounting, account UI, and resolver configuration. The reusable component provides `mode: 'inline' | 'popup'`: inline follows the host layout; popup supplies a draggable launcher and resizable, keyboard-accessible nonmodal panel. Both modes share the same conversation controls and preserve history and drafts when switching. It must work inside a normal page region or the extension side panel, without demo layout tokens or global styles.
 
 Render model and tool text as text. Rich Markdown and HTML rendering are outside the first release. Support accessible names, keyboard operation, visible focus, appropriate live announcements, reduced motion, and fluid narrow layouts. Auto-scroll only when the user is already near the newest message. Multiple chat elements must have distinct control IDs.
 
 The local demo uses this API. The new subpaths are available through source and unpublished tarballs until release. `appConfig.modelId` comes from developer configuration. `getCurrentPageContext` and tool registration belong to the demo application:
 
 ```ts
-import { createRemotePlanner } from '@vampaz/webmcp-kit'
+import { createRemoteResolver } from '@vampaz/webmcp-kit'
 import { createPiHarness } from '@vampaz/webmcp-kit/pi'
 import { defineWebMCPChat, type WebMCPChatElement } from '@vampaz/webmcp-kit/chat'
 
@@ -197,7 +197,7 @@ const harness = await createPiHarness({
     conversationId: 'chat-example'
   },
   worker: { url: '/webmcp-pi/worker.ts', scope: '/webmcp-pi/' },
-  planner: createRemotePlanner({
+  resolver: createRemoteResolver({
     provider: 'openai-compatible',
     baseUrl: '/__lmstudio/v1',
     model: appConfig.modelId,
@@ -217,7 +217,7 @@ chat?.configure({ harness, placeholder: 'Ask the assistant' })
 // Call harness.destroy() from the host framework's teardown hook.
 ```
 
-The local proxy supplies an LM Studio token if configured. A production website can instead supply `createHostedOpenAIPlanner()` with its service URL and publishable key, plus a compiled worker URL. The extension uses its authenticated account adapter, described below. These are host decisions; the chat does not need a model-settings panel.
+The local proxy supplies an LM Studio token if configured. A production website can instead supply `createHostedOpenAIResolver()` with its service URL and publishable key, plus a compiled worker URL. The extension uses its authenticated account adapter, described below. These are host decisions; the chat does not need a model-settings panel.
 
 ### 6. Native support, fallback behavior, and extension tool access
 
@@ -251,9 +251,9 @@ Package scripts and assets locally. Reuse Vite for extension packaging, Vitest f
 
 ### 7. WebMCP login and hosted credits
 
-Own account and inference code in the private `apps/service` application inside Kit. Port the relevant existing Astro/Cloudflare, Better Auth, D1, authorization, and planner modules with their tests. Preserve the established WebMCP identity and account records. Do not create a second identity database or embed server credentials in the npm package or extension.
+Own account and inference code in the private `apps/service` application inside Kit. Port the relevant existing Astro/Cloudflare, Better Auth, D1, authorization, and resolver modules with their tests. Preserve the established WebMCP identity and account records. Do not create a second identity database or embed server credentials in the npm package or extension.
 
-Develop against isolated local database bindings. Before production cutover, inventory the current auth, project-key, administration, and planner routes and their dependencies. Preserve their public URLs, auth issuer, cookie behavior, signing secrets, and D1 migration history. The proposed deployment keeps the current public origin and routes only the owned account/API paths to Service; public demo pages stay served by the existing deployment. Give Service assets a dedicated URL prefix and include that prefix in the route mapping, so account UI assets cannot collide with the standalone site's assets. Verify route precedence, asset loading, and callbacks in staging before enabling that mapping. Record the exact route list and deployment ownership in Kit. Do not deploy both backends as competing owners of the same paths or run copied migrations twice.
+Develop against isolated local database bindings. Before production cutover, inventory the current auth, project-key, administration, and resolver routes and their dependencies. Preserve their public URLs, auth issuer, cookie behavior, signing secrets, and D1 migration history. The proposed deployment keeps the current public origin and routes only the owned account/API paths to Service; public demo pages stay served by the existing deployment. Give Service assets a dedicated URL prefix and include that prefix in the route mapping, so account UI assets cannot collide with the standalone site's assets. Verify route precedence, asset loading, and callbacks in staging before enabling that mapping. Record the exact route list and deployment ownership in Kit. Do not deploy both backends as competing owners of the same paths or run copied migrations twice.
 
 The in-repository demo stays a small local consumer; it does not become the account service. Service can retain Astro and Vue where the imported account UI requires them, without adding those dependencies to `/pi` or `/chat`.
 
@@ -274,30 +274,30 @@ Store extension access tokens in `chrome.storage.session` with trusted-context a
 
 Proposed routes, owned by Service under the established public origin:
 
-| Route                           | Contract                                                                                                            |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `GET /extension/authorize`      | Website sign-in/consent UI for a validated authorization request                                                    |
-| `POST /api/extension/authorize` | Website session and CSRF checks; issue one authorization code                                                       |
-| `POST /api/extension/token`     | Validate client, redirect, code, and PKCE; atomically consume code; return scoped token                             |
-| `POST /api/extension/logout`    | Revoke the current extension session; clear client credentials and cancel work                                      |
-| `GET /api/extension/account`    | Return authenticated account, model entitlement, balance, and any held usage                                        |
-| `POST /api/extension/plan`      | Authenticate user and session, enforce policy/credits, invoke shared planner service, return plan and usage receipt |
+| Route                            | Contract                                                                                                                   |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `GET /extension/authorize`       | Website sign-in/consent UI for a validated authorization request                                                           |
+| `POST /api/extension/authorize`  | Website session and CSRF checks; issue one authorization code                                                              |
+| `POST /api/extension/token`      | Validate client, redirect, code, and PKCE; atomically consume code; return scoped token                                    |
+| `POST /api/extension/logout`     | Revoke the current extension session; clear client credentials and cancel work                                             |
+| `GET /api/extension/account`     | Return authenticated account, model entitlement, balance, and any held usage                                               |
+| `POST /api/extension/resolution` | Authenticate user and session, enforce policy/credits, invoke shared resolver service, return resolution and usage receipt |
 
 Keep extension sessions distinct from project publishable-key sessions. Do not broaden `/api/webmcp/session` to trust arbitrary extension origins. Verify client registration and token audience; CORS alone is not authentication. Handle registered extension IDs and their origin scheme explicitly instead of passing them through website-origin normalization. Authorization codes and login callback handling require replay, CSRF, open-redirect, and account-switch tests. Reauthorization must not retry the interrupted paid request automatically.
 
 Require PKCE S256, rate-limit the authorization and token endpoints, and return `Cache-Control: no-store` for authorization, token, account, and usage responses. Use `Referrer-Policy: no-referrer` on the authorization page and redact authorization codes from logs. Website session cookies remain on WebMCP; do not copy them into the extension.
 
-Extract the existing provider call and plan validation from `/api/webmcp/plan` into a shared server module. The website route retains its project-key access policy; the extension route uses a user principal. Both apply size limits, server model allowlists, rate limits, concurrency limits, and generic public errors. Provider secrets stay in Cloudflare bindings/secrets.
+Extract the existing provider call and resolution validation from `/api/webmcp/resolve` into a shared server module. The website route retains its project-key access policy; the extension route uses a user principal. Both apply size limits, server model allowlists, rate limits, concurrency limits, and generic public errors. Provider secrets stay in Cloudflare bindings/secrets.
 
 **Access tokens** authenticate requests. **Inference credits** pay for model usage. Signing in does not mint an unlimited balance. For the MVP, use administrator-provisioned account grants; self-service purchasing, subscriptions, and payment-provider integration are later product work.
 
-Add a user balance and append-only credit/usage ledger in D1. Each planner round gets a stable request ID, payload hash, owner, provider/model, reservation, actual usage, and terminal state. A Pi turn can have several charged rounds. The server owns accounting; the current Pi zero-valued usage fields are never a billing source.
+Add a user balance and append-only credit/usage ledger in D1. Each resolver round gets a stable request ID, payload hash, owner, provider/model, reservation, actual usage, and terminal state. A Pi turn can have several charged rounds. The server owns accounting; the current Pi zero-valued usage fields are never a billing source.
 
 Use separate records for registered extension clients, hashed authorization codes, hashed extension sessions, account balances, inference requests, and immutable ledger entries. A request progresses through `reserved`, `in-flight`, and either `settled`, `released`, or `unresolved`. Unique account/request IDs and grant IDs prevent repeated debits or grants. Balance and ledger updates commit together. Persist provider receipt metadata; avoid storing complete prompts or tool results in the billing ledger.
 
 Before calling the provider, atomically reserve a conservative request allowance within the account balance. Bind reservation and request identity in the same database transaction. Settle from measured provider usage, release unused allowance, and deduplicate completed requests. A reused ID with different content is rejected. Never automatically repeat a provider request after an ambiguous timeout; hold and reconcile uncertain usage instead of treating it as free or charging twice.
 
-Capture provider usage before parsing or validating the proposed tool plan. A response that fails plan validation can still incur provider usage; record that receipt while executing no page action. Distinguish cancellation before dispatch from cancellation after the provider may have started work.
+Capture provider usage before parsing or validating the proposed tool resolution. A response that fails resolution validation can still incur provider usage; record that receipt while executing no page action. Distinguish cancellation before dispatch from cancellation after the provider may have started work.
 
 Provide an administrator-only grant/reconciliation API using the existing role and write guards. Administrators can resolve a held request from provider receipts with an audited adjustment. Definite failures before dispatch release the reservation; a crashed or timed-out in-flight request becomes unresolved, without automatic refund or redispatch. Define the support response window before enabling credits. Clients receive a receipt or explicit unresolved/already-completed status, never an instruction to replay a page action.
 
@@ -307,7 +307,7 @@ The initial model and conversion from measured tokens to credits must be a versi
 
 ### 8. Later external provider login
 
-Keep WebMCP identity separate from inference authorization. A later provider connection belongs to the WebMCP user and supplies a planner adapter. Account selection lives in the extension shell; the reusable chat still receives a configured controller.
+Keep WebMCP identity separate from inference authorization. A later provider connection belongs to the WebMCP user and supplies a resolver adapter. Account selection lives in the extension shell; the reusable chat still receives a configured controller.
 
 Add OpenAI and other providers one at a time. For each provider, establish supported client registration, scopes, grant type, token storage, refresh/revocation behavior, permitted endpoints, and whose quota pays for inference. Prove one real authorized model call before integrating the connection into the Pi loop.
 
@@ -345,11 +345,11 @@ Each step is a focused implementation unit inside Kit. Listed new files, scripts
     - Acceptance: a fresh Kit checkout can run the core example without the sibling repository, a published kit build, an account, or a model. Vite serves source imports without duplicate registries. The LM Studio proxy accepts only its configured local target and never exposes its token. The core example proves read, validation, confirmation, denial, and native-disabled fallback.
 
 - [x] Phase 2: Extract the Pi Durable harness
-  - [x] Step 2.1: Extract the Pi loop and planner/model adapters without demo wording or UI dependencies.
-    - Files, Kit: `packages/pi/src/{runtime,planner-adapter,model-adapter}.ts` and adjacent `.spec.ts` files; `package.json`, `package-lock.json` for the verified Pi dependencies.
-    - Read-only source, Legacy reference: `src/workers/pi-assistant.ts`, `src/utils/{pi-model,pi-planner}.ts` and their tests.
-    - Verification, Kit: `npm run test -- packages/pi/src/runtime.spec.ts packages/pi/src/planner-adapter.spec.ts packages/pi/src/model-adapter.spec.ts`.
-    - Acceptance: actual Pi harness test proves answer, action/result/replan, denied action, invalid plan, tool limit, stop, and no fallback. Do not replace these with a mocked loop.
+  - [x] Step 2.1: Extract the Pi loop and resolver/model adapters without demo wording or UI dependencies.
+    - Files, Kit: `packages/pi/src/{runtime,resolver-adapter,model-adapter}.ts` and adjacent `.spec.ts` files; `package.json`, `package-lock.json` for the verified Pi dependencies.
+    - Read-only source, Legacy reference: `src/workers/pi-assistant.ts`, `src/utils/{pi-model,pi-resolver}.ts` and their tests.
+    - Verification, Kit: `npm run test -- packages/pi/src/runtime.spec.ts packages/pi/src/resolver-adapter.spec.ts packages/pi/src/model-adapter.spec.ts`.
+    - Acceptance: actual Pi harness test proves answer, action/result/re-resolve, denied action, invalid resolution, tool limit, stop, and no fallback. Do not replace these with a mocked loop.
   - [x] Step 2.2: Extract IndexedDB storage and recovery with explicit session identity.
     - Files, Kit: `packages/pi/src/{storage,recovery,session}.ts` and adjacent `.spec.ts` files.
     - Files, Kit: `apps/demo/tests/e2e/pi-storage.spec.ts`, a development-only storage fixture under `apps/demo/src/fixtures/`.
@@ -381,7 +381,7 @@ Each step is a focused implementation unit inside Kit. Listed new files, scripts
     - Files, Kit: `apps/demo/src/App.vue`, `apps/demo/src/{main,config,harness}.ts`, `apps/demo/src/config.spec.ts`, `apps/demo/tests/e2e/lmstudio.spec.ts`, `playwright.lmstudio.config.ts`, `package.json`, `apps/demo/.env.example`.
     - Add `test:lmstudio` with a preflight check for the configured local endpoint and model. Exclude this test file from ordinary fixture-based Playwright runs; label the two result sets separately.
     - Verification: `npm run test -- apps/demo/src/config.spec.ts`; `npm run typecheck:demo`; `npm run test:lmstudio` with LM Studio running and the chosen model loaded.
-    - Acceptance: both examples consume public package APIs, use the same local model configuration, and execute the real Pi loop. Cover answer, read, confirmed write, feedback/replan, denied write, stop, and reload. Endpoint failure remains visible and never selects a hosted provider or fixture. The reusable chat has no settings panel.
+    - Acceptance: both examples consume public package APIs, use the same local model configuration, and execute the real Pi loop. Cover answer, read, confirmed write, feedback/re-resolve, denied write, stop, and reload. Endpoint failure remains visible and never selects a hosted provider or fixture. The reusable chat has no settings panel.
   - [x] Step 4.2: Finish the local demo instructions and consumer examples.
     - Files, Kit: `apps/demo/README.md`, `README.md`, `docs/{getting-started,browser-support,pi,chat,vue,react,astro,svelte}.md` as required by the examples, `apps/demo/tests/e2e/{core,pi-assistant,webmcp-chat}.spec.ts`.
     - Verification: `npm run test`; `npm exec tsc -- --noEmit`; `npm run typecheck:demo`; `npm run lint`; `npm run test:e2e`; `npm run test:lmstudio`.
@@ -426,22 +426,22 @@ Each step is a focused implementation unit inside Kit. Listed new files, scripts
     - Files, Service: `src/pages/extension/authorize.astro`, `src/pages/api/extension/{authorize,token,logout,account}.ts`, adjacent route tests, `src/lib/auth/extension-sessions.ts`, adjacent `.spec.ts`, `src/interfaces/extension-auth.ts`, `src/db/schema.ts`, a new next-numbered migration in `drizzle/migrations/`, `src/interfaces/cloudflare.ts`, `.env.example`, imported login page/component and `src/lib/login-callback-url.ts` with its test, `tests/e2e/extension-login.spec.ts`.
     - Verification, Service: `npm run test -- src/lib/auth/extension-sessions.spec.ts src/lib/login-callback-url.spec.ts src/pages/api/extension/authorize.spec.ts src/pages/api/extension/token.spec.ts src/pages/api/extension/logout.spec.ts src/pages/api/extension/account.spec.ts`; `npm run typecheck`; `npm run test:e2e -- tests/e2e/extension-login.spec.ts`.
     - Acceptance: exact redirects, PKCE/state, single-use codes, expiry/revocation, trusted clients, account switching, and no token leakage. Password/social sign-in returns to the validated authorization transaction. Existing website login and project-key flows remain valid.
-  - [ ] Step 7.2: Extract the shared server planner and capture provider usage.
-    - Files, Service: `src/lib/hosted-planner.ts`, adjacent `.spec.ts`, `src/interfaces/hosted-planner.ts`, `src/pages/api/webmcp/plan.ts`, and its test; `tests/e2e/lmstudio.spec.ts`, a model-test config and `test:lmstudio` script.
-    - Verification, Service: `npm run test -- src/lib/hosted-planner.spec.ts src/pages/api/webmcp/plan.spec.ts`; `npm run test:lmstudio` using isolated local account data and the local model upstream.
-    - Acceptance: preserve project-key authorization and existing responses. Return usage internally even when plan validation fails; never expose provider secrets or fabricate token counts.
+  - [ ] Step 7.2: Extract the shared server resolver and capture provider usage.
+    - Files, Service: `src/lib/hosted-resolver.ts`, adjacent `.spec.ts`, `src/interfaces/hosted-resolver.ts`, `src/pages/api/webmcp/resolve.ts`, and its test; `tests/e2e/lmstudio.spec.ts`, a model-test config and `test:lmstudio` script.
+    - Verification, Service: `npm run test -- src/lib/hosted-resolver.spec.ts src/pages/api/webmcp/resolve.spec.ts`; `npm run test:lmstudio` using isolated local account data and the local model upstream.
+    - Acceptance: preserve project-key authorization and existing responses. Return usage internally even when resolution validation fails; never expose provider secrets or fabricate token counts.
   - [ ] Step 7.3: Add account grants, reservations, settlement, and administrative reconciliation.
     - Files, Service: `src/lib/paid-services/{credits,usage}.ts`, adjacent `.spec.ts`, `src/lib/paid-services/credits.d1.spec.ts`, `src/db/schema.ts`, new next-numbered migration, `src/pages/api/admin/account-credits.ts`, adjacent `.spec.ts`.
     - Verification, Service: `npm run test -- src/lib/paid-services/credits.spec.ts src/lib/paid-services/usage.spec.ts src/lib/paid-services/credits.d1.spec.ts src/pages/api/admin/account-credits.spec.ts`.
     - The D1 test file provisions an isolated local database through a test fixture and applies the proposed migrations. Add its runtime dependency only after evaluating the existing Wrangler/workerd tooling; it must never target remote production data.
     - Acceptance: concurrent reservations cannot overspend; duplicate IDs do not debit twice; mismatched payloads fail; uncertain calls remain held; provider usage survives settlement retries. Prove admin-only grants and audited adjustments. Include real SQLite transaction tests and local D1 integration evidence.
-  - [ ] Step 7.4: Enforce account policy and accounting on extension planner requests.
-    - Files, Service: `src/pages/api/extension/plan.ts`, adjacent `.spec.ts`, `src/pages/api/extension/account.ts` and its test, `src/lib/security/concurrency-limit.ts` only where shared policy requires it.
-    - Verification, Service: `npm run test -- src/pages/api/extension/plan.spec.ts src/pages/api/extension/account.spec.ts src/lib/security/concurrency-limit.spec.ts`.
+  - [ ] Step 7.4: Enforce account policy and accounting on extension resolver requests.
+    - Files, Service: `src/pages/api/extension/resolution.ts`, adjacent `.spec.ts`, `src/pages/api/extension/account.ts` and its test, `src/lib/security/concurrency-limit.ts` only where shared policy requires it.
+    - Verification, Service: `npm run test -- src/pages/api/extension/resolution.spec.ts src/pages/api/extension/account.spec.ts src/lib/security/concurrency-limit.spec.ts`.
     - Acceptance: zero entitlement blocks before dispatch; session/client/model policy is rechecked per round; held usage appears in account results; failed validation, logout, and ambiguous network failures do not bypass accounting or replay requests.
-  - [ ] Step 7.5: Connect extension sign-in, balance, and the account-backed planner adapter.
-    - Files, Extension: `src/{auth,account,webmcp-planner,sidepanel}.ts`, adjacent `.spec.ts`, `src/interfaces/account.ts`, `tests/e2e/account.spec.ts`.
-    - Verification, Extension: `npm run test -- src/auth.spec.ts src/account.spec.ts src/webmcp-planner.spec.ts`; `npm run typecheck`; `npm run test:e2e -- tests/e2e/account.spec.ts` on the prepared artifact.
+  - [ ] Step 7.5: Connect extension sign-in, balance, and the account-backed resolver adapter.
+    - Files, Extension: `src/{auth,account,webmcp-resolver,sidepanel}.ts`, adjacent `.spec.ts`, `src/interfaces/account.ts`, `tests/e2e/account.spec.ts`.
+    - Verification, Extension: `npm run test -- src/auth.spec.ts src/account.spec.ts src/webmcp-resolver.spec.ts`; `npm run typecheck`; `npm run test:e2e -- tests/e2e/account.spec.ts` on the prepared artifact.
     - Acceptance: login returns to the panel; available/held credits are visible; expiry and exhausted quota give usable states; sign-out revokes/cancels; another user cannot see the previous user's history. Account controls remain outside `<webmcp-chat>`.
   - [ ] Step 7.6: Prepare migration, service, and extension release evidence.
     - Files, Kit: `temp-docs/release-webmcp-extension.md`, `temp-docs/service-cutover.md`; Service: environment/deployment documentation; Extension: `README.md`, manifest version, privacy/data-use disclosure.

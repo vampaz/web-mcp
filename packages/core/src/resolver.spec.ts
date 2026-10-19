@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
-  createBestPlanner,
-  createChromeAIPlanner,
-  createConfiguredPlanner,
-  createHeuristicPlanner
-} from './planner'
+  createBestResolver,
+  createChromeAIResolver,
+  createConfiguredResolver,
+  createHeuristicResolver
+} from './resolver'
 import type { JsonSchema, WebMCPTool } from './interfaces/tool'
 
 interface WindowWithLanguageModel extends Window {
@@ -21,14 +21,14 @@ interface WindowWithLanguageModel extends Window {
   }
 }
 
-describe('planner', () => {
+describe('resolver', () => {
   afterEach(() => {
     delete (window as WindowWithLanguageModel).LanguageModel
     window.localStorage.clear()
     vi.unstubAllGlobals()
   })
 
-  it('constrains and validates a single-step request without changing bounded Planner mode', async function test() {
+  it('constrains and validates a single-step request without changing bounded Resolver mode', async function test() {
     const fetch = vi.fn(async function respond(
       _url: string | URL | Request,
       _options?: RequestInit
@@ -52,7 +52,7 @@ describe('planner', () => {
       )
     })
     vi.stubGlobal('fetch', fetch)
-    const planner = await createConfiguredPlanner({
+    const resolver = await createConfiguredResolver({
       provider: 'openai-compatible',
       baseUrl: '/local/v1',
       responseFormat: 'json_schema'
@@ -64,7 +64,7 @@ describe('planner', () => {
         additionalProperties: false
       })
     ]
-    await expect(planner.plan('Read', tools, {}, { singleStep: true })).rejects.toThrow(
+    await expect(resolver.resolve('Read', tools, {}, { singleStep: true })).rejects.toThrow(
       'single-step'
     )
     const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))
@@ -74,7 +74,7 @@ describe('planner', () => {
       'tool_sequence'
     )
     expect(body.messages[0].content).toContain('exactly one')
-    expect((await planner.plan('Read', tools)).toolName).toBe('tool_sequence')
+    expect((await resolver.resolve('Read', tools)).toolName).toBe('tool_sequence')
   })
 
   it('sends the explicit JSON schema format required by LM Studio', async function test() {
@@ -100,7 +100,7 @@ describe('planner', () => {
       )
     })
     vi.stubGlobal('fetch', fetch)
-    const planner = await createConfiguredPlanner({
+    const resolver = await createConfiguredResolver({
       provider: 'openai-compatible',
       baseUrl: 'http://127.0.0.1:1234/v1',
       model: 'configured',
@@ -109,12 +109,12 @@ describe('planner', () => {
       temperature: 0.2,
       reasoningEffort: 'none'
     })
-    await planner.plan('Hello', [])
+    await resolver.resolve('Hello', [])
     expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)).response_format).toMatchObject({
       type: 'json_schema',
-      json_schema: { name: 'webmcp_plan', schema: { type: 'object' } }
+      json_schema: { name: 'webmcp_resolution', schema: { type: 'object' } }
     })
-    expect(planner.capabilities?.conversation).toBe(true)
+    expect(resolver.capabilities?.conversation).toBe(true)
     expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toMatchObject({
       max_tokens: 1024,
       temperature: 0.2,
@@ -122,9 +122,9 @@ describe('planner', () => {
     })
   })
 
-  it('uses a deterministic fallback planner without Chrome built-in AI', async () => {
-    const planner = await createBestPlanner()
-    const plan = await planner.plan('Create an invoice for Acme for 250 euros', [
+  it('uses a deterministic fallback resolver without Chrome built-in AI', async () => {
+    const resolver = await createBestResolver()
+    const resolution = await resolver.resolve('Create an invoice for Acme for 250 euros', [
       createTool('create_invoice', 'Create a draft invoice for a customer.', {
         type: 'object',
         properties: {
@@ -136,12 +136,12 @@ describe('planner', () => {
       })
     ])
 
-    expect(planner.status).toBe('fallback')
-    expect(plan.toolName).toBe('create_invoice')
-    expect(plan.input.amount).toBe(250)
+    expect(resolver.status).toBe('fallback')
+    expect(resolution.toolName).toBe('create_invoice')
+    expect(resolution.input.amount).toBe(250)
   })
 
-  it('uses Chrome AI as the active planner when the model is downloadable', async () => {
+  it('uses Chrome AI as the active resolver when the model is downloadable', async () => {
     const create = vi.fn(async () => ({
       prompt: async () =>
         JSON.stringify({
@@ -156,8 +156,8 @@ describe('planner', () => {
       create
     }
 
-    const planner = await createBestPlanner()
-    const plan = await planner.plan('Select all the foods that are French', [
+    const resolver = await createBestResolver()
+    const resolution = await resolver.resolve('Select all the foods that are French', [
       {
         name: 'select_items',
         description: 'Select checklist items by ID.',
@@ -170,10 +170,10 @@ describe('planner', () => {
       }
     ])
 
-    expect(planner.available).toBe(true)
-    expect(planner.status).toBe('downloadable')
-    expect(plan.toolName).toBe('select_items')
-    expect(plan.input).toEqual({
+    expect(resolver.available).toBe(true)
+    expect(resolver.status).toBe('downloadable')
+    expect(resolution.toolName).toBe('select_items')
+    expect(resolution.input).toEqual({
       ids: ['item_4', 'item_7']
     })
     expect(create).toHaveBeenCalledOnce()
@@ -194,10 +194,10 @@ describe('planner', () => {
       create
     }
 
-    const planner = await createChromeAIPlanner()
+    const resolver = await createChromeAIResolver()
     expect(create).not.toHaveBeenCalled()
 
-    const plan = await planner.plan('Find docks', [
+    const resolution = await resolver.resolve('Find docks', [
       {
         name: 'search_products',
         description: 'Search products.',
@@ -210,9 +210,9 @@ describe('planner', () => {
       }
     ])
 
-    expect(planner.available).toBe(true)
-    expect(planner.status).toBe('ready')
-    expect(plan.toolName).toBe('search_products')
+    expect(resolver.available).toBe(true)
+    expect(resolver.status).toBe('ready')
+    expect(resolution.toolName).toBe('search_products')
     expect(create).toHaveBeenCalledOnce()
   })
 
@@ -224,15 +224,19 @@ describe('planner', () => {
       }
     }
 
-    const planner = await createChromeAIPlanner()
-    const plan = await planner.plan('Add ten keyboards to the cart.', [createCartTool()], {
-      products: [{ id: 'keyboard', name: 'Keyboard' }]
-    })
+    const resolver = await createChromeAIResolver()
+    const resolution = await resolver.resolve(
+      'Add ten keyboards to the cart.',
+      [createCartTool()],
+      {
+        products: [{ id: 'keyboard', name: 'Keyboard' }]
+      }
+    )
 
-    expect(planner.available).toBe(true)
-    expect(plan.toolName).toBe('add_to_cart')
-    expect(plan.input.quantity).toBe(10)
-    expect(plan.reason).toContain('Used deterministic fallback')
+    expect(resolver.available).toBe(true)
+    expect(resolution.toolName).toBe('add_to_cart')
+    expect(resolution.input.quantity).toBe(10)
+    expect(resolution.reason).toContain('Used deterministic fallback')
   })
 
   it('does not start Chrome inference after cancellation during session creation', async function test() {
@@ -255,14 +259,14 @@ describe('planner', () => {
         })
       }
     }
-    const planner = await createChromeAIPlanner(true)
+    const resolver = await createChromeAIResolver(true)
     const controller = new AbortController()
-    const pending = planner.plan('Read', [], {}, { signal: controller.signal })
+    const pending = resolver.resolve('Read', [], {}, { signal: controller.signal })
     controller.abort()
     activate({ prompt })
     await expect(pending).rejects.toThrow('cancelled')
     expect(prompt).not.toHaveBeenCalled()
-    planner.dispose?.()
+    resolver.dispose?.()
   })
 
   it('shares pending Chrome sessions and destroys sessions that finish after disposal', async function test() {
@@ -278,11 +282,11 @@ describe('planner', () => {
       availability: async () => 'available',
       create
     }
-    const planner = await createChromeAIPlanner()
-    const first = planner.plan('Find products', [])
-    const second = planner.plan('Find products', [])
+    const resolver = await createChromeAIResolver()
+    const first = resolver.resolve('Find products', [])
+    const second = resolver.resolve('Find products', [])
     const results = Promise.allSettled([first, second])
-    planner.dispose?.()
+    resolver.dispose?.()
     const prompt = vi.fn()
     const destroy = vi.fn()
     activate({ prompt, destroy })
@@ -297,7 +301,7 @@ describe('planner', () => {
   })
 
   it('asks for clarification instead of guessing an unmatched or ambiguous object ID', async function test() {
-    const planner = createHeuristicPlanner()
+    const resolver = createHeuristicResolver()
     for (const products of [
       [{ id: 'a', name: 'Apple' }],
       [
@@ -305,10 +309,10 @@ describe('planner', () => {
         { id: 'b', name: 'Keyboard B' }
       ]
     ]) {
-      const plan = await planner.plan('Add a keyboard to the cart', [createCartTool()], {
+      const resolution = await resolver.resolve('Add a keyboard to the cart', [createCartTool()], {
         products
       })
-      expect(plan.toolName).toBe('needs_clarification')
+      expect(resolution.toolName).toBe('needs_clarification')
     }
   })
 
@@ -329,14 +333,14 @@ describe('planner', () => {
         return { prompt }
       }
     }
-    const planner = await createChromeAIPlanner(true)
+    const resolver = await createChromeAIResolver(true)
     const controller = new AbortController()
-    await planner.plan('Read', [], {}, { signal: controller.signal })
+    await resolver.resolve('Read', [], {}, { signal: controller.signal })
     expect(prompt).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({ signal: controller.signal })
     )
-    planner.dispose?.()
+    resolver.dispose?.()
   })
 
   it('does not fall back when Chrome AI is explicitly selected', async () => {
@@ -347,15 +351,15 @@ describe('planner', () => {
       }
     }
 
-    const planner = await createConfiguredPlanner({
+    const resolver = await createConfiguredResolver({
       provider: 'chrome-built-in',
       auth: {
         mode: 'none'
       }
     })
 
-    await expect(planner.plan('Add ten keyboards to the cart.', [])).rejects.toThrow(
-      'Chrome built-in AI could not plan this command'
+    await expect(resolver.resolve('Add ten keyboards to the cart.', [])).rejects.toThrow(
+      'Chrome built-in AI could not resolve this command'
     )
   })
 
@@ -367,8 +371,8 @@ describe('planner', () => {
       })
     }
 
-    const planner = await createChromeAIPlanner()
-    const plan = await planner.plan('Find docks', [
+    const resolver = await createChromeAIResolver()
+    const resolution = await resolver.resolve('Find docks', [
       createTool('search_products', 'Search products.', {
         type: 'object',
         properties: {
@@ -379,8 +383,8 @@ describe('planner', () => {
       })
     ])
 
-    expect(plan.toolName).toBe('search_products')
-    expect(plan.reason).toContain('Chrome built-in AI returned unparseable JSON')
+    expect(resolution.toolName).toBe('search_products')
+    expect(resolution.reason).toContain('Chrome built-in AI returned unparseable JSON')
   })
 
   it('falls back if Chrome AI chooses an unavailable tool', async () => {
@@ -397,8 +401,8 @@ describe('planner', () => {
       })
     }
 
-    const planner = await createChromeAIPlanner()
-    const plan = await planner.plan('Find docks', [
+    const resolver = await createChromeAIResolver()
+    const resolution = await resolver.resolve('Find docks', [
       {
         name: 'search_products',
         description: 'Search products.',
@@ -411,11 +415,11 @@ describe('planner', () => {
       }
     ])
 
-    expect(plan.toolName).toBe('search_products')
-    expect(plan.reason).toContain('provider selected unknown tool "delete_everything"')
+    expect(resolution.toolName).toBe('search_products')
+    expect(resolution.reason).toContain('provider selected unknown tool "delete_everything"')
   })
 
-  it('disposes Chrome AI sessions when the planner is disposed', async () => {
+  it('disposes Chrome AI sessions when the resolver is disposed', async () => {
     const destroy = vi.fn()
     ;(window as WindowWithLanguageModel).LanguageModel = {
       availability: async () => 'available',
@@ -431,8 +435,8 @@ describe('planner', () => {
       })
     }
 
-    const planner = await createChromeAIPlanner()
-    await planner.plan('Find docks', [
+    const resolver = await createChromeAIResolver()
+    await resolver.resolve('Find docks', [
       {
         name: 'search_products',
         description: 'Search products.',
@@ -444,34 +448,38 @@ describe('planner', () => {
         }
       }
     ])
-    planner.dispose?.()
+    resolver.dispose?.()
 
     expect(destroy).toHaveBeenCalledOnce()
   })
 
-  it('creates a direct heuristic planner', () => {
-    const planner = createHeuristicPlanner()
+  it('creates a direct heuristic resolver', () => {
+    const resolver = createHeuristicResolver()
 
-    expect(planner.status).toBe('fallback')
-    expect(planner.available).toBe(true)
+    expect(resolver.status).toBe('fallback')
+    expect(resolver.available).toBe(true)
   })
 
   it('extracts word quantities for cart commands', async () => {
-    const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Add ten keyboards to the cart.', [createCartTool()], {
-      products: [{ id: 'product_keyboard', name: 'Keyboard kit' }]
-    })
+    const resolver = createHeuristicResolver()
+    const resolution = await resolver.resolve(
+      'Add ten keyboards to the cart.',
+      [createCartTool()],
+      {
+        products: [{ id: 'product_keyboard', name: 'Keyboard kit' }]
+      }
+    )
 
-    expect(plan.toolName).toBe('add_to_cart')
-    expect(plan.input).toEqual({
+    expect(resolution.toolName).toBe('add_to_cart')
+    expect(resolution.input).toEqual({
       productId: 'product_keyboard',
       quantity: 10
     })
   })
 
-  it('returns no_tools_match when the local planner has no matching tool', async () => {
-    const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Make coffee for the team', [
+  it('returns no_tools_match when the local resolver has no matching tool', async () => {
+    const resolver = createHeuristicResolver()
+    const resolution = await resolver.resolve('Make coffee for the team', [
       createTool('search_products', 'Search visible products.', {
         type: 'object',
         properties: {
@@ -482,7 +490,7 @@ describe('planner', () => {
       })
     ])
 
-    expect(plan).toEqual({
+    expect(resolution).toEqual({
       toolName: 'no_tools_match',
       input: {},
       confidence: 0,
@@ -491,12 +499,12 @@ describe('planner', () => {
   })
 
   it('returns needs_clarification when required IDs are missing from context', async () => {
-    const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Select the water items', [createSelectItemsTool()], {
+    const resolver = createHeuristicResolver()
+    const resolution = await resolver.resolve('Select the water items', [createSelectItemsTool()], {
       checklistItems: [{ id: 'item_1', name: 'Apple' }]
     })
 
-    expect(plan).toEqual({
+    expect(resolution).toEqual({
       toolName: 'needs_clarification',
       input: {},
       confidence: 0,
@@ -506,76 +514,88 @@ describe('planner', () => {
   })
 
   it('does not match number words inside larger words', async () => {
-    const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Add stone keyboards to the cart.', [createCartTool()], {
-      products: [{ id: 'product_keyboard', name: 'Keyboard kit' }]
-    })
+    const resolver = createHeuristicResolver()
+    const resolution = await resolver.resolve(
+      'Add stone keyboards to the cart.',
+      [createCartTool()],
+      {
+        products: [{ id: 'product_keyboard', name: 'Keyboard kit' }]
+      }
+    )
 
-    expect(plan.input).toEqual({
+    expect(resolution.input).toEqual({
       productId: 'product_keyboard',
       quantity: 1
     })
   })
 
   it('extracts numeric quantities for cart commands', async () => {
-    const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Add 12 docks to the cart.', [createCartTool()], {
+    const resolver = createHeuristicResolver()
+    const resolution = await resolver.resolve('Add 12 docks to the cart.', [createCartTool()], {
       products: [{ id: 'product_dock', name: 'Dock' }]
     })
 
-    expect(plan.toolName).toBe('add_to_cart')
-    expect(plan.input).toEqual({
+    expect(resolution.toolName).toBe('add_to_cart')
+    expect(resolution.input).toEqual({
       productId: 'product_dock',
       quantity: 12
     })
   })
 
   it('routes checkout commands to the confirmed checkout tool', async () => {
-    const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Checkout the cart.', [createCheckoutTool()])
+    const resolver = createHeuristicResolver()
+    const resolution = await resolver.resolve('Checkout the cart.', [createCheckoutTool()])
 
-    expect(plan.toolName).toBe('checkout_cart')
-    expect(plan.input).toEqual({})
+    expect(resolution.toolName).toBe('checkout_cart')
+    expect(resolution.input).toEqual({})
   })
 
-  it('plans positional checklist selection', async () => {
-    const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Select the first five items', [createSelectItemsTool()], {
-      checklistItems: [
-        { id: 'item_1' },
-        { id: 'item_2' },
-        { id: 'item_3' },
-        { id: 'item_4' },
-        { id: 'item_5' },
-        { id: 'item_6' }
-      ]
-    })
+  it('resolves positional checklist selection', async () => {
+    const resolver = createHeuristicResolver()
+    const resolution = await resolver.resolve(
+      'Select the first five items',
+      [createSelectItemsTool()],
+      {
+        checklistItems: [
+          { id: 'item_1' },
+          { id: 'item_2' },
+          { id: 'item_3' },
+          { id: 'item_4' },
+          { id: 'item_5' },
+          { id: 'item_6' }
+        ]
+      }
+    )
 
-    expect(plan.toolName).toBe('select_items')
-    expect(plan.input).toEqual({
+    expect(resolution.toolName).toBe('select_items')
+    expect(resolution.input).toEqual({
       ids: ['item_1', 'item_2', 'item_3', 'item_4', 'item_5']
     })
   })
 
-  it('plans checklist selection from visible item names in current app context', async () => {
-    const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Select all items with water', [createSelectItemsTool()], {
-      checklistItems: [
-        { id: 'item_1', name: 'Apple' },
-        { id: 'item_8', name: 'Water' },
-        { id: 'item_16', name: 'Sparkling water' },
-        { id: 'item_20', name: 'Tea' }
-      ]
-    })
+  it('resolves checklist selection from visible item names in current app context', async () => {
+    const resolver = createHeuristicResolver()
+    const resolution = await resolver.resolve(
+      'Select all items with water',
+      [createSelectItemsTool()],
+      {
+        checklistItems: [
+          { id: 'item_1', name: 'Apple' },
+          { id: 'item_8', name: 'Water' },
+          { id: 'item_16', name: 'Sparkling water' },
+          { id: 'item_20', name: 'Tea' }
+        ]
+      }
+    )
 
-    expect(plan.toolName).toBe('select_items')
-    expect(plan.input).toEqual({
+    expect(resolution.toolName).toBe('select_items')
+    expect(resolution.input).toEqual({
       ids: ['item_8', 'item_16']
     })
   })
 
   it('infers semantic checklist groups from visible item names', async () => {
-    const planner = createHeuristicPlanner()
+    const resolver = createHeuristicResolver()
     const tools = [createSelectItemsTool()]
     const context = {
       checklistItems: [
@@ -593,25 +613,33 @@ describe('planner', () => {
       ]
     }
 
-    await expect(planner.plan('Select all French items', tools, context)).resolves.toMatchObject({
+    await expect(
+      resolver.resolve('Select all French items', tools, context)
+    ).resolves.toMatchObject({
       toolName: 'select_items',
       input: {
         ids: ['item_4', 'item_7', 'item_13', 'item_18', 'item_22']
       }
     })
-    await expect(planner.plan('Select all water items', tools, context)).resolves.toMatchObject({
-      toolName: 'select_items',
-      input: {
-        ids: ['item_8', 'item_16']
+    await expect(resolver.resolve('Select all water items', tools, context)).resolves.toMatchObject(
+      {
+        toolName: 'select_items',
+        input: {
+          ids: ['item_8', 'item_16']
+        }
       }
-    })
-    await expect(planner.plan('Select all apple items', tools, context)).resolves.toMatchObject({
-      toolName: 'select_items',
-      input: {
-        ids: ['item_1']
+    )
+    await expect(resolver.resolve('Select all apple items', tools, context)).resolves.toMatchObject(
+      {
+        toolName: 'select_items',
+        input: {
+          ids: ['item_1']
+        }
       }
-    })
-    await expect(planner.plan('Select all pantry items', tools, context)).resolves.toMatchObject({
+    )
+    await expect(
+      resolver.resolve('Select all pantry items', tools, context)
+    ).resolves.toMatchObject({
       toolName: 'select_items',
       input: {
         ids: ['item_23']
@@ -619,9 +647,9 @@ describe('planner', () => {
     })
   })
 
-  it('plans inventory table sorting from column wording', async () => {
-    const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Sort inventory by stock highest first', [
+  it('resolves inventory table sorting from column wording', async () => {
+    const resolver = createHeuristicResolver()
+    const resolution = await resolver.resolve('Sort inventory by stock highest first', [
       {
         name: 'sort_inventory',
         description: 'Sort the visible inventory table by a supported column.',
@@ -640,7 +668,7 @@ describe('planner', () => {
       }
     ])
 
-    expect(plan).toMatchObject({
+    expect(resolution).toMatchObject({
       toolName: 'sort_inventory',
       input: {
         direction: 'desc',
@@ -650,8 +678,8 @@ describe('planner', () => {
   })
 
   it('uses the schema default when direction enum values are not asc or desc', async () => {
-    const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Sort by stock descending', [
+    const resolver = createHeuristicResolver()
+    const resolution = await resolver.resolve('Sort by stock descending', [
       createTool('sort_inventory', 'Sort inventory.', {
         type: 'object',
         properties: {
@@ -662,14 +690,14 @@ describe('planner', () => {
       })
     ])
 
-    expect(plan.input).toEqual({
+    expect(resolution.input).toEqual({
       direction: 'up'
     })
   })
 
-  it('plans invoice selection from visible customer wording', async () => {
-    const planner = createHeuristicPlanner()
-    const plan = await planner.plan(
+  it('resolves invoice selection from visible customer wording', async () => {
+    const resolver = createHeuristicResolver()
+    const resolution = await resolver.resolve(
       'Select Globex invoices',
       [
         {
@@ -699,15 +727,15 @@ describe('planner', () => {
       }
     )
 
-    expect(plan.toolName).toBe('select_invoices')
-    expect(plan.input).toEqual({
+    expect(resolution.toolName).toBe('select_invoices')
+    expect(resolution.input).toEqual({
       ids: ['inv_4']
     })
   })
 
-  it('plans invoice opening from the visible customer name', async () => {
-    const planner = createHeuristicPlanner()
-    const plan = await planner.plan(
+  it('resolves invoice opening from the visible customer name', async () => {
+    const resolver = createHeuristicResolver()
+    const resolution = await resolver.resolve(
       'Open the Stark invoice',
       [
         {
@@ -732,15 +760,15 @@ describe('planner', () => {
       }
     )
 
-    expect(plan.toolName).toBe('open_invoice')
-    expect(plan.input).toEqual({
+    expect(resolution.toolName).toBe('open_invoice')
+    expect(resolution.input).toEqual({
       id: 'inv_2'
     })
   })
 
-  it('plans invoice status changes from matching schema enum values', async () => {
-    const planner = createHeuristicPlanner()
-    const plan = await planner.plan(
+  it('resolves invoice status changes from matching schema enum values', async () => {
+    const resolver = createHeuristicResolver()
+    const resolution = await resolver.resolve(
       'Mark Stark Industries invoices as paid',
       [
         {
@@ -784,7 +812,7 @@ describe('planner', () => {
       }
     )
 
-    expect(plan).toMatchObject({
+    expect(resolution).toMatchObject({
       toolName: 'update_selected_invoice_status',
       input: {
         status: 'paid'
@@ -793,8 +821,8 @@ describe('planner', () => {
   })
 
   it('keeps single-step invoice status changes single-step', async () => {
-    const planner = createHeuristicPlanner()
-    const plan = await planner.plan(
+    const resolver = createHeuristicResolver()
+    const resolution = await resolver.resolve(
       'Mark invoices as paid',
       [
         {
@@ -838,18 +866,18 @@ describe('planner', () => {
       }
     )
 
-    expect(plan).toMatchObject({
+    expect(resolution).toMatchObject({
       toolName: 'update_selected_invoice_status',
       input: {
         status: 'paid'
       }
     })
-    expect(plan.steps).toBeUndefined()
+    expect(resolution.steps).toBeUndefined()
   })
 
   it('asks for clarification when context cannot ground a selection request', async () => {
-    const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Select all the items that are French food.', [
+    const resolver = createHeuristicResolver()
+    const resolution = await resolver.resolve('Select all the items that are French food.', [
       createSelectItemsTool(),
       createTool('search_products', 'Search products.', {
         type: 'object',
@@ -861,7 +889,7 @@ describe('planner', () => {
       })
     ])
 
-    expect(plan).toMatchObject({
+    expect(resolution).toMatchObject({
       toolName: 'needs_clarification',
       input: {}
     })
@@ -884,8 +912,8 @@ describe('planner', () => {
       })
     }
 
-    const planner = await createChromeAIPlanner()
-    const plan = await planner.plan(
+    const resolver = await createChromeAIResolver()
+    const resolution = await resolver.resolve(
       'Select all the foods that are French',
       [
         {
@@ -909,15 +937,15 @@ describe('planner', () => {
 
     expect(promptText).toContain('Current app context')
     expect(promptText).toContain('Croissant')
-    expect(plan.toolName).toBe('select_items')
-    expect(plan.input).toEqual({
+    expect(resolution.toolName).toBe('select_items')
+    expect(resolution.input).toEqual({
       ids: ['item_4', 'item_7']
     })
   })
 
-  it('plans checklist selection clearing', async () => {
-    const planner = createHeuristicPlanner()
-    const plan = await planner.plan('Clear the selection', [
+  it('resolves checklist selection clearing', async () => {
+    const resolver = createHeuristicResolver()
+    const resolution = await resolver.resolve('Clear the selection', [
       createTool('clear_item_selection', 'Clear the current item selection.', {
         type: 'object',
         properties: {},
@@ -926,12 +954,12 @@ describe('planner', () => {
       })
     ])
 
-    expect(plan.toolName).toBe('clear_item_selection')
-    expect(plan.input).toEqual({})
+    expect(resolution.toolName).toBe('clear_item_selection')
+    expect(resolution.input).toEqual({})
   })
 
   it('requires a user key for browser-key remote providers', async () => {
-    const planner = await createConfiguredPlanner({
+    const resolver = await createConfiguredResolver({
       provider: 'openrouter',
       model: 'openrouter/auto',
       auth: {
@@ -949,13 +977,13 @@ describe('planner', () => {
       }
     ]
 
-    expect(planner.status).toBe('needs-key')
-    await expect(planner.plan('Select all the items that are French food.', tools)).rejects.toThrow(
-      'OpenRouter needs a user API key'
-    )
+    expect(resolver.status).toBe('needs-key')
+    await expect(
+      resolver.resolve('Select all the items that are French food.', tools)
+    ).rejects.toThrow('OpenRouter needs a user API key')
   })
 
-  it('plans through OpenRouter with a user key in the browser', async () => {
+  it('resolves through OpenRouter with a user key in the browser', async () => {
     const fetch = vi.fn(
       async () =>
         new Response(
@@ -963,7 +991,7 @@ describe('planner', () => {
             choices: [
               {
                 message: {
-                  content: `Here is the plan:\n\n\`\`\`json\n${JSON.stringify({
+                  content: `Here is the resolution:\n\n\`\`\`json\n${JSON.stringify({
                     toolName: 'select_items',
                     input: { ids: ['item_4', 'item_7'] },
                     confidence: 0.92,
@@ -977,7 +1005,7 @@ describe('planner', () => {
     )
     vi.stubGlobal('fetch', fetch)
 
-    const planner = await createConfiguredPlanner({
+    const resolver = await createConfiguredResolver({
       provider: 'openrouter',
       model: 'openrouter/auto',
       auth: {
@@ -985,7 +1013,7 @@ describe('planner', () => {
         apiKey: 'test-key'
       }
     })
-    const plan = await planner.plan('Select all the foods that are French', [
+    const resolution = await resolver.resolve('Select all the foods that are French', [
       {
         name: 'select_items',
         description: 'Select checklist items by ID.',
@@ -996,8 +1024,8 @@ describe('planner', () => {
       }
     ])
 
-    expect(planner.name).toBe('OpenRouter')
-    expect(plan.input).toEqual({
+    expect(resolver.name).toBe('OpenRouter')
+    expect(resolution.input).toEqual({
       ids: ['item_4', 'item_7']
     })
     expect(fetch).toHaveBeenCalledWith(
@@ -1010,7 +1038,7 @@ describe('planner', () => {
     )
   })
 
-  it('rejects remote planner input that does not match the selected tool schema', async () => {
+  it('rejects remote resolver input that does not match the selected tool schema', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () =>
@@ -1018,22 +1046,22 @@ describe('planner', () => {
           toolName: 'select_items',
           input: {},
           confidence: 0.88,
-          reason: 'Server planner selected the tool but omitted input.'
+          reason: 'Server resolver selected the tool but omitted input.'
         })
       )
     )
 
-    const planner = await createConfiguredPlanner({
+    const resolver = await createConfiguredResolver({
       provider: 'cloudflare-binding',
       model: '@cf/qwen/qwq-32b',
       auth: {
         mode: 'server',
-        endpoint: '/api/webmcp/plan'
+        endpoint: '/api/webmcp/resolve'
       }
     })
 
     await expect(
-      planner.plan('Select all liquids', [
+      resolver.resolve('Select all liquids', [
         {
           name: 'select_items',
           description: 'Select checklist items by ID.',
@@ -1056,26 +1084,26 @@ describe('planner', () => {
     ).rejects.toThrow('provider returned invalid input')
   })
 
-  it('plans through a server endpoint without browser secrets', async () => {
+  it('resolves through a server endpoint without browser secrets', async () => {
     const fetch = vi.fn(async () =>
       Response.json({
         toolName: 'search_products',
         input: { query: 'dock' },
         confidence: 0.88,
-        reason: 'Server planner selected search.'
+        reason: 'Server resolver selected search.'
       })
     )
     vi.stubGlobal('fetch', fetch)
 
-    const planner = await createConfiguredPlanner({
+    const resolver = await createConfiguredResolver({
       provider: 'openai',
       model: 'gpt-5.4-mini',
       auth: {
         mode: 'server',
-        endpoint: '/api/webmcp/plan'
+        endpoint: '/api/webmcp/resolve'
       }
     })
-    const plan = await planner.plan('Find dock products', [
+    const resolution = await resolver.resolve('Find dock products', [
       {
         name: 'search_products',
         description: 'Search products.',
@@ -1086,9 +1114,9 @@ describe('planner', () => {
       }
     ])
 
-    expect(plan.toolName).toBe('search_products')
+    expect(resolution.toolName).toBe('search_products')
     expect(fetch).toHaveBeenCalledWith(
-      '/api/webmcp/plan',
+      '/api/webmcp/resolve',
       expect.objectContaining({
         body: expect.stringContaining('"provider":"openai"')
       })
@@ -1112,16 +1140,16 @@ describe('planner', () => {
       )
     )
 
-    const planner = await createConfiguredPlanner({
+    const resolver = await createConfiguredResolver({
       provider: 'openai',
       model: 'gpt-5.4-mini',
       auth: {
         mode: 'server',
-        endpoint: '/api/webmcp/plan'
+        endpoint: '/api/webmcp/resolve'
       }
     })
     await expect(
-      planner.plan('Select all liquids', [
+      resolver.resolve('Select all liquids', [
         {
           name: 'select_items',
           description: 'Select checklist items by ID.',
@@ -1138,18 +1166,18 @@ describe('planner', () => {
     const fetch = vi.fn()
     vi.stubGlobal('fetch', fetch)
     const controller = new AbortController()
-    const planner = await createConfiguredPlanner({
+    const resolver = await createConfiguredResolver({
       provider: 'openai',
       model: 'gpt-5.4-mini',
       auth: {
         mode: 'server',
-        endpoint: '/api/webmcp/plan'
+        endpoint: '/api/webmcp/resolve'
       }
     })
     controller.abort()
 
     await expect(
-      planner.plan(
+      resolver.resolve(
         'Find dock products',
         [
           {
@@ -1164,11 +1192,11 @@ describe('planner', () => {
         {},
         { signal: controller.signal }
       )
-    ).rejects.toThrow('Planner request was cancelled.')
+    ).rejects.toThrow('Resolver request was cancelled.')
     expect(fetch).not.toHaveBeenCalled()
   })
 
-  it('plans through a Cloudflare binding server endpoint with the selected model', async () => {
+  it('resolves through a Cloudflare binding server endpoint with the selected model', async () => {
     const fetch = vi.fn(async () =>
       Response.json({
         toolName: 'select_items',
@@ -1179,15 +1207,15 @@ describe('planner', () => {
     )
     vi.stubGlobal('fetch', fetch)
 
-    const planner = await createConfiguredPlanner({
+    const resolver = await createConfiguredResolver({
       provider: 'cloudflare-binding',
       model: '@cf/qwen/qwq-32b',
       auth: {
         mode: 'server',
-        endpoint: '/api/webmcp/plan'
+        endpoint: '/api/webmcp/resolve'
       }
     })
-    const plan = await planner.plan('Select all roots', [
+    const resolution = await resolver.resolve('Select all roots', [
       {
         name: 'select_items',
         description: 'Select checklist items by ID.',
@@ -1198,12 +1226,12 @@ describe('planner', () => {
       }
     ])
 
-    expect(planner.name).toBe('Cloudflare binding')
-    expect(plan.input).toEqual({
+    expect(resolver.name).toBe('Cloudflare binding')
+    expect(resolution.input).toEqual({
       ids: ['item_3', 'item_9']
     })
     expect(fetch).toHaveBeenCalledWith(
-      '/api/webmcp/plan',
+      '/api/webmcp/resolve',
       expect.objectContaining({
         body: expect.stringContaining('"provider":"cloudflare-binding"')
       })
@@ -1213,16 +1241,16 @@ describe('planner', () => {
   })
 
   it('does not allow Cloudflare binding mode without a server endpoint', async () => {
-    const planner = await createConfiguredPlanner({
+    const resolver = await createConfiguredResolver({
       provider: 'cloudflare-binding',
       auth: {
         mode: 'none'
       }
     })
 
-    expect(planner.available).toBe(false)
-    expect(planner.status).toBe('unavailable')
-    expect(planner.detail).toContain('server endpoint mode')
+    expect(resolver.available).toBe(false)
+    expect(resolver.status).toBe('unavailable')
+    expect(resolver.detail).toContain('server endpoint mode')
   })
 })
 

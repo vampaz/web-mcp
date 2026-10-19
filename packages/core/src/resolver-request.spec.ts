@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { createChromeAIPlanner, createRemotePlanner } from './planner'
-import { createHostedOpenAIPlanner } from './hosted-openai-planner'
+import { createChromeAIResolver, createRemoteResolver } from './resolver'
+import { createHostedOpenAIResolver } from './hosted-openai-resolver'
 
 afterEach(function cleanup() {
   vi.unstubAllGlobals()
@@ -27,28 +27,28 @@ it.each(['json_object', 'json_schema', 'server', 'hosted'] as const)(
       )
     })
     vi.stubGlobal('fetch', fetch)
-    const planner =
+    const resolver =
       mode === 'hosted'
-        ? createHostedOpenAIPlanner({
+        ? createHostedOpenAIResolver({
             accessKey: 'fixture',
-            baseUrl: 'https://planner.test',
+            baseUrl: 'https://resolver.test',
             model: 'fixture'
           })
-        : createRemotePlanner({
+        : createRemoteResolver({
             provider: 'openai-compatible',
-            baseUrl: 'https://planner.test/v1',
+            baseUrl: 'https://resolver.test/v1',
             responseFormat: mode === 'server' ? undefined : mode,
             ...(mode === 'server'
-              ? { auth: { mode: 'server' as const, endpoint: 'https://planner.test/plan' } }
+              ? { auth: { mode: 'server' as const, endpoint: 'https://resolver.test/resolution' } }
               : {})
           })
-    await planner.plan('Olá 🌍', [], { selected: '日本語' }, { singleStep: true })
+    await resolver.resolve('Olá 🌍', [], { selected: '日本語' }, { singleStep: true })
     const body = String(fetch.mock.calls.at(-1)?.[1]?.body)
     const bytes = new TextEncoder().encode(body).byteLength
     expect(bytes).toBeGreaterThan(body.length)
     fetch.mockClear()
     await expect(
-      planner.plan(
+      resolver.resolve(
         'Olá 🌍',
         [],
         { selected: '日本語' },
@@ -57,7 +57,7 @@ it.each(['json_object', 'json_schema', 'server', 'hosted'] as const)(
     ).rejects.toMatchObject({ code: 'limit_reached' })
     expect(fetch).not.toHaveBeenCalled()
     await expect(
-      planner.plan(
+      resolver.resolve(
         'Olá 🌍',
         [],
         { selected: '日本語' },
@@ -79,8 +79,8 @@ it('bounds Chrome prompts and response constraints without falling back', async 
       return { prompt }
     }
   })
-  const planner = await createChromeAIPlanner()
-  await expect(planner.plan('Hello', [], {}, { maxRequestBytes: 20 })).rejects.toMatchObject({
+  const resolver = await createChromeAIResolver()
+  await expect(resolver.resolve('Hello', [], {}, { maxRequestBytes: 20 })).rejects.toMatchObject({
     code: 'limit_reached'
   })
   expect(prompt).not.toHaveBeenCalled()

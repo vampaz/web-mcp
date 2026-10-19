@@ -38,7 +38,7 @@ describe('server tools', () => {
       toolName: 'send_invoice',
       input: { invoiceId: 'inv_1' },
       confirmed: true,
-      source: 'planner'
+      source: 'resolver'
     })
 
     expect(result).toMatchObject({
@@ -53,7 +53,7 @@ describe('server tools', () => {
       body: JSON.stringify({
         toolName: 'send_invoice',
         input: { invoiceId: 'inv_1' },
-        source: 'planner'
+        source: 'resolver'
       })
     })
   })
@@ -83,7 +83,7 @@ describe('server tools', () => {
     const result = await invokeTool({
       toolName: 'send_invoice',
       input: { invoiceId: 'inv_1' },
-      source: 'planner'
+      source: 'resolver'
     })
 
     expect(result).toMatchObject({

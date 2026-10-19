@@ -17,7 +17,7 @@ test('answers and discovers tools through the actual model and Pi loop', async f
   await expect(page.locator('webmcp-chat details')).toHaveCount(0)
 })
 
-test('popup reads, confirms a result-dependent write, replans, and restores without replay', async function actions({
+test('popup reads, confirms a result-dependent write, re-resolves, and restores without replay', async function actions({
   page
 }) {
   await page.goto('/?mode=chat&presentation=popup')

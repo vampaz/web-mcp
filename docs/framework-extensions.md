@@ -8,11 +8,11 @@ The core package owns:
 - native WebMCP registration
 - fallback registry
 - events
-- planner configuration
+- resolver configuration
 - form helpers
 - catalog/adapters
 
-Framework subpaths should not own protocol, planner, registry, or execution logic. Vue, React, Svelte, and Astro support starts as lifecycle-safe helpers that delegate registration to `@vampaz/webmcp-kit`.
+Framework subpaths should not own protocol, resolver, registry, or execution logic. Vue, React, Svelte, and Astro support starts as lifecycle-safe helpers that delegate registration to `@vampaz/webmcp-kit`.
 
 Thin optional subpaths should only wrap lifecycle cleanup and delegate all behavior to core. Current subpaths:
 

@@ -137,7 +137,7 @@ describe('integration diagnostics', () => {
     )
   })
 
-  it('includes planner readiness when provided', () => {
+  it('includes resolver readiness when provided', () => {
     registerTool(
       defineTool({
         name: 'select_items',
@@ -160,12 +160,12 @@ describe('integration diagnostics', () => {
     )
 
     const report = getIntegrationHealthReport({
-      planner: {
+      resolver: {
         name: 'Cloudflare binding',
         available: true,
         status: 'ready',
         detail: 'Workers AI binding is available.',
-        plan() {
+        resolve() {
           return Promise.resolve({
             toolName: 'select_items',
             input: { ids: [] },
@@ -179,7 +179,7 @@ describe('integration diagnostics', () => {
     expect(report.status).toBe('ready')
     expect(report.diagnostics).toContainEqual(
       expect.objectContaining({
-        id: 'planner-ready',
+        id: 'resolver-ready',
         severity: 'info'
       })
     )

@@ -1,4 +1,4 @@
-import type { JsonSchema, PlannerContext, ToolPlan, WebMCPTool } from './interfaces/tool'
+import type { JsonSchema, ResolverContext, ToolResolution, WebMCPTool } from './interfaces/tool'
 import { validateJsonValue } from './schema'
 
 const numberWords = new Map([
@@ -48,14 +48,14 @@ const ignoredTerms = new Set([
   'with'
 ])
 
-export function planWithHeuristics(
+export function resolveWithHeuristics(
   message: string,
   tools: WebMCPTool[],
-  context: PlannerContext = {}
-): ToolPlan {
+  context: ResolverContext = {}
+): ToolResolution {
   const selectedTool = selectTool(message, tools)
   if (!selectedTool) {
-    return createPlannerOutcome(
+    return createResolverOutcome(
       'no_tools_match',
       'No registered WebMCP tool matched this request closely enough to run.'
     )
@@ -66,7 +66,7 @@ export function planWithHeuristics(
     hasMissingRequiredArrayInput(selectedTool.inputSchema, input) ||
     validateJsonValue(input, selectedTool.inputSchema).length > 0
   ) {
-    return createPlannerOutcome(
+    return createResolverOutcome(
       'needs_clarification',
       'The request matched a tool, but the request and current app context did not supply valid required inputs.'
     )
@@ -81,7 +81,7 @@ export function planWithHeuristics(
   }
 }
 
-function createPlannerOutcome(toolName: 'needs_clarification' | 'no_tools_match', reason: string) {
+function createResolverOutcome(toolName: 'needs_clarification' | 'no_tools_match', reason: string) {
   return {
     toolName,
     input: {},
@@ -156,7 +156,7 @@ function getSearchIntentScore(message: string, tool: WebMCPTool): number {
 function createInputFromSchema(
   schema: JsonSchema,
   message: string,
-  context: PlannerContext
+  context: ResolverContext
 ): Record<string, unknown> {
   if (schema.type !== 'object' || !schema.properties) return {}
 
@@ -184,7 +184,7 @@ function createInputValue(
   key: string,
   schema: JsonSchema,
   message: string,
-  context: PlannerContext,
+  context: ResolverContext,
   required: boolean
 ): unknown {
   if (Array.isArray(schema.enum)) return getEnumValue(schema.enum, message, key, required)
@@ -248,14 +248,14 @@ function getEnumValue(values: unknown[], message: string, key: string, required:
 function findContextValueForKey(
   key: string,
   message: string,
-  context: PlannerContext
+  context: ResolverContext
 ): string | undefined {
   if (!isIdKey(key)) return undefined
 
   return findBestContextObject(message, context)?.id
 }
 
-function findContextIds(message: string, context: PlannerContext): string[] {
+function findContextIds(message: string, context: ResolverContext): string[] {
   if (message.toLowerCase().includes('first')) {
     return findContextObjects(context)
       .slice(0, extractQuantity(message))
@@ -275,7 +275,7 @@ function findContextIds(message: string, context: PlannerContext): string[] {
 
 function findBestContextObject(
   message: string,
-  context: PlannerContext
+  context: ResolverContext
 ): { id: string } | undefined {
   const objects = findContextObjects(context)
   const matches = objects.filter(function objectMatchesMessage(item) {
@@ -284,7 +284,7 @@ function findBestContextObject(
   return matches.length === 1 ? matches[0] : undefined
 }
 
-function findContextObjects(context: PlannerContext): Array<{ id: string; text: string }> {
+function findContextObjects(context: ResolverContext): Array<{ id: string; text: string }> {
   return Object.values(context).flatMap(function flattenContextValue(value) {
     if (!Array.isArray(value)) return []
     return value.flatMap(function mapContextItem(item) {

@@ -1,19 +1,19 @@
 import type {
-  PlannerContext,
-  PlannerRunOptions,
-  ToolPlan,
-  ToolPlanner,
+  ResolverContext,
+  ResolverRunOptions,
+  ToolResolution,
+  ToolResolver,
   WebMCPTool
 } from './interfaces/tool'
 import type {
-  WebMCPCommandInputPlannerModelOption,
-  WebMCPCommandInputPlannerOption
+  WebMCPCommandInputResolverModelOption,
+  WebMCPCommandInputResolverOption
 } from './interfaces/command-input'
 import { getErrorMessage } from './confirmation'
-import { createToolPlanSchema, validateToolPlan } from './plan-validation'
-import { serializePlannerRequest } from './planner-request'
+import { createToolResolutionSchema, validateToolResolution } from './resolution-validation'
+import { serializeResolverRequest } from './resolver-request'
 
-export interface HostedOpenAIPlannerOptions {
+export interface HostedOpenAIResolverOptions {
   accessKey?: string
   baseUrl?: string
   browserChallengeSiteKey?: string
@@ -22,7 +22,7 @@ export interface HostedOpenAIPlannerOptions {
   sessionEndpoint?: string
 }
 
-interface ResolvedHostedOpenAIPlannerOptions extends HostedOpenAIPlannerOptions {
+interface ResolvedHostedOpenAIResolverOptions extends HostedOpenAIResolverOptions {
   endpoint: string
   sessionEndpoint: string
 }
@@ -65,23 +65,23 @@ interface TurnstileRenderOptions {
   size: 'invisible'
 }
 
-const hostedOpenAIPlannerServiceId = 'hosted-openai-planner'
+const hostedOpenAIResolverServiceId = 'hosted-openai-resolver'
 const turnstileScriptSrc = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
 const sessionRefreshSkewMs = 30 * 1000
-const defaultPlanEndpointPath = '/api/webmcp/plan'
+const defaultResolverEndpointPath = '/api/webmcp/resolve'
 const defaultSessionEndpointPath = '/api/webmcp/session'
 let turnstileScriptPromise: Promise<void> | undefined
 
-export function createHostedOpenAIPlanner(rawOptions: HostedOpenAIPlannerOptions): ToolPlanner {
-  const options = resolveHostedOpenAIPlannerOptions(rawOptions)
+export function createHostedOpenAIResolver(rawOptions: HostedOpenAIResolverOptions): ToolResolver {
+  const options = resolveHostedOpenAIResolverOptions(rawOptions)
   if (!options.accessKey) {
     return {
       available: false,
       detail:
-        'Hosted OpenAI needs a WebMCP publishable key. Other local and app-owned planners remain available.',
+        'Hosted OpenAI needs a WebMCP publishable key. Other local and app-owned resolvers remain available.',
       name: 'Hosted OpenAI',
       status: 'needs-key',
-      async plan() {
+      async resolve() {
         throw new Error('Hosted OpenAI needs a WebMCP publishable key.')
       }
     }
@@ -92,30 +92,30 @@ export function createHostedOpenAIPlanner(rawOptions: HostedOpenAIPlannerOptions
   return {
     capabilities: { conversation: true },
     available: true,
-    detail: 'Hosted OpenAI will plan through the WebMCP paid endpoint.',
+    detail: 'Hosted OpenAI will resolve through the WebMCP paid endpoint.',
     name: 'Hosted OpenAI',
     status: 'ready',
-    async plan(
+    async resolve(
       message: string,
       tools: WebMCPTool[],
-      context: PlannerContext = {},
-      runOptions?: PlannerRunOptions
+      context: ResolverContext = {},
+      runOptions?: ResolverRunOptions
     ) {
       runOptions?.signal?.throwIfAborted()
-      const body = serializePlannerRequest(
+      const body = serializeResolverRequest(
         {
           context,
           message,
           model: options.model,
           provider: 'openai',
-          responseSchema: createToolPlanSchema(tools, runOptions?.singleStep),
+          responseSchema: createToolResolutionSchema(tools, runOptions?.singleStep),
           ...(runOptions?.singleStep ? { singleStep: true } : {}),
           tools: createHostedToolCatalog(tools)
         },
         runOptions?.maxRequestBytes
       )
       paidAccessSession = await getPaidAccessSession(options, paidAccessSession, runOptions?.signal)
-      const response = await requestHostedPlan({
+      const response = await requestHostedResolution({
         body,
         options,
         signal: runOptions?.signal,
@@ -127,18 +127,18 @@ export function createHostedOpenAIPlanner(rawOptions: HostedOpenAIPlannerOptions
       }
 
       if (!response.ok) {
-        throw new Error(await getHostedPlannerError(response))
+        throw new Error(await getHostedResolverError(response))
       }
 
-      const plan = (await response.json()) as ToolPlan
+      const resolution = (await response.json()) as ToolResolution
       runOptions?.signal?.throwIfAborted()
-      validateToolPlan(plan, tools, { singleStep: runOptions?.singleStep })
-      return plan
+      validateToolResolution(resolution, tools, { singleStep: runOptions?.singleStep })
+      return resolution
     }
   }
 }
 
-export interface HostedOpenAIPlannerOptionConfig {
+export interface HostedOpenAIResolverOptionConfig {
   accessKey?: string
   baseUrl?: string
   browserChallengeSiteKey?: string
@@ -146,26 +146,26 @@ export interface HostedOpenAIPlannerOptionConfig {
   id?: string
   label?: string
   model?: string
-  modelOptions?: WebMCPCommandInputPlannerModelOption[]
+  modelOptions?: WebMCPCommandInputResolverModelOption[]
   sessionEndpoint?: string
 }
 
-export function createHostedOpenAIPlannerOption(
-  config: HostedOpenAIPlannerOptionConfig
-): WebMCPCommandInputPlannerOption {
+export function createHostedOpenAIResolverOption(
+  config: HostedOpenAIResolverOptionConfig
+): WebMCPCommandInputResolverOption {
   return {
     id: config.id ?? 'hosted-openai',
     label: config.label ?? 'Hosted OpenAI',
     modelOptions: config.modelOptions,
-    createPlanner(options) {
+    createResolver(options) {
       const model = options?.model ?? config.model ?? config.modelOptions?.[0]?.model
       if (!model) {
         throw new Error(
-          'Hosted OpenAI planner option needs a model: pass "model" or a non-empty "modelOptions".'
+          'Hosted OpenAI resolver option needs a model: pass "model" or a non-empty "modelOptions".'
         )
       }
 
-      return createHostedOpenAIPlanner({
+      return createHostedOpenAIResolver({
         accessKey: config.accessKey,
         baseUrl: config.baseUrl,
         browserChallengeSiteKey: config.browserChallengeSiteKey,
@@ -177,12 +177,12 @@ export function createHostedOpenAIPlannerOption(
   }
 }
 
-function resolveHostedOpenAIPlannerOptions(
-  options: HostedOpenAIPlannerOptions
-): ResolvedHostedOpenAIPlannerOptions {
+function resolveHostedOpenAIResolverOptions(
+  options: HostedOpenAIResolverOptions
+): ResolvedHostedOpenAIResolverOptions {
   return {
     ...options,
-    endpoint: resolveHostedEndpoint(options.baseUrl, options.endpoint, defaultPlanEndpointPath),
+    endpoint: resolveHostedEndpoint(options.baseUrl, options.endpoint, defaultResolverEndpointPath),
     sessionEndpoint: resolveHostedEndpoint(
       options.baseUrl,
       options.sessionEndpoint,
@@ -202,9 +202,9 @@ function resolveHostedEndpoint(
   return `${baseUrl.replace(/\/+$/, '')}${defaultPath}`
 }
 
-async function requestHostedPlan(input: {
+async function requestHostedResolution(input: {
   body: string
-  options: ResolvedHostedOpenAIPlannerOptions
+  options: ResolvedHostedOpenAIResolverOptions
   signal?: AbortSignal
   token: string
 }): Promise<Response> {
@@ -220,7 +220,7 @@ async function requestHostedPlan(input: {
 }
 
 async function getPaidAccessSession(
-  options: ResolvedHostedOpenAIPlannerOptions,
+  options: ResolvedHostedOpenAIResolverOptions,
   currentSession: PaidAccessSession | null,
   signal?: AbortSignal
 ): Promise<PaidAccessSession> {
@@ -232,7 +232,7 @@ async function getPaidAccessSession(
     body: JSON.stringify({
       accessKey: options.accessKey,
       model: options.model,
-      serviceId: hostedOpenAIPlannerServiceId,
+      serviceId: hostedOpenAIResolverServiceId,
       turnstileToken
     }),
     headers: {
@@ -243,14 +243,14 @@ async function getPaidAccessSession(
   })
 
   if (!response.ok) {
-    throw new Error(await getHostedPlannerError(response))
+    throw new Error(await getHostedResolverError(response))
   }
 
   return (await response.json()) as PaidAccessSession
 }
 
 async function getBrowserChallengeToken(
-  options: HostedOpenAIPlannerOptions,
+  options: HostedOpenAIResolverOptions,
   signal?: AbortSignal
 ): Promise<string | undefined> {
   if (typeof window === 'undefined') return undefined
@@ -258,7 +258,7 @@ async function getBrowserChallengeToken(
     Promise.resolve(
       window.webmcpCreateTurnstileToken?.({
         model: options.model,
-        serviceId: hostedOpenAIPlannerServiceId
+        serviceId: hostedOpenAIResolverServiceId
       })
     ),
     signal
@@ -400,7 +400,7 @@ function createHostedToolCatalog(tools: WebMCPTool[]) {
   })
 }
 
-async function getHostedPlannerError(response: Response): Promise<string> {
+async function getHostedResolverError(response: Response): Promise<string> {
   try {
     const payload = (await response.json()) as { error?: string }
     if (payload.error) return `Hosted OpenAI returned ${response.status}: ${payload.error}`

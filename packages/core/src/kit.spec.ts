@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { createWebMCPKit } from './kit'
 
 describe('createWebMCPKit', () => {
-  it('initializes with the configured planner', async () => {
+  it('initializes with the configured resolver', async () => {
     const kit = await createWebMCPKit({
-      planner: {
+      resolver: {
         provider: 'openrouter',
         model: 'openrouter/auto',
         auth: {
@@ -14,8 +14,8 @@ describe('createWebMCPKit', () => {
       }
     })
 
-    expect(kit.planner.name).toBe('OpenRouter')
-    expect(kit.planner.status).toBe('needs-key')
-    expect(kit.plannerConfig?.provider).toBe('openrouter')
+    expect(kit.resolver.name).toBe('OpenRouter')
+    expect(kit.resolver.status).toBe('needs-key')
+    expect(kit.resolverConfig?.provider).toBe('openrouter')
   })
 })

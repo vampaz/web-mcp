@@ -1,24 +1,24 @@
-import type { ToolInvocationResult, ToolPlan, ToolPlanStep } from './interfaces/tool'
+import type { ToolInvocationResult, ToolResolution, ToolResolutionStep } from './interfaces/tool'
 import type { WebMCPCommandStepEventDetail } from './interfaces/command-input'
-import { isPlannerOutcomeToolName } from './plan-validation'
+import { isResolverOutcomeToolName } from './resolution-validation'
 import { invokeTool } from './registry'
 
-export async function invokePlannedSteps(
-  plan: ToolPlan,
+export async function invokeResolvedSteps(
+  resolution: ToolResolution,
   setActiveToolName: (toolName: string) => void,
   dispatchStepEvent: (detail: Omit<WebMCPCommandStepEventDetail, 'message'>) => void,
   signal?: AbortSignal
 ): Promise<ToolInvocationResult> {
-  if (isPlannerOutcomeToolName(plan.toolName)) {
+  if (isResolverOutcomeToolName(resolution.toolName)) {
     return {
-      toolName: plan.toolName,
-      status: plan.toolName === 'needs_clarification' ? 'blocked' : 'unavailable',
-      error: plan.reason,
+      toolName: resolution.toolName,
+      status: resolution.toolName === 'needs_clarification' ? 'blocked' : 'unavailable',
+      error: resolution.reason,
       durationMs: 0
     }
   }
 
-  const steps = getPlanSteps(plan)
+  const steps = getResolutionSteps(resolution)
   let result: ToolInvocationResult | undefined
 
   for (const [index, step] of steps.entries()) {
@@ -28,7 +28,7 @@ export async function invokePlannedSteps(
     setActiveToolName(toolName)
     dispatchStepEvent({
       phase: 'started',
-      plan,
+      resolution,
       step,
       stepCount: steps.length,
       stepIndex: index
@@ -37,11 +37,11 @@ export async function invokePlannedSteps(
       toolName: step.toolName,
       input: step.input,
       signal,
-      source: 'planner'
+      source: 'resolver'
     })
     dispatchStepEvent({
       phase: 'completed',
-      plan,
+      resolution,
       result,
       step,
       stepCount: steps.length,
@@ -52,9 +52,9 @@ export async function invokePlannedSteps(
 
   return (
     result ?? {
-      toolName: plan.toolName,
+      toolName: resolution.toolName,
       status: 'error',
-      error: 'Planner returned no executable steps.',
+      error: 'Resolver returned no executable steps.',
       durationMs: 0
     }
   )
@@ -65,15 +65,15 @@ export function throwIfAborted(signal: AbortSignal | undefined): void {
   throw new Error('Command was cancelled.')
 }
 
-function getPlanSteps(plan: ToolPlan): ToolPlanStep[] {
-  if (Array.isArray(plan.steps)) return plan.steps
+function getResolutionSteps(resolution: ToolResolution): ToolResolutionStep[] {
+  if (Array.isArray(resolution.steps)) return resolution.steps
 
   return [
     {
-      toolName: plan.toolName,
-      input: plan.input,
-      confidence: plan.confidence,
-      reason: plan.reason
+      toolName: resolution.toolName,
+      input: resolution.input,
+      confidence: resolution.confidence,
+      reason: resolution.reason
     }
   ]
 }

@@ -13,9 +13,9 @@ Feature-detect the capabilities your integration uses. Native WebMCP and Chrome 
 | Popup chat            | The preceding APIs plus the Popover API                                                     |
 | `createPiRuntime()`   | IndexedDB and Web Locks in the current browser context                                      |
 | `createPiHarness()`   | HTTPS secure context, service workers, IndexedDB, Web Locks, and a valid same-origin worker |
-| Chrome AI planner     | Available `LanguageModel` API and its model/session requirements                            |
+| Chrome AI resolver    | Available `LanguageModel` API and its model/session requirements                            |
 
-Check availability before advertising an integration to users. A missing Pi prerequisite is an error, not a switch to transient history. A missing conversational planner is an error, not a heuristic conversation. See [browser support](./browser-support.md) for the tested matrix and native registration behavior.
+Check availability before advertising an integration to users. A missing Pi prerequisite is an error, not a switch to transient history. A missing conversational resolver is an error, not a heuristic conversation. See [browser support](./browser-support.md) for the tested matrix and native registration behavior.
 
 ## HTTPS development
 
@@ -45,11 +45,11 @@ The runtime calls `skipWaiting()` during worker installation. An update can inte
 
 ## CSP, endpoints, and application security
 
-Allow the same-origin worker through the application's `worker-src` policy. Keep worker bundles self-contained where possible. Configure `connect-src` only for the model/planner endpoints your integration actually uses. The app-owned server endpoint remains responsible for authentication, authorization, model selection, rate limits, and credential handling.
+Allow the same-origin worker through the application's `worker-src` policy. Keep worker bundles self-contained where possible. Configure `connect-src` only for the model/resolver endpoints your integration actually uses. The app-owned server endpoint remains responsible for authentication, authorization, model selection, rate limits, and credential handling.
 
 Test the supplied components under your production Content Security Policy. They create shadow DOM through `innerHTML` and install inline shadow styles. The kit currently has no Trusted Types policy injection or style nonce option. A policy requiring Trusted Types or prohibiting those styles can prevent these components from rendering. A headless controller with application-owned UI is available when the supplied component cannot satisfy the host's policy. Do not weaken a site-wide policy without reviewing the concrete integration.
 
-Tool and assistant text is displayed as text, not interpreted as model-provided HTML. This does not make tool inputs trusted. Keep input validation, current-state guards, app-owned approval, and server authorization in the execution path. Native callers, planners, test helpers, devtools, and the local bridge use the core invocation rules.
+Tool and assistant text is displayed as text, not interpreted as model-provided HTML. This does not make tool inputs trusted. Keep input validation, current-state guards, app-owned approval, and server authorization in the execution path. Native callers, resolvers, test helpers, devtools, and the local bridge use the core invocation rules.
 
 `ownerId` partitions browser history; it does not authenticate or encrypt it. Scripts on the same origin can access that origin's storage. Store only necessary conversation data. Destroy old controllers on account changes and apply the application's history-retention policy. Clearing history does not undo application actions.
 
@@ -110,7 +110,7 @@ The workflow builds once, tests `artifacts/webmcp-kit.tgz`, and publishes that t
 | Native registration fails but fallback works | Await registration `ready`, inspect `warnings`, and detect the actual browser API. Fallback availability does not prove native registration.                               |
 | Worker registration or activation fails      | Check the HTTPS certificate, same origin, non-root scope, base path, compiled asset, MIME type, CSP, and root PWA caching.                                                 |
 | Page loads an old worker                     | Recompile the wrapper, verify the deployed asset and registration, then reload. Stop active work before updating a development registration.                               |
-| `configuration` or `unsupported`             | Check session fields, limits, browser capabilities, and conversational planner availability. Handle initialization rejection in the host.                                  |
+| `configuration` or `unsupported`             | Check session fields, limits, browser capabilities, and conversational resolver availability. Handle initialization rejection in the host.                                 |
 | `conversation_busy`                          | Another controller/tab owns the operation. Wait for it to finish or stop it through its own UI. Do not automatically steal or retry the action.                            |
 | `stale_document`                             | Cancellation or catalog/document change invalidated the request. Rediscover current state for a new user turn.                                                             |
 | `transport_failed` after a mutation          | The action may have executed before its reply was lost. Inspect actual app/server state before any new attempt.                                                            |

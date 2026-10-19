@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { WebMCPTool } from './interfaces/tool'
-import { createHostedOpenAIPlanner } from './hosted-openai-planner'
+import { createHostedOpenAIResolver } from './hosted-openai-resolver'
 
 const paidAccessKey = 'wmcp_pk_test_access123_secret123secret456'
 
-describe('createHostedOpenAIPlanner', function describeHostedOpenAIPlanner() {
+describe('createHostedOpenAIResolver', function describeHostedOpenAIResolver() {
   afterEach(function cleanup() {
     delete window.turnstile
     delete window.webmcpCreateTurnstileToken
@@ -13,7 +13,7 @@ describe('createHostedOpenAIPlanner', function describeHostedOpenAIPlanner() {
     vi.unstubAllGlobals()
   })
 
-  it('mints a session before planning and never sends the publishable license to the spend endpoint', async function testSessionFlow() {
+  it('mints a session before resolving and never sends the publishable license to the spend endpoint', async function testSessionFlow() {
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(
@@ -33,15 +33,15 @@ describe('createHostedOpenAIPlanner', function describeHostedOpenAIPlanner() {
       )
     vi.stubGlobal('fetch', fetch)
 
-    const planner = createHostedOpenAIPlanner({
+    const resolver = createHostedOpenAIResolver({
       accessKey: paidAccessKey,
-      endpoint: '/api/webmcp/plan',
+      endpoint: '/api/webmcp/resolve',
       model: 'gpt-5.4-mini',
       sessionEndpoint: '/api/webmcp/session'
     })
-    const plan = await planner.plan('Select water', [createSelectItemsTool()], {})
+    const resolution = await resolver.resolve('Select water', [createSelectItemsTool()], {})
 
-    expect(plan.toolName).toBe('select_items')
+    expect(resolution.toolName).toBe('select_items')
     expect(fetch).toHaveBeenNthCalledWith(
       1,
       '/api/webmcp/session',
@@ -51,7 +51,7 @@ describe('createHostedOpenAIPlanner', function describeHostedOpenAIPlanner() {
     )
     expect(fetch).toHaveBeenNthCalledWith(
       2,
-      '/api/webmcp/plan',
+      '/api/webmcp/resolve',
       expect.objectContaining({
         headers: expect.objectContaining({
           Authorization: 'Bearer wmcp_session.test.signature'
@@ -60,12 +60,12 @@ describe('createHostedOpenAIPlanner', function describeHostedOpenAIPlanner() {
       })
     )
 
-    const planRequest = fetch.mock.calls[1]?.[1] as RequestInit
-    expect(JSON.stringify(planRequest)).not.toContain(paidAccessKey)
+    const resolutionRequest = fetch.mock.calls[1]?.[1] as RequestInit
+    expect(JSON.stringify(resolutionRequest)).not.toContain(paidAccessKey)
   })
 
-  it('caches fresh sessions for later plans', async function testSessionCache() {
-    const fetch = vi.fn(async function fetchHostedPlanner(url: string) {
+  it('caches fresh sessions for later resolutions', async function testSessionCache() {
+    const fetch = vi.fn(async function fetchHostedResolver(url: string) {
       if (url === '/api/webmcp/session') {
         return Response.json({
           expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
@@ -83,15 +83,15 @@ describe('createHostedOpenAIPlanner', function describeHostedOpenAIPlanner() {
     })
     vi.stubGlobal('fetch', fetch)
 
-    const planner = createHostedOpenAIPlanner({
+    const resolver = createHostedOpenAIResolver({
       accessKey: paidAccessKey,
-      endpoint: '/api/webmcp/plan',
+      endpoint: '/api/webmcp/resolve',
       model: 'gpt-5.4-mini',
       sessionEndpoint: '/api/webmcp/session'
     })
 
-    await planner.plan('Select water', [createSelectItemsTool()], {})
-    await planner.plan('Select water again', [createSelectItemsTool()], {})
+    await resolver.resolve('Select water', [createSelectItemsTool()], {})
+    await resolver.resolve('Select water again', [createSelectItemsTool()], {})
 
     expect(
       fetch.mock.calls.filter(function filterSessionCall(call) {
@@ -122,18 +122,18 @@ describe('createHostedOpenAIPlanner', function describeHostedOpenAIPlanner() {
       )
     vi.stubGlobal('fetch', fetch)
 
-    const planner = createHostedOpenAIPlanner({
+    const resolver = createHostedOpenAIResolver({
       accessKey: paidAccessKey,
-      endpoint: '/api/webmcp/plan',
+      endpoint: '/api/webmcp/resolve',
       model: 'gpt-5.4-mini',
       sessionEndpoint: '/api/webmcp/session'
     })
-    await planner.plan('Select water', [createSelectItemsTool()], {})
+    await resolver.resolve('Select water', [createSelectItemsTool()], {})
 
     const sessionRequest = fetch.mock.calls[0]?.[1] as RequestInit
     expect(createToken).toHaveBeenCalledWith({
       model: 'gpt-5.4-mini',
-      serviceId: 'hosted-openai-planner'
+      serviceId: 'hosted-openai-resolver'
     })
     expect(JSON.parse(String(sessionRequest.body))).toMatchObject({
       turnstileToken: 'turnstile-token'
@@ -172,14 +172,14 @@ describe('createHostedOpenAIPlanner', function describeHostedOpenAIPlanner() {
       )
     vi.stubGlobal('fetch', fetch)
 
-    const planner = createHostedOpenAIPlanner({
+    const resolver = createHostedOpenAIResolver({
       accessKey: paidAccessKey,
       browserChallengeSiteKey: 'turnstile-site-key',
-      endpoint: '/api/webmcp/plan',
+      endpoint: '/api/webmcp/resolve',
       model: 'gpt-5.4-mini',
       sessionEndpoint: '/api/webmcp/session'
     })
-    await planner.plan('Select water', [createSelectItemsTool()], {})
+    await resolver.resolve('Select water', [createSelectItemsTool()], {})
 
     const sessionRequest = fetch.mock.calls[0]?.[1] as RequestInit
     expect(window.turnstile.render).toHaveBeenCalledWith(
@@ -197,12 +197,12 @@ describe('createHostedOpenAIPlanner', function describeHostedOpenAIPlanner() {
   })
 
   it('allows another challenge-script request after a failed load', async function test() {
-    const planner = createHostedOpenAIPlanner({
+    const resolver = createHostedOpenAIResolver({
       accessKey: paidAccessKey,
       browserChallengeSiteKey: 'site-key',
       model: 'test-model'
     })
-    const pending = planner.plan('Select water', [createSelectItemsTool()], {})
+    const pending = resolver.resolve('Select water', [createSelectItemsTool()], {})
     const rejected = expect(pending).rejects.toThrow('script failed to load')
     await vi.waitFor(function scriptReady() {
       expect(document.querySelector('script[src*="turnstile"]')).not.toBeNull()
@@ -211,7 +211,7 @@ describe('createHostedOpenAIPlanner', function describeHostedOpenAIPlanner() {
     first.dispatchEvent(new Event('error'))
     await rejected
     expect(first.isConnected).toBe(false)
-    const retry = planner.plan('Select water', [createSelectItemsTool()], {})
+    const retry = resolver.resolve('Select water', [createSelectItemsTool()], {})
     const retryRejected = expect(retry).rejects.toThrow('script failed to load')
     await vi.waitFor(function scriptReady() {
       expect(document.querySelector('script[src*="turnstile"]')).not.toBeNull()
@@ -233,13 +233,13 @@ describe('createHostedOpenAIPlanner', function describeHostedOpenAIPlanner() {
       remove: vi.fn(),
       reset: vi.fn()
     }
-    const planner = createHostedOpenAIPlanner({
+    const resolver = createHostedOpenAIResolver({
       accessKey: paidAccessKey,
       browserChallengeSiteKey: 'site-key',
       model: 'test-model'
     })
     const controller = new AbortController()
-    const pending = planner.plan(
+    const pending = resolver.resolve(
       'Select water',
       [createSelectItemsTool()],
       {},
@@ -287,7 +287,7 @@ describe('hosted endpoint resolution', function describeHostedEndpointResolution
     vi.unstubAllGlobals()
   })
 
-  it('derives plan and session endpoints from a base URL', async function testBaseUrlDerivation() {
+  it('derives resolution and session endpoints from a base URL', async function testBaseUrlDerivation() {
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(
@@ -307,12 +307,12 @@ describe('hosted endpoint resolution', function describeHostedEndpointResolution
       )
     vi.stubGlobal('fetch', fetch)
 
-    const planner = createHostedOpenAIPlanner({
+    const resolver = createHostedOpenAIResolver({
       accessKey: paidAccessKey,
       baseUrl: 'https://webmcp.example/',
       model: 'gpt-5.4-mini'
     })
-    await planner.plan('Select water', [createSelectItemsTool()], {})
+    await resolver.resolve('Select water', [createSelectItemsTool()], {})
 
     expect(fetch).toHaveBeenNthCalledWith(
       1,
@@ -321,17 +321,17 @@ describe('hosted endpoint resolution', function describeHostedEndpointResolution
     )
     expect(fetch).toHaveBeenNthCalledWith(
       2,
-      'https://webmcp.example/api/webmcp/plan',
+      'https://webmcp.example/api/webmcp/resolve',
       expect.objectContaining({ method: 'POST' })
     )
   })
 
   it('defaults to same-origin endpoints without a base URL', function testDefaultEndpoints() {
-    const planner = createHostedOpenAIPlanner({
+    const resolver = createHostedOpenAIResolver({
       accessKey: paidAccessKey,
       model: 'gpt-5.4-mini'
     })
 
-    expect(planner.status).toBe('ready')
+    expect(resolver.status).toBe('ready')
   })
 })

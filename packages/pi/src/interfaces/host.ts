@@ -1,4 +1,4 @@
-import type { JsonSchema, PlannerContext, ToolInvocationResult } from '@vampaz/webmcp-kit'
+import type { JsonSchema, ResolverContext, ToolInvocationResult } from '@vampaz/webmcp-kit'
 
 export interface PiToolDescription {
   name: string
@@ -13,7 +13,7 @@ export interface PiToolCatalog {
 
 export interface PiToolHost {
   discover(signal: AbortSignal): Promise<PiToolCatalog>
-  context(signal: AbortSignal): Promise<PlannerContext>
+  context(signal: AbortSignal): Promise<ResolverContext>
   invoke(
     call: { name: string; input: Record<string, unknown>; revision: string },
     signal: AbortSignal

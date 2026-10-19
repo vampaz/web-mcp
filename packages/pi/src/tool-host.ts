@@ -1,10 +1,10 @@
 import { invokeTool, listTools } from '@vampaz/webmcp-kit'
-import type { PlannerContext } from '@vampaz/webmcp-kit'
+import type { ResolverContext } from '@vampaz/webmcp-kit'
 import type { PiToolHost } from './interfaces/host'
 import { PiFailure } from './errors'
 
 export function createRegistryToolHost(
-  context: () => PlannerContext | Promise<PlannerContext> = function empty() {
+  context: () => ResolverContext | Promise<ResolverContext> = function empty() {
     return {}
   }
 ): PiToolHost {
@@ -50,7 +50,7 @@ export function createRegistryToolHost(
       const current = await discover(signal)
       if (current.revision !== call.revision)
         throw new PiFailure('stale_document', 'The tool catalog changed. Send a new request.')
-      return invokeTool({ toolName: call.name, input: call.input, source: 'planner', signal })
+      return invokeTool({ toolName: call.name, input: call.input, source: 'resolver', signal })
     }
   }
 }

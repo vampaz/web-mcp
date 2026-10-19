@@ -1,6 +1,6 @@
 import { createPiRuntime, createRegistryToolHost, type PiController } from '@vampaz/webmcp-kit/pi'
 import type { StorageFixture } from '../interfaces/storage-fixture'
-import { createFixturePlanner } from './planner'
+import { createFixtureResolver } from './resolver'
 
 export function installStorageFixture() {
   const controllers = new Map<string, PiController>()
@@ -59,7 +59,7 @@ export function installStorageFixture() {
     async open(label, owner, conversation, limits) {
       const controller = await createPiRuntime({
         session: { namespace, ownerId: owner, conversationId: conversation },
-        planner: createFixturePlanner(),
+        resolver: createFixtureResolver(),
         host: createRegistryToolHost(),
         limits
       })

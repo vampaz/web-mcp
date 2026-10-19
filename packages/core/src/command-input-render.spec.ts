@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { defineWebMCPCommandInput } from './command-input'
 import { defineTool } from './define-tool'
 import type { WebMCPCommandInputElement } from './interfaces/command-input'
-import type { ToolPlan } from './interfaces/tool'
+import type { ToolResolution } from './interfaces/tool'
 import { clearToolsForTest, registerTool } from './registry'
 
 let tagCounter = 0
@@ -48,12 +48,12 @@ describe('WebMCP command input rendering', () => {
     element.remove()
   })
 
-  it('renders a selected planner option with open settings', async () => {
+  it('renders a selected resolver option with open settings', async () => {
     const element = createRenderedElement()
     element.configure({
       endpointOptions: multiProviderEndpointOptions,
-      initialPlannerOptionId: 'browser-local-ai',
-      plannerOptions: [
+      initialResolverOptionId: 'browser-local-ai',
+      resolverOptions: [
         {
           id: 'browser-local-ai',
           label: 'Browser local AI',
@@ -67,14 +67,14 @@ describe('WebMCP command input rendering', () => {
               model: 'qwen-2b'
             }
           ],
-          createPlanner() {
+          createResolver() {
             return {
               name: 'Browser local AI',
               available: true,
               status: 'ready',
-              detail: 'Browser planner.',
-              async plan() {
-                throw new Error('Not planned in render specs.')
+              detail: 'Browser resolver.',
+              async resolve() {
+                throw new Error('Not resolved in render specs.')
               }
             }
           }
@@ -119,7 +119,7 @@ describe('WebMCP command input rendering', () => {
   it('renders fixed provider and model without controls', async () => {
     const element = createRenderedElement()
     element.configure({
-      endpoint: '/api/webmcp/plan',
+      endpoint: '/api/webmcp/resolve',
       model: 'gpt-5.4-mini',
       provider: 'openai'
     })
@@ -130,7 +130,7 @@ describe('WebMCP command input rendering', () => {
     element.remove()
   })
 
-  it('renders the planning phase button state', async () => {
+  it('renders the resolving phase button state', async () => {
     registerTool(
       defineTool({
         name: 'search_products',
@@ -148,16 +148,16 @@ describe('WebMCP command input rendering', () => {
         }
       })
     )
-    let resolvePlan: ((plan: ToolPlan) => void) | undefined
+    let resolveResolution: ((resolution: ToolResolution) => void) | undefined
     const element = createRenderedElement()
-    element.planner = {
-      name: 'Slow planner',
+    element.resolver = {
+      name: 'Slow resolver',
       available: true,
       status: 'ready',
-      detail: 'Planning in progress.',
-      plan() {
-        return new Promise<ToolPlan>(function capturePlanResolve(resolve) {
-          resolvePlan = resolve
+      detail: 'Resolving in progress.',
+      resolve() {
+        return new Promise<ToolResolution>(function captureResolutionResolve(resolve) {
+          resolveResolution = resolve
         })
       }
     }
@@ -170,7 +170,7 @@ describe('WebMCP command input rendering', () => {
 
     expect(serializeShadow(element)).toMatchSnapshot()
 
-    resolvePlan?.({
+    resolveResolution?.({
       toolName: 'search_products',
       input: { query: 'dock' },
       confidence: 0.9,

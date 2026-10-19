@@ -10,9 +10,9 @@ import ProductTools from '../components/ProductTools.vue'
 <ProductTools client:only="vue" />
 ```
 
-For the Cloudflare Workers AI provider, keep secrets and bindings on the server endpoint. The browser should send the selected provider/model and planning request to your app endpoint, not receive Cloudflare credentials directly.
+For the Cloudflare Workers AI provider, keep secrets and bindings on the server endpoint. The browser should send the selected provider/model and resolution request to your app endpoint, not receive Cloudflare credentials directly.
 
-The standalone [vampaz/web-mcp-demo](https://github.com/vampaz/web-mcp-demo) owns its Astro adapter, planner endpoint, bindings, and deployment configuration. Follow that repository's current setup when working on the demo. The kit does not supply those server or deployment resources.
+The standalone [vampaz/web-mcp-demo](https://github.com/vampaz/web-mcp-demo) owns its Astro adapter, resolver endpoint, bindings, and deployment configuration. Follow that repository's current setup when working on the demo. The kit does not supply those server or deployment resources.
 
 During integration, call `getIntegrationHealthReport()` from client-side app code or open the devtools overlay to confirm that Astro islands have mounted and registered their WebMCP tools.
 

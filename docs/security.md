@@ -1,6 +1,6 @@
 # Security
 
-WebMCP tools turn app behavior into callable actions. Treat every tool input as untrusted, even when the request comes from a local planner or browser API.
+WebMCP tools turn app behavior into callable actions. Treat every tool input as untrusted, even when the request comes from a local resolver or browser API.
 
 ## Tool Design
 
@@ -46,9 +46,9 @@ The internal `confirmed: true` invocation flag is only for code paths that alrea
 
 Approval does not freeze application state. The kit rechecks registration identity, schema, scope, and cancellation across asynchronous approval and guard boundaries. Server authorization must still use current state. Cancellation after an action starts does not guarantee rollback or prove that a failed response means the action failed.
 
-Chained planner output does not change this rule. A `tool_sequence` executes as individual tool invocations, so each mutating step still runs its own guard and confirmation check before execution. If the user rejects a confirmation or a guard blocks a step, the sequence stops and later steps do not run.
+Chained resolver output does not change this rule. A `tool_sequence` executes as individual tool invocations, so each mutating step still runs its own guard and confirmation check before execution. If the user rejects a confirmation or a guard blocks a step, the sequence stops and later steps do not run.
 
-Planner outcomes are non-executing. `needs_clarification` returns a blocked command result, and `no_tools_match` returns an unavailable result. They cannot include steps, and app tools cannot use `tool_sequence`, `needs_clarification`, or `no_tools_match` as names.
+Resolver outcomes are non-executing. `needs_clarification` returns a blocked command result, and `no_tools_match` returns an unavailable result. They cannot include steps, and app tools cannot use `tool_sequence`, `needs_clarification`, or `no_tools_match` as names.
 
 ## Server-Backed Tools
 
@@ -79,7 +79,7 @@ scope() {
 }
 ```
 
-The built-in command input omits scope-unavailable tools from the planner request. Scope is checked again during invocation so a tool cannot execute after the relevant app state changes.
+The built-in command input omits scope-unavailable tools from the resolver request. Scope is checked again during invocation so a tool cannot execute after the relevant app state changes.
 
 ## Audit Hooks
 
@@ -104,4 +104,4 @@ Pi stores conversation data in origin-local IndexedDB, partitioned by explicit n
 
 ## Developer controls
 
-A browser local-storage toggle for provider controls is a development convenience, not access control. The in-repository lab configures LM Studio through server-side environment variables; its visible Presentation selector only changes chat layout. In production, supply app-owned planner configuration and enforce provider permissions on the server. Hiding a control does not authorize or protect the underlying endpoint.
+A browser local-storage toggle for provider controls is a development convenience, not access control. The in-repository lab configures LM Studio through server-side environment variables; its visible Presentation selector only changes chat layout. In production, supply app-owned resolver configuration and enforce provider permissions on the server. Hiding a control does not authorize or protect the underlying endpoint.
