@@ -437,7 +437,8 @@ it('keeps the composer usable without submitting a second turn while waiting', a
   input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }))
   expect(input.disabled).toBe(false)
   expect(element.shadowRoot!.activeElement).toBe(input)
-  expect(element.shadowRoot!.querySelector('[role=status]')!.textContent).toBe('Sending…')
+  expect(element.shadowRoot!.querySelector('[role=status]')!.textContent).toBe('')
+  expect(element.shadowRoot!.querySelector<HTMLElement>('.working')!.hidden).toBe(false)
   element.configure({ harness: fixture.api, title: 'Updated title' })
   input.value = 'Follow-up draft'
   input.dispatchEvent(new Event('input'))
@@ -449,6 +450,59 @@ it('keeps the composer usable without submitting a second turn while waiting', a
   expect(element.shadowRoot!.querySelector<HTMLButtonElement>('[type=submit]')!.disabled).toBe(
     false
   )
+})
+
+it('shows the working indicator in the transcript instead of the status region', async function test() {
+  const fixture = controller()
+  let complete!: (outcome: PiTurnOutcome) => void
+  vi.mocked(fixture.api.send).mockReturnValueOnce(
+    new Promise(function pending(resolve) {
+      complete = resolve
+    })
+  )
+  const element = mount(fixture.api)
+  const input = element.shadowRoot!.querySelector('textarea')!
+  const working = element.shadowRoot!.querySelector<HTMLElement>('.working')!
+  const status = element.shadowRoot!.querySelector('[role=status]')!
+  expect(working.hidden).toBe(true)
+  input.value = 'Hello'
+  input.dispatchEvent(new Event('input'))
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }))
+  expect(working.hidden).toBe(false)
+  expect(working.closest('ol')).toBeNull()
+  expect(status.textContent).toBe('')
+  fixture.publish({ state: 'running', messages: [{ id: 'sent', role: 'user', text: 'Hello' }] })
+  expect(working.hidden).toBe(false)
+  expect(status.textContent).toBe('')
+  expect(element.shadowRoot!.querySelector('ol')!.textContent).not.toContain('Working')
+  fixture.publish({ state: 'stopping', messages: [{ id: 'sent', role: 'user', text: 'Hello' }] })
+  expect(working.hidden).toBe(false)
+  fixture.publish({ state: 'idle', messages: fixture.api.getSnapshot().messages })
+  complete({ status: 'completed' })
+  await Promise.resolve()
+  expect(working.hidden).toBe(true)
+  expect(status.textContent).toBe('Ready')
+})
+
+it('hides the working indicator when a turn ends before send settles', async function test() {
+  const fixture = controller()
+  let complete!: (outcome: PiTurnOutcome) => void
+  vi.mocked(fixture.api.send).mockReturnValueOnce(
+    new Promise(function pending(resolve) {
+      complete = resolve
+    })
+  )
+  const element = mount(fixture.api)
+  const input = element.shadowRoot!.querySelector('textarea')!
+  input.value = 'Hello'
+  input.dispatchEvent(new Event('input'))
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }))
+  expect(element.shadowRoot!.querySelector<HTMLElement>('.working')!.hidden).toBe(false)
+  fixture.publish({ state: 'interrupted', messages: [] })
+  expect(element.shadowRoot!.querySelector<HTMLElement>('.working')!.hidden).toBe(true)
+  expect(element.shadowRoot!.querySelector('[role=status]')!.textContent).toContain('interrupted')
+  complete({ status: 'interrupted' })
+  await Promise.resolve()
 })
 
 it('cancels a stale clear confirmation when the controller changes', function test() {

@@ -40,6 +40,12 @@ li[data-role=tool] { border:1px solid var(--webmcp-chat-border,#e1e5ed); border-
 summary { cursor:pointer; font-weight:500 }
 pre { white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; margin-block:.5rem }
 [data-empty] { text-align:center; max-inline-size:28ch; margin:clamp(1rem,5vh,3rem) auto; color:var(--webmcp-chat-muted,#657087); line-height:1.7 }
+.working { display:flex; align-items:center; margin:1.25rem 0 0; padding-inline:.15rem; color:var(--webmcp-chat-muted,#657087) }
+.working-dots { display:inline-flex; align-items:center; gap:.25rem }
+.working-dots span { inline-size:.4rem; block-size:.4rem; border-radius:50%; background:currentColor; animation:webmcp-chat-working 1.2s ease-in-out infinite }
+.working-dots span:nth-child(2) { animation-delay:.15s }
+.working-dots span:nth-child(3) { animation-delay:.3s }
+@keyframes webmcp-chat-working { 0%,60%,100% { opacity:.25; transform:translateY(0) } 30% { opacity:1; transform:translateY(-.15rem) } }
 .composer { display:grid; gap:.7rem; padding:.85rem; border-block-start:1px solid var(--webmcp-chat-border,#e1e5ed) }
 .message-box { border:1px solid var(--webmcp-chat-border,#e1e5ed); border-radius:.8rem; padding:.35rem; background:var(--webmcp-chat-background,#fff) }
 .message-box:focus-within { border-color:var(--webmcp-chat-accent,#325ce8); box-shadow:0 0 0 3px color-mix(in srgb,var(--webmcp-chat-accent,#325ce8) 9%,transparent) }
@@ -69,7 +75,7 @@ dialog [data-confirm-clear] { font-weight:600 }
 .visually-hidden { position:absolute; inline-size:1px; block-size:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0 }
 .suggestions:empty,[hidden] { display:none!important }
 @media(max-height:36rem) { header,.composer { padding:.6rem; gap:.4rem } textarea { min-block-size:3em } }
-@media(prefers-reduced-motion:reduce) { * { scroll-behavior:auto!important } }
+@media(prefers-reduced-motion:reduce) { * { scroll-behavior:auto!important } .working-dots span { animation:none; opacity:.6 } }
 `
 
 export const popupStyles = `

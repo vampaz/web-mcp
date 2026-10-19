@@ -2,7 +2,9 @@
 
 [Documentation index](./README.md) · [Complete integration](./integration.md) · [API reference](./api-reference.md)
 
-`@vampaz/webmcp-kit/pi` provides a headless, persistent conversation controller. Core remains responsible for application validation, scope, guards, approval, and execution. Pi requests exactly one action, receives its actual result, refreshes context, and chooses the next step. Bounded Planner mode keeps its separate sequence contract.
+`@vampaz/webmcp-kit/pi` provides a headless, persistent conversation controller. Core remains responsible for application validation, scope, guards, approval, and execution. Pi requests exactly one action, receives its actual result, refreshes context, and chooses the next step. The command input's bounded planning remains a separate core surface with its own sequence contract.
+
+`planner` in this guide means the model-provider adapter you configure (type `ToolPlanner`) and pass to `createPiHarness()` or `createPiRuntime()`. It is not a UI mode, and the kit ships no model endpoint of its own; configure your provider as described in [Where inference comes from](./planner-providers.md#where-inference-comes-from).
 
 Install `0.2.1` or newer. The kit declares its Pi runtime libraries as dependencies, so npm installs them automatically:
 

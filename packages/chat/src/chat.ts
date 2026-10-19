@@ -31,6 +31,7 @@ export function defineWebMCPChat(): void {
     private readonly transcript: HTMLDivElement
     private readonly list: HTMLOListElement
     private readonly empty: HTMLParagraphElement
+    private readonly working: HTMLParagraphElement
     private readonly heading: HTMLHeadingElement
     private readonly input: HTMLTextAreaElement
     private readonly sendButton: HTMLButtonElement
@@ -52,7 +53,7 @@ export function defineWebMCPChat(): void {
             <div class="header-actions"><button class="icon-button" type="button" data-clear aria-label="Clear chat" title="Clear chat">${icon('M4 7h16M10 3h4l1 4H9l1-4M6 7l1 13h10l1-13M10 11v5M14 11v5')}</button></div>
           </header>
           <div class="conversation">
-            <div class="transcript" tabindex="0" role="log" aria-label="Conversation"><p data-empty></p><ol></ol></div>
+            <div class="transcript" tabindex="0" role="log" aria-label="Conversation"><p data-empty></p><ol></ol><p class="working" hidden><span class="visually-hidden">Working…</span><span class="working-dots" aria-hidden="true"><span></span><span></span><span></span></span></p></div>
             <button type="button" class="jump-latest" hidden>Jump to latest</button>
           </div>
           <form class="composer">
@@ -79,6 +80,7 @@ export function defineWebMCPChat(): void {
       this.transcript = this.root.querySelector('.transcript')!
       this.list = this.root.querySelector('ol')!
       this.empty = this.root.querySelector('[data-empty]')!
+      this.working = this.root.querySelector('.working')!
       this.input = this.root.querySelector('textarea')!
       this.sendButton = this.root.querySelector('[type=submit]')!
       this.stopButton = this.root.querySelector('[data-stop]')!
@@ -196,22 +198,26 @@ export function defineWebMCPChat(): void {
       if (latestMessage !== this.latestMessage && !nearEnd) this.unread = true
       this.latestMessage = latestMessage
       updateTranscript(this.list, snapshot.messages, this.options?.assistantLabel ?? 'Assistant')
-      this.empty.hidden = snapshot.messages.length > 0
+      this.empty.hidden = snapshot.messages.length > 0 || this.isWorking()
       this.updateComposer(nearEnd)
     }
 
     private updateComposer(nearEnd = this.nearEnd()) {
       const snapshot = this.snapshot
+      const working = this.isWorking()
       this.suggestions.hidden = snapshot.messages.length > 0 || this.input.value.length > 0
+      this.working.hidden = !working
       const status = this.clearing
         ? 'Clearing conversation…'
-        : this.sending && snapshot.state === 'idle'
-          ? 'Sending…'
+        : working && !snapshot.error
+          ? ''
           : statusText(snapshot)
       if (this.status.textContent !== status) this.status.textContent = status
       const busy =
         this.sending || this.clearing || ['running', 'stopping', 'loading'].includes(snapshot.state)
-      this.transcript.setAttribute('aria-busy', String(busy))
+      const busyState = String(busy)
+      if (this.list.getAttribute('aria-busy') !== busyState)
+        this.list.setAttribute('aria-busy', busyState)
       const disabled = !this.options || this.options.disabled || snapshot.state === 'closed'
       const tooLong = this.input.value.length > messageLimit
       this.input.disabled = Boolean(disabled || snapshot.state === 'loading')
@@ -236,6 +242,13 @@ export function defineWebMCPChat(): void {
         this.initiallyScrolled = snapshot.state !== 'loading' && this.transcript.clientHeight > 0
       }
       this.updateJump()
+    }
+
+    private isWorking() {
+      const state = this.snapshot.state
+      if (state === 'running' || state === 'stopping') return true
+      if (state === 'interrupted' || state === 'error' || state === 'closed') return false
+      return this.sending
     }
 
     private nearEnd() {

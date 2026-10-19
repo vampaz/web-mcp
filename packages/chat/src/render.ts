@@ -59,11 +59,11 @@ export function statusText(snapshot: PiSnapshot): string {
   if (snapshot.error) return snapshot.error.message
   if (snapshot.state === 'idle' && snapshot.messages.at(-1)?.failed)
     return 'The last response failed. Check application state before sending a new request.'
+  // Active turns are reported by the working indicator in the transcript.
+  if (snapshot.state === 'running' || snapshot.state === 'stopping') return ''
   return {
     loading: 'Loading conversation…',
     idle: 'Ready',
-    running: 'Working…',
-    stopping: 'Stopping…',
     interrupted:
       'The previous turn was interrupted. Check application state, then send a new request.',
     error: 'The turn failed. Check the application and try a new request.',

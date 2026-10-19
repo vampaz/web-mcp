@@ -148,11 +148,13 @@ test('keeps focus outside chat when a pending response arrives', async function 
   await input.fill('Hello')
   await input.press('Enter')
   await expect(input).toBeFocused()
+  await expect(chat.getByRole('log').locator('.working')).toBeVisible()
   await input.fill('My next question')
   await expect(chat.getByRole('button', { name: 'Send', exact: true })).toBeDisabled()
   await page.getByRole('textbox', { name: 'Outside chat' }).fill('Keep typing')
   await page.getByRole('button', { name: 'Finish response' }).click()
   await expect(chat.getByRole('status')).toHaveText('Ready')
+  await expect(chat.getByRole('log').locator('.working')).toBeHidden()
   await expect(page.getByRole('textbox', { name: 'Outside chat' })).toBeFocused()
   await expect(input).toHaveValue('My next question')
 })
@@ -397,6 +399,45 @@ test('switches inline and popup modes while keeping the conversation and draft',
   await expect(chat).toContainText('Counter: 7')
   await expect(input).toBeVisible()
 })
+
+for (const viewport of [
+  { width: 1280, height: 720 },
+  { width: 390, height: 844 }
+]) {
+  test(`restores the popup anchor after resizing at ${viewport.width}px`, async function anchor({
+    page
+  }) {
+    await page.setViewportSize(viewport)
+    await page.goto('/?mode=chat&presentation=popup')
+    const chat = page.locator('webmcp-chat')
+    const launcher = chat.getByRole('button', { name: 'Open Assistant', exact: true })
+    await launcher.click()
+    const panel = chat.getByRole('dialog', { name: 'Assistant', exact: true })
+    const resize = chat.getByRole('button', { name: 'Resize chat', exact: true })
+    const original = (await panel.boundingBox())!
+    for (let cycle = 0; cycle < 2; cycle++) {
+      await resize.click()
+      await expect
+        .poll(async function expanded() {
+          return (await panel.boundingBox())!.height
+        })
+        .toBeGreaterThan(original.height)
+      await resize.click()
+      await expect
+        .poll(async function anchored() {
+          return panel.boundingBox()
+        })
+        .toEqual(original)
+    }
+    await chat.getByRole('button', { name: 'Close chat', exact: true }).click()
+    await launcher.click()
+    await expect
+      .poll(async function reopened() {
+        return panel.boundingBox()
+      })
+      .toEqual(original)
+  })
+}
 
 test('drags the popup launcher and panel, resizes by keyboard, and stays within the viewport', async function geometry({
   page

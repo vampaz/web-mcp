@@ -4,6 +4,49 @@ WebMCP Kit can plan tool calls with different model providers. The app still own
 
 Sequences belong to the command-input contract. The [Pi harness](./pi.md) requests one next action and replans after actual results. Model identifiers below are examples; choose models allowed and tested by your endpoint. They are not a claim of current provider availability or pricing.
 
+## Where Inference Comes From
+
+The kit ships no model service and no default inference endpoint. Your application chooses where inference runs. The command input and Pi use a **planner** (type `ToolPlanner`): a model-provider adapter that receives the available tools and app-owned context, returns the next action, and never executes app tools.
+
+"Planner" is the API name for that adapter, not a user-facing mode. The command input's bounded planning and Pi's conversation loop are two consumers of the same adapter shape; this page documents the adapter, not a mode.
+
+| How the app reaches a model | Configure                                                                              | Secret stays                  | Use when                                                        |
+| --------------------------- | -------------------------------------------------------------------------------------- | ----------------------------- | --------------------------------------------------------------- |
+| Browser built-in AI         | `createConfiguredPlanner()` with `provider: 'chrome-built-in'`                         | nowhere                       | Chrome exposes `LanguageModel` and no app-owned model is needed |
+| OpenAI-compatible endpoint  | `createRemotePlanner()` with `baseUrl` and `auth`                                      | browser (`user-key`) or proxy | Local or self-hosted model behind a same-origin HTTPS proxy     |
+| Your server endpoint        | `createRemotePlanner()` with server-mode `endpoint`                                    | server                        | App-owned provider keys, production, SaaS                       |
+| Hosted OpenAI               | `createHostedOpenAIPlanner()` with `accessKey`, `model`, `endpoint`, `sessionEndpoint` | server                        | A separately hosted service supports publishable-key sessions   |
+| App-defined adapter         | Implement `ToolPlanner`; declare `capabilities.conversation: true` for Pi              | app-defined                   | WebLLM, custom routing, app-specific inference                  |
+
+Pointing Pi at an app-owned endpoint:
+
+```ts
+import { createRemotePlanner } from '@vampaz/webmcp-kit'
+import { createPiHarness } from '@vampaz/webmcp-kit/pi'
+
+const planner = createRemotePlanner({
+  provider: 'openai',
+  model: 'your-approved-model',
+  auth: {
+    mode: 'server',
+    endpoint: '/api/webmcp/plan'
+  }
+})
+
+const harness = await createPiHarness({
+  session: { namespace: 'my-app', ownerId: currentUserId, conversationId: location.pathname },
+  worker: { url: '/webmcp-pi/worker.js', scope: '/webmcp-pi/' },
+  planner,
+  context: getCurrentPageContext
+})
+```
+
+The `planner` option on `createPiHarness()`, `createPiRuntime()`, and the command input accepts a `ToolPlanner`. `createWebMCPKit({ planner: config })` and the command input's `plannerConfig` option accept a `PlannerProviderConfig` and create the adapter.
+
+`baseUrl` is an OpenAI-compatible base; the kit posts to `baseUrl + '/chat/completions'`. Server mode instead posts the contract below to your route, so the browser never receives provider credentials. A custom conversational adapter must declare `capabilities: { conversation: true }`, honor `PlannerRunOptions.singleStep` and `maxRequestBytes`, and reject failures instead of returning a heuristic fallback.
+
+The remaining sections document each shape in full.
+
 ## Production: Server Mode
 
 Use server mode when the key belongs to the app or company.

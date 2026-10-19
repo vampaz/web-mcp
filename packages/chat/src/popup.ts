@@ -267,7 +267,7 @@ export class ChatPopup {
     )
     const launcher = this.launcher.getBoundingClientRect()
     const panel = this.panel.getBoundingClientRect()
-    this.panelPosition = this.place(
+    this.place(
       this.panel,
       this.panelPosition ?? {
         x: launcher.right - panel.width,
