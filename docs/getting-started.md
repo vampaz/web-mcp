@@ -278,4 +278,4 @@ Playwright tests can then import helpers from `@vampaz/webmcp-kit/testing/playwr
 
 ## Persistent conversation and independent chat
 
-For a result-driven conversation, configure the [Pi controller](./pi.md), compile an application-owned worker, and optionally mount [webmcp-chat](./chat.md). Core tools and application confirmations stay authoritative. The existing command input continues to provide bounded Planner mode. Try all three surfaces in the [local package lab](../apps/demo/README.md).
+For a result-driven conversation, configure the [Pi controller](./pi.md), compile an application-owned worker, and optionally mount [webmcp-chat](./chat.md). Core tools and application confirmations stay authoritative. The existing command input continues to offer bounded, non-conversational planning. Configure the model endpoint in the host, as described in [Where inference comes from](./planner-providers.md#where-inference-comes-from). Try all three surfaces in the [local package lab](../apps/demo/README.md).

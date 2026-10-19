@@ -1,6 +1,6 @@
 # Developer documentation
 
-WebMCP Kit exposes application actions through one registry and invocation pipeline. Add a planner for commands, a Pi controller for persistent conversations, and the chat component when you want a supplied interface.
+WebMCP Kit exposes application actions through one registry and invocation pipeline. Add a model provider adapter (the kit calls it a `planner`) for commands, a Pi controller for persistent conversations, and the chat component when you want a supplied interface.
 
 The `/pi`, `/pi/worker`, and `/chat` additions were introduced in `0.2.0`. Install `0.2.1` or newer so npm also installs their runtime dependencies automatically.
 

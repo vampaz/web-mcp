@@ -108,6 +108,8 @@ initWebMCP({
 
 Plan and session endpoints are derived from `baseUrl` (`/api/webmcp/plan` and `/api/webmcp/session`). Omit `accessKey` to keep the element's default planner behavior, pass `target` to use an element you placed in your own markup, and call the returned handle's `destroy()` to tear everything down.
 
+The hosted endpoint above belongs to the standalone demo. The kit ships no model service and no default inference endpoint. To configure your own provider, see [Where inference comes from](./docs/planner-providers.md#where-inference-comes-from).
+
 `defineTool()` infers the `execute` and `guard` input types from the `inputSchema` literal — `input.query` above is typed `string` without generics or casts. If you already use Zod, install it alongside the kit and use the `@vampaz/webmcp-kit/zod` subpath to keep the schema and TypeScript input type in one place:
 
 ```sh
