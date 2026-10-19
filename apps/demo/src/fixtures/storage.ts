@@ -110,14 +110,14 @@ export function installStorageFixture() {
       })
     },
     async unavailable() {
-      const open = indexedDB.open
-      indexedDB.open = function fail() {
+      const open = IDBFactory.prototype.open
+      IDBFactory.prototype.open = function fail() {
         throw new Error('Storage disabled by browser fixture')
       }
       try {
         return await api.open('unavailable', 'owner', 'unavailable')
       } finally {
-        indexedDB.open = open
+        IDBFactory.prototype.open = open
       }
     }
   }

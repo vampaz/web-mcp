@@ -238,6 +238,8 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
           watch = undefined
           // Abort before enabling any resolver or page request on recovery.
           await conversation.abort(context)
+          // Root creation options do not update a restored conversation's persisted model.
+          await conversation.configure({ model: piModel }, context)
           if (previousTurn === 'started')
             await conversation.submit(
               { type: 'write', entry: { kind: 'webmcp.turn.interrupted' } },
@@ -272,8 +274,13 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
               { type: 'input', content: text, requestId: crypto.randomUUID(), whenBusy: 'reject' },
               context
             )
-            await submission.wait(context)
+            const settled = await submission.wait(context)
             accepting = false
+            if (!signal.aborted && !failure && settled.status === 'unanswered')
+              failure = {
+                code: 'provider_failed',
+                message: `The conversation could not answer this request (${settled.reason}). Send a new request.`
+              }
             await aborting
             await conversation.submit(
               {

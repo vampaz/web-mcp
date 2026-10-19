@@ -92,7 +92,7 @@ export async function resolvePiRound(
   if (jsonBytes({ message, tools, context: currentContext }) > maxBytes)
     throw new PiFailure(
       'limit_reached',
-      'This conversation exceeds the resolver request limit. Clear chat before continuing.'
+      'This conversation exceeds the resolver request limit. Start a new chat before continuing.'
     )
   const resolution = await abortable(
     resolver.resolve(message, tools, currentContext, {

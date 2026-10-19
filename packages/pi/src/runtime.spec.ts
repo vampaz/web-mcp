@@ -1,16 +1,23 @@
 // @vitest-environment node
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context'
+import { createModels } from '@earendil-works/pi-ai/models'
+import { createRegistry, Harness } from '@earendil-works/pi-durable'
 import type { ToolResolution, ToolResolver } from '@vampaz/webmcp-kit'
 import { createPiRuntime } from './runtime'
 import type { PiController } from './interfaces/controller'
 import type { PiToolHost } from './interfaces/host'
 import { installBrowserStorage } from './test-utils/browser'
+import * as modelAdapter from './model-adapter'
+import { openPiStorage } from './storage'
+import { piSessionKey, resolvePiLimits } from './session'
 
 let runtime: PiController | undefined
 beforeEach(installBrowserStorage)
 afterEach(async function cleanup() {
   await runtime?.destroy()
   runtime = undefined
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
 
@@ -84,6 +91,79 @@ it('runs the actual Pi loop and persists an answer across reopening', async func
     })
   ).toBe(true)
   expect(config.resolver.resolve).toHaveBeenCalledTimes(1)
+})
+
+it.each([false, true])(
+  'upgrades a saved model without losing history or replaying actions (interrupted: %s)',
+  async function upgrade(interrupted) {
+    const config = options([resolution('read_counter', {}), resolution(), resolution()])
+    runtime = await createPiRuntime(config)
+    expect(await runtime.send('Read before upgrading')).toEqual({ status: 'completed' })
+    const history = runtime.getSnapshot().messages
+    await runtime.destroy()
+
+    const storage = await openPiStorage(
+      piSessionKey(config.session),
+      resolvePiLimits().maxHistoryBytes
+    )
+    const legacy = await Harness.open(
+      storage,
+      {
+        registry: createRegistry(),
+        models: modelAdapter.createPiModels(async function unused() {
+          return resolution()
+        })
+      },
+      BACKGROUND_CONTEXT
+    )
+    try {
+      const conversation = await legacy.root(BACKGROUND_CONTEXT)
+      await conversation.configure(
+        { model: { provider: 'webmcp', modelId: 'configured-planner' } },
+        BACKGROUND_CONTEXT
+      )
+      if (interrupted)
+        await conversation.submit(
+          { type: 'write', entry: { kind: 'webmcp.turn.started' } },
+          BACKGROUND_CONTEXT
+        )
+    } finally {
+      await legacy.close(BACKGROUND_CONTEXT)
+    }
+
+    runtime = await createPiRuntime(config)
+    expect(runtime.getSnapshot()).toMatchObject({
+      state: interrupted ? 'interrupted' : 'idle',
+      messages: history
+    })
+    expect(config.resolver.resolve).toHaveBeenCalledTimes(2)
+    expect(config.invoke).toHaveBeenCalledTimes(1)
+    expect(await runtime.send('Continue after upgrading')).toEqual({ status: 'completed' })
+    expect(config.resolver.resolve).toHaveBeenCalledTimes(3)
+    expect(config.invoke).toHaveBeenCalledTimes(1)
+    const continued = runtime.getSnapshot().messages
+    expect(continued.slice(0, history.length)).toEqual(history)
+    expect(continued.at(-1)).toMatchObject({ role: 'assistant', text: 'Answered' })
+
+    await runtime.destroy()
+    runtime = await createPiRuntime(config)
+    expect(runtime.getSnapshot()).toMatchObject({ state: 'idle', messages: continued })
+    expect(config.resolver.resolve).toHaveBeenCalledTimes(3)
+    expect(config.invoke).toHaveBeenCalledTimes(1)
+  }
+)
+
+it('reports an unanswered Pi submission instead of claiming completion', async function unanswered() {
+  vi.spyOn(modelAdapter, 'createPiModels').mockReturnValue(createModels())
+  const config = options([resolution()])
+  runtime = await createPiRuntime(config)
+  expect(await runtime.send('Hello')).toMatchObject({
+    status: 'error',
+    error: { code: 'provider_failed', message: expect.stringContaining('no_model') }
+  })
+  expect(runtime.getSnapshot()).toMatchObject({ state: 'error' })
+  expect(config.resolver.resolve).not.toHaveBeenCalled()
+  expect(config.invoke).not.toHaveBeenCalled()
 })
 
 it('feeds the actual tool result back before choosing the next step', async function test() {
@@ -339,7 +419,7 @@ it('settles a pending clear before destruction closes the controller', async fun
   expect(runtime.getSnapshot().state).toBe('closed')
 })
 
-it('stops visibly at the durable history limit and still permits Clear chat', async function test() {
+it('stops visibly at the durable history limit and still permits starting a new chat', async function test() {
   runtime = await createPiRuntime({
     ...options([resolution(), resolution(), resolution()]),
     limits: { maxHistoryBytes: 65536, maxRequestBytes: 65536 }
@@ -353,7 +433,7 @@ it('stops visibly at the durable history limit and still permits Clear chat', as
     }
   }
   expect(failure?.status).toBe('error')
-  expect(failure?.error?.message).toContain('Clear chat')
+  expect(failure?.error?.message).toContain('Start a new chat')
   expect(runtime.getSnapshot().state).toBe('error')
   await runtime.clear()
   expect(runtime.getSnapshot().messages).toEqual([])

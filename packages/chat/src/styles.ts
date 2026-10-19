@@ -66,12 +66,6 @@ textarea:focus-visible { outline:none }
 textarea[aria-invalid=true] { outline:2px solid currentColor; outline-offset:-2px }
 .jump-latest { position:absolute; inset-block-end:.5rem; inset-inline-end:.75rem; max-inline-size:calc(100% - 1.5rem); font-size:.75rem; border-radius:2rem; box-shadow:0 .15rem .6rem #222b3c14 }
 li[data-layout=failed] { border-inline-start:.2rem solid currentColor; padding-inline-start:.75rem }
-dialog { max-inline-size:min(26rem,calc(100vw - 2rem)); max-block-size:calc(100dvh - 2rem); padding:1.5rem; color:inherit; background:var(--webmcp-chat-background,#fff); border:1px solid var(--webmcp-chat-border,#e1e5ed); border-radius:var(--webmcp-chat-radius,1rem); overflow:auto; box-shadow:0 1.5rem 5rem #222b3c26 }
-dialog::backdrop { background:#17203366; backdrop-filter:blur(3px) }
-dialog form { display:grid; gap:1rem }
-dialog p { line-height:1.65; margin:0; color:var(--webmcp-chat-muted,#657087) }
-dialog .actions { justify-content:flex-end; gap:.5rem }
-dialog [data-confirm-clear] { font-weight:600 }
 .visually-hidden { position:absolute; inline-size:1px; block-size:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0 }
 .suggestions:empty,[hidden] { display:none!important }
 @media(max-height:36rem) { header,.composer { padding:.6rem; gap:.4rem } textarea { min-block-size:3em } }
