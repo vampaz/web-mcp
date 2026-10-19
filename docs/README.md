@@ -4,10 +4,13 @@ WebMCP Kit exposes application actions through one registry and invocation pipel
 
 The `/pi`, `/pi/worker`, and `/chat` additions were introduced in `0.2.0`. Install `0.2.1` or newer so npm also installs their runtime dependencies automatically.
 
+Version `0.3.0` renames the model-provider adapter from _planner_ to _resolver_. Apply the [0.3.0 migration guide](./migration-0.3.md) when upgrading an existing integration.
+
 ## Start here
 
 | Task                                                                   | Guide                                                     |
 | ---------------------------------------------------------------------- | --------------------------------------------------------- |
+| Upgrade an application that used the planner API                       | [Upgrading to 0.3.0](./migration-0.3.md)                  |
 | Integrate tools, a worker, and chat into an application                | [Integration walkthrough](./integration.md)               |
 | Understand execution, persistence, and ownership                       | [Architecture and diagrams](./architecture.md)            |
 | Look up defaults, errors, events, and lifecycle behavior               | [API behavior](./api-behavior.md)                         |

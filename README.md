@@ -4,6 +4,8 @@ WebMCP Kit is a local-first TypeScript toolkit for exposing real web app actions
 
 Developer documentation: [integration walkthrough](./docs/integration.md), [architecture and diagrams](./docs/architecture.md), [full API reference](./docs/api-reference.md), [runtime contracts](./docs/api-behavior.md), and [operations](./docs/operations.md). The [documentation index](./docs/README.md) links framework guides and runnable examples.
 
+Version `0.3.0` renames the model-provider adapter from _planner_ to _resolver_ and changes every related export, option, event, and endpoint path. Existing applications must apply the [0.3.0 migration](./docs/migration-0.3.md); there are no compatibility aliases.
+
 ## Status
 
 This repository is an early MVP. Chrome WebMCP and Chrome built-in AI are emerging browser capabilities, so the kit is designed as progressive enhancement:

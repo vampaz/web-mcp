@@ -89,7 +89,7 @@ Run `npm audit` for advisories and `npm audit signatures` for registry verificat
 
 ## Release procedure
 
-The npm version must be new: the release workflow skips a version already present in the registry. Version `0.2.0` introduces the Pi and chat entry points; `0.1.0` does not contain them.
+The npm version must be new: the release workflow skips a version already present in the registry. Version `0.2.0` introduces the Pi and chat entry points; `0.1.0` does not contain them. Version `0.3.0` renames the planner API to resolver and is a breaking change without compatibility aliases.
 
 1. Finish the review and validation above on the release branch, including the packed consumer tests. Check the manifest and lockfile versions together.
 2. Check `npm view @vampaz/webmcp-kit versions --json` and confirm the candidate version is unused. A registry or authentication error does not establish that a version is available.
@@ -104,6 +104,7 @@ The workflow builds once, tests `artifacts/webmcp-kit.tgz`, and publishes that t
 
 | Symptom                                      | Inspect and correct                                                                                                                                                        |
 | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unknown planner export such as `ToolPlanner` | The installed release predates `0.3.0`. Upgrade and apply the [0.3.0 migration guide](./migration-0.3.md).                                                                 |
 | `/pi` or `/chat` cannot be resolved          | The installed release may predate these exports. Use the reviewed tarball described in the integration guide, or a release that actually contains them.                    |
 | Missing Pi runtime dependency                | Upgrade to `0.2.1` or newer and reinstall the kit. npm installs the runtime dependencies automatically. See the dependency model for removing direct `0.2.0` declarations. |
 | No tools discovered                          | Check component mounting, `when`, `scope()`, stable names, and duplicate copies of the kit. Use `listTools()` and the integration health report in the page.               |
