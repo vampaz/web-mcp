@@ -3,6 +3,7 @@ import { expect, it, vi } from 'vitest'
 import { installPiServiceWorker } from './worker'
 import { openRuntime } from './runtime-engine'
 import { createPeer } from './protocol'
+import { piProtocolVersion } from './interfaces/protocol'
 import { piSessionKey } from './session'
 
 vi.mock('./runtime-engine', function runtime() {
@@ -92,7 +93,10 @@ it('stops the runtime when a send request is cancelled', async function test() {
     scope.dispatchEvent(event)
   }
   try {
-    dispatch({ version: 1, op: 'connect', requestId: 'connect', session, binding }, [channel.port2])
+    dispatch(
+      { version: piProtocolVersion, op: 'connect', requestId: 'connect', session, binding },
+      [channel.port2]
+    )
     await peer.call('ready', { available: true, capabilities: { conversation: true } })
     const controller = new AbortController()
     const outcome = peer.call('send', 'Work', controller.signal)

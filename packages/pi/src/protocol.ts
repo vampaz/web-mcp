@@ -1,3 +1,4 @@
+import { piProtocolVersion } from './interfaces/protocol'
 import type { PiBinding, PiConnect, PiEnvelope, PiPeer } from './interfaces/protocol'
 import { isPiError, jsonBytes, piError, PiFailure } from './errors'
 import { piSessionKey } from './session'
@@ -24,7 +25,7 @@ export function validBinding(value: unknown): value is PiBinding {
 export function validConnect(value: unknown): value is PiConnect {
   if (
     !record(value) ||
-    value.version !== 1 ||
+    value.version !== piProtocolVersion ||
     value.op !== 'connect' ||
     !identity(value.requestId) ||
     !validBinding(value.binding)
@@ -51,7 +52,7 @@ export function boundedJson(value: unknown): boolean {
 export function validEnvelope(value: unknown, binding: PiBinding): value is PiEnvelope {
   if (
     !record(value) ||
-    value.version !== 1 ||
+    value.version !== piProtocolVersion ||
     !identity(value.requestId) ||
     !validBinding(value.binding) ||
     !operations.includes(String(value.op)) ||
@@ -88,7 +89,7 @@ export function createPeer(
   let closed = false
   function post(message: Omit<PiEnvelope, 'version' | 'binding'>) {
     if (closed) throw new PiFailure('transport_failed', 'The conversation connection closed.')
-    const envelope: PiEnvelope = { ...message, version: 1, binding }
+    const envelope: PiEnvelope = { ...message, version: piProtocolVersion, binding }
     if (!boundedJson(envelope))
       throw new PiFailure(
         'limit_reached',
@@ -134,7 +135,10 @@ export function createPeer(
       incoming.set(id, controller)
       try {
         if (!options.methods.includes(message.method!))
-          throw new PiFailure('transport_failed', 'Unknown conversation operation.')
+          throw new PiFailure(
+            'transport_failed',
+            'The Pi service worker speaks a different protocol version. Reload the page to update it.'
+          )
         const result = await options.request(message.method!, message.payload, controller.signal)
         if (!closed && !controller.signal.aborted)
           post({ op: 'reply', requestId: id, payload: result })

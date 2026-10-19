@@ -8,6 +8,7 @@ import type {
 import type { PiBinding, PiConnect, PiPeer } from './interfaces/protocol'
 import { isPiError, piError, PiFailure } from './errors'
 import { createPeer } from './protocol'
+import { piProtocolVersion } from './interfaces/protocol'
 import { piSessionKey, resolvePiLimits } from './session'
 import { createRegistryToolHost } from './tool-host'
 
@@ -38,10 +39,23 @@ export async function createPiHarness(options: PiHarnessOptions): Promise<PiCont
       'configuration',
       'Use a same-origin worker URL inside its dedicated non-root scope.'
     )
-  const registration = await navigator.serviceWorker.register(url.href, {
+  // The worker script is registered under a protocol-versioned URL. A browser
+  // that still holds an older worker script therefore fetches the current one
+  // instead of pairing a stale worker with a newer page.
+  const scriptUrl = new URL(url.href)
+  scriptUrl.searchParams.set('wmpcv', String(piProtocolVersion))
+  const registration = await navigator.serviceWorker.register(scriptUrl.href, {
     scope: scope.href,
     type: 'module'
   })
+  // A tab that stayed open across a deployment can still be controlled by an
+  // older worker script. Fetch the current script before connecting so the page
+  // and the worker always speak the same protocol.
+  try {
+    await registration.update?.()
+  } catch {
+    /* The browser refused the update check. The active worker is used instead. */
+  }
   let worker = registration.installing ?? registration.waiting ?? registration.active
   if (!worker) throw new PiFailure('unsupported', 'The Pi service worker could not start.')
   await waitForActivation(worker)
@@ -147,7 +161,7 @@ export async function createPiHarness(options: PiHarnessOptions): Promise<PiCont
       }
     })
     const command: PiConnect = {
-      version: 1,
+      version: piProtocolVersion,
       op: 'connect',
       requestId: crypto.randomUUID(),
       binding,
