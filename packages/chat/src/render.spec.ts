@@ -33,6 +33,8 @@ it('keeps expanded tool details while updating text without interpreting HTML', 
 })
 it('explains interrupted work and displays structured errors', function test() {
   expect(statusText({ state: 'interrupted', messages: [] })).toContain('Check application state')
+  expect(statusText({ state: 'running', messages: [] })).toBe('')
+  expect(statusText({ state: 'stopping', messages: [] })).toBe('')
   expect(
     statusText({
       state: 'error',
