@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { expect, it, vi } from 'vitest'
 import { createPeer, validConnect, validEnvelope } from './protocol'
+import { piProtocolVersion } from './interfaces/protocol'
 import { piSessionKey } from './session'
 
 const session = { namespace: 'tests', ownerId: 'one', conversationId: 'chat' }
@@ -11,12 +12,14 @@ const binding = {
 }
 
 it('rejects mismatched, malformed, and oversized messages', function test() {
-  expect(validConnect({ version: 1, op: 'connect', requestId: 'id', binding, session })).toBe(true)
-  expect(validConnect({ version: 2, op: 'connect', requestId: 'id', binding, session })).toBe(false)
+  expect(
+    validConnect({ version: piProtocolVersion, op: 'connect', requestId: 'id', binding, session })
+  ).toBe(true)
+  expect(validConnect({ version: 1, op: 'connect', requestId: 'id', binding, session })).toBe(false)
   expect(
     validEnvelope(
       {
-        version: 1,
+        version: piProtocolVersion,
         op: 'request',
         requestId: 'id',
         method: 'send',
@@ -27,13 +30,19 @@ it('rejects mismatched, malformed, and oversized messages', function test() {
   ).toBe(false)
   expect(
     validEnvelope(
-      { version: 1, op: 'reply', requestId: 'id', binding, payload: 'x'.repeat(17 * 1024 * 1024) },
+      {
+        version: piProtocolVersion,
+        op: 'reply',
+        requestId: 'id',
+        binding,
+        payload: 'x'.repeat(17 * 1024 * 1024)
+      },
       binding
     )
   ).toBe(false)
-  expect(validEnvelope({ version: 1, op: 'unknown', requestId: 'id', binding }, binding)).toBe(
-    false
-  )
+  expect(
+    validEnvelope({ version: piProtocolVersion, op: 'unknown', requestId: 'id', binding }, binding)
+  ).toBe(false)
 })
 it('correlates real port requests and acknowledges cancellation', async function test() {
   const channel = new MessageChannel()
@@ -44,7 +53,7 @@ it('correlates real port requests and acknowledges cancellation', async function
   const right = createPeer(channel.port2, binding, { methods: ['echo', 'wait'], request })
   try {
     expect(await left.call('echo', { value: 3 })).toEqual({ value: 3 })
-    await expect(left.call('unknown')).rejects.toThrow('Unknown')
+    await expect(left.call('unknown')).rejects.toThrow('speaks a different protocol version')
     request.mockImplementationOnce(function wait() {
       return new Promise(function never() {})
     })
@@ -128,7 +137,12 @@ it('allows a cancellable request without a whole-operation deadline', async func
     ).toEqual(['request'])
     controller.abort()
     expect(sent.at(-1)?.op).toBe('cancel')
-    await peer.receive({ version: 1, binding, requestId: sent[0]!.requestId, op: 'cancelled' })
+    await peer.receive({
+      version: piProtocolVersion,
+      binding,
+      requestId: sent[0]!.requestId,
+      op: 'cancelled'
+    })
     await rejected
   } finally {
     peer.close()

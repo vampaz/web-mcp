@@ -2,6 +2,7 @@ import { MessageChannel } from 'node:worker_threads'
 import { afterEach, expect, it, vi } from 'vitest'
 import { createPiHarness } from './connection'
 import { createPeer } from './protocol'
+import { piProtocolVersion } from './interfaces/protocol'
 import type { PiConnect, PiEnvelope, PiPeer } from './interfaces/protocol'
 
 afterEach(function cleanup() {
@@ -104,6 +105,151 @@ it('keeps a healthy turn active beyond the individual RPC timeout', async functi
     expect(await outcome).toEqual({ status: 'completed' })
   } finally {
     finish?.()
+    await harness.destroy()
+    remote?.close()
+  }
+})
+
+it('registers the worker script under a protocol-versioned URL', async function test() {
+  vi.stubGlobal('MessageChannel', MessageChannel)
+  vi.stubGlobal('isSecureContext', true)
+  vi.stubGlobal('indexedDB', {})
+  let remote: PiPeer | undefined
+  const worker = Object.assign(new EventTarget(), {
+    state: 'activated',
+    postMessage(message: PiConnect | PiEnvelope, ports?: MessagePort[]) {
+      if (message.op === 'connect') {
+        remote = createPeer(ports![0], message.binding, {
+          methods: ['ready', 'destroy', 'stop', 'ping', 'send'],
+          async request(method) {
+            return method === 'ready' ? { state: 'idle', messages: [] } : null
+          }
+        })
+      } else void remote!.receive(message)
+    }
+  })
+  const registered: string[] = []
+  vi.stubGlobal('navigator', {
+    locks: {},
+    serviceWorker: {
+      async register(url: string) {
+        registered.push(url)
+        return { active: worker }
+      }
+    }
+  })
+  const harness = await createPiHarness({
+    session: { namespace: 'tests', ownerId: 'one', conversationId: 'chat' },
+    worker: { url: '/pi/worker.js', scope: '/pi/' },
+    resolver: {
+      name: 'test',
+      available: true,
+      status: 'ready',
+      detail: '',
+      async resolve() {
+        throw new Error('must not resolve')
+      }
+    },
+    host: {
+      async discover() {
+        return { revision: '1', tools: [] }
+      },
+      async context() {
+        return {}
+      },
+      async invoke() {
+        throw new Error('Unexpected tool')
+      }
+    }
+  })
+  try {
+    expect(registered).toHaveLength(1)
+    expect(registered[0]).toContain(`wmpcv=${piProtocolVersion}`)
+  } finally {
+    await harness.destroy()
+    remote?.close()
+  }
+})
+
+it('connects to a freshly updated worker instead of a stale active one', async function test() {
+  vi.stubGlobal('MessageChannel', MessageChannel)
+  vi.stubGlobal('isSecureContext', true)
+  vi.stubGlobal('indexedDB', {})
+  const stalePostMessage = vi.fn()
+  const stale = Object.assign(new EventTarget(), {
+    state: 'activated',
+    postMessage: stalePostMessage
+  })
+  let remote: PiPeer | undefined
+  const freshPostMessage = vi.fn(function post(
+    message: PiConnect | PiEnvelope,
+    ports?: MessagePort[]
+  ) {
+    if (message.op === 'connect') {
+      remote = createPeer(ports![0], message.binding, {
+        methods: ['ready', 'destroy', 'stop', 'ping', 'send'],
+        async request(method) {
+          if (method === 'ready') return { state: 'idle', messages: [] }
+          return null
+        }
+      })
+    } else void remote!.receive(message)
+  })
+  const fresh = Object.assign(new EventTarget(), {
+    state: 'installing',
+    postMessage: freshPostMessage
+  })
+  const registration = {
+    active: stale as unknown as ServiceWorker,
+    installing: undefined as ServiceWorker | undefined,
+    waiting: undefined as ServiceWorker | undefined,
+    async update() {
+      registration.installing = fresh as unknown as ServiceWorker
+      queueMicrotask(function activate() {
+        ;(fresh as unknown as { state: string }).state = 'activated'
+        registration.active = fresh as unknown as ServiceWorker
+        fresh.dispatchEvent(new Event('statechange'))
+      })
+      return registration
+    }
+  }
+  vi.stubGlobal('navigator', {
+    locks: {},
+    serviceWorker: {
+      async register() {
+        return registration
+      }
+    }
+  })
+  const harness = await createPiHarness({
+    session: { namespace: 'tests', ownerId: 'one', conversationId: 'chat' },
+    worker: { url: '/pi/worker.js', scope: '/pi/' },
+    resolver: {
+      name: 'test',
+      available: true,
+      capabilities: { conversation: true },
+      status: 'ready',
+      detail: '',
+      async resolve() {
+        throw new Error('must not resolve')
+      }
+    },
+    host: {
+      async discover() {
+        return { revision: '1', tools: [] }
+      },
+      async context() {
+        return {}
+      },
+      async invoke() {
+        throw new Error('Unexpected tool')
+      }
+    }
+  })
+  try {
+    expect(freshPostMessage).toHaveBeenCalled()
+    expect(stalePostMessage).not.toHaveBeenCalled()
+  } finally {
     await harness.destroy()
     remote?.close()
   }

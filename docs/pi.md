@@ -86,6 +86,8 @@ Run `npm run dev` for local development and open the HTTPS domain advertised by 
 
 Configure the page independently from the chat. Use Vite's base path for both the worker URL and scope, including deployments below paths such as `/nested/`:
 
+The page registers the worker script under a protocol-versioned URL and checks for a newer script before it connects. A browser that still holds an older worker script therefore fetches the current one instead of pairing a stale worker with a newer page. Application changes to the worker bundle are picked up by the same check, so the script must be served with revalidation headers.
+
 ```ts
 import { createRemoteResolver } from '@vampaz/webmcp-kit'
 import { createPiHarness } from '@vampaz/webmcp-kit/pi'

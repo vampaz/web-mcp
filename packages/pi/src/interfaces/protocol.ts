@@ -1,6 +1,14 @@
 import type { PiLimits, PiSession } from './session'
 import type { PiError } from './controller'
 
+/**
+ * Wire protocol version between the page and the Pi service worker. Bump it
+ * whenever the message contract changes. The page registers the worker script
+ * under a versioned URL, so a browser that still holds an older worker script
+ * never pairs it with a newer page.
+ */
+export const piProtocolVersion = 2
+
 export interface PiBinding {
   connectionId: string
   documentId: string
@@ -8,7 +16,7 @@ export interface PiBinding {
 }
 
 export interface PiConnect {
-  version: 1
+  version: typeof piProtocolVersion
   op: 'connect'
   requestId: string
   binding: PiBinding
@@ -17,7 +25,7 @@ export interface PiConnect {
 }
 
 export interface PiEnvelope {
-  version: 1
+  version: typeof piProtocolVersion
   binding: PiBinding
   requestId: string
   op: 'request' | 'reply' | 'event' | 'cancel' | 'cancelled'
