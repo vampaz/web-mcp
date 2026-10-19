@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { clearToolsForTest, listTools, type ToolPlanner } from '@vampaz/webmcp-kit'
+import { clearToolsForTest, listTools, type ToolResolver } from '@vampaz/webmcp-kit'
 import { createPiHarness, type PiController } from '@vampaz/webmcp-kit/pi'
 import { createDialogApproval, mountCounterAssistant } from '../../docs/examples/counter-assistant'
 
@@ -13,12 +13,12 @@ afterEach(function cleanup() {
   vi.resetAllMocks()
 })
 
-const planner: ToolPlanner = {
-  name: 'Unused test planner',
+const resolver: ToolResolver = {
+  name: 'Unused test resolver',
   available: true,
   status: 'ready',
   detail: 'Initialization is controlled by the test.',
-  async plan() {
+  async resolve() {
     throw new Error('This example lifecycle check must not run inference.')
   }
 }
@@ -28,7 +28,7 @@ function mount() {
     container: document.body,
     workerScope: '/webmcp-pi/',
     session: { namespace: 'docs', ownerId: 'test', conversationId: 'counter' },
-    planner,
+    resolver,
     approve() {
       return false
     },

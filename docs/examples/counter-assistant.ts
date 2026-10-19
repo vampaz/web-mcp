@@ -3,17 +3,17 @@ import {
   registerTool,
   type ConfirmationHandler,
   type ConfirmationTool,
-  type ToolPlanner
+  type ToolResolver
 } from '@vampaz/webmcp-kit'
 import { createPiHarness, type PiController, type PiSession } from '@vampaz/webmcp-kit/pi'
 import { defineWebMCPChat, type WebMCPChatElement } from '@vampaz/webmcp-kit/chat'
 
-// Call this in the browser. The host owns the planner and approval dialog.
+// Call this in the browser. The host owns the resolver and approval dialog.
 export function mountCounterAssistant(options: {
   container: HTMLElement
   workerScope: string
   session: PiSession
-  planner: ToolPlanner
+  resolver: ToolResolver
   approve: ConfirmationHandler
   onValue(value: number): void
 }) {
@@ -55,7 +55,7 @@ export function mountCounterAssistant(options: {
     try {
       const next = await createPiHarness({
         session: options.session,
-        planner: options.planner,
+        resolver: options.resolver,
         worker: { url: `${options.workerScope}worker.js`, scope: options.workerScope },
         context() {
           return { counter: value }

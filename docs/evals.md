@@ -1,17 +1,17 @@
 # WebMCP Evals
 
-WebMCP tools need normal deterministic tests and agent-facing evals. Deterministic tests prove that a tool validates input, enforces guards and confirmations, and updates app state correctly. Evals check whether a model or planner chooses the right tool, fills the right parameters, and completes the user journey.
+WebMCP tools need normal deterministic tests and agent-facing evals. Deterministic tests prove that a tool validates input, enforces guards and confirmations, and updates app state correctly. Evals check whether a model or resolver chooses the right tool, fills the right parameters, and completes the user journey.
 
-Use evals before exposing tools in production and whenever tool names, descriptions, schemas, or planner prompts change.
+Use evals before exposing tools in production and whenever tool names, descriptions, schemas, or resolver prompts change.
 
 ## What To Evaluate
 
-- Tool selection: given a user request, does the planner choose the intended tool?
-- Parameter extraction: does the planner produce schema-valid input with stable IDs from context?
+- Tool selection: given a user request, does the resolver choose the intended tool?
+- Parameter extraction: does the resolver produce schema-valid input with stable IDs from context?
 - Call order: for multi-step tasks, does each step happen in a sensible sequence?
 - Journey success: after execution, is the app in the expected state?
-- Ambiguity: when two tools look similar, does the planner still choose correctly?
-- Rejection: when a request is impossible or unsafe, does the planner avoid inventing parameters?
+- Ambiguity: when two tools look similar, does the resolver still choose correctly?
+- Rejection: when a request is impossible or unsafe, does the resolver avoid inventing parameters?
 
 ## Starter Cases
 
@@ -43,15 +43,15 @@ Commerce:
 - Expected input: `{ "query": "laptop stands" }`.
 - Success check: matching products are returned and no cart state changes.
 
-## Planner Helper API
+## Resolver Helper API
 
-For planner-only checks, import the helper API from `@vampaz/webmcp-kit/testing`:
+For resolver-only checks, import the helper API from `@vampaz/webmcp-kit/testing`:
 
 ```ts
-import { createHeuristicPlanner } from '@vampaz/webmcp-kit'
-import { runWebMCPPlannerEvals, runWebMCPPlannerEvalSuite } from '@vampaz/webmcp-kit/testing'
+import { createHeuristicResolver } from '@vampaz/webmcp-kit'
+import { runWebMCPResolverEvals, runWebMCPResolverEvalSuite } from '@vampaz/webmcp-kit/testing'
 
-const results = await runWebMCPPlannerEvals(createHeuristicPlanner(), tools, [
+const results = await runWebMCPResolverEvals(createHeuristicResolver(), tools, [
   {
     name: 'product search',
     message: 'Find laptop stands',
@@ -70,13 +70,13 @@ expect(
 ).toBe(true)
 ```
 
-The helper validates the returned plan against the available tool schemas before checking the expected tool and input. Use `runWebMCPPlannerEvalCase()` for one case when a test needs custom reporting.
+The helper validates the returned resolution against the available tool schemas before checking the expected tool and input. Use `runWebMCPResolverEvalCase()` for one case when a test needs custom reporting.
 
 ```ts
-interface WebMCPPlannerEvalCaseBase {
+interface WebMCPResolverEvalCaseBase {
   name: string
   message: string
-  context?: PlannerContext
+  context?: ResolverContext
   expectedInput?: Record<string, unknown>
   expectedInputSubset?: Record<string, unknown>
   expectedSteps?: Array<{
@@ -85,7 +85,7 @@ interface WebMCPPlannerEvalCaseBase {
   }>
 }
 
-type WebMCPPlannerEvalCase = WebMCPPlannerEvalCaseBase &
+type WebMCPResolverEvalCase = WebMCPResolverEvalCaseBase &
   (
     | { expectedToolName: string; expectedOutcome?: never }
     | {
@@ -97,10 +97,10 @@ type WebMCPPlannerEvalCase = WebMCPPlannerEvalCaseBase &
 
 Set exactly one of `expectedToolName` or `expectedOutcome` on each case. Pass at least one case to a suite; an empty suite has no evaluation signal.
 
-Use `runWebMCPPlannerEvalSuite()` when model output can vary. It repeats every case and applies a minimum pass-rate threshold while retaining the individual plans, errors, and durations in a serializable summary.
+Use `runWebMCPResolverEvalSuite()` when model output can vary. It repeats every case and applies a minimum pass-rate threshold while retaining the individual resolutions, errors, and durations in a serializable summary.
 
 ```ts
-const summary = await runWebMCPPlannerEvalSuite(planner, tools, cases, {
+const summary = await runWebMCPResolverEvalSuite(resolver, tools, cases, {
   runsPerCase: 5,
   minimumPassRate: 0.8
 })
@@ -109,16 +109,16 @@ expect(summary.passed).toBe(true)
 console.log(JSON.stringify(summary, null, 2))
 ```
 
-For chained plans, use `expectedSteps` to check tool order and important input fields. Still add an end-to-end test that invokes the plan and asserts the final app state.
+For chained resolutions, use `expectedSteps` to check tool order and important input fields. Still add an end-to-end test that invokes the resolution and asserts the final app state.
 
 ## Failure Signals
 
 Treat these as eval failures, not just warnings:
 
-- The planner picks a mutating tool when a read-only tool answers the request.
-- The planner skips a required lookup step and invents IDs.
-- The planner calls tools in an order that makes later steps unavailable.
-- The planner emits input that only passes because the tool is overly permissive.
-- A tool description overlaps another tool enough that the planner frequently chooses either one.
+- The resolver picks a mutating tool when a read-only tool answers the request.
+- The resolver skips a required lookup step and invents IDs.
+- The resolver calls tools in an order that makes later steps unavailable.
+- The resolver emits input that only passes because the tool is overly permissive.
+- A tool description overlaps another tool enough that the resolver frequently chooses either one.
 
 These cases usually mean the tool strategy needs tightening: rename the tool, clarify the description, make the schema more specific, add enum values, or expose/hide tools based on current state.

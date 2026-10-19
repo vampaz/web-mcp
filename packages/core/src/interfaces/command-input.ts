@@ -1,17 +1,17 @@
 import type {
-  PlannerContext,
-  PlannerProviderConfig,
-  PlannerProviderKind,
+  ResolverContext,
+  ResolverProviderConfig,
+  ResolverProviderKind,
   ToolInvocationResult,
-  ToolPlan,
-  ToolPlanStep,
-  ToolPlanner
+  ToolResolution,
+  ToolResolutionStep,
+  ToolResolver
 } from './tool'
 
 export type WebMCPCommandInputPhase =
   | 'idle'
   | 'preparing'
-  | 'planning'
+  | 'resolving'
   | 'executing'
   | 'completed'
   | 'failed'
@@ -19,26 +19,26 @@ export type WebMCPCommandInputPhase =
 export interface WebMCPCommandInputEndpointOption {
   label: string
   model?: string
-  provider: PlannerProviderKind
+  provider: ResolverProviderKind
 }
 
-export interface WebMCPCommandInputPlannerModelOption {
+export interface WebMCPCommandInputResolverModelOption {
   label: string
   model: string
 }
 
-export interface WebMCPCommandInputPlannerCreateOptions {
+export interface WebMCPCommandInputResolverCreateOptions {
   model?: string
-  modelOption?: WebMCPCommandInputPlannerModelOption
+  modelOption?: WebMCPCommandInputResolverModelOption
 }
 
-export interface WebMCPCommandInputPlannerOption {
-  createPlanner: (
-    options?: WebMCPCommandInputPlannerCreateOptions
-  ) => Promise<ToolPlanner> | ToolPlanner
+export interface WebMCPCommandInputResolverOption {
+  createResolver: (
+    options?: WebMCPCommandInputResolverCreateOptions
+  ) => Promise<ToolResolver> | ToolResolver
   id: string
   label: string
-  modelOptions?: WebMCPCommandInputPlannerModelOption[]
+  modelOptions?: WebMCPCommandInputResolverModelOption[]
 }
 
 export interface WebMCPCommandInputConfigureOptions {
@@ -46,20 +46,20 @@ export interface WebMCPCommandInputConfigureOptions {
   authMode?: 'none' | 'server' | 'user-key'
   baseUrl?: string
   buttonLabel?: string
-  context?: PlannerContext | (() => PlannerContext)
+  context?: ResolverContext | (() => ResolverContext)
   disabled?: boolean
   endpoint?: string
   endpointOptions?: WebMCPCommandInputEndpointOption[]
   floating?: boolean
   initialModel?: string
-  initialPlannerOptionId?: string
-  initialProvider?: PlannerProviderKind
+  initialResolverOptionId?: string
+  initialProvider?: ResolverProviderKind
   model?: string
   placeholder?: string
-  planner?: ToolPlanner
-  plannerConfig?: PlannerProviderConfig
-  plannerOptions?: WebMCPCommandInputPlannerOption[]
-  provider?: PlannerProviderKind
+  resolver?: ToolResolver
+  resolverConfig?: ResolverProviderConfig
+  resolverOptions?: WebMCPCommandInputResolverOption[]
+  provider?: ResolverProviderKind
   settingsOpen?: boolean
   showChromeAI?: boolean
 }
@@ -69,7 +69,7 @@ export interface WebMCPCommandInputElement extends HTMLElement {
   authMode?: 'none' | 'server' | 'user-key'
   baseUrl?: string
   buttonLabel?: string
-  context?: PlannerContext | (() => PlannerContext)
+  context?: ResolverContext | (() => ResolverContext)
   disabled: boolean
   endpoint?: string
   endpointOptions?: WebMCPCommandInputEndpointOption[]
@@ -77,10 +77,10 @@ export interface WebMCPCommandInputElement extends HTMLElement {
   model?: string
   panelOpen: boolean
   placeholder: string
-  planner?: ToolPlanner
-  plannerConfig?: PlannerProviderConfig
-  plannerOptions?: WebMCPCommandInputPlannerOption[]
-  provider?: PlannerProviderKind
+  resolver?: ToolResolver
+  resolverConfig?: ResolverProviderConfig
+  resolverOptions?: WebMCPCommandInputResolverOption[]
+  provider?: ResolverProviderKind
   showChromeAI?: boolean
   closePanel: () => void
   configure: (options: WebMCPCommandInputConfigureOptions) => void
@@ -96,19 +96,19 @@ export interface WebMCPCommandInputRunOptions {
   signal?: AbortSignal
 }
 
-export interface WebMCPCommandPlanEventDetail {
+export interface WebMCPCommandResolutionEventDetail {
   message: string
-  plan: ToolPlan
-  planner: ToolPlanner
+  resolution: ToolResolution
+  resolver: ToolResolver
 }
 
-export interface WebMCPCommandPlannerEventDetail {
-  planner: ToolPlanner
+export interface WebMCPCommandResolverEventDetail {
+  resolver: ToolResolver
 }
 
 export interface WebMCPCommandResultEventDetail {
   message: string
-  plan: ToolPlan
+  resolution: ToolResolution
   result: ToolInvocationResult
 }
 
@@ -119,9 +119,9 @@ export interface WebMCPCommandPanelToggleEventDetail {
 export interface WebMCPCommandStepEventDetail {
   message: string
   phase: 'started' | 'completed'
-  plan: ToolPlan
+  resolution: ToolResolution
   result?: ToolInvocationResult
-  step: ToolPlanStep
+  step: ToolResolutionStep
   stepCount: number
   stepIndex: number
 }

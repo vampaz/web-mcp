@@ -30,22 +30,22 @@ Fallback mode keeps tools in an in-memory registry. It is useful for:
 - local demos
 - devtools inspection
 - Playwright tests
-- provider planning experiments
+- provider resolution experiments
 - catalog exports
 
 Fallback mode exposes tools to application-controlled callers, including production assistants, devtools, and tests. It does not enable native browser-agent discovery in a browser that lacks WebMCP.
 
 ## Chrome Built-In AI
 
-The kit's Chrome planner uses `window.LanguageModel` when available. It declares English text input and output. The local lab uses its configured LM Studio model; it does not automatically switch to browser AI.
+The kit's Chrome resolver uses `window.LanguageModel` when available. It declares English text input and output. The local lab uses its configured LM Studio model; it does not automatically switch to browser AI.
 
 The command input adds Chrome built-in AI to the provider selector when the browser exposes an available `LanguageModel` API. Consumers can hide that option with `showChromeAI: false`.
 
-The automatic planner uses local heuristics when Chrome AI is unavailable. Downloadable or downloading Chrome models remain selected and initialize from a user command. Non-strict Chrome planning can fall back to heuristics on failure. Explicit Chrome selection and strict conversational planning report failure without substituting another provider.
+The automatic resolver uses local heuristics when Chrome AI is unavailable. Downloadable or downloading Chrome models remain selected and initialize from a user command. Non-strict Chrome resolution can fall back to heuristics on failure. Explicit Chrome selection and strict conversational resolution report failure without substituting another provider.
 
 ## Application-Owned Browser Models
 
-An application can configure the command input with a custom browser-local planner. For example, a WebLLM integration owns its model download and WebGPU requirements. The application installs that dependency and passes a `ToolPlanner` to the kit. WebMCP Kit does not bundle WebLLM or download a model on import.
+An application can configure the command input with a custom browser-local resolver. For example, a WebLLM integration owns its model download and WebGPU requirements. The application installs that dependency and passes a `ToolResolver` to the kit. WebMCP Kit does not bundle WebLLM or download a model on import.
 
 ## Inspecting Tools
 

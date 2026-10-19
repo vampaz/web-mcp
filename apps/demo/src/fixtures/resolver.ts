@@ -1,13 +1,13 @@
-import type { ToolPlan, ToolPlanner } from '@vampaz/webmcp-kit'
+import type { ToolResolution, ToolResolver } from '@vampaz/webmcp-kit'
 
-export function createFixturePlanner(): ToolPlanner {
+export function createFixtureResolver(): ToolResolver {
   return {
     name: 'Deterministic test fixture (not model evidence)',
     capabilities: { conversation: true },
     available: true,
     status: 'ready',
     detail: 'Fault injection fixture.',
-    async plan(message, _tools, context, options): Promise<ToolPlan> {
+    async resolve(message, _tools, context, options): Promise<ToolResolution> {
       message = message.split('\n\n')[0]
       if (message === 'wait')
         await new Promise<void>(function wait(_resolve, reject) {

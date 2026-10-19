@@ -4,7 +4,7 @@
 
 ## Components and ownership
 
-The application owns tools, state, authorization, approvals, model configuration, and lifecycle. The kit supplies registration, validation, transport, persistence, and optional interfaces. A planner proposes an action; only application code executes it.
+The application owns tools, state, authorization, approvals, model configuration, and lifecycle. The kit supplies registration, validation, transport, persistence, and optional interfaces. A resolver proposes an action; only application code executes it.
 
 ```mermaid
 flowchart TB
@@ -14,7 +14,7 @@ flowchart TB
   Worker[Dedicated Pi service worker]
   Storage[(IndexedDB conversation log)]
   Lock[Web Lock for the conversation]
-  Planner[Application-configured planner]
+  Resolver[Application-configured resolver]
   Model[Browser AI or application model endpoint]
   Registry[Core registry and invocation pipeline]
   App[Application state and authenticated services]
@@ -24,9 +24,9 @@ flowchart TB
   Page <-->|Bound MessageChannel and worker messages| Worker
   Worker --> Lock
   Worker --> Storage
-  Worker -->|Plan one next action| Page
-  Page --> Planner
-  Planner --> Model
+  Worker -->|Resolution one next action| Page
+  Page --> Resolver
+  Resolver --> Model
   Worker -->|Invoke one action| Page
   Page --> Registry
   Native --> Registry
@@ -35,7 +35,7 @@ flowchart TB
 
 | Surface           | Responsibility                                                                                    | Starts work on import?                                     |
 | ----------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Core              | Definitions, registry, native adapter, invocation, planners, command input, diagnostics           | No automatic tool registration or inference                |
+| Core              | Definitions, registry, native adapter, invocation, resolvers, command input, diagnostics          | No automatic tool registration or inference                |
 | `/pi`             | `createPiHarness`, current-context `createPiRuntime`, registry tool host, public controller types | No worker, storage, or model request                       |
 | `/pi/worker`      | Installs the worker message protocol and persistent runtime                                       | Only after `installPiServiceWorker()`                      |
 | `/chat`           | Text-only transcript and controls bound to a supplied controller                                  | Only after defining, mounting, and configuring the element |
@@ -52,7 +52,7 @@ sequenceDiagram
   participant Page as Page controller
   participant Pi as Pi runtime
   participant DB as IndexedDB
-  participant Planner as Configured planner
+  participant Resolver as Configured resolver
   participant Tools as Core and application
   User->>UI: Send a message
   UI->>Page: send(text)
@@ -62,10 +62,10 @@ sequenceDiagram
   loop Until reply, failure, cancellation, or limit
     Pi->>Page: Discover tools and read current safe context
     Page-->>Pi: Catalog revision and context
-    Pi->>Page: Plan exactly one next action
-    Page->>Planner: plan(..., singleStep, signal, maxRequestBytes)
-    Planner-->>Page: Validated action or text reply
-    Page-->>Pi: Planning result
+    Pi->>Page: Resolution exactly one next action
+    Page->>Resolver: resolve(..., singleStep, signal, maxRequestBytes)
+    Resolver-->>Page: Validated action or text reply
+    Page-->>Pi: Resolving result
     alt Application action
       Pi->>Page: invoke(name, input, catalog revision)
       Page->>Tools: Validate input and current availability
@@ -89,9 +89,9 @@ sequenceDiagram
   Pi-->>Page: completed, interrupted, or error
 ```
 
-The runtime never predicts the result of an unfinished action. After a successful action, it discovers tools again. An action that opens an editor can expose a save tool for the next round. A catalog change during planning rejects the old action. Core also rechecks registration identity, schema, scope, and cancellation after approval and guards.
+The runtime never predicts the result of an unfinished action. After a successful action, it discovers tools again. An action that opens an editor can expose a save tool for the next round. A catalog change during resolution rejects the old action. Core also rechecks registration identity, schema, scope, and cancellation after approval and guards.
 
-The standalone command input has a different contract: it can execute a validated sequence of up to five planned steps. Pi always requests one next action and replans from actual results. Heuristic fallback is available for ordinary commands; the conversational runtime requires an available planner with `capabilities.conversation === true`.
+The standalone command input has a different contract: it can execute a validated sequence of up to five resolved steps. Pi always requests one next action and re-resolves from actual results. Heuristic fallback is available for ordinary commands; the conversational runtime requires an available resolver with `capabilities.conversation === true`.
 
 ## State and cancellation
 
@@ -118,7 +118,7 @@ stateDiagram-v2
 
 Initialization can reject before a controller exists. `send()` reports its outcome as data; callers must inspect the returned status. `stop()` and `clear()` can reject on transport or storage failures. Closing the popup only hides the view. Removing the element unsubscribes the view. Neither action destroys the controller.
 
-Stop aborts planning and pending approval. It cannot undo an action that already reached the application or server. A lost reply can leave the action's outcome unknown. The runtime does not automatically retry the turn. Heartbeats apply only to the connection and turn that initiated them; a late failure cannot cancel a later turn.
+Stop aborts resolution and pending approval. It cannot undo an action that already reached the application or server. A lost reply can leave the action's outcome unknown. The runtime does not automatically retry the turn. Heartbeats apply only to the connection and turn that initiated them; a late failure cannot cancel a later turn.
 
 ## Persistence and recovery
 

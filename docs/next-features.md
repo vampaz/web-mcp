@@ -1,6 +1,6 @@
 # Next Features: Making WebMCP Kit Really Usable
 
-This roadmap starts from the current implementation. The first foundation layer is now in place: runtime input and output validation, Zod tool definitions, Vue/React/Svelte helpers, app-level confirmation handlers, scope-aware planning, bounded tool sequences, explicit planner outcomes, server-backed tools, and repeatable planner eval suites.
+This roadmap starts from the current implementation. The first foundation layer is now in place: runtime input and output validation, Zod tool definitions, Vue/React/Svelte helpers, app-level confirmation handlers, scope-aware tool selection, bounded tool sequences, explicit resolver outcomes, server-backed tools, and repeatable resolver eval suites.
 
 This file contains proposals, not additional exports. Version `0.2.0` adds the implemented [Pi](./pi.md) and [chat](./chat.md) surfaces. Use the [API reference](./api-reference.md) to distinguish implemented APIs from the illustrative proposals below.
 
@@ -13,21 +13,21 @@ These capabilities are part of the current API and should be treated as baseline
 - `defineZodTool()` is available from `@vampaz/webmcp-kit/zod` for single-source schema and TypeScript inference.
 - Vue, React, and Svelte helpers register tools with lifecycle cleanup and return `{ unregister, getRegistration }`.
 - `setConfirmationHandler()` lets apps provide their own approval UI, with `window.confirm()` as the browser fallback.
-- The command input excludes scope-unavailable tools before asking a planner to choose an action.
-- Planners can return a single tool, a bounded `tool_sequence`, `needs_clarification`, or `no_tools_match`.
+- The command input excludes scope-unavailable tools before asking a resolver to choose an action.
+- Resolvers can return a single tool, a bounded `tool_sequence`, `needs_clarification`, or `no_tools_match`.
 - `defineServerTool()` lets browser-visible tools delegate execution to an app-owned server endpoint.
-- Planner eval helpers, including repeated runs and minimum pass-rate summaries, are available from `@vampaz/webmcp-kit/testing`.
+- Resolver eval helpers, including repeated runs and minimum pass-rate summaries, are available from `@vampaz/webmcp-kit/testing`.
 
-## Tier 1 - Planner Reliability
+## Tier 1 - Resolver Reliability
 
 ### 1. Richer Agent-Loop Semantics
 
-**Current state**: The command input supports bounded tool sequencing. A planner can return `toolName: "tool_sequence"` with ordered `steps`; each step is validated, executed in order, and still uses the normal scope, confirmation, guard, and execution path. Pi already replans from actual tool results one action at a time. The proposal below concerns explicit data references inside a preplanned command sequence.
+**Current state**: The command input supports bounded tool sequencing. A resolver can return `toolName: "tool_sequence"` with ordered `steps`; each step is validated, executed in order, and still uses the normal scope, confirmation, guard, and execution path. Pi already re-resolves from actual tool results one action at a time. The proposal below concerns explicit data references inside a pre-resolved command sequence.
 
 **Needed**: Later steps should be able to consume earlier tool outputs in a typed, inspectable way.
 
 ```ts
-interface ToolPlanStep {
+interface ToolResolutionStep {
   toolName: string
   input: Record<string, unknown>
   confidence: number
@@ -36,7 +36,7 @@ interface ToolPlanStep {
 }
 ```
 
-This would let a workflow search for a product, pass the selected product ID to `add_to_cart`, then call `checkout_cart` without asking the planner to invent intermediate IDs.
+This would let a workflow search for a product, pass the selected product ID to `add_to_cart`, then call `checkout_cart` without asking the resolver to invent intermediate IDs.
 
 ### 2. Structured Error Responses
 
@@ -51,11 +51,11 @@ class WebMCPToolError extends Error {
 }
 ```
 
-Planner and eval tools could then classify failures without parsing prose.
+Resolver and eval tools could then classify failures without parsing prose.
 
-### 3. Better Planner Outcome UX
+### 3. Better Resolver Outcome UX
 
-**Current state**: `needs_clarification` and `no_tools_match` are valid planner outcomes, and the command input returns blocked or unavailable results for them.
+**Current state**: `needs_clarification` and `no_tools_match` are valid resolver outcomes, and the command input returns blocked or unavailable results for them.
 
 **Needed**: First-class UI affordances for clarification prompts and unsupported requests, including event detail that lets apps render a reply, collect missing fields, and rerun the command.
 
@@ -63,7 +63,7 @@ Planner and eval tools could then classify failures without parsing prose.
 
 ### 4. Tool Composition and Recipes
 
-**Current state**: Tools are atomic, and planners can compose short sequences dynamically.
+**Current state**: Tools are atomic, and resolvers can compose short sequences dynamically.
 
 **Needed**: A `defineRecipe()` helper that makes common workflows explicit and discoverable.
 
@@ -145,9 +145,9 @@ This would help multi-page apps, documentation, and pre-navigation agent workflo
 | Streaming tool results              | The execute-then-return model is enough for most current workflows. Revisit when browser WebMCP streaming semantics stabilize. |
 | Cross-tab/origin tool orchestration | Tools should remain page-scoped for now.                                                                                       |
 | Built-in rate limiting              | Policy belongs to the app. Provide hooks and metrics first.                                                                    |
-| Tool-to-OpenAPI generator           | Useful, but secondary to planner reliability and workflow authoring.                                                           |
+| Tool-to-OpenAPI generator           | Useful, but secondary to resolver reliability and workflow authoring.                                                          |
 | Visual tool builder / no-code       | The kit is aimed at developers integrating existing apps.                                                                      |
 
 ## Summary
 
-The next useful layer is planner reliability: output-aware sequences, structured errors, and clearer clarification UX. After that, recipes, undo, observability, and manifests make WebMCP Kit easier to operate in larger applications.
+The next useful layer is resolver reliability: output-aware sequences, structured errors, and clearer clarification UX. After that, recipes, undo, observability, and manifests make WebMCP Kit easier to operate in larger applications.

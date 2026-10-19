@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { validateToolPlan } from './plan-validation'
+import { validateToolResolution } from './resolution-validation'
 
-describe('tool plan validation', () => {
+describe('tool resolution validation', () => {
   const tools = [
     {
       name: 'select_items',
@@ -22,9 +22,9 @@ describe('tool plan validation', () => {
     }
   ]
 
-  it('validates single tool plans against the selected tool schema', () => {
-    expect(function validateInvalidPlan() {
-      validateToolPlan(
+  it('validates single tool resolutions against the selected tool schema', () => {
+    expect(function validateInvalidResolution() {
+      validateToolResolution(
         {
           toolName: 'select_items',
           input: {},
@@ -37,14 +37,14 @@ describe('tool plan validation', () => {
   })
 
   it('accepts unknown values so callers can validate untrusted provider output', () => {
-    expect(function validateUnknownPlan() {
-      validateToolPlan('not a plan', tools)
-    }).toThrow('provider returned an invalid plan')
+    expect(function validateUnknownResolution() {
+      validateToolResolution('not a resolution', tools)
+    }).toThrow('provider returned an invalid resolution')
   })
 
   it('rejects non-finite confidence values', () => {
-    expect(function validateInvalidConfidencePlan() {
-      validateToolPlan(
+    expect(function validateInvalidConfidenceResolution() {
+      validateToolResolution(
         {
           toolName: 'select_items',
           input: { ids: [] },
@@ -53,12 +53,12 @@ describe('tool plan validation', () => {
         },
         tools
       )
-    }).toThrow('provider returned a plan without numeric confidence')
+    }).toThrow('provider returned a resolution without numeric confidence')
   })
 
-  it('accepts planner outcome plans without registered tools', () => {
-    expect(function validateNoMatchPlan() {
-      validateToolPlan(
+  it('accepts resolver outcome resolutions without registered tools', () => {
+    expect(function validateNoMatchResolution() {
+      validateToolResolution(
         {
           toolName: 'no_tools_match',
           input: {},
@@ -70,9 +70,9 @@ describe('tool plan validation', () => {
     }).not.toThrow()
   })
 
-  it('rejects planner outcomes that include executable steps', () => {
+  it('rejects resolver outcomes that include executable steps', () => {
     expect(function validateOutcomeWithSteps() {
-      validateToolPlan(
+      validateToolResolution(
         {
           toolName: 'needs_clarification',
           input: {},
@@ -89,12 +89,12 @@ describe('tool plan validation', () => {
         },
         tools
       )
-    }).toThrow('provider returned a planner outcome with steps')
+    }).toThrow('provider returned a resolver outcome with steps')
   })
 
   it('validates tool sequences with server-style messages', () => {
-    expect(function validateInvalidServerPlan() {
-      validateToolPlan(
+    expect(function validateInvalidServerResolution() {
+      validateToolResolution(
         {
           toolName: 'tool_sequence',
           input: {},

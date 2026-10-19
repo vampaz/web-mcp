@@ -1,15 +1,15 @@
-import type { PlannerProviderConfig, PlannerProviderKind, ToolPlanner } from './interfaces/tool'
+import type { ResolverProviderConfig, ResolverProviderKind, ToolResolver } from './interfaces/tool'
 import type {
   WebMCPCommandInputEndpointOption,
-  WebMCPCommandInputPlannerModelOption,
-  WebMCPCommandInputPlannerOption
+  WebMCPCommandInputResolverModelOption,
+  WebMCPCommandInputResolverOption
 } from './interfaces/command-input'
 import {
-  createBestPlanner,
-  createChromeAIPlanner,
-  createConfiguredPlanner,
-  createHeuristicPlanner
-} from './planner'
+  createBestResolver,
+  createChromeAIResolver,
+  createConfiguredResolver,
+  createHeuristicResolver
+} from './resolver'
 import { escapeAttribute } from './command-input-html'
 
 type ModelOption = {
@@ -23,37 +23,37 @@ type ProviderOption = {
 }
 
 export const defaultModel = ''
-export const defaultEndpoint = '/api/webmcp/plan'
-export const plannerOptionValuePrefix = 'planner:'
+export const defaultEndpoint = '/api/webmcp/resolve'
+export const resolverOptionValuePrefix = 'resolver:'
 
-export async function createCommandInputPlanner(
-  config: PlannerProviderConfig | undefined
-): Promise<ToolPlanner> {
-  if (!config) return createBestPlanner()
-  if (config.provider === 'chrome-built-in') return createChromeAIPlanner(true)
-  if (config.provider === 'local') return createHeuristicPlanner()
+export async function createCommandInputResolver(
+  config: ResolverProviderConfig | undefined
+): Promise<ToolResolver> {
+  if (!config) return createBestResolver()
+  if (config.provider === 'chrome-built-in') return createChromeAIResolver(true)
+  if (config.provider === 'local') return createHeuristicResolver()
 
-  return createConfiguredPlanner(config)
+  return createConfiguredResolver(config)
 }
 
 export function getProviderControlMarkup(
   provider: string,
   endpointOptions?: WebMCPCommandInputEndpointOption[],
   includeChromeAI = false,
-  plannerOptions?: WebMCPCommandInputPlannerOption[]
+  resolverOptions?: WebMCPCommandInputResolverOption[]
 ): string {
   return `
     <label>
       <span>Provider</span>
       <select data-provider>
-        ${getProviderOptionsMarkup(provider, endpointOptions, includeChromeAI, plannerOptions)}
+        ${getProviderOptionsMarkup(provider, endpointOptions, includeChromeAI, resolverOptions)}
       </select>
     </label>
   `
 }
 
 export function getOptionsStatusText(
-  provider: PlannerProviderKind,
+  provider: ResolverProviderKind,
   model: string,
   endpointOptions?: WebMCPCommandInputEndpointOption[]
 ): string {
@@ -63,18 +63,18 @@ export function getOptionsStatusText(
   return `${getProviderLabel(provider)} · ${modelLabel}`
 }
 
-export function getPlannerOptionStatusText(
-  plannerOption: WebMCPCommandInputPlannerOption,
+export function getResolverOptionStatusText(
+  resolverOption: WebMCPCommandInputResolverOption,
   model: string
 ): string {
-  const modelLabel = getPlannerOptionModelLabel(plannerOption, model)
-  if (!modelLabel) return plannerOption.label
+  const modelLabel = getResolverOptionModelLabel(resolverOption, model)
+  if (!modelLabel) return resolverOption.label
 
-  return `${plannerOption.label} · ${modelLabel}`
+  return `${resolverOption.label} · ${modelLabel}`
 }
 
 export function getModelControlMarkup(
-  provider: PlannerProviderKind,
+  provider: ResolverProviderKind,
   model: string,
   endpointOptions?: WebMCPCommandInputEndpointOption[]
 ): string {
@@ -90,22 +90,22 @@ export function getModelControlMarkup(
   `
 }
 
-export function getPlannerOptionModelControlMarkup(
-  plannerOption: WebMCPCommandInputPlannerOption,
+export function getResolverOptionModelControlMarkup(
+  resolverOption: WebMCPCommandInputResolverOption,
   model: string
 ): string {
   return `
     <label>
       <span>Model</span>
       <select data-model>
-        ${getModelOptionsMarkup(getPlannerOptionModelOptions(plannerOption), model)}
+        ${getModelOptionsMarkup(getResolverOptionModelOptions(resolverOption), model)}
       </select>
     </label>
   `
 }
 
 export function getDefaultModelForProvider(
-  provider: PlannerProviderKind,
+  provider: ResolverProviderKind,
   endpointOptions?: WebMCPCommandInputEndpointOption[]
 ): string {
   const configuredOption = getConfiguredEndpointOptions(provider, endpointOptions)[0]
@@ -113,42 +113,42 @@ export function getDefaultModelForProvider(
   return ''
 }
 
-export function getDefaultModelForPlannerOption(
-  plannerOption: WebMCPCommandInputPlannerOption | undefined
+export function getDefaultModelForResolverOption(
+  resolverOption: WebMCPCommandInputResolverOption | undefined
 ): string {
-  return getPlannerOptionModelOptions(plannerOption)[0]?.value ?? ''
+  return getResolverOptionModelOptions(resolverOption)[0]?.value ?? ''
 }
 
 export function getDefaultProvider(
   endpointOptions?: WebMCPCommandInputEndpointOption[],
   includeChromeAI = false
-): PlannerProviderKind {
+): ResolverProviderKind {
   if (includeChromeAI) return 'chrome-built-in'
   return endpointOptions?.[0]?.provider ?? 'auto'
 }
 
 export function getModelOptionCount(
-  provider: PlannerProviderKind,
+  provider: ResolverProviderKind,
   endpointOptions?: WebMCPCommandInputEndpointOption[]
 ): number {
   return getConfiguredEndpointOptions(provider, endpointOptions).length
 }
 
-export function getPlannerOptionModelOptionCount(
-  plannerOption: WebMCPCommandInputPlannerOption | undefined
+export function getResolverOptionModelOptionCount(
+  resolverOption: WebMCPCommandInputResolverOption | undefined
 ): number {
-  return getPlannerOptionModelOptions(plannerOption).length
+  return getResolverOptionModelOptions(resolverOption).length
 }
 
 export function getProviderOptionCount(
   endpointOptions?: WebMCPCommandInputEndpointOption[],
   includeChromeAI = false,
-  plannerOptions?: WebMCPCommandInputPlannerOption[]
+  resolverOptions?: WebMCPCommandInputResolverOption[]
 ): number {
-  return getConfiguredProviderOptions(endpointOptions, includeChromeAI, plannerOptions).length
+  return getConfiguredProviderOptions(endpointOptions, includeChromeAI, resolverOptions).length
 }
 
-export function isPlannerAttribute(name: string): boolean {
+export function isResolverAttribute(name: string): boolean {
   return (
     name === 'api-key' ||
     name === 'auth-mode' ||
@@ -163,7 +163,7 @@ export function isAuthMode(value: unknown): value is 'none' | 'server' | 'user-k
   return value === 'none' || value === 'server' || value === 'user-key'
 }
 
-export function isPlannerProviderKind(value: unknown): value is PlannerProviderKind {
+export function isResolverProviderKind(value: unknown): value is ResolverProviderKind {
   return (
     value === 'auto' ||
     value === 'chrome-built-in' ||
@@ -175,29 +175,29 @@ export function isPlannerProviderKind(value: unknown): value is PlannerProviderK
   )
 }
 
-export function getPlannerOptionValue(id: string): string {
-  return `${plannerOptionValuePrefix}${id}`
+export function getResolverOptionValue(id: string): string {
+  return `${resolverOptionValuePrefix}${id}`
 }
 
-export function getPlannerOptionId(value: string): string | undefined {
-  if (!value.startsWith(plannerOptionValuePrefix)) return undefined
-  return value.slice(plannerOptionValuePrefix.length) || undefined
+export function getResolverOptionId(value: string): string | undefined {
+  if (!value.startsWith(resolverOptionValuePrefix)) return undefined
+  return value.slice(resolverOptionValuePrefix.length) || undefined
 }
 
 function getProviderOptionsMarkup(
   provider: string,
   endpointOptions?: WebMCPCommandInputEndpointOption[],
   includeChromeAI = false,
-  plannerOptions?: WebMCPCommandInputPlannerOption[]
+  resolverOptions?: WebMCPCommandInputResolverOption[]
 ): string {
-  return getConfiguredProviderOptions(endpointOptions, includeChromeAI, plannerOptions)
+  return getConfiguredProviderOptions(endpointOptions, includeChromeAI, resolverOptions)
     .map(function mapProviderOption(option) {
       return `<option value="${escapeAttribute(option.value)}" ${option.value === provider ? 'selected' : ''}>${escapeAttribute(option.label)}</option>`
     })
     .join('')
 }
 
-function getProviderLabel(provider: PlannerProviderKind): string {
+function getProviderLabel(provider: ResolverProviderKind): string {
   if (provider === 'auto') return 'Auto'
   if (provider === 'chrome-built-in') return 'Chrome built-in AI'
   if (provider === 'local') return 'Local deterministic'
@@ -209,7 +209,7 @@ function getProviderLabel(provider: PlannerProviderKind): string {
 }
 
 function getModelLabel(
-  provider: PlannerProviderKind,
+  provider: ResolverProviderKind,
   model: string,
   endpointOptions?: WebMCPCommandInputEndpointOption[]
 ): string | undefined {
@@ -220,12 +220,12 @@ function getModelLabel(
   return option?.label ?? model
 }
 
-function getPlannerOptionModelLabel(
-  plannerOption: WebMCPCommandInputPlannerOption,
+function getResolverOptionModelLabel(
+  resolverOption: WebMCPCommandInputResolverOption,
   model: string
 ): string | undefined {
   if (!model) return undefined
-  const option = getPlannerOptionModelOptions(plannerOption).find(function findModelOption(item) {
+  const option = getResolverOptionModelOptions(resolverOption).find(function findModelOption(item) {
     return item.value === model
   })
   return option?.label ?? model
@@ -240,17 +240,17 @@ function getModelOptionsMarkup(options: ModelOption[], model: string): string {
 }
 
 function getModelOptions(
-  provider: PlannerProviderKind,
+  provider: ResolverProviderKind,
   endpointOptions?: WebMCPCommandInputEndpointOption[]
 ): ModelOption[] {
   return getConfiguredEndpointOptions(provider, endpointOptions)
 }
 
-function getPlannerOptionModelOptions(
-  plannerOption: WebMCPCommandInputPlannerOption | undefined
+function getResolverOptionModelOptions(
+  resolverOption: WebMCPCommandInputResolverOption | undefined
 ): ModelOption[] {
-  return (plannerOption?.modelOptions ?? []).map(function mapPlannerOptionModel(
-    option: WebMCPCommandInputPlannerModelOption
+  return (resolverOption?.modelOptions ?? []).map(function mapResolverOptionModel(
+    option: WebMCPCommandInputResolverModelOption
   ) {
     return {
       label: option.label,
@@ -260,7 +260,7 @@ function getPlannerOptionModelOptions(
 }
 
 function getConfiguredEndpointOptions(
-  provider: PlannerProviderKind,
+  provider: ResolverProviderKind,
   endpointOptions: WebMCPCommandInputEndpointOption[] | undefined
 ): ModelOption[] {
   return (endpointOptions ?? [])
@@ -278,7 +278,7 @@ function getConfiguredEndpointOptions(
 function getConfiguredProviderOptions(
   endpointOptions: WebMCPCommandInputEndpointOption[] | undefined,
   includeChromeAI = false,
-  plannerOptions?: WebMCPCommandInputPlannerOption[]
+  resolverOptions?: WebMCPCommandInputResolverOption[]
 ): ProviderOption[] {
   const providers: ProviderOption[] = []
   if (includeChromeAI) {
@@ -288,10 +288,10 @@ function getConfiguredProviderOptions(
     })
   }
 
-  for (const option of plannerOptions ?? []) {
+  for (const option of resolverOptions ?? []) {
     providers.push({
       label: option.label,
-      value: getPlannerOptionValue(option.id)
+      value: getResolverOptionValue(option.id)
     })
   }
 

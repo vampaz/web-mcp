@@ -1,8 +1,10 @@
 # WebMCP Kit
 
-WebMCP Kit is a local-first TypeScript toolkit for exposing real web app actions as safe, typed WebMCP tools. It lets apps register narrow actions with schemas, guards, confirmations, and lifecycle cleanup, then progressively connects those tools to native browser WebMCP, local devtools, tests, and planner-driven demos.
+WebMCP Kit is a local-first TypeScript toolkit for exposing real web app actions as safe, typed WebMCP tools. It lets apps register narrow actions with schemas, guards, confirmations, and lifecycle cleanup, then progressively connects those tools to native browser WebMCP, local devtools, tests, and resolver-driven demos.
 
 Developer documentation: [integration walkthrough](./docs/integration.md), [architecture and diagrams](./docs/architecture.md), [full API reference](./docs/api-reference.md), [runtime contracts](./docs/api-behavior.md), and [operations](./docs/operations.md). The [documentation index](./docs/README.md) links framework guides and runnable examples.
+
+Version `0.3.0` renames the model-provider adapter from _planner_ to _resolver_ and changes every related export, option, event, and endpoint path. Existing applications must apply the [0.3.0 migration](./docs/migration-0.3.md); there are no compatibility aliases.
 
 ## Status
 
@@ -10,18 +12,18 @@ This repository is an early MVP. Chrome WebMCP and Chrome built-in AI are emergi
 
 1. Use native WebMCP when `document.modelContext.registerTool` is available.
 2. Keep a fallback registry for unsupported browsers, tests, demos, and devtools.
-3. Use Chrome built-in AI planning when `LanguageModel` is available.
-4. Fall back to deterministic local planning when browser AI is unavailable.
+3. Use Chrome built-in AI to resolve commands when `LanguageModel` is available.
+4. Fall back to deterministic local resolution when browser AI is unavailable.
 
-The current aim is not to replace app code or invent a new agent runtime. The kit gives existing web apps a small adoption layer for making selected user-facing actions callable by browsers, tests, local tools, or planners while the app keeps ownership of validation, confirmation, authorization, and execution.
+The current aim is not to replace app code or invent a new agent runtime. The kit gives existing web apps a small adoption layer for making selected user-facing actions callable by browsers, tests, local tools, or resolvers while the app keeps ownership of validation, confirmation, authorization, and execution.
 
 What is in this repo now:
 
-- Core tool registration, native WebMCP wrapping, fallback invocation, validation, confirmations, events, planners, and form helpers.
+- Core tool registration, native WebMCP wrapping, fallback invocation, validation, confirmations, events, resolvers, and form helpers.
 - Optional Vue, React, and Svelte lifecycle helpers that delegate to core registration.
 - Devtools, Playwright helpers, and a local MCP-style bridge for development and testing.
 - A headless Pi conversation runtime, independent chat UI, and an in-repository Vite + Vue integration lab.
-- A separate Astro + Vue + Cloudflare demo app in [vampaz/web-mcp-demo](https://github.com/vampaz/web-mcp-demo) that exercises planner providers, Cloudflare Workers AI, and fallback behavior.
+- A separate Astro + Vue + Cloudflare demo app in [vampaz/web-mcp-demo](https://github.com/vampaz/web-mcp-demo) that exercises resolver providers, Cloudflare Workers AI, and fallback behavior.
 
 The npm package name is `@vampaz/webmcp-kit`. Releases publish the compiled `dist` output to npm and GitHub Packages, then create a GitHub release tagged with the package version, when a new version reaches `master`.
 
@@ -39,20 +41,20 @@ The existing standalone demo remains an independent consumer. Its later adoption
 
 ## How It Fits
 
-Consumers keep ownership of app state, tools, secrets, and approved planner endpoints. WebMCP Kit provides the browser-facing registration layer, the fallback registry, the command input, diagnostics, tests, and planner clients.
+Consumers keep ownership of app state, tools, secrets, and approved resolver endpoints. WebMCP Kit provides the browser-facing registration layer, the fallback registry, the command input, diagnostics, tests, and resolver clients.
 
 ```mermaid
 flowchart TB
   User["User command"]
   Consumer["Consumer app config<br/>tools, context, endpointOptions"]
   Command["WebMCP command input<br/>provider + model controls"]
-  Choice{"Selected planner"}
+  Choice{"Selected resolver"}
   ChromeAI["Browser local<br/>Chrome built-in AI"]
-  LocalPlanner["Browser local<br/>deterministic fallback"]
-  Server["Consumer server endpoint<br/>/api/webmcp/plan"]
+  LocalResolver["Browser local<br/>deterministic fallback"]
+  Server["Consumer server endpoint<br/>/api/webmcp/resolve"]
   Secrets["Server-owned secrets<br/>API keys + bindings"]
   Providers["Provider APIs<br/>OpenAI / OpenRouter / Workers AI"]
-  Plan["Validated tool plan"]
+  Resolution["Validated tool resolution"]
   Registry["WebMCP tool registry<br/>native adapter + fallback"]
   Native["Optional integrations<br/>document.modelContext, devtools, tests, MCP bridge"]
   Tools["Consumer tools execute<br/>guards, confirmations, app state updates"]
@@ -62,21 +64,21 @@ flowchart TB
   Consumer --> Registry
   Command --> Choice
   Choice -->|"Chrome AI"| ChromeAI
-  Choice -->|"local fallback"| LocalPlanner
+  Choice -->|"local fallback"| LocalResolver
   Choice -->|"server mode"| Server
   Server --> Secrets
   Server --> Providers
-  ChromeAI --> Plan
-  LocalPlanner --> Plan
-  Providers --> Plan
-  Plan --> Registry
+  ChromeAI --> Resolution
+  LocalResolver --> Resolution
+  Providers --> Resolution
+  Resolution --> Registry
   Registry --> Tools
   Registry -.-> Native
 ```
 
 ## Quick Start
 
-The fastest path is `initWebMCP()`: one call registers your tools, defines the `<webmcp-command-input>` element (creating a floating one if the page has none), and wires the hosted planner from a publishable key:
+The fastest path is `initWebMCP()`: one call registers your tools, defines the `<webmcp-command-input>` element (creating a floating one if the page has none), and wires the hosted resolver from a publishable key:
 
 ```ts
 import { defineTool, initWebMCP } from '@vampaz/webmcp-kit'
@@ -106,9 +108,9 @@ initWebMCP({
 })
 ```
 
-Plan and session endpoints are derived from `baseUrl` (`/api/webmcp/plan` and `/api/webmcp/session`). Omit `accessKey` to keep the element's default planner behavior, pass `target` to use an element you placed in your own markup, and call the returned handle's `destroy()` to tear everything down.
+The resolution and session endpoints are derived from `baseUrl` (`/api/webmcp/resolve` and `/api/webmcp/session`). Omit `accessKey` to keep the element's default resolver behavior, pass `target` to use an element you placed in your own markup, and call the returned handle's `destroy()` to tear everything down.
 
-The hosted endpoint above belongs to the standalone demo. The kit ships no model service and no default inference endpoint. To configure your own provider, see [Where inference comes from](./docs/planner-providers.md#where-inference-comes-from).
+The hosted endpoint above belongs to the standalone demo. The kit ships no model service and no default inference endpoint. To configure your own provider, see [Where inference comes from](./docs/resolver-providers.md#where-inference-comes-from).
 
 `defineTool()` infers the `execute` and `guard` input types from the `inputSchema` literal — `input.query` above is typed `string` without generics or casts. If you already use Zod, install it alongside the kit and use the `@vampaz/webmcp-kit/zod` subpath to keep the schema and TypeScript input type in one place:
 
@@ -221,36 +223,36 @@ confirmation: {
 
 ## Core API
 
-- `initWebMCP(options)` is the one-call setup: registers tools, defines and locates (or creates) the command input element, and wires a hosted planner from an access key.
-- `createWebMCPKit(options)` initializes the kit and optional planner provider.
+- `initWebMCP(options)` is the one-call setup: registers tools, defines and locates (or creates) the command input element, and wires a hosted resolver from an access key.
+- `createWebMCPKit(options)` initializes the kit and optional resolver provider.
 - `defineTool(tool)` validates and preserves a typed tool definition, inferring the input type from the `inputSchema` literal.
 - `registerTool(tool)` registers with native WebMCP when available and always stores the tool in the fallback registry. Native registration passes through WebMCP `annotations` such as `readOnlyHint` and unregisters with `AbortSignal` when supported by the browser. Re-registering an existing name replaces it and logs a non-production warning.
 - Registration handles expose `ready`, which resolves after asynchronous native registration settles. The fallback registry remains available if native registration fails.
 - `unregisterTool(name)` removes a registration by name and returns whether one existed.
 - `invokeTool({ toolName, input, confirmed, signal })` invokes fallback-registered tools for devtools, tests, and demos. The optional `AbortSignal` is passed to the tool execution context.
 - `setConfirmationHandler(handler)` configures one global async confirmation provider for tools with `confirmation.required`; a per-tool `confirmation.handler` overrides it.
-- `createHostedOpenAIPlannerOption(config)` returns a ready-made planner option for the command input's `plannerOptions` list.
+- `createHostedOpenAIResolverOption(config)` returns a ready-made resolver option for the command input's `resolverOptions` list.
 - `listTools()` returns current registrations, including tools whose scope is unavailable.
 - `getRegistrySnapshot()` returns support mode, tool count, and registered tools.
-- `getIntegrationHealthReport()` returns developer-facing diagnostics for missing tools, weak schemas, missing confirmation handlers, unavailable tools, and planner status.
+- `getIntegrationHealthReport()` returns developer-facing diagnostics for missing tools, weak schemas, missing confirmation handlers, unavailable tools, and resolver status.
 - `assertWebMCPIntegration()` throws when the current integration has blocking errors.
 - `isWebMCPSupported()` checks for native WebMCP registration support.
-- `createBestPlanner()` uses Chrome built-in AI when available, otherwise a deterministic local planner.
-- `defineWebMCPCommandInput()` registers a ready-made `<webmcp-command-input>` web component for planner-driven commands.
+- `createBestResolver()` uses Chrome built-in AI when available, otherwise a deterministic local resolver.
+- `defineWebMCPCommandInput()` registers a ready-made `<webmcp-command-input>` web component for resolver-driven commands.
 - `defineServerTool()` creates a tool definition whose execution posts to an app-owned server endpoint. Register it with `registerTool()` or a framework helper.
-- `validateToolPlan()` validates single-tool, chained, and planner-outcome plans before execution.
+- `validateToolResolution()` validates single-tool, chained, and outcome resolutions before execution.
 - Tool outputs are validated against `outputSchema` before a successful invocation result is emitted.
 - `installWebMCPKitTestBridge()` exposes a kit-specific test bridge for Playwright and local QA.
 
 ## Supported JSON Schema
 
-WebMCP Kit evaluates this schema vocabulary at runtime: primitive and object types, `properties`, `required`, `items`, `additionalProperties`, `enum`, `const`, `anyOf`, `oneOf`, numeric and collection limits, string lengths, and `pattern`. It also accepts `title` and `description` as annotations for browsers, planners, and developer tooling.
+WebMCP Kit evaluates this schema vocabulary at runtime: primitive and object types, `properties`, `required`, `items`, `additionalProperties`, `enum`, `const`, `anyOf`, `oneOf`, numeric and collection limits, string lengths, and `pattern`. It also accepts `title` and `description` as annotations for browsers, resolvers, and developer tooling.
 
 The known string formats `email`, `date`, `time`, `date-time`, and `uri` receive built-in runtime checks. Unknown or app-specific format names remain annotations. Use `pattern` or a tool guard when an application needs stricter business-specific validation than the built-in format check.
 
-## Planner Output
+## Resolver Output
 
-Planners normally return one tool invocation:
+Resolvers normally return one tool invocation:
 
 ```ts
 {
@@ -261,7 +263,7 @@ Planners normally return one tool invocation:
 }
 ```
 
-For requests that require multiple app actions, planners can return a bounded chained plan. The demo executor runs each step in order and stops on the first blocked, failed, or unavailable step:
+For requests that require multiple app actions, resolvers can return a bounded chained resolution. The demo executor runs each step in order and stops on the first blocked, failed, or unavailable step:
 
 ```ts
 {
@@ -286,9 +288,9 @@ For requests that require multiple app actions, planners can return a bounded ch
 }
 ```
 
-Each step is validated against its tool schema before execution. Confirmation is still enforced per tool invocation, so a chained plan cannot bypass approval for mutating tools.
+Each step is validated against its tool schema before execution. Confirmation is still enforced per tool invocation, so a chained resolution cannot bypass approval for mutating tools.
 
-When a request cannot be executed, planners can return a non-executing outcome:
+When a request cannot be executed, resolvers can return a non-executing outcome:
 
 ```ts
 {
@@ -303,7 +305,7 @@ When a request cannot be executed, planners can return a non-executing outcome:
 
 ## Invocation Pipeline
 
-Every invocation — from planners, devtools, tests, or the MCP bridge — runs the same pipeline in this order:
+Every invocation — from resolvers, devtools, tests, or the MCP bridge — runs the same pipeline in this order:
 
 1. **Schema validation**: the input is validated against `inputSchema`. Failures return `status: 'error'`, `code: 'invalid_input'` before any tool code runs.
 2. **Scope**: `scope()` runs synchronously and answers "is this tool usable in the current app state?" Returning `{ available: false, reason }` yields `status: 'unavailable'`, `code: 'scope_unavailable'`.
@@ -337,30 +339,30 @@ Every invocation — from planners, devtools, tests, or the MCP bridge — runs 
 POST <endpoint>
 Content-Type: application/json
 
-{ "toolName": "send_invoice", "input": { "invoiceId": "inv_104" }, "source": "planner" }
+{ "toolName": "send_invoice", "input": { "invoiceId": "inv_104" }, "source": "resolver" }
 ```
 
 The endpoint should return the tool output as JSON (`204 No Content` maps to `undefined`). Non-2xx responses fail the invocation; an `{ "error": "..." }` body becomes the error message. Schema validation, scope, confirmation, and guard all run in the browser before the request is sent, and a declared `outputSchema` validates the response before success is reported. Invocation cancellation is forwarded to the request. Treat the endpoint as untrusted-input territory and validate again server-side.
 
-## Custom Planners
+## Custom Resolvers
 
-Anything that satisfies the `ToolPlanner` interface can drive the command input:
+Anything that satisfies the `ToolResolver` interface can drive the command input:
 
 ```ts
-import type { ToolPlanner } from '@vampaz/webmcp-kit'
+import type { ToolResolver } from '@vampaz/webmcp-kit'
 
-const planner: ToolPlanner = {
-  name: 'My planner',
+const resolver: ToolResolver = {
+  name: 'My resolver',
   available: true,
   status: 'ready', // 'ready' | 'downloadable' | 'downloading' | 'unavailable' | 'fallback' | 'needs-key'
-  detail: 'Plans through my own backend.',
-  async plan(message, tools, context, options) {
-    // Return a ToolPlan: { toolName, input, confidence, reason, steps? }
-    // Throw for planner failures; use validateToolPlan(plan, tools) before returning.
-    return myBackendPlan(message, tools, context, options?.signal)
+  detail: 'Resolves through my own backend.',
+  async resolve(message, tools, context, options) {
+    // Return a ToolResolution: { toolName, input, confidence, reason, steps? }
+    // Throw for resolver failures; use validateToolResolution(resolution, tools) before returning.
+    return myBackendResolution(message, tools, context, options?.signal)
   },
   dispose() {
-    // Optional: release resources when the planner is replaced.
+    // Optional: release resources when the resolver is replaced.
   }
 }
 ```
@@ -372,7 +374,7 @@ Use the health report while wiring WebMCP into an app:
 ```ts
 import { getIntegrationHealthReport } from '@vampaz/webmcp-kit'
 
-const report = getIntegrationHealthReport({ planner: kit.planner })
+const report = getIntegrationHealthReport({ resolver: kit.resolver })
 
 if (report.status !== 'ready') {
   console.table(report.diagnostics)
@@ -395,7 +397,7 @@ interface IntegrationHealthReport {
 }
 ```
 
-The devtools overlay shows the same report, so developers can see whether tools are registered, schemas are strict, confirmations are installed, and the selected planner is usable.
+The devtools overlay shows the same report, so developers can see whether tools are registered, schemas are strict, confirmations are installed, and the selected resolver is usable.
 
 ## Framework Helpers
 
@@ -419,15 +421,15 @@ WebMCP Kit tracks the browser proposal while keeping a local fallback for unsupp
 - [Chrome WebMCP evals](https://developer.chrome.com/docs/ai/webmcp/evals)
 - [When to use WebMCP and MCP](https://developer.chrome.com/docs/ai/webmcp/compare-mcp)
 
-## Planner Providers
+## Resolver Providers
 
-Developers can pass a planner provider when initializing the kit:
+Developers can pass a resolver provider when initializing the kit:
 
 ```ts
 import { createWebMCPKit } from '@vampaz/webmcp-kit'
 
 const kit = await createWebMCPKit({
-  planner: {
+  resolver: {
     provider: 'openrouter',
     model: 'nvidia/nemotron-3-super-120b-a12b:free',
     auth: {
@@ -442,18 +444,18 @@ User-key mode is intentionally simple and does not need a server, but the key is
 
 ```ts
 await createWebMCPKit({
-  planner: {
+  resolver: {
     provider: 'openai',
     model: 'gpt-5.4-mini',
     auth: {
       mode: 'server',
-      endpoint: '/api/webmcp/plan'
+      endpoint: '/api/webmcp/resolve'
     }
   }
 })
 ```
 
-See [Planner Providers](./docs/planner-providers.md) for OpenRouter, OpenAI, OpenAI-compatible, Cloudflare Workers AI, Chrome built-in AI, and local fallback examples.
+See [Resolver Providers](./docs/resolver-providers.md) for OpenRouter, OpenAI, OpenAI-compatible, Cloudflare Workers AI, Chrome built-in AI, and local fallback examples.
 
 The `cloudflare-binding` provider requires an application-owned server endpoint backed by an `AI` binding. The separate [Astro/Cloudflare demo](https://github.com/vampaz/web-mcp-demo) owns its provider selection, permissions, and deployment setup. The local package lab uses LM Studio instead.
 
@@ -471,7 +473,7 @@ defineWebMCPCommandInput()
 <webmcp-command-input
   provider="openai"
   model="gpt-5.4-mini"
-  endpoint="/api/webmcp/plan"
+  endpoint="/api/webmcp/resolve"
 ></webmcp-command-input>
 ```
 
@@ -479,12 +481,12 @@ When `provider` and `model` are initialized by attributes or properties, the com
 
 Chrome built-in AI is detected from the browser `LanguageModel` API and appears automatically when available. Consumers can hide it with `showChromeAI: false`.
 
-For local development, leave `provider` and `model` unset and pass the endpoint options your app supports so developers can switch server-backed planners from the command box:
+For local development, leave `provider` and `model` unset and pass the endpoint options your app supports so developers can switch server-backed resolvers from the command box:
 
 ```ts
 input.configure({
-  context: getPlannerContext,
-  endpoint: '/api/webmcp/plan',
+  context: getResolverContext,
+  endpoint: '/api/webmcp/resolve',
   endpointOptions: [
     {
       label: 'GPT-5.4 mini',
@@ -513,9 +515,9 @@ input.configure({
 })
 ```
 
-Applications can pass an app-owned planner/provider/model to fix those choices and hide the corresponding controls. The options panel is hidden when neither the provider nor the model control offers a choice. A single planner option can still expose a model selector when it supplies multiple models. The local lab demonstrates the separate chat component and configures its model through server-side environment variables.
+Applications can pass an app-owned resolver/provider/model to fix those choices and hide the corresponding controls. The options panel is hidden when neither the provider nor the model control offers a choice. A single resolver option can still expose a model selector when it supplies multiple models. The local lab demonstrates the separate chat component and configures its model through server-side environment variables.
 
-For app-owned planner objects, pass `plannerOptions`. Use `initialPlannerOptionId` and `initialModel` to set development defaults without fixing the provider for users. When a planner option exposes `modelOptions`, the selected model option is passed to `createPlanner({ model, modelOption })`, so app-owned planners can attach metadata such as context-window size without adding provider-specific fields to core.
+For app-owned resolver objects, pass `resolverOptions`. Use `initialResolverOptionId` and `initialModel` to set development defaults without fixing the provider for users. When a resolver option exposes `modelOptions`, the selected model option is passed to `createResolver({ model, modelOption })`, so app-owned resolvers can attach metadata such as context-window size without adding provider-specific fields to core.
 
 ```ts
 interface BrowserLocalAIModelOption {
@@ -533,16 +535,16 @@ const browserLocalAIModels: BrowserLocalAIModelOption[] = [
 ]
 
 input.configure({
-  initialPlannerOptionId: 'browser-local-ai',
-  plannerOptions: [
+  initialResolverOptionId: 'browser-local-ai',
+  resolverOptions: [
     {
       id: 'browser-local-ai',
       label: 'Browser local AI',
       modelOptions: browserLocalAIModels,
-      createPlanner(options) {
+      createResolver(options) {
         const modelOption = options?.modelOption as BrowserLocalAIModelOption | undefined
 
-        return createBrowserLocalAIPlanner({
+        return createBrowserLocalAIResolver({
           model: options?.model ?? browserLocalAIModels[0].model,
           contextWindowSize: modelOption?.contextWindowSize
         })
@@ -561,7 +563,7 @@ import type { WebMCPCommandInputElement } from '@vampaz/webmcp-kit'
 const input = document.querySelector<WebMCPCommandInputElement>('webmcp-command-input')
 
 if (input) {
-  input.context = function getPlannerContext() {
+  input.context = function getResolverContext() {
     return {
       route: location.pathname,
       selectedIds: getSelectedIds()
@@ -570,7 +572,7 @@ if (input) {
 }
 ```
 
-The component uses the active WebMCP registry, excludes tools whose current `scope()` reports them unavailable, invokes the returned step or bounded `tool_sequence`, and emits `webmcp-command-plan`, `webmcp-command-step`, `webmcp-command-result`, and `webmcp-command-error` events. `run(message, { signal })` accepts an `AbortSignal` for cancelling commands before planning, during signal-aware execution, or between sequence steps; remote planner fetches and server-backed tool requests receive the same signal.
+The component uses the active WebMCP registry, excludes tools whose current `scope()` reports them unavailable, invokes the returned step or bounded `tool_sequence`, and emits `webmcp-command-resolution`, `webmcp-command-step`, `webmcp-command-result`, and `webmcp-command-error` events. `run(message, { signal })` accepts an `AbortSignal` for cancelling commands before resolution, during signal-aware execution, or between sequence steps; remote resolver fetches and server-backed tool requests receive the same signal.
 
 ### Theming
 
@@ -612,7 +614,7 @@ await waitForWebMCPTool(page, 'select_items')
 await invokeWebMCPTool(page, {
   toolName: 'select_items',
   input: { ids: ['item_4', 'item_7'] },
-  source: 'planner'
+  source: 'resolver'
 })
 ```
 

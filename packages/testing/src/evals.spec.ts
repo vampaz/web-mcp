@@ -1,11 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { createHeuristicPlanner, defineTool } from '@vampaz/webmcp-kit'
+import { createHeuristicResolver, defineTool } from '@vampaz/webmcp-kit'
 
-import { runWebMCPPlannerEvalCase, runWebMCPPlannerEvalSuite, runWebMCPPlannerEvals } from './evals'
-import type { WebMCPPlannerEvalCase } from './interfaces/evals'
+import {
+  runWebMCPResolverEvalCase,
+  runWebMCPResolverEvalSuite,
+  runWebMCPResolverEvals
+} from './evals'
+import type { WebMCPResolverEvalCase } from './interfaces/evals'
 
-describe('planner eval helpers', () => {
+describe('resolver eval helpers', () => {
   const tools = [
     defineTool({
       name: 'search_products',
@@ -24,9 +28,9 @@ describe('planner eval helpers', () => {
     })
   ]
 
-  it('returns a passing result when the planner matches the expected tool and input', async () => {
-    const planner = createHeuristicPlanner()
-    const result = await runWebMCPPlannerEvalCase(planner, tools, {
+  it('returns a passing result when the resolver matches the expected tool and input', async () => {
+    const resolver = createHeuristicResolver()
+    const result = await runWebMCPResolverEvalCase(resolver, tools, {
       name: 'product search',
       message: 'Find docks',
       expectedToolName: 'search_products',
@@ -40,12 +44,12 @@ describe('planner eval helpers', () => {
       passed: true,
       errors: []
     })
-    expect(result.plan?.toolName).toBe('search_products')
+    expect(result.resolution?.toolName).toBe('search_products')
   })
 
   it('reports mismatches without throwing', async () => {
-    const planner = createHeuristicPlanner()
-    const [result] = await runWebMCPPlannerEvals(planner, tools, [
+    const resolver = createHeuristicResolver()
+    const [result] = await runWebMCPResolverEvals(resolver, tools, [
       {
         name: 'wrong expectation',
         message: 'Find docks',
@@ -60,9 +64,9 @@ describe('planner eval helpers', () => {
     expect(result?.errors[0]).toContain('Expected toolName "create_invoice"')
   })
 
-  it('supports planner outcomes and partial input expectations', async () => {
-    const planner = createHeuristicPlanner()
-    const result = await runWebMCPPlannerEvalCase(planner, tools, {
+  it('supports resolver outcomes and partial input expectations', async () => {
+    const resolver = createHeuristicResolver()
+    const result = await runWebMCPResolverEvalCase(resolver, tools, {
       name: 'unsupported request',
       message: 'Send the weekly report',
       expectedOutcome: 'no_tools_match'
@@ -71,12 +75,12 @@ describe('planner eval helpers', () => {
     expect(result).toMatchObject({
       passed: true,
       durationMs: expect.any(Number),
-      plan: {
+      resolution: {
         toolName: 'no_tools_match'
       }
     })
 
-    const partialResult = await runWebMCPPlannerEvalCase(planner, tools, {
+    const partialResult = await runWebMCPResolverEvalCase(resolver, tools, {
       name: 'partial product search',
       message: 'Find docks',
       expectedToolName: 'search_products',
@@ -88,13 +92,13 @@ describe('planner eval helpers', () => {
     expect(partialResult.passed).toBe(true)
   })
 
-  it('checks ordered chained-plan steps', async () => {
-    const planner = {
-      name: 'Sequence planner',
+  it('checks ordered chained-resolution steps', async () => {
+    const resolver = {
+      name: 'Sequence resolver',
       available: true,
       status: 'ready' as const,
       detail: 'Ready for tests.',
-      async plan() {
+      async resolve() {
         return {
           toolName: 'tool_sequence',
           input: {},
@@ -118,7 +122,7 @@ describe('planner eval helpers', () => {
       }
     }
 
-    const result = await runWebMCPPlannerEvalCase(planner, tools, {
+    const result = await runWebMCPResolverEvalCase(resolver, tools, {
       name: 'ordered search sequence',
       message: 'Find docks and keyboards',
       expectedToolName: 'tool_sequence',
@@ -133,12 +137,12 @@ describe('planner eval helpers', () => {
 
   it('summarizes repeated runs against a pass-rate threshold', async () => {
     let run = 0
-    const planner = {
-      name: 'Variable planner',
+    const resolver = {
+      name: 'Variable resolver',
       available: true,
       status: 'ready' as const,
       detail: 'Ready for tests.',
-      async plan() {
+      async resolve() {
         run += 1
         return {
           toolName: run === 2 ? 'no_tools_match' : 'search_products',
@@ -149,8 +153,8 @@ describe('planner eval helpers', () => {
       }
     }
 
-    const summary = await runWebMCPPlannerEvalSuite(
-      planner,
+    const summary = await runWebMCPResolverEvalSuite(
+      resolver,
       tools,
       [
         {
@@ -167,7 +171,7 @@ describe('planner eval helpers', () => {
     )
 
     expect(summary).toMatchObject({
-      plannerName: 'Variable planner',
+      resolverName: 'Variable resolver',
       passed: true,
       minimumPassRate: 0.66,
       caseResults: [
@@ -183,25 +187,25 @@ describe('planner eval helpers', () => {
   })
 
   it('rejects empty eval suites', async () => {
-    await expect(runWebMCPPlannerEvalSuite(createHeuristicPlanner(), tools, [])).rejects.toThrow(
+    await expect(runWebMCPResolverEvalSuite(createHeuristicResolver(), tools, [])).rejects.toThrow(
       'testCases must contain at least one eval case.'
     )
   })
 
-  it('rejects ambiguous case expectations before calling the planner', async () => {
-    const planner = createHeuristicPlanner()
-    const plan = vi.spyOn(planner, 'plan')
+  it('rejects ambiguous case expectations before calling the resolver', async () => {
+    const resolver = createHeuristicResolver()
+    const resolution = vi.spyOn(resolver, 'resolve')
     const testCase = {
       name: 'ambiguous expectation',
       message: 'Find docks',
       expectedToolName: 'search_products',
       expectedOutcome: 'no_tools_match'
-    } as unknown as WebMCPPlannerEvalCase
+    } as unknown as WebMCPResolverEvalCase
 
-    await expect(runWebMCPPlannerEvalCase(planner, tools, testCase)).resolves.toMatchObject({
+    await expect(runWebMCPResolverEvalCase(resolver, tools, testCase)).resolves.toMatchObject({
       passed: false,
       errors: ['Eval case must define exactly one of expectedToolName or expectedOutcome.']
     })
-    expect(plan).not.toHaveBeenCalled()
+    expect(resolution).not.toHaveBeenCalled()
   })
 })

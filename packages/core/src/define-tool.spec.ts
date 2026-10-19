@@ -4,12 +4,12 @@ import { defineTool } from './define-tool'
 
 describe('defineTool', () => {
   it.each(['needs_clarification', 'no_tools_match', 'tool_sequence'])(
-    'rejects the reserved planner name "%s"',
+    'rejects the reserved resolver name "%s"',
     (reservedName) => {
       expect(function defineReservedTool() {
         defineTool({
           name: reservedName,
-          description: 'A tool that collides with a reserved planner name.',
+          description: 'A tool that collides with a reserved resolver name.',
           inputSchema: {
             type: 'object',
             properties: {},

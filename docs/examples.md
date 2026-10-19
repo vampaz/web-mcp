@@ -121,7 +121,7 @@ test('selects items through the WebMCP test bridge', async function testSelectIt
     input: {
       ids: ['item_4', 'item_7']
     },
-    source: 'planner'
+    source: 'resolver'
   })
 
   expect(result.status).toBe('success')
@@ -185,10 +185,10 @@ The helper applies `toolname`, `tooldescription`, and official field metadata at
 ## Eval Fixtures
 
 ```ts
-import { createHeuristicPlanner } from '@vampaz/webmcp-kit'
-import { runWebMCPPlannerEvals } from '@vampaz/webmcp-kit/testing'
+import { createHeuristicResolver } from '@vampaz/webmcp-kit'
+import { runWebMCPResolverEvals } from '@vampaz/webmcp-kit/testing'
 
-const results = await runWebMCPPlannerEvals(createHeuristicPlanner(), tools, [
+const results = await runWebMCPResolverEvals(createHeuristicResolver(), tools, [
   {
     name: 'product search',
     message: 'Find laptop stands',
@@ -198,4 +198,4 @@ const results = await runWebMCPPlannerEvals(createHeuristicPlanner(), tools, [
 ])
 ```
 
-See [WebMCP Evals](./evals.md) for planner helper details and starter cases that check tool selection, parameter extraction, call order, and end-to-end user journey success.
+See [WebMCP Evals](./evals.md) for resolver helper details and starter cases that check tool selection, parameter extraction, call order, and end-to-end user journey success.

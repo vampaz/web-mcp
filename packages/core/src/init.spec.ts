@@ -54,16 +54,16 @@ describe('initWebMCP', () => {
     }).toThrowError('found no element matching "#missing-command-input"')
   })
 
-  it('wires a hosted planner from an access key', () => {
+  it('wires a hosted resolver from an access key', () => {
     const handle = initWebMCP({
       accessKey: paidAccessKey,
       baseUrl: 'https://webmcp.example',
       model: 'gpt-5.4-mini'
     })
 
-    expect(handle.planner?.name).toBe('Hosted OpenAI')
-    expect(handle.planner?.status).toBe('ready')
-    expect(handle.element.planner).toBe(handle.planner)
+    expect(handle.resolver?.name).toBe('Hosted OpenAI')
+    expect(handle.resolver?.status).toBe('ready')
+    expect(handle.element.resolver).toBe(handle.resolver)
 
     handle.destroy()
   })
@@ -107,7 +107,7 @@ describe('initWebMCP failure handling', () => {
     document.body.innerHTML = ''
   })
 
-  it('leaves no side effects when the hosted planner options are invalid', () => {
+  it('leaves no side effects when the hosted resolver options are invalid', () => {
     expect(function initWithoutModel() {
       initWebMCP({
         accessKey: paidAccessKey,

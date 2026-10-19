@@ -2,9 +2,9 @@
 
 [Documentation index](./README.md) · [Complete integration](./integration.md) · [API reference](./api-reference.md)
 
-`@vampaz/webmcp-kit/pi` provides a headless, persistent conversation controller. Core remains responsible for application validation, scope, guards, approval, and execution. Pi requests exactly one action, receives its actual result, refreshes context, and chooses the next step. The command input's bounded planning remains a separate core surface with its own sequence contract.
+`@vampaz/webmcp-kit/pi` provides a headless, persistent conversation controller. Core remains responsible for application validation, scope, guards, approval, and execution. Pi requests exactly one action, receives its actual result, refreshes context, and chooses the next step. The command input's bounded resolution remains a separate core surface with its own sequence contract.
 
-`planner` in this guide means the model-provider adapter you configure (type `ToolPlanner`) and pass to `createPiHarness()` or `createPiRuntime()`. It is not a UI mode, and the kit ships no model endpoint of its own; configure your provider as described in [Where inference comes from](./planner-providers.md#where-inference-comes-from).
+`resolver` in this guide means the model-provider adapter you configure (type `ToolResolver`) and pass to `createPiHarness()` or `createPiRuntime()`. It is not a UI mode, and the kit ships no model endpoint of its own; configure your provider as described in [Where inference comes from](./resolver-providers.md#where-inference-comes-from).
 
 Install `0.2.1` or newer. The kit declares its Pi runtime libraries as dependencies, so npm installs them automatically:
 
@@ -87,14 +87,14 @@ Run `npm run dev` for local development and open the HTTPS domain advertised by 
 Configure the page independently from the chat. Use Vite's base path for both the worker URL and scope, including deployments below paths such as `/nested/`:
 
 ```ts
-import { createRemotePlanner } from '@vampaz/webmcp-kit'
+import { createRemoteResolver } from '@vampaz/webmcp-kit'
 import { createPiHarness } from '@vampaz/webmcp-kit/pi'
 
 const workerScope = `${import.meta.env.BASE_URL}webmcp-pi/`
 const harness = await createPiHarness({
   session: { namespace: 'my-app', ownerId: 'anonymous-session', conversationId: 'support' },
   worker: { url: `${workerScope}worker.js`, scope: workerScope },
-  planner: createRemotePlanner({
+  resolver: createRemoteResolver({
     provider: 'openai-compatible',
     baseUrl: '/my-local-model-proxy/v1',
     model: appConfig.modelId,
@@ -108,7 +108,7 @@ const harness = await createPiHarness({
 })
 ```
 
-The host defines `appConfig`, the proxy, and the context callback. For hosted inference, supply `createHostedOpenAIPlanner()` instead. Provider credentials belong on the server. A custom `ToolPlanner` must declare `capabilities: { conversation: true }`, honor `PlannerRunOptions.singleStep` and `maxRequestBytes`, and reject failures instead of returning a heuristic fallback. Check the UTF-8 size of the complete serialized request before dispatch, including prompts and schemas. Hosted endpoints receive a single-step schema and flag; they must honor that contract before production conversational use. Strict Chrome planners advertise this capability; deterministic planners do not.
+The host defines `appConfig`, the proxy, and the context callback. For hosted inference, supply `createHostedOpenAIResolver()` instead. Provider credentials belong on the server. A custom `ToolResolver` must declare `capabilities: { conversation: true }`, honor `ResolverRunOptions.singleStep` and `maxRequestBytes`, and reject failures instead of returning a heuristic fallback. Check the UTF-8 size of the complete serialized request before dispatch, including prompts and schemas. Hosted endpoints receive a single-step schema and flag; they must honor that contract before production conversational use. Strict Chrome resolvers advertise this capability; deterministic resolvers do not.
 
 Catch initialization errors in the host's mounting code and show them next to the assistant launcher. The [Vue](./vue.md#independent-conversation-ui), [React](./react.md#independent-conversation-ui), and [Svelte](./svelte.md#independent-conversation-ui) examples include this handling and cleanup. A missing worker usually means `build:worker` did not run or the deployed base path differs. Check that the worker URL returns JavaScript rather than the site's HTML fallback. The packaged consumer fixture uses this worker configuration under a nested base path.
 
@@ -123,7 +123,7 @@ Both `createPiHarness()` and `createPiRuntime()` return `PiController`. The latt
 | `getSnapshot()`       | Returns a detached normalized snapshot.                                        |
 | `subscribe(listener)` | Immediately supplies the current snapshot; returns an unsubscribe function.    |
 | `send(text)`          | Admits one turn and resolves with `completed`, `interrupted`, or `error`.      |
-| `stop()`              | Cancels planning and pending approvals; waits for cancellation.                |
+| `stop()`              | Cancels resolution and pending approvals; waits for cancellation.              |
 | `clear()`             | Clears this conversation under its writer lock; rejects during an active turn. |
 | `destroy()`           | Cancels work, closes local resources and subscriptions, and preserves history. |
 
@@ -139,7 +139,7 @@ Application confirmation handlers can receive an optional fourth argument, `{ si
 
 History is stored in `webmcp-kit-pi-v1:` IndexedDB databases partitioned by the explicit namespace, owner, and conversation. The owner is a storage partition, not verified account identity. Each conversation uses one Web Lock across readers, writers, clear, tabs, and worker replacements. Contention reports `conversation_busy`; it never interrupts another tab's active work.
 
-Commits reach IndexedDB before snapshots are published. Reopening aborts unfinished Pi tasks before allowing planner or application requests. Completed dialogue and outcomes remain visible. The interrupted state survives reopening until a new user turn completes or the conversation is cleared. Recovery never replays previous actions.
+Commits reach IndexedDB before snapshots are published. Reopening aborts unfinished Pi tasks before allowing resolver or application requests. Completed dialogue and outcomes remain visible. The interrupted state survives reopening until a new user turn completes or the conversation is cleared. Recovery never replays previous actions.
 
 Defaults and accepted bounds:
 
@@ -149,7 +149,7 @@ Defaults and accepted bounds:
 | `maxHistoryBytes` | 8 MiB       | 64 KiB–8 MiB |
 | `maxRequestBytes` | 128 KiB     | 1 KiB–1 MiB  |
 
-Built-in planners enforce `maxRequestBytes` on the serialized HTTP body, or the Chrome prompt and response constraint. This bounds data sent by the browser; server-added context and the model's internal session history are outside this limit. Custom planners must enforce the same boundary for their transport.
+Built-in resolvers enforce `maxRequestBytes` on the serialized HTTP body, or the Chrome prompt and response constraint. This bounds data sent by the browser; server-added context and the model's internal session history are outside this limit. Custom resolvers must enforce the same boundary for their transport.
 
 Each model request has a two-minute timeout. A turn can span multiple requests and wait for application approval without a total turn deadline. Worker health checks and Stop still interrupt a disconnected or cancelled turn.
 

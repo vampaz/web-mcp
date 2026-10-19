@@ -34,13 +34,13 @@ onMounted(async function mount() {
   const next = await createPiHarness({
     session: { namespace: 'packed-consumer', ownerId: 'test', conversationId: 'one' },
     worker: { url: '/nested/webmcp-pi/worker.js', scope: '/nested/webmcp-pi/' },
-    planner: {
+    resolver: {
       name: 'Package fixture',
       capabilities: { conversation: true },
       available: true,
       status: 'ready',
       detail: 'Package test',
-      async plan(_message, _tools, context) {
+      async resolve(_message, _tools, context) {
         const completed = JSON.stringify(context?.piConversation).includes('toolResult')
         return {
           toolName: completed ? 'pi_reply' : 'read_value',

@@ -103,9 +103,9 @@ export function getStyles(): string {
       background: var(--webmcp-accent-dark);
     }
 
-    .webmcp-run-button[data-phase="planning"] {
+    .webmcp-run-button[data-phase="resolving"] {
       opacity: 1;
-      animation: webmcp-planning-pulse 1.1s ease-in-out infinite;
+      animation: webmcp-resolving-pulse 1.1s ease-in-out infinite;
     }
 
     button:disabled {
@@ -113,7 +113,7 @@ export function getStyles(): string {
       opacity: 0.7;
     }
 
-    .webmcp-run-button[data-phase="planning"]:disabled {
+    .webmcp-run-button[data-phase="resolving"]:disabled {
       opacity: 1;
     }
 
@@ -284,7 +284,7 @@ export function getStyles(): string {
       font-size: 0.84rem;
     }
 
-    @keyframes webmcp-planning-pulse {
+    @keyframes webmcp-resolving-pulse {
       0%,
       100% {
         opacity: 1;
@@ -296,7 +296,7 @@ export function getStyles(): string {
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .webmcp-run-button[data-phase="planning"] {
+      .webmcp-run-button[data-phase="resolving"] {
         animation: none;
       }
     }

@@ -1,4 +1,4 @@
-import type { PlannerContext, ToolPlanner } from '@vampaz/webmcp-kit'
+import type { ResolverContext, ToolResolver } from '@vampaz/webmcp-kit'
 import type { PiToolHost } from './host'
 import type { PiLimits, PiSession } from './session'
 
@@ -57,7 +57,7 @@ export interface PiController {
 
 export interface PiRuntimeOptions {
   session: PiSession
-  planner: ToolPlanner
+  resolver: ToolResolver
   host: PiToolHost
   limits?: PiLimits
 }
@@ -65,8 +65,8 @@ export interface PiRuntimeOptions {
 export interface PiHarnessOptions {
   session: PiSession
   worker: { url: string | URL; scope: string }
-  planner: ToolPlanner
-  context?: () => PlannerContext | Promise<PlannerContext>
+  resolver: ToolResolver
+  context?: () => ResolverContext | Promise<ResolverContext>
   host?: PiToolHost
   limits?: PiLimits
   /** Called when pending application approval UI must close. */

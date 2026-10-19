@@ -3,12 +3,12 @@ import type {
   IntegrationDiagnostic,
   IntegrationHealthReport,
   RegisteredTool,
-  ToolPlanner
+  ToolResolver
 } from './interfaces/tool'
 import { getRegistrySnapshot, listTools } from './registry'
 
 export interface IntegrationHealthOptions {
-  planner?: ToolPlanner
+  resolver?: ToolResolver
 }
 
 export function getIntegrationHealthReport(
@@ -19,7 +19,7 @@ export function getIntegrationHealthReport(
   const diagnostics = [
     ...getRegistryDiagnostics(tools),
     ...getToolDiagnostics(tools),
-    ...getPlannerDiagnostics(options.planner)
+    ...getResolverDiagnostics(options.resolver)
   ]
   const errorCount = diagnostics.filter((diagnostic) => diagnostic.severity === 'error').length
   const warningCount = diagnostics.filter((diagnostic) => diagnostic.severity === 'warning').length
@@ -132,22 +132,22 @@ function getScopeDiagnostic(registration: RegisteredTool): IntegrationDiagnostic
       severity: 'error',
       title: `${tool.name} scope failed`,
       detail: getErrorMessage(error),
-      action: 'Fix the scope() function so devtools and planners can safely check availability.',
+      action: 'Fix the scope() function so devtools and resolvers can safely check availability.',
       toolName: tool.name
     }
   }
 }
 
-function getPlannerDiagnostics(planner: ToolPlanner | undefined): IntegrationDiagnostic[] {
-  if (!planner) return []
+function getResolverDiagnostics(resolver: ToolResolver | undefined): IntegrationDiagnostic[] {
+  if (!resolver) return []
 
-  if (planner.available && planner.status === 'ready') {
+  if (resolver.available && resolver.status === 'ready') {
     return [
       {
-        id: 'planner-ready',
+        id: 'resolver-ready',
         severity: 'info',
-        title: `${planner.name} planner is ready`,
-        detail: planner.detail,
+        title: `${resolver.name} resolver is ready`,
+        detail: resolver.detail,
         action: 'Run a command through the demo or your app command input.'
       }
     ]
@@ -155,11 +155,11 @@ function getPlannerDiagnostics(planner: ToolPlanner | undefined): IntegrationDia
 
   return [
     {
-      id: `planner-${planner.status}`,
+      id: `resolver-${resolver.status}`,
       severity:
-        planner.status === 'needs-key' || planner.status === 'unavailable' ? 'warning' : 'info',
-      title: `${planner.name} planner is ${planner.status}`,
-      detail: planner.detail,
+        resolver.status === 'needs-key' || resolver.status === 'unavailable' ? 'warning' : 'info',
+      title: `${resolver.name} resolver is ${resolver.status}`,
+      detail: resolver.detail,
       action: 'Check the selected provider, model, endpoint, and server environment.'
     }
   ]

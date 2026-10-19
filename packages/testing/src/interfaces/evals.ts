@@ -1,22 +1,22 @@
-import type { PlannerContext, ToolPlan } from '@vampaz/webmcp-kit'
+import type { ResolverContext, ToolResolution } from '@vampaz/webmcp-kit'
 
-export type WebMCPPlannerOutcome = 'needs_clarification' | 'no_tools_match'
+export type WebMCPResolverOutcome = 'needs_clarification' | 'no_tools_match'
 
-export interface WebMCPPlannerEvalStepExpectation {
+export interface WebMCPResolverEvalStepExpectation {
   toolName: string
   inputSubset?: Record<string, unknown>
 }
 
-export interface WebMCPPlannerEvalCaseBase {
+export interface WebMCPResolverEvalCaseBase {
   name: string
   message: string
-  context?: PlannerContext
+  context?: ResolverContext
   expectedInput?: Record<string, unknown>
   expectedInputSubset?: Record<string, unknown>
-  expectedSteps?: WebMCPPlannerEvalStepExpectation[]
+  expectedSteps?: WebMCPResolverEvalStepExpectation[]
 }
 
-export type WebMCPPlannerEvalCase = WebMCPPlannerEvalCaseBase &
+export type WebMCPResolverEvalCase = WebMCPResolverEvalCaseBase &
   (
     | {
         expectedToolName: string
@@ -24,38 +24,38 @@ export type WebMCPPlannerEvalCase = WebMCPPlannerEvalCaseBase &
       }
     | {
         expectedToolName?: never
-        expectedOutcome: WebMCPPlannerOutcome
+        expectedOutcome: WebMCPResolverOutcome
       }
   )
 
-export interface WebMCPPlannerEvalResult {
+export interface WebMCPResolverEvalResult {
   name: string
   passed: boolean
   message: string
   durationMs: number
-  plan?: ToolPlan
+  resolution?: ToolResolution
   errors: string[]
 }
 
-export interface WebMCPPlannerEvalSuiteOptions {
+export interface WebMCPResolverEvalSuiteOptions {
   minimumPassRate?: number
   runsPerCase?: number
 }
 
-export interface WebMCPPlannerEvalCaseSummary {
+export interface WebMCPResolverEvalCaseSummary {
   name: string
   runs: number
   passes: number
   passRate: number
   passed: boolean
   averageDurationMs: number
-  results: WebMCPPlannerEvalResult[]
+  results: WebMCPResolverEvalResult[]
 }
 
-export interface WebMCPPlannerEvalSuiteResult {
-  plannerName: string
+export interface WebMCPResolverEvalSuiteResult {
+  resolverName: string
   passed: boolean
   minimumPassRate: number
   runsPerCase: number
-  caseResults: WebMCPPlannerEvalCaseSummary[]
+  caseResults: WebMCPResolverEvalCaseSummary[]
 }

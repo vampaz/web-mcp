@@ -1,37 +1,37 @@
 import {
-  validateToolPlan,
+  validateToolResolution,
   type AnyWebMCPTool,
-  type ToolPlan,
-  type ToolPlanner,
+  type ToolResolution,
+  type ToolResolver,
   type WebMCPTool
 } from '@vampaz/webmcp-kit'
 
 import type {
-  WebMCPPlannerEvalCase,
-  WebMCPPlannerEvalCaseSummary,
-  WebMCPPlannerEvalResult,
-  WebMCPPlannerEvalSuiteOptions,
-  WebMCPPlannerEvalSuiteResult
+  WebMCPResolverEvalCase,
+  WebMCPResolverEvalCaseSummary,
+  WebMCPResolverEvalResult,
+  WebMCPResolverEvalSuiteOptions,
+  WebMCPResolverEvalSuiteResult
 } from './interfaces/evals'
 
 export type {
-  WebMCPPlannerEvalCase,
-  WebMCPPlannerEvalCaseBase,
-  WebMCPPlannerEvalCaseSummary,
-  WebMCPPlannerEvalResult,
-  WebMCPPlannerEvalStepExpectation,
-  WebMCPPlannerEvalSuiteOptions,
-  WebMCPPlannerEvalSuiteResult,
-  WebMCPPlannerOutcome
+  WebMCPResolverEvalCase,
+  WebMCPResolverEvalCaseBase,
+  WebMCPResolverEvalCaseSummary,
+  WebMCPResolverEvalResult,
+  WebMCPResolverEvalStepExpectation,
+  WebMCPResolverEvalSuiteOptions,
+  WebMCPResolverEvalSuiteResult,
+  WebMCPResolverOutcome
 } from './interfaces/evals'
 
-export async function runWebMCPPlannerEvalCase(
-  planner: ToolPlanner,
+export async function runWebMCPResolverEvalCase(
+  resolver: ToolResolver,
   tools: readonly AnyWebMCPTool[],
-  testCase: WebMCPPlannerEvalCase
-): Promise<WebMCPPlannerEvalResult> {
+  testCase: WebMCPResolverEvalCase
+): Promise<WebMCPResolverEvalResult> {
   const errors: string[] = []
-  const plannerTools = tools as unknown as WebMCPTool[]
+  const resolverTools = tools as unknown as WebMCPTool[]
   const startedAt = performance.now()
   const expectationError = getExpectationError(testCase)
   if (expectationError) {
@@ -45,15 +45,19 @@ export async function runWebMCPPlannerEvalCase(
   }
 
   try {
-    const plan = await planner.plan(testCase.message, plannerTools, testCase.context ?? {})
-    collectPlanErrors(plan, plannerTools, testCase, errors)
+    const resolution = await resolver.resolve(
+      testCase.message,
+      resolverTools,
+      testCase.context ?? {}
+    )
+    collectResolutionErrors(resolution, resolverTools, testCase, errors)
 
     return {
       name: testCase.name,
       passed: errors.length === 0,
       message: testCase.message,
       durationMs: Math.round(performance.now() - startedAt),
-      plan,
+      resolution,
       errors
     }
   } catch (error) {
@@ -67,21 +71,21 @@ export async function runWebMCPPlannerEvalCase(
   }
 }
 
-export async function runWebMCPPlannerEvalSuite(
-  planner: ToolPlanner,
+export async function runWebMCPResolverEvalSuite(
+  resolver: ToolResolver,
   tools: readonly AnyWebMCPTool[],
-  testCases: readonly WebMCPPlannerEvalCase[],
-  options: WebMCPPlannerEvalSuiteOptions = {}
-): Promise<WebMCPPlannerEvalSuiteResult> {
+  testCases: readonly WebMCPResolverEvalCase[],
+  options: WebMCPResolverEvalSuiteOptions = {}
+): Promise<WebMCPResolverEvalSuiteResult> {
   const runsPerCase = options.runsPerCase ?? 1
   const minimumPassRate = options.minimumPassRate ?? 1
   assertValidSuiteOptions(testCases, runsPerCase, minimumPassRate)
-  const caseResults: WebMCPPlannerEvalCaseSummary[] = []
+  const caseResults: WebMCPResolverEvalCaseSummary[] = []
 
   for (const testCase of testCases) {
-    const results: WebMCPPlannerEvalResult[] = []
+    const results: WebMCPResolverEvalResult[] = []
     for (let run = 0; run < runsPerCase; run += 1) {
-      results.push(await runWebMCPPlannerEvalCase(planner, tools, testCase))
+      results.push(await runWebMCPResolverEvalCase(resolver, tools, testCase))
     }
 
     const passes = results.filter(function evalPassed(result) {
@@ -103,7 +107,7 @@ export async function runWebMCPPlannerEvalSuite(
   }
 
   return {
-    plannerName: planner.name,
+    resolverName: resolver.name,
     passed: caseResults.every(function casePassed(result) {
       return result.passed
     }),
@@ -113,68 +117,70 @@ export async function runWebMCPPlannerEvalSuite(
   }
 }
 
-export async function runWebMCPPlannerEvals(
-  planner: ToolPlanner,
+export async function runWebMCPResolverEvals(
+  resolver: ToolResolver,
   tools: readonly AnyWebMCPTool[],
-  testCases: readonly WebMCPPlannerEvalCase[]
-): Promise<WebMCPPlannerEvalResult[]> {
-  const results: WebMCPPlannerEvalResult[] = []
+  testCases: readonly WebMCPResolverEvalCase[]
+): Promise<WebMCPResolverEvalResult[]> {
+  const results: WebMCPResolverEvalResult[] = []
 
   for (const testCase of testCases) {
-    results.push(await runWebMCPPlannerEvalCase(planner, tools, testCase))
+    results.push(await runWebMCPResolverEvalCase(resolver, tools, testCase))
   }
 
   return results
 }
 
-function collectPlanErrors(
-  plan: ToolPlan,
+function collectResolutionErrors(
+  resolution: ToolResolution,
   tools: WebMCPTool[],
-  testCase: WebMCPPlannerEvalCase,
+  testCase: WebMCPResolverEvalCase,
   errors: string[]
 ): void {
   try {
-    validateToolPlan(plan, tools)
+    validateToolResolution(resolution, tools)
   } catch (error) {
     errors.push(error instanceof Error ? error.message : String(error))
   }
 
   const expectedToolName = testCase.expectedToolName ?? testCase.expectedOutcome
-  if (plan.toolName !== expectedToolName) {
-    errors.push(`Expected toolName "${expectedToolName}" but planner returned "${plan.toolName}".`)
+  if (resolution.toolName !== expectedToolName) {
+    errors.push(
+      `Expected toolName "${expectedToolName}" but resolver returned "${resolution.toolName}".`
+    )
   }
 
   if (
     testCase.expectedInput !== undefined &&
-    stringifyStable(plan.input) !== stringifyStable(testCase.expectedInput)
+    stringifyStable(resolution.input) !== stringifyStable(testCase.expectedInput)
   ) {
     errors.push(
-      `Expected input ${stringifyStable(testCase.expectedInput)} but planner returned ${stringifyStable(plan.input)}.`
+      `Expected input ${stringifyStable(testCase.expectedInput)} but resolver returned ${stringifyStable(resolution.input)}.`
     )
   }
 
   if (
     testCase.expectedInputSubset !== undefined &&
-    !isJsonSubset(plan.input, testCase.expectedInputSubset)
+    !isJsonSubset(resolution.input, testCase.expectedInputSubset)
   ) {
     errors.push(
-      `Expected input to include ${stringifyStable(testCase.expectedInputSubset)} but planner returned ${stringifyStable(plan.input)}.`
+      `Expected input to include ${stringifyStable(testCase.expectedInputSubset)} but resolver returned ${stringifyStable(resolution.input)}.`
     )
   }
 
-  collectStepErrors(plan, testCase, errors)
+  collectStepErrors(resolution, testCase, errors)
 }
 
 function collectStepErrors(
-  plan: ToolPlan,
-  testCase: WebMCPPlannerEvalCase,
+  resolution: ToolResolution,
+  testCase: WebMCPResolverEvalCase,
   errors: string[]
 ): void {
   if (!testCase.expectedSteps) return
-  const steps = plan.steps ?? []
+  const steps = resolution.steps ?? []
   if (steps.length !== testCase.expectedSteps.length) {
     errors.push(
-      `Expected ${testCase.expectedSteps.length} steps but planner returned ${steps.length}.`
+      `Expected ${testCase.expectedSteps.length} steps but resolver returned ${steps.length}.`
     )
     return
   }
@@ -184,12 +190,12 @@ function collectStepErrors(
     if (!step) return
     if (step.toolName !== expectedStep.toolName) {
       errors.push(
-        `Expected step ${index + 1} toolName "${expectedStep.toolName}" but planner returned "${step.toolName}".`
+        `Expected step ${index + 1} toolName "${expectedStep.toolName}" but resolver returned "${step.toolName}".`
       )
     }
     if (expectedStep.inputSubset && !isJsonSubset(step.input, expectedStep.inputSubset)) {
       errors.push(
-        `Expected step ${index + 1} input to include ${stringifyStable(expectedStep.inputSubset)} but planner returned ${stringifyStable(step.input)}.`
+        `Expected step ${index + 1} input to include ${stringifyStable(expectedStep.inputSubset)} but resolver returned ${stringifyStable(step.input)}.`
       )
     }
   })
@@ -207,7 +213,7 @@ function isJsonSubset(value: unknown, subset: unknown): boolean {
   })
 }
 
-function getExpectationError(testCase: WebMCPPlannerEvalCase): string | undefined {
+function getExpectationError(testCase: WebMCPResolverEvalCase): string | undefined {
   const expectedToolDefined = testCase.expectedToolName !== undefined
   const expectedOutcomeDefined = testCase.expectedOutcome !== undefined
   if (expectedToolDefined === expectedOutcomeDefined) {
@@ -218,7 +224,7 @@ function getExpectationError(testCase: WebMCPPlannerEvalCase): string | undefine
 }
 
 function assertValidSuiteOptions(
-  testCases: readonly WebMCPPlannerEvalCase[],
+  testCases: readonly WebMCPResolverEvalCase[],
   runsPerCase: number,
   minimumPassRate: number
 ): void {

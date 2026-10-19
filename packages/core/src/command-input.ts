@@ -1,21 +1,21 @@
 import type {
-  PlannerContext,
-  PlannerProviderConfig,
-  PlannerProviderKind,
+  ResolverContext,
+  ResolverProviderConfig,
+  ResolverProviderKind,
   ToolInvocationResult,
-  ToolPlan,
-  ToolPlanner
+  ToolResolution,
+  ToolResolver
 } from './interfaces/tool'
 import type {
   WebMCPCommandErrorEventDetail,
   WebMCPCommandInputConfigureOptions,
   WebMCPCommandInputElement,
   WebMCPCommandInputEndpointOption,
-  WebMCPCommandInputPlannerOption,
+  WebMCPCommandInputResolverOption,
   WebMCPCommandInputPhase,
   WebMCPCommandPanelToggleEventDetail,
-  WebMCPCommandPlanEventDetail,
-  WebMCPCommandPlannerEventDetail,
+  WebMCPCommandResolutionEventDetail,
+  WebMCPCommandResolverEventDetail,
   WebMCPCommandResultEventDetail,
   WebMCPCommandStepEventDetail,
   WebMCPCommandInputRunOptions
@@ -25,32 +25,32 @@ import {
   getStructureSignature,
   type CommandInputViewState
 } from './command-input-render'
-import { invokePlannedSteps, throwIfAborted } from './command-input-runner'
+import { invokeResolvedSteps, throwIfAborted } from './command-input-runner'
 import { getErrorMessage } from './confirmation'
 import {
-  createCommandInputPlanner,
+  createCommandInputResolver,
   defaultEndpoint,
   defaultModel,
   getDefaultModelForProvider,
-  getDefaultModelForPlannerOption,
+  getDefaultModelForResolverOption,
   getDefaultProvider,
   getModelControlMarkup,
   getModelOptionCount,
   getOptionsStatusText,
-  getPlannerOptionModelControlMarkup,
-  getPlannerOptionModelOptionCount,
-  getPlannerOptionId,
-  getPlannerOptionStatusText,
-  getPlannerOptionValue,
+  getResolverOptionModelControlMarkup,
+  getResolverOptionModelOptionCount,
+  getResolverOptionId,
+  getResolverOptionStatusText,
+  getResolverOptionValue,
   getProviderControlMarkup,
   getProviderOptionCount,
   isAuthMode,
-  isPlannerAttribute,
-  isPlannerProviderKind
+  isResolverAttribute,
+  isResolverProviderKind
 } from './command-input-options'
-import { createChromeAIPlanner } from './planner'
+import { createChromeAIResolver } from './resolver'
 import { listAvailableTools } from './registry'
-import { validateToolPlan } from './plan-validation'
+import { validateToolResolution } from './resolution-validation'
 
 type CommandInputConstructor = CustomElementConstructor & {
   observedAttributes: string[]
@@ -60,25 +60,25 @@ type CommandInputRuntimeState = {
   buttonLabel: string
   disabled: boolean
   fixedModel?: string
-  fixedProvider?: PlannerProviderKind
+  fixedProvider?: ResolverProviderKind
   floating: boolean
   floatingExpanded: boolean
   hasDiagnostics: boolean
   diagnosticsOpen: boolean
   model: string
   phase: WebMCPCommandInputPhase
-  plannerOptionId?: string
+  resolverOptionId?: string
   placeholder: string
   prompt: string
-  plannerDetail: string
-  plannerName: string
-  provider: PlannerProviderKind
+  resolverDetail: string
+  resolverName: string
+  provider: ResolverProviderKind
   settingsOpen: boolean
 }
 
 const defaultPlaceholder = 'Tell this app what to do'
 const defaultButtonLabel = 'Run'
-const supersededPlannerRefreshMessage = 'Planner refresh was superseded.'
+const supersededResolverRefreshMessage = 'Resolver refresh was superseded.'
 const webMCPCommandInputTagName = 'webmcp-command-input'
 const observedAttributes = [
   'api-key',
@@ -107,28 +107,28 @@ export function defineWebMCPCommandInput(
     apiKey?: string
     authMode?: 'none' | 'server' | 'user-key'
     baseUrl?: string
-    context?: PlannerContext | (() => PlannerContext)
+    context?: ResolverContext | (() => ResolverContext)
     endpoint?: string
     endpointOptions?: WebMCPCommandInputEndpointOption[]
-    plannerOptions?: WebMCPCommandInputPlannerOption[]
+    resolverOptions?: WebMCPCommandInputResolverOption[]
     showChromeAI = true
     private chromeAIAvailable = false
     private chromeAILoadId = 0
-    private currentPlanner?: ToolPlanner
-    private currentPlannerSignature = ''
-    private currentPlannerWasCreated = false
+    private currentResolver?: ToolResolver
+    private currentResolverSignature = ''
+    private currentResolverWasCreated = false
     private isConnectedToDom = false
     private providerWasChosen = false
     private lightDomObserver?: MutationObserver
-    private plannerLoadId = 0
-    private plannerRevision = 0
-    private providedPlanner?: ToolPlanner
-    private providedPlannerConfig?: PlannerProviderConfig
+    private resolverLoadId = 0
+    private resolverRevision = 0
+    private providedResolver?: ToolResolver
+    private providedResolverConfig?: ResolverProviderConfig
     private renderedStructureSignature = ''
     private running = false
     private activeCommand?: AbortController
     private userSelectedModel = false
-    private userSelectedPlanner = false
+    private userSelectedResolver = false
     private readonly state: CommandInputRuntimeState = {
       buttonLabel: defaultButtonLabel,
       disabled: false,
@@ -140,8 +140,8 @@ export function defineWebMCPCommandInput(
       phase: 'idle',
       placeholder: defaultPlaceholder,
       prompt: '',
-      plannerDetail: 'Planner is waiting for a command.',
-      plannerName: 'Planner',
+      resolverDetail: 'Resolver is waiting for a command.',
+      resolverName: 'Resolver',
       provider: 'auto',
       settingsOpen: false
     }
@@ -159,14 +159,14 @@ export function defineWebMCPCommandInput(
       this.render()
       if (this.state.floatingExpanded) this.focusPromptInput()
       void this.refreshChromeAIAvailability()
-      void this.refreshPlannerStatus()
+      void this.refreshResolverStatus()
     }
 
     disconnectedCallback() {
       this.isConnectedToDom = false
       this.lightDomObserver?.disconnect()
       this.lightDomObserver = undefined
-      this.invalidatePlanner()
+      this.invalidateResolver()
     }
 
     attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null) {
@@ -174,9 +174,9 @@ export function defineWebMCPCommandInput(
       this.applyAttribute(name, newValue)
       if (!this.isConnectedToDom) return
       this.render()
-      if (isPlannerAttribute(name)) {
-        this.invalidatePlanner()
-        void this.refreshPlannerStatus()
+      if (isResolverAttribute(name)) {
+        this.invalidateResolver()
+        void this.refreshResolverStatus()
       }
     }
 
@@ -221,9 +221,9 @@ export function defineWebMCPCommandInput(
 
     set model(value: string | undefined) {
       this.applyModelState(value)
-      this.invalidatePlanner()
+      this.invalidateResolver()
       this.renderIfConnected()
-      void this.refreshPlannerStatus()
+      void this.refreshResolverStatus()
     }
 
     get placeholder(): string {
@@ -235,37 +235,37 @@ export function defineWebMCPCommandInput(
       this.renderIfConnected()
     }
 
-    get planner(): ToolPlanner | undefined {
-      return this.providedPlanner
+    get resolver(): ToolResolver | undefined {
+      return this.providedResolver
     }
 
-    set planner(value: ToolPlanner | undefined) {
-      this.providedPlanner = value
-      this.invalidatePlanner()
+    set resolver(value: ToolResolver | undefined) {
+      this.providedResolver = value
+      this.invalidateResolver()
       this.renderIfConnected()
-      void this.refreshPlannerStatus()
+      void this.refreshResolverStatus()
     }
 
-    get plannerConfig(): PlannerProviderConfig | undefined {
-      return this.providedPlannerConfig
+    get resolverConfig(): ResolverProviderConfig | undefined {
+      return this.providedResolverConfig
     }
 
-    set plannerConfig(value: PlannerProviderConfig | undefined) {
-      this.providedPlannerConfig = value
-      this.invalidatePlanner()
+    set resolverConfig(value: ResolverProviderConfig | undefined) {
+      this.providedResolverConfig = value
+      this.invalidateResolver()
       this.renderIfConnected()
-      void this.refreshPlannerStatus()
+      void this.refreshResolverStatus()
     }
 
-    get provider(): PlannerProviderKind | undefined {
+    get provider(): ResolverProviderKind | undefined {
       return this.state.fixedProvider
     }
 
-    set provider(value: PlannerProviderKind | undefined) {
+    set provider(value: ResolverProviderKind | undefined) {
       this.applyProviderState(value)
-      this.invalidatePlanner()
+      this.invalidateResolver()
       this.renderIfConnected()
-      void this.refreshPlannerStatus()
+      void this.refreshResolverStatus()
     }
 
     configure(options: WebMCPCommandInputConfigureOptions) {
@@ -275,7 +275,7 @@ export function defineWebMCPCommandInput(
       this.context = options.context ?? this.context
       this.endpoint = options.endpoint ?? this.endpoint
       this.endpointOptions = options.endpointOptions ?? this.endpointOptions
-      this.plannerOptions = options.plannerOptions ?? this.plannerOptions
+      this.resolverOptions = options.resolverOptions ?? this.resolverOptions
       if (options.showChromeAI !== undefined) {
         this.showChromeAI = options.showChromeAI
         if (!this.showChromeAI) {
@@ -290,10 +290,10 @@ export function defineWebMCPCommandInput(
       if (
         options.initialProvider !== undefined &&
         !this.state.fixedProvider &&
-        !this.userSelectedPlanner
+        !this.userSelectedResolver
       ) {
         this.providerWasChosen = true
-        this.state.plannerOptionId = undefined
+        this.state.resolverOptionId = undefined
         this.state.provider = options.initialProvider
       } else if (
         options.endpointOptions !== undefined &&
@@ -308,7 +308,7 @@ export function defineWebMCPCommandInput(
       if (
         options.initialModel !== undefined &&
         !this.state.fixedModel &&
-        !this.userSelectedPlanner &&
+        !this.userSelectedResolver &&
         !this.userSelectedModel
       ) {
         this.state.model = options.initialModel
@@ -320,23 +320,23 @@ export function defineWebMCPCommandInput(
         this.state.model = getDefaultModelForProvider(this.state.provider, options.endpointOptions)
       }
       if (
-        options.initialPlannerOptionId !== undefined &&
+        options.initialResolverOptionId !== undefined &&
         !this.state.fixedProvider &&
-        !this.userSelectedPlanner
+        !this.userSelectedResolver
       ) {
-        const initialPlannerOption = this.getPlannerOptionById(options.initialPlannerOptionId)
-        if (initialPlannerOption) {
+        const initialResolverOption = this.getResolverOptionById(options.initialResolverOptionId)
+        if (initialResolverOption) {
           this.providerWasChosen = true
-          this.state.plannerOptionId = initialPlannerOption.id
+          this.state.resolverOptionId = initialResolverOption.id
           this.state.provider = 'auto'
           if (!this.state.fixedModel) {
-            this.state.model = getDefaultModelForPlannerOption(initialPlannerOption)
+            this.state.model = getDefaultModelForResolverOption(initialResolverOption)
           }
         }
       }
       if (options.settingsOpen !== undefined) this.state.settingsOpen = options.settingsOpen
-      if (options.planner !== undefined) this.providedPlanner = options.planner
-      if (options.plannerConfig !== undefined) this.providedPlannerConfig = options.plannerConfig
+      if (options.resolver !== undefined) this.providedResolver = options.resolver
+      if (options.resolverConfig !== undefined) this.providedResolverConfig = options.resolverConfig
 
       if (options.buttonLabel !== undefined) this.applyButtonLabelState(options.buttonLabel)
       if (options.disabled !== undefined) this.state.disabled = options.disabled
@@ -344,10 +344,10 @@ export function defineWebMCPCommandInput(
       if (options.model !== undefined) this.applyModelState(options.model)
       if (options.provider !== undefined) this.applyProviderState(options.provider)
 
-      this.invalidatePlanner()
+      this.invalidateResolver()
       this.renderIfConnected()
       void this.refreshChromeAIAvailability()
-      void this.refreshPlannerStatus()
+      void this.refreshResolverStatus()
     }
 
     openPanel() {
@@ -379,43 +379,43 @@ export function defineWebMCPCommandInput(
       this.setPhase('preparing')
 
       try {
-        this.invalidateAutoPlannerBeforeRun()
+        this.invalidateAutoResolverBeforeRun()
         const controller = new AbortController()
         this.activeCommand = controller
         const signal = options.signal
           ? AbortSignal.any([controller.signal, options.signal])
           : controller.signal
-        const planner = await this.getCurrentPlanner()
+        const resolver = await this.getCurrentResolver()
         const tools = listAvailableTools().map(function mapRegistration(registration) {
           return registration.tool
         })
 
-        this.setPhase('planning')
+        this.setPhase('resolving')
         throwIfAborted(signal)
-        const plan = await planner.plan(command, tools, this.getPlannerContext(), {
+        const resolution = await resolver.resolve(command, tools, this.getResolverContext(), {
           signal
         })
         throwIfAborted(signal)
-        validateToolPlan(plan, tools)
-        this.dispatchPlanEvent(command, plan, planner)
+        validateToolResolution(resolution, tools)
+        this.dispatchResolutionEvent(command, resolution, resolver)
         this.setPhase('executing')
 
-        const result = await invokePlannedSteps(
-          plan,
+        const result = await invokeResolvedSteps(
+          resolution,
           this.setActiveToolName.bind(this),
           (detail) => this.dispatchStepEvent(command, detail),
           signal
         )
         this.setPhase(result.status === 'success' ? 'completed' : 'failed')
-        this.dispatchResultEvent(command, plan, result)
+        this.dispatchResultEvent(command, resolution, result)
         return result
       } catch (error) {
         const errorMessage = getErrorMessage(error)
-        this.state.plannerDetail = errorMessage
+        this.state.resolverDetail = errorMessage
         this.setPhase('failed')
         this.dispatchErrorEvent(command, errorMessage)
         return {
-          toolName: this.state.plannerName,
+          toolName: this.state.resolverName,
           status: 'error',
           error: errorMessage,
           durationMs: 0
@@ -493,80 +493,80 @@ export function defineWebMCPCommandInput(
     }
 
     private applyProviderState(value: string | null | undefined) {
-      this.state.fixedProvider = isPlannerProviderKind(value) ? value : undefined
+      this.state.fixedProvider = isResolverProviderKind(value) ? value : undefined
       this.providerWasChosen = Boolean(this.state.fixedProvider)
-      this.state.plannerOptionId = undefined
+      this.state.resolverOptionId = undefined
       this.state.provider = this.state.fixedProvider ?? 'auto'
     }
 
-    private async getCurrentPlanner(): Promise<ToolPlanner> {
-      if (this.planner) {
-        this.state.plannerName = `${this.planner.name} (${this.planner.status})`
-        this.state.plannerDetail = this.planner.detail
-        this.dispatchPlannerEvent(this.planner)
-        return this.planner
+    private async getCurrentResolver(): Promise<ToolResolver> {
+      if (this.resolver) {
+        this.state.resolverName = `${this.resolver.name} (${this.resolver.status})`
+        this.state.resolverDetail = this.resolver.detail
+        this.dispatchResolverEvent(this.resolver)
+        return this.resolver
       }
 
-      const plannerOption = this.getSelectedPlannerOption()
-      if (plannerOption) {
-        const plannerModel = this.state.fixedModel ?? this.state.model
-        const plannerSignature = JSON.stringify({
-          plannerOption: plannerOption.id,
-          model: plannerModel || undefined
+      const resolverOption = this.getSelectedResolverOption()
+      if (resolverOption) {
+        const resolverModel = this.state.fixedModel ?? this.state.model
+        const resolverSignature = JSON.stringify({
+          resolverOption: resolverOption.id,
+          model: resolverModel || undefined
         })
-        if (this.currentPlanner && this.currentPlannerSignature === plannerSignature)
-          return this.currentPlanner
+        if (this.currentResolver && this.currentResolverSignature === resolverSignature)
+          return this.currentResolver
 
-        this.disposeCreatedPlanner()
-        const loadId = this.plannerLoadId + 1
-        this.plannerLoadId = loadId
-        const revision = this.plannerRevision
-        const planner = await plannerOption.createPlanner({
-          model: plannerModel || undefined,
-          modelOption: plannerOption.modelOptions?.find(function findModelOption(option) {
-            return option.model === plannerModel
+        this.disposeCreatedResolver()
+        const loadId = this.resolverLoadId + 1
+        this.resolverLoadId = loadId
+        const revision = this.resolverRevision
+        const resolver = await resolverOption.createResolver({
+          model: resolverModel || undefined,
+          modelOption: resolverOption.modelOptions?.find(function findModelOption(option) {
+            return option.model === resolverModel
           })
         })
-        if (revision !== this.plannerRevision || loadId !== this.plannerLoadId) {
-          planner.dispose?.()
-          throw new Error(supersededPlannerRefreshMessage)
+        if (revision !== this.resolverRevision || loadId !== this.resolverLoadId) {
+          resolver.dispose?.()
+          throw new Error(supersededResolverRefreshMessage)
         }
 
-        this.currentPlanner = planner
-        this.currentPlannerWasCreated = true
-        this.currentPlannerSignature = plannerSignature
-        this.state.plannerName = `${this.currentPlanner.name} (${this.currentPlanner.status})`
-        this.state.plannerDetail = this.currentPlanner.detail
-        this.dispatchPlannerEvent(this.currentPlanner)
-        return this.currentPlanner
+        this.currentResolver = resolver
+        this.currentResolverWasCreated = true
+        this.currentResolverSignature = resolverSignature
+        this.state.resolverName = `${this.currentResolver.name} (${this.currentResolver.status})`
+        this.state.resolverDetail = this.currentResolver.detail
+        this.dispatchResolverEvent(this.currentResolver)
+        return this.currentResolver
       }
 
-      const plannerConfig = this.getPlannerConfig()
-      const plannerSignature = JSON.stringify(plannerConfig ?? { provider: 'auto' })
-      if (this.currentPlanner && this.currentPlannerSignature === plannerSignature)
-        return this.currentPlanner
+      const resolverConfig = this.getResolverConfig()
+      const resolverSignature = JSON.stringify(resolverConfig ?? { provider: 'auto' })
+      if (this.currentResolver && this.currentResolverSignature === resolverSignature)
+        return this.currentResolver
 
-      this.disposeCreatedPlanner()
-      const loadId = this.plannerLoadId + 1
-      this.plannerLoadId = loadId
-      const revision = this.plannerRevision
-      const planner = await createCommandInputPlanner(plannerConfig)
-      if (revision !== this.plannerRevision || loadId !== this.plannerLoadId) {
-        planner.dispose?.()
-        throw new Error(supersededPlannerRefreshMessage)
+      this.disposeCreatedResolver()
+      const loadId = this.resolverLoadId + 1
+      this.resolverLoadId = loadId
+      const revision = this.resolverRevision
+      const resolver = await createCommandInputResolver(resolverConfig)
+      if (revision !== this.resolverRevision || loadId !== this.resolverLoadId) {
+        resolver.dispose?.()
+        throw new Error(supersededResolverRefreshMessage)
       }
 
-      this.currentPlanner = planner
-      this.currentPlannerWasCreated = true
-      this.currentPlannerSignature = plannerSignature
-      this.state.plannerName = `${this.currentPlanner.name} (${this.currentPlanner.status})`
-      this.state.plannerDetail = this.currentPlanner.detail
-      this.dispatchPlannerEvent(this.currentPlanner)
-      return this.currentPlanner
+      this.currentResolver = resolver
+      this.currentResolverWasCreated = true
+      this.currentResolverSignature = resolverSignature
+      this.state.resolverName = `${this.currentResolver.name} (${this.currentResolver.status})`
+      this.state.resolverDetail = this.currentResolver.detail
+      this.dispatchResolverEvent(this.currentResolver)
+      return this.currentResolver
     }
 
-    private getPlannerConfig(): PlannerProviderConfig | undefined {
-      if (this.plannerConfig) return this.plannerConfig
+    private getResolverConfig(): ResolverProviderConfig | undefined {
+      if (this.resolverConfig) return this.resolverConfig
 
       const provider = this.state.fixedProvider ?? this.state.provider
       if (provider === 'auto') return undefined
@@ -596,28 +596,28 @@ export function defineWebMCPCommandInput(
       }
     }
 
-    private getAuthMode(provider: PlannerProviderKind): 'none' | 'server' | 'user-key' {
+    private getAuthMode(provider: ResolverProviderKind): 'none' | 'server' | 'user-key' {
       if (this.authMode) return this.authMode
       if (provider === 'cloudflare-binding') return 'server'
       if (this.endpoint && provider !== 'openai-compatible') return 'server'
       return 'user-key'
     }
 
-    private getPlannerContext(): PlannerContext {
+    private getResolverContext(): ResolverContext {
       const context = this.context
       if (typeof context === 'function') return context()
       return context ?? {}
     }
 
-    private async refreshPlannerStatus() {
+    private async refreshResolverStatus() {
       if (!this.isConnectedToDom) return
 
       try {
-        await this.getCurrentPlanner()
+        await this.getCurrentResolver()
       } catch (error) {
-        if (getErrorMessage(error) === supersededPlannerRefreshMessage) return
-        this.state.plannerName = 'Planner'
-        this.state.plannerDetail = getErrorMessage(error)
+        if (getErrorMessage(error) === supersededResolverRefreshMessage) return
+        this.state.resolverName = 'Resolver'
+        this.state.resolverDetail = getErrorMessage(error)
       }
 
       this.renderIfConnected()
@@ -632,46 +632,46 @@ export function defineWebMCPCommandInput(
         return
       }
 
-      const planner = await createChromeAIPlanner()
-      planner.dispose?.()
+      const resolver = await createChromeAIResolver()
+      resolver.dispose?.()
       if (!this.isConnectedToDom || loadId !== this.chromeAILoadId) return
-      if (this.chromeAIAvailable === planner.available) return
+      if (this.chromeAIAvailable === resolver.available) return
       const wasAvailable = this.chromeAIAvailable
-      this.chromeAIAvailable = planner.available
+      this.chromeAIAvailable = resolver.available
       if (
         !wasAvailable &&
         this.chromeAIAvailable &&
         !this.providerWasChosen &&
         !this.state.fixedProvider &&
-        !this.state.plannerOptionId
+        !this.state.resolverOptionId
       ) {
         this.state.provider = 'chrome-built-in'
         this.state.model = ''
-        this.invalidatePlanner()
-        void this.refreshPlannerStatus()
+        this.invalidateResolver()
+        void this.refreshResolverStatus()
       }
       this.renderIfConnected()
     }
 
-    private disposeCreatedPlanner() {
-      if (this.currentPlannerWasCreated) this.currentPlanner?.dispose?.()
-      this.currentPlanner = undefined
-      this.currentPlannerSignature = ''
-      this.currentPlannerWasCreated = false
+    private disposeCreatedResolver() {
+      if (this.currentResolverWasCreated) this.currentResolver?.dispose?.()
+      this.currentResolver = undefined
+      this.currentResolverSignature = ''
+      this.currentResolverWasCreated = false
     }
 
-    private invalidatePlanner() {
+    private invalidateResolver() {
       this.activeCommand?.abort()
-      this.plannerRevision += 1
-      this.plannerLoadId += 1
-      this.disposeCreatedPlanner()
+      this.resolverRevision += 1
+      this.resolverLoadId += 1
+      this.disposeCreatedResolver()
     }
 
-    private invalidateAutoPlannerBeforeRun() {
-      if (this.planner || this.plannerConfig) return
-      if (this.state.plannerOptionId) return
+    private invalidateAutoResolverBeforeRun() {
+      if (this.resolver || this.resolverConfig) return
+      if (this.state.resolverOptionId) return
       const provider = this.state.fixedProvider ?? this.state.provider
-      if (provider === 'auto') this.invalidatePlanner()
+      if (provider === 'auto') this.invalidateResolver()
     }
 
     private shouldShowChromeAIOption(): boolean {
@@ -684,44 +684,52 @@ export function defineWebMCPCommandInput(
     }
 
     private setActiveToolName(toolName: string) {
-      this.state.plannerDetail = `Running ${toolName}.`
+      this.state.resolverDetail = `Running ${toolName}.`
       this.renderIfConnected()
     }
 
-    private dispatchPlanEvent(message: string, plan: ToolPlan, planner: ToolPlanner) {
+    private dispatchResolutionEvent(
+      message: string,
+      resolution: ToolResolution,
+      resolver: ToolResolver
+    ) {
       this.dispatchEvent(
-        new CustomEvent<WebMCPCommandPlanEventDetail>('webmcp-command-plan', {
+        new CustomEvent<WebMCPCommandResolutionEventDetail>('webmcp-command-resolution', {
           bubbles: true,
           composed: true,
           detail: {
             message,
-            plan,
-            planner
+            resolution,
+            resolver
           }
         })
       )
     }
 
-    private dispatchPlannerEvent(planner: ToolPlanner) {
+    private dispatchResolverEvent(resolver: ToolResolver) {
       this.dispatchEvent(
-        new CustomEvent<WebMCPCommandPlannerEventDetail>('webmcp-command-planner', {
+        new CustomEvent<WebMCPCommandResolverEventDetail>('webmcp-command-resolver', {
           bubbles: true,
           composed: true,
           detail: {
-            planner
+            resolver
           }
         })
       )
     }
 
-    private dispatchResultEvent(message: string, plan: ToolPlan, result: ToolInvocationResult) {
+    private dispatchResultEvent(
+      message: string,
+      resolution: ToolResolution,
+      result: ToolInvocationResult
+    ) {
       this.dispatchEvent(
         new CustomEvent<WebMCPCommandResultEventDetail>('webmcp-command-result', {
           bubbles: true,
           composed: true,
           detail: {
             message,
-            plan,
+            resolution,
             result
           }
         })
@@ -769,19 +777,19 @@ export function defineWebMCPCommandInput(
     private handleProviderChanged(event: Event) {
       const target = event.target
       if (!(target instanceof HTMLSelectElement)) return
-      const plannerOptionId = getPlannerOptionId(target.value)
-      const provider = isPlannerProviderKind(target.value) ? target.value : 'auto'
+      const resolverOptionId = getResolverOptionId(target.value)
+      const provider = isResolverProviderKind(target.value) ? target.value : 'auto'
       this.providerWasChosen = true
-      this.userSelectedPlanner = true
-      this.state.plannerOptionId = plannerOptionId
+      this.userSelectedResolver = true
+      this.state.resolverOptionId = resolverOptionId
       this.state.provider = provider
-      this.state.model = plannerOptionId
-        ? getDefaultModelForPlannerOption(this.getPlannerOptionById(plannerOptionId))
+      this.state.model = resolverOptionId
+        ? getDefaultModelForResolverOption(this.getResolverOptionById(resolverOptionId))
         : getDefaultModelForProvider(provider, this.endpointOptions)
       this.state.settingsOpen = true
-      this.invalidatePlanner()
+      this.invalidateResolver()
       this.render()
-      void this.refreshPlannerStatus()
+      void this.refreshResolverStatus()
     }
 
     private handleModelChanged(event: Event) {
@@ -789,8 +797,8 @@ export function defineWebMCPCommandInput(
       if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLSelectElement)) return
       this.userSelectedModel = true
       this.state.model = target.value
-      this.invalidatePlanner()
-      void this.refreshPlannerStatus()
+      this.invalidateResolver()
+      void this.refreshResolverStatus()
     }
 
     private handleSettingsToggled(event: Event) {
@@ -860,30 +868,30 @@ export function defineWebMCPCommandInput(
     }
 
     private getViewState(): CommandInputViewState {
-      const plannerOption = this.getSelectedPlannerOption()
+      const resolverOption = this.getSelectedResolverOption()
       const provider =
-        this.plannerConfig?.provider ?? this.state.fixedProvider ?? this.state.provider
-      const model = this.plannerConfig?.model ?? this.state.fixedModel ?? this.state.model
-      const providerControlValue = plannerOption
-        ? getPlannerOptionValue(plannerOption.id)
+        this.resolverConfig?.provider ?? this.state.fixedProvider ?? this.state.provider
+      const model = this.resolverConfig?.model ?? this.state.fixedModel ?? this.state.model
+      const providerControlValue = resolverOption
+        ? getResolverOptionValue(resolverOption.id)
         : provider
       const showChromeAIOption = this.shouldShowChromeAIOption()
       const showProviderControl =
-        !this.planner &&
-        !this.plannerConfig &&
+        !this.resolver &&
+        !this.resolverConfig &&
         !this.state.fixedProvider &&
-        getProviderOptionCount(this.endpointOptions, showChromeAIOption, this.plannerOptions) > 1
+        getProviderOptionCount(this.endpointOptions, showChromeAIOption, this.resolverOptions) > 1
       const showModelControl =
-        !this.planner &&
-        !this.plannerConfig &&
+        !this.resolver &&
+        !this.resolverConfig &&
         !this.state.fixedModel &&
-        (plannerOption
-          ? getPlannerOptionModelOptionCount(plannerOption) > 1
+        (resolverOption
+          ? getResolverOptionModelOptionCount(resolverOption) > 1
           : getModelOptionCount(provider, this.endpointOptions) > 1)
-      const optionsStatus = this.planner
-        ? this.state.plannerName
-        : plannerOption
-          ? getPlannerOptionStatusText(plannerOption, model)
+      const optionsStatus = this.resolver
+        ? this.state.resolverName
+        : resolverOption
+          ? getResolverOptionStatusText(resolverOption, model)
           : getOptionsStatusText(provider, model, this.endpointOptions)
 
       return {
@@ -893,8 +901,8 @@ export function defineWebMCPCommandInput(
         floating: this.state.floating,
         floatingExpanded: this.state.floatingExpanded,
         modelControlMarkup: showModelControl
-          ? plannerOption
-            ? getPlannerOptionModelControlMarkup(plannerOption, model)
+          ? resolverOption
+            ? getResolverOptionModelControlMarkup(resolverOption, model)
             : getModelControlMarkup(provider, model, this.endpointOptions)
           : '',
         optionsStatus,
@@ -906,7 +914,7 @@ export function defineWebMCPCommandInput(
               providerControlValue,
               this.endpointOptions,
               showChromeAIOption,
-              this.plannerOptions
+              this.resolverOptions
             )
           : '',
         running: this.running,
@@ -992,18 +1000,18 @@ export function defineWebMCPCommandInput(
       this.syncFloatingHost()
     }
 
-    private getSelectedPlannerOption(): WebMCPCommandInputPlannerOption | undefined {
-      const plannerOptionId = this.state.plannerOptionId
-      if (!plannerOptionId) return undefined
+    private getSelectedResolverOption(): WebMCPCommandInputResolverOption | undefined {
+      const resolverOptionId = this.state.resolverOptionId
+      if (!resolverOptionId) return undefined
 
-      return this.getPlannerOptionById(plannerOptionId)
+      return this.getResolverOptionById(resolverOptionId)
     }
 
-    private getPlannerOptionById(
-      plannerOptionId: string
-    ): WebMCPCommandInputPlannerOption | undefined {
-      return this.plannerOptions?.find(function findPlannerOption(option) {
-        return option.id === plannerOptionId
+    private getResolverOptionById(
+      resolverOptionId: string
+    ): WebMCPCommandInputResolverOption | undefined {
+      return this.resolverOptions?.find(function findResolverOption(option) {
+        return option.id === resolverOptionId
       })
     }
 
@@ -1028,7 +1036,7 @@ export function defineWebMCPCommandInput(
 
 function getStatusLabel(phase: WebMCPCommandInputPhase): string {
   if (phase === 'preparing') return 'Preparing...'
-  if (phase === 'planning') return 'Planning...'
+  if (phase === 'resolving') return 'Resolving...'
   if (phase === 'executing') return 'Running...'
   return defaultButtonLabel
 }

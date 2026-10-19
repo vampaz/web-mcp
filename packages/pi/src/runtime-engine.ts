@@ -11,7 +11,7 @@ import type {
 } from './interfaces/controller'
 import { abortable, jsonBytes, piError, PiFailure } from './errors'
 import { createPiModels, piModel } from './model-adapter'
-import { planPiRound } from './planner-adapter'
+import { resolvePiRound } from './resolver-adapter'
 import { normalizeMessages, lastTurnState } from './recovery'
 import type { PiToolCatalog } from './interfaces/host'
 import { piSessionKey, resolvePiLimits } from './session'
@@ -173,7 +173,7 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
             )
           }
           installCatalog(catalog)
-          const models = createPiModels(async function plan(messages, requestSignal) {
+          const models = createPiModels(async function resolution(messages, requestSignal) {
             if (!accepting)
               throw new PiFailure(
                 'stale_document',
@@ -190,8 +190,8 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                   'stale_document',
                   'The tool catalog changed. Send a new request.'
                 )
-              return await planPiRound(
-                options.planner,
+              return await resolvePiRound(
+                options.resolver,
                 messages,
                 current.tools,
                 await abortable(options.host.context(currentSignal), currentSignal),
@@ -228,7 +228,7 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
               model: piModel,
               thinkingLevel: 'off',
               instructions:
-                'Assist using current application tools and context. Replan after each result. Never replay abandoned actions. Application validation and approval are authoritative.'
+                'Assist using current application tools and context. Re-resolve after each result. Never replay abandoned actions. Application validation and approval are authoritative.'
             }
           })
           watch = await conversation.watch(context)
@@ -236,7 +236,7 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
           interrupted = previousTurn === 'started' || previousTurn === 'interrupted'
           await watch.stop()
           watch = undefined
-          // Abort before enabling any planner or page request on recovery.
+          // Abort before enabling any resolver or page request on recovery.
           await conversation.abort(context)
           if (previousTurn === 'started')
             await conversation.submit(

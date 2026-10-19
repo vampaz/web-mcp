@@ -53,7 +53,7 @@ export interface ToolAnnotations {
 }
 
 export interface ToolContext {
-  source: 'native' | 'fallback' | 'devtools' | 'planner'
+  source: 'native' | 'fallback' | 'devtools' | 'resolver'
   signal?: AbortSignal
 }
 
@@ -153,26 +153,26 @@ export interface ToolInvocationResult<TOutput = unknown> {
   durationMs: number
 }
 
-export interface ToolPlan {
+export interface ToolResolution {
   toolName: string
   input: Record<string, unknown>
   confidence: number
   reason: string
-  steps?: ToolPlanStep[]
+  steps?: ToolResolutionStep[]
 }
 
-export interface ToolPlanStep {
+export interface ToolResolutionStep {
   toolName: string
   input: Record<string, unknown>
   confidence: number
   reason: string
 }
 
-export interface PlannerContext {
+export interface ResolverContext {
   [key: string]: unknown
 }
 
-export type PlannerProviderKind =
+export type ResolverProviderKind =
   | 'auto'
   | 'chrome-built-in'
   | 'local'
@@ -181,47 +181,47 @@ export type PlannerProviderKind =
   | 'openai-compatible'
   | 'cloudflare-binding'
 
-export type PlannerAuth =
+export type ResolverAuth =
   | { mode: 'none' }
   | { mode: 'server'; endpoint: string }
   | { mode: 'user-key'; apiKey?: string; storageKey?: string }
 
-export interface PlannerProviderConfig {
-  provider: PlannerProviderKind
+export interface ResolverProviderConfig {
+  provider: ResolverProviderKind
   model?: string
   baseUrl?: string
-  auth?: PlannerAuth
+  auth?: ResolverAuth
   responseFormat?: 'json_object' | 'json_schema'
   maxTokens?: number
   temperature?: number
   reasoningEffort?: 'none' | 'low' | 'medium' | 'high'
 }
 
-export interface PlannerRequest {
+export interface ResolverRequest {
   message: string
   tools: WebMCPTool[]
-  context: PlannerContext
+  context: ResolverContext
 }
 
-export interface PlannerRunOptions {
+export interface ResolverRunOptions {
   signal?: AbortSignal
   singleStep?: boolean
-  /** Maximum UTF-8 bytes in the serialized planner request, including prompt/schema overhead. */
+  /** Maximum UTF-8 bytes in the serialized resolver request, including prompt/schema overhead. */
   maxRequestBytes?: number
 }
 
-export interface ToolPlanner {
+export interface ToolResolver {
   capabilities?: { conversation: boolean }
   name: string
   available: boolean
   status: 'ready' | 'downloadable' | 'downloading' | 'unavailable' | 'fallback' | 'needs-key'
   detail: string
-  plan: (
+  resolve: (
     message: string,
     tools: WebMCPTool[],
-    context?: PlannerContext,
-    options?: PlannerRunOptions
-  ) => Promise<ToolPlan>
+    context?: ResolverContext,
+    options?: ResolverRunOptions
+  ) => Promise<ToolResolution>
   dispose?: () => void
 }
 

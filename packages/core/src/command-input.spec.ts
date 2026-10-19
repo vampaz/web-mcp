@@ -4,12 +4,12 @@ import { defineWebMCPCommandInput } from './command-input'
 import { defineTool } from './define-tool'
 import type {
   WebMCPCommandInputElement,
-  WebMCPCommandInputPlannerCreateOptions,
-  WebMCPCommandPlannerEventDetail,
+  WebMCPCommandInputResolverCreateOptions,
+  WebMCPCommandResolverEventDetail,
   WebMCPCommandResultEventDetail,
   WebMCPCommandStepEventDetail
 } from './interfaces/command-input'
-import type { ToolPlan, ToolPlanner } from './interfaces/tool'
+import type { ToolResolution, ToolResolver } from './interfaces/tool'
 import { clearToolsForTest, registerTool } from './registry'
 
 interface WindowWithLanguageModel extends Window {
@@ -37,7 +37,7 @@ describe('WebMCP command input', () => {
     setViewportSize(defaultViewport.width, defaultViewport.height)
   })
 
-  it('plans a command and invokes the selected registered tool', async () => {
+  it('resolves a command and invokes the selected registered tool', async () => {
     const execute = vi.fn(function executeSearch(input: Record<string, unknown>) {
       return {
         query: input.query
@@ -59,12 +59,12 @@ describe('WebMCP command input', () => {
       })
     )
 
-    const planner: ToolPlanner = {
-      name: 'Test planner',
+    const resolver: ToolResolver = {
+      name: 'Test resolver',
       available: true,
       status: 'ready',
       detail: 'Ready for tests.',
-      async plan(message, tools, context) {
+      async resolve(message, tools, context) {
         expect(message).toBe('Find docks')
         expect(
           tools.map(function mapTool(tool) {
@@ -86,8 +86,8 @@ describe('WebMCP command input', () => {
       }
     }
     const element = createCommandInputElement()
-    element.planner = planner
-    element.context = function getPlannerContext() {
+    element.resolver = resolver
+    element.context = function getResolverContext() {
       return {
         route: 'catalog'
       }
@@ -112,19 +112,19 @@ describe('WebMCP command input', () => {
         query: 'dock'
       },
       {
-        source: 'planner',
+        source: 'resolver',
         signal: expect.any(AbortSignal)
       }
     )
   })
 
-  it('returns planner outcomes without invoking a registered tool', async () => {
-    const planner: ToolPlanner = {
-      name: 'Outcome planner',
+  it('returns resolver outcomes without invoking a registered tool', async () => {
+    const resolver: ToolResolver = {
+      name: 'Outcome resolver',
       available: true,
       status: 'ready',
       detail: 'Ready for tests.',
-      async plan() {
+      async resolve() {
         return {
           toolName: 'no_tools_match',
           input: {},
@@ -134,7 +134,7 @@ describe('WebMCP command input', () => {
       }
     }
     const element = createCommandInputElement()
-    element.planner = planner
+    element.resolver = resolver
 
     document.body.append(element)
     await Promise.resolve()
@@ -146,7 +146,7 @@ describe('WebMCP command input', () => {
     })
   })
 
-  it('does not send scope-unavailable tools to the planner', async () => {
+  it('does not send scope-unavailable tools to the resolver', async () => {
     registerTool(
       defineTool({
         name: 'checkout_cart',
@@ -166,12 +166,12 @@ describe('WebMCP command input', () => {
       })
     )
 
-    const planner: ToolPlanner = {
-      name: 'Scope-aware planner',
+    const resolver: ToolResolver = {
+      name: 'Scope-aware resolver',
       available: true,
       status: 'ready',
       detail: 'Ready for tests.',
-      async plan(_message, tools) {
+      async resolve(_message, tools) {
         expect(tools).toEqual([])
         return {
           toolName: 'no_tools_match',
@@ -182,7 +182,7 @@ describe('WebMCP command input', () => {
       }
     }
     const element = createCommandInputElement()
-    element.planner = planner
+    element.resolver = resolver
     document.body.append(element)
     await Promise.resolve()
 
@@ -192,8 +192,8 @@ describe('WebMCP command input', () => {
     })
   })
 
-  it('marks the run button as planning while the planner is working', async () => {
-    const planRequest = createDeferred<ToolPlan>()
+  it('marks the run button as resolving while the resolver is working', async () => {
+    const resolutionRequest = createDeferred<ToolResolution>()
     registerTool(
       defineTool({
         name: 'search_products',
@@ -212,17 +212,17 @@ describe('WebMCP command input', () => {
       })
     )
 
-    const planner: ToolPlanner = {
-      name: 'Slow planner',
+    const resolver: ToolResolver = {
+      name: 'Slow resolver',
       available: true,
       status: 'ready',
-      detail: 'Planning in progress.',
-      async plan() {
-        return await planRequest.promise
+      detail: 'Resolving in progress.',
+      async resolve() {
+        return await resolutionRequest.promise
       }
     }
     const element = createCommandInputElement()
-    element.planner = planner
+    element.resolver = resolver
     document.body.append(element)
     await Promise.resolve()
 
@@ -231,10 +231,10 @@ describe('WebMCP command input', () => {
     await Promise.resolve()
 
     const button = element.shadowRoot?.querySelector<HTMLButtonElement>('.webmcp-run-button')
-    expect(button?.dataset.phase).toBe('planning')
+    expect(button?.dataset.phase).toBe('resolving')
     expect(button?.getAttribute('aria-busy')).toBe('true')
 
-    planRequest.resolve({
+    resolutionRequest.resolve({
       toolName: 'search_products',
       input: {
         query: 'dock'
@@ -245,7 +245,7 @@ describe('WebMCP command input', () => {
     await result
   })
 
-  it('emits progress events for planned tool sequences', async () => {
+  it('emits progress events for resolved tool sequences', async () => {
     registerTool(
       defineTool({
         name: 'select_items',
@@ -282,12 +282,12 @@ describe('WebMCP command input', () => {
       })
     )
 
-    const planner: ToolPlanner = {
-      name: 'Sequence planner',
+    const resolver: ToolResolver = {
+      name: 'Sequence resolver',
       available: true,
       status: 'ready',
       detail: 'Ready for tests.',
-      async plan() {
+      async resolve() {
         return {
           toolName: 'tool_sequence',
           input: {},
@@ -312,7 +312,7 @@ describe('WebMCP command input', () => {
     }
     const element = createCommandInputElement()
     const steps: WebMCPCommandStepEventDetail[] = []
-    element.planner = planner
+    element.resolver = resolver
     element.addEventListener('webmcp-command-step', function handleStep(event) {
       steps.push((event as CustomEvent<WebMCPCommandStepEventDetail>).detail)
     })
@@ -335,8 +335,8 @@ describe('WebMCP command input', () => {
     ])
   })
 
-  it('cancels a command before planning starts', async () => {
-    const plan = vi.fn(async function createPlan() {
+  it('cancels a command before resolving starts', async () => {
+    const resolve = vi.fn(async function createResolution() {
       return {
         toolName: 'search_products',
         input: { query: 'dock' },
@@ -344,16 +344,16 @@ describe('WebMCP command input', () => {
         reason: 'Should not run.'
       }
     })
-    const planner: ToolPlanner = {
-      name: 'Test planner',
+    const resolver: ToolResolver = {
+      name: 'Test resolver',
       available: true,
       status: 'ready',
       detail: 'Ready for tests.',
-      plan
+      resolve
     }
     const controller = new AbortController()
     const element = createCommandInputElement()
-    element.planner = planner
+    element.resolver = resolver
     document.body.append(element)
     await Promise.resolve()
     controller.abort()
@@ -362,13 +362,13 @@ describe('WebMCP command input', () => {
       status: 'error',
       error: 'Command was cancelled.'
     })
-    expect(plan).not.toHaveBeenCalled()
+    expect(resolve).not.toHaveBeenCalled()
   })
 
   it.each(['disconnect', 'reconfigure'] as const)(
-    'does not execute a late plan after %s',
+    'does not execute a late resolution after %s',
     async function test(action) {
-      let finish!: (plan: ToolPlan) => void
+      let finish!: (resolution: ToolResolution) => void
       const execute = vi.fn()
       registerTool(
         defineTool({
@@ -379,20 +379,20 @@ describe('WebMCP command input', () => {
         })
       )
       const element = createCommandInputElement()
-      element.planner = {
-        name: 'Pending planner',
+      element.resolver = {
+        name: 'Pending resolver',
         available: true,
         status: 'ready',
         detail: 'Pending',
-        plan: vi.fn(function pending() {
-          return new Promise<ToolPlan>(function wait(resolve) {
+        resolve: vi.fn(function pending() {
+          return new Promise<ToolResolution>(function wait(resolve) {
             finish = resolve
           })
         })
       }
       document.body.append(element)
       const pending = element.run('Read items')
-      await vi.waitFor(function planning() {
+      await vi.waitFor(function resolving() {
         expect(finish).toBeTypeOf('function')
       })
       if (action === 'disconnect') element.remove()
@@ -407,7 +407,7 @@ describe('WebMCP command input', () => {
     const element = createCommandInputElement()
     element.setAttribute('provider', 'openai')
     element.setAttribute('model', 'gpt-5.4-mini')
-    element.setAttribute('endpoint', '/api/webmcp/plan')
+    element.setAttribute('endpoint', '/api/webmcp/resolve')
 
     document.body.append(element)
     await Promise.resolve()
@@ -416,7 +416,7 @@ describe('WebMCP command input', () => {
     expect(element.shadowRoot?.querySelector('[data-model]')).toBeNull()
   })
 
-  it('does not render planner controls without consumer endpoint options', async () => {
+  it('does not render resolver controls without consumer endpoint options', async () => {
     const element = createCommandInputElement()
 
     document.body.append(element)
@@ -427,7 +427,7 @@ describe('WebMCP command input', () => {
     expect(element.shadowRoot?.querySelector('.webmcp-settings')).toBeNull()
   })
 
-  it('renders no planner controls for one consumer endpoint option', async () => {
+  it('renders no resolver controls for one consumer endpoint option', async () => {
     const element = createCommandInputElement()
     element.configure({
       endpointOptions: [
@@ -496,7 +496,7 @@ describe('WebMCP command input', () => {
     ).toEqual(['OpenRouter Nemotron', 'OpenRouter Nano'])
   })
 
-  it('shows consumer planner options and runs the selected planner', async () => {
+  it('shows consumer resolver options and runs the selected resolver', async () => {
     registerTool(
       defineTool({
         name: 'select_items',
@@ -526,7 +526,7 @@ describe('WebMCP command input', () => {
           provider: 'openai'
         }
       ],
-      plannerOptions: [
+      resolverOptions: [
         {
           id: 'browser-local-ai',
           label: 'Browser local AI',
@@ -540,38 +540,38 @@ describe('WebMCP command input', () => {
               model: 'qwen-2b'
             }
           ],
-          createPlanner(options) {
+          createResolver(options) {
             return {
               name: 'Browser local AI',
               available: true,
               status: 'downloadable',
               detail: `Runs ${options?.model ?? 'unknown'} in the browser.`,
-              async plan() {
+              async resolve() {
                 return {
                   toolName: 'select_items',
                   input: { ids: [options?.model ?? 'missing-model'] },
                   confidence: 0.9,
-                  reason: 'Selected with a consumer planner.'
+                  reason: 'Selected with a consumer resolver.'
                 }
               }
             }
           }
         },
         {
-          id: 'custom-browser-planner',
-          label: 'Custom browser planner',
-          createPlanner() {
+          id: 'custom-browser-resolver',
+          label: 'Custom browser resolver',
+          createResolver() {
             return {
-              name: 'Custom browser planner',
+              name: 'Custom browser resolver',
               available: true,
               status: 'ready',
-              detail: 'Consumer-provided browser planner.',
-              async plan() {
+              detail: 'Consumer-provided browser resolver.',
+              async resolve() {
                 return {
                   toolName: 'select_items',
                   input: { ids: ['item_7'] },
                   confidence: 0.9,
-                  reason: 'Selected with a second consumer planner.'
+                  reason: 'Selected with a second consumer resolver.'
                 }
               }
             }
@@ -588,9 +588,9 @@ describe('WebMCP command input', () => {
       Array.from(provider?.options ?? []).map(function mapOption(option) {
         return option.textContent
       })
-    ).toEqual(['Browser local AI', 'Custom browser planner', 'OpenAI'])
+    ).toEqual(['Browser local AI', 'Custom browser resolver', 'OpenAI'])
 
-    provider!.value = 'planner:browser-local-ai'
+    provider!.value = 'resolver:browser-local-ai'
     provider!.dispatchEvent(new Event('change', { bubbles: true }))
     await Promise.resolve()
 
@@ -771,7 +771,7 @@ describe('WebMCP command input', () => {
     ).toEqual(['Cloudflare binding', 'OpenRouter'])
   })
 
-  it('routes OpenRouter planning through the configured server endpoint', async () => {
+  it('routes OpenRouter resolving through the configured server endpoint', async () => {
     const fetch = vi.fn(async () =>
       Response.json({
         toolName: 'select_items',
@@ -796,7 +796,7 @@ describe('WebMCP command input', () => {
 
     const element = createCommandInputElement()
     element.configure({
-      endpoint: '/api/webmcp/plan',
+      endpoint: '/api/webmcp/resolve',
       endpointOptions: [
         {
           label: 'Nemotron 3 Super 120B A12B',
@@ -819,7 +819,7 @@ describe('WebMCP command input', () => {
 
     expect(result?.status).toBe('success')
     expect(fetch).toHaveBeenCalledWith(
-      '/api/webmcp/plan',
+      '/api/webmcp/resolve',
       expect.objectContaining({
         body: expect.stringContaining('"provider":"openrouter"')
       })
@@ -953,12 +953,12 @@ describe('WebMCP command input', () => {
   it('opens the floating panel when a command is run programmatically', async () => {
     setViewportSize(1200, 900)
     const element = createCommandInputElement()
-    element.planner = {
-      name: 'Test planner',
+    element.resolver = {
+      name: 'Test resolver',
       available: true,
       status: 'ready',
       detail: 'Ready for tests.',
-      async plan() {
+      async resolve() {
         return {
           toolName: 'search_products',
           input: {
@@ -1001,7 +1001,7 @@ describe('WebMCP command input', () => {
     )
   })
 
-  it('uses initial planner choices without locking the controls', async () => {
+  it('uses initial resolver choices without locking the controls', async () => {
     const element = createCommandInputElement()
     document.body.append(element)
 
@@ -1064,7 +1064,7 @@ describe('WebMCP command input', () => {
     expect(renderedInput.selectionEnd).toBe(10)
   })
 
-  it('emits planner status when the selected provider changes', async () => {
+  it('emits resolver status when the selected provider changes', async () => {
     const element = createCommandInputElement()
     element.configure({
       endpointOptions: [
@@ -1083,7 +1083,7 @@ describe('WebMCP command input', () => {
     document.body.append(element)
     await Promise.resolve()
 
-    const event = waitForCommandPlanner(element)
+    const event = waitForCommandResolver(element)
     const provider = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
     if (!provider) throw new Error('Expected provider control.')
     provider.value = 'openrouter'
@@ -1091,7 +1091,7 @@ describe('WebMCP command input', () => {
 
     await expect(event).resolves.toMatchObject({
       detail: {
-        planner: expect.objectContaining({
+        resolver: expect.objectContaining({
           name: 'OpenRouter',
           status: 'needs-key'
         })
@@ -1099,7 +1099,7 @@ describe('WebMCP command input', () => {
     })
   })
 
-  it('reports an unavailable explicitly selected Chrome planner without falling back', async () => {
+  it('reports an unavailable explicitly selected Chrome resolver without falling back', async () => {
     registerTool(
       defineTool({
         name: 'add_to_cart',
@@ -1135,7 +1135,7 @@ describe('WebMCP command input', () => {
   it('hides controls when provider and model are fixed through configure', async () => {
     const element = createCommandInputElement()
     element.configure({
-      endpoint: '/api/webmcp/plan',
+      endpoint: '/api/webmcp/resolve',
       model: 'gpt-5.4-mini',
       provider: 'openai'
     })
@@ -1147,7 +1147,7 @@ describe('WebMCP command input', () => {
     expect(element.shadowRoot?.querySelector('[data-model]')).toBeNull()
   })
 
-  it('selects a configured planner option through initialPlannerOptionId', async () => {
+  it('selects a configured resolver option through initialResolverOptionId', async () => {
     registerTool(
       defineTool({
         name: 'select_items',
@@ -1177,8 +1177,8 @@ describe('WebMCP command input', () => {
           provider: 'openai'
         }
       ],
-      initialPlannerOptionId: 'browser-local-ai',
-      plannerOptions: [
+      initialResolverOptionId: 'browser-local-ai',
+      resolverOptions: [
         {
           id: 'browser-local-ai',
           label: 'Browser local AI',
@@ -1192,18 +1192,18 @@ describe('WebMCP command input', () => {
               model: 'qwen-2b'
             }
           ],
-          createPlanner(options) {
+          createResolver(options) {
             return {
               name: 'Browser local AI',
               available: true,
               status: 'ready',
               detail: `Runs ${options?.model ?? 'unknown'} in the browser.`,
-              async plan() {
+              async resolve() {
                 return {
                   toolName: 'select_items',
                   input: { ids: [options?.model ?? 'missing-model'] },
                   confidence: 0.9,
-                  reason: 'Selected with the initial consumer planner.'
+                  reason: 'Selected with the initial consumer resolver.'
                 }
               }
             }
@@ -1217,7 +1217,7 @@ describe('WebMCP command input', () => {
     const provider = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
     const model = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-model]')
     const settings = element.shadowRoot?.querySelector<HTMLDetailsElement>('.webmcp-settings')
-    expect(provider?.value).toBe('planner:browser-local-ai')
+    expect(provider?.value).toBe('resolver:browser-local-ai')
     expect(model?.value).toBe('hermes-3')
     expect(settings?.open).toBe(false)
 
@@ -1234,32 +1234,32 @@ describe('WebMCP command input', () => {
     expect(changedProvider?.value).toBe('openai')
   })
 
-  it('passes the selected model option object to createPlanner', async () => {
+  it('passes the selected model option object to createResolver', async () => {
     const hermesModelOption = {
       label: 'Hermes 3',
       model: 'hermes-3',
       contextWindowSize: 8192
     }
     let receivedModelOption: unknown
-    const createPlanner = vi.fn(function createPlannerSpy(
-      options?: WebMCPCommandInputPlannerCreateOptions
-    ): ToolPlanner {
+    const createResolver = vi.fn(function createResolverSpy(
+      options?: WebMCPCommandInputResolverCreateOptions
+    ): ToolResolver {
       receivedModelOption = options?.modelOption
 
       return {
         name: 'Browser local AI',
         available: true,
         status: 'ready',
-        detail: 'Browser planner.',
-        async plan(): Promise<ToolPlan> {
-          throw new Error('Not planned in this spec.')
+        detail: 'Browser resolver.',
+        async resolve(): Promise<ToolResolution> {
+          throw new Error('Not resolved in this spec.')
         }
       }
     })
     const element = createCommandInputElement()
     element.configure({
-      initialPlannerOptionId: 'browser-local-ai',
-      plannerOptions: [
+      initialResolverOptionId: 'browser-local-ai',
+      resolverOptions: [
         {
           id: 'browser-local-ai',
           label: 'Browser local AI',
@@ -1270,7 +1270,7 @@ describe('WebMCP command input', () => {
               model: 'qwen-2b'
             }
           ],
-          createPlanner
+          createResolver
         }
       ]
     })
@@ -1278,14 +1278,14 @@ describe('WebMCP command input', () => {
     await Promise.resolve()
     await Promise.resolve()
 
-    expect(createPlanner).toHaveBeenCalledWith({
+    expect(createResolver).toHaveBeenCalledWith({
       model: 'hermes-3',
       modelOption: hermesModelOption
     })
     expect(receivedModelOption).toBe(hermesModelOption)
   })
 
-  it('keeps the user planner selection when configure() runs again with initial options', async () => {
+  it('keeps the user resolver selection when configure() runs again with initial options', async () => {
     const configureOptions = {
       endpointOptions: [
         {
@@ -1300,20 +1300,20 @@ describe('WebMCP command input', () => {
         }
       ],
       initialModel: 'gpt-5.4-mini',
-      initialPlannerOptionId: 'browser-local-ai',
+      initialResolverOptionId: 'browser-local-ai',
       initialProvider: 'openai' as const,
-      plannerOptions: [
+      resolverOptions: [
         {
           id: 'browser-local-ai',
           label: 'Browser local AI',
-          createPlanner(): ToolPlanner {
+          createResolver(): ToolResolver {
             return {
               name: 'Browser local AI',
               available: true,
               status: 'ready',
-              detail: 'Browser planner.',
-              async plan(): Promise<ToolPlan> {
-                throw new Error('Not planned in this spec.')
+              detail: 'Browser resolver.',
+              async resolve(): Promise<ToolResolution> {
+                throw new Error('Not resolved in this spec.')
               }
             }
           }
@@ -1326,7 +1326,7 @@ describe('WebMCP command input', () => {
     await Promise.resolve()
 
     const provider = element.shadowRoot?.querySelector<HTMLSelectElement>('[data-provider]')
-    expect(provider?.value).toBe('planner:browser-local-ai')
+    expect(provider?.value).toBe('resolver:browser-local-ai')
 
     provider!.value = 'openrouter'
     provider!.dispatchEvent(new Event('change', { bubbles: true }))
@@ -1340,7 +1340,7 @@ describe('WebMCP command input', () => {
     expect(reconfiguredProvider?.value).toBe('openrouter')
   })
 
-  it('ignores unknown initialPlannerOptionId values', async () => {
+  it('ignores unknown initialResolverOptionId values', async () => {
     const element = createCommandInputElement()
     element.configure({
       endpointOptions: [
@@ -1355,7 +1355,7 @@ describe('WebMCP command input', () => {
           provider: 'cloudflare-binding'
         }
       ],
-      initialPlannerOptionId: 'missing-planner-option'
+      initialResolverOptionId: 'missing-resolver-option'
     })
     document.body.append(element)
     await Promise.resolve()
@@ -1364,25 +1364,25 @@ describe('WebMCP command input', () => {
     expect(provider?.value).toBe('openrouter')
   })
 
-  it('ignores initialPlannerOptionId when the provider is fixed by the app', async () => {
+  it('ignores initialResolverOptionId when the provider is fixed by the app', async () => {
     const element = createCommandInputElement()
     element.configure({
-      endpoint: '/api/webmcp/plan',
+      endpoint: '/api/webmcp/resolve',
       model: 'gpt-5.4-mini',
       provider: 'openai',
-      initialPlannerOptionId: 'browser-local-ai',
-      plannerOptions: [
+      initialResolverOptionId: 'browser-local-ai',
+      resolverOptions: [
         {
           id: 'browser-local-ai',
           label: 'Browser local AI',
-          createPlanner() {
+          createResolver() {
             return {
               name: 'Browser local AI',
               available: true,
               status: 'ready',
               detail: 'Should not be selected.',
-              async plan() {
-                throw new Error('Should not plan.')
+              async resolve() {
+                throw new Error('Should not resolution.')
               }
             }
           }
@@ -1438,7 +1438,7 @@ describe('WebMCP command input', () => {
 
     element.configure({
       buttonLabel: 'Go',
-      endpoint: '/api/webmcp/plan',
+      endpoint: '/api/webmcp/resolve',
       endpointOptions: [
         {
           label: 'Nemotron 3 Super 120B A12B',
@@ -1462,18 +1462,20 @@ describe('WebMCP command input', () => {
     expect(records.length).toBe(1)
   })
 
-  it('emits one planner status after a multi-option configure() call', async () => {
+  it('emits one resolver status after a multi-option configure() call', async () => {
     const element = createCommandInputElement()
     document.body.append(element)
     await Promise.resolve()
 
-    const plannerNames: string[] = []
-    element.addEventListener('webmcp-command-planner', function trackPlanner(event) {
-      plannerNames.push((event as CustomEvent<WebMCPCommandPlannerEventDetail>).detail.planner.name)
+    const resolverNames: string[] = []
+    element.addEventListener('webmcp-command-resolver', function trackResolver(event) {
+      resolverNames.push(
+        (event as CustomEvent<WebMCPCommandResolverEventDetail>).detail.resolver.name
+      )
     })
 
     element.configure({
-      endpoint: '/api/webmcp/plan',
+      endpoint: '/api/webmcp/resolve',
       endpointOptions: [
         {
           label: 'Nemotron 3 Super 120B A12B',
@@ -1493,27 +1495,27 @@ describe('WebMCP command input', () => {
     await Promise.resolve()
     await Promise.resolve()
 
-    expect(plannerNames).toEqual(['OpenRouter'])
+    expect(resolverNames).toEqual(['OpenRouter'])
   })
 
-  it('does not show superseded planner refreshes after late configuration', async () => {
+  it('does not show superseded resolver refreshes after late configuration', async () => {
     const element = createCommandInputElement()
     document.body.append(element)
     await Promise.resolve()
 
-    const event = waitForCommandPlanner(element)
+    const event = waitForCommandResolver(element)
     element.configure({
-      planner: {
-        name: 'Configured planner',
+      resolver: {
+        name: 'Configured resolver',
         available: true,
         status: 'ready',
         detail: 'Configured after mount.',
-        async plan() {
+        async resolve() {
           return {
             toolName: 'search_products',
             input: {},
             confidence: 0.5,
-            reason: 'Test planner.'
+            reason: 'Test resolver.'
           }
         }
       }
@@ -1523,8 +1525,8 @@ describe('WebMCP command input', () => {
 
     await expect(event).resolves.toMatchObject({
       detail: {
-        planner: expect.objectContaining({
-          name: 'Configured planner'
+        resolver: expect.objectContaining({
+          name: 'Configured resolver'
         })
       }
     })
@@ -1564,14 +1566,14 @@ function waitForCommandResult(
   })
 }
 
-function waitForCommandPlanner(
+function waitForCommandResolver(
   element: WebMCPCommandInputElement
-): Promise<CustomEvent<WebMCPCommandPlannerEventDetail>> {
-  return new Promise(function resolveCommandPlanner(resolve) {
+): Promise<CustomEvent<WebMCPCommandResolverEventDetail>> {
+  return new Promise(function resolveCommandResolver(resolve) {
     element.addEventListener(
-      'webmcp-command-planner',
-      function handlePlanner(event) {
-        resolve(event as CustomEvent<WebMCPCommandPlannerEventDetail>)
+      'webmcp-command-resolver',
+      function handleResolver(event) {
+        resolve(event as CustomEvent<WebMCPCommandResolverEventDetail>)
       },
       { once: true }
     )

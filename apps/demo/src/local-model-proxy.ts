@@ -46,7 +46,7 @@ export async function handleLocalModelRequest(
       for await (const chunk of request) {
         size += Buffer.byteLength(chunk)
         if (size > 1024 * 1024) {
-          response.writeHead(413).end('Planner request is too large.')
+          response.writeHead(413).end('Resolver request is too large.')
           return
         }
         chunks.push(Buffer.from(chunk))
@@ -55,7 +55,7 @@ export async function handleLocalModelRequest(
       try {
         payload = JSON.parse(Buffer.concat(chunks).toString())
       } catch {
-        response.writeHead(400).end('The planner request must be valid JSON.')
+        response.writeHead(400).end('The resolver request must be valid JSON.')
         return
       }
       if (

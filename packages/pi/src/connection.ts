@@ -93,7 +93,7 @@ export async function createPiHarness(options: PiHarnessOptions): Promise<PiCont
       sendRequest(message) {
         target.postMessage(message)
       },
-      methods: ['discover', 'context', 'invoke', 'plan'],
+      methods: ['discover', 'context', 'invoke', 'resolve'],
       async request(method, payload, signal) {
         if (closed) throw new PiFailure('stale_document', 'The document closed.')
         if (method === 'discover') return host.discover(signal)
@@ -130,9 +130,9 @@ export async function createPiHarness(options: PiHarnessOptions): Promise<PiCont
           !request.context ||
           typeof request.context !== 'object'
         )
-          throw new PiFailure('transport_failed', 'Invalid planner request.')
+          throw new PiFailure('transport_failed', 'Invalid resolver request.')
         try {
-          return await options.planner.plan(request.message, request.tools, request.context, {
+          return await options.resolver.resolve(request.message, request.tools, request.context, {
             signal,
             singleStep: request.singleStep === true,
             maxRequestBytes: limits.maxRequestBytes
@@ -158,7 +158,7 @@ export async function createPiHarness(options: PiHarnessOptions): Promise<PiCont
     target.addEventListener('statechange', workerChanged)
     const ready = await peer.call(
       'ready',
-      { capabilities: options.planner.capabilities, available: options.planner.available },
+      { capabilities: options.resolver.capabilities, available: options.resolver.available },
       undefined,
       15000
     )

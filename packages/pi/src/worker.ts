@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import type { PiController } from './interfaces/controller'
 import type { PiToolCatalog } from './interfaces/host'
-import type { PlannerContext, ToolInvocationResult, ToolPlan } from '@vampaz/webmcp-kit'
+import type { ResolverContext, ToolInvocationResult, ToolResolution } from '@vampaz/webmcp-kit'
 import { createPeer, validConnect, validEnvelope } from './protocol'
 import { PiFailure } from './errors'
 import { openRuntime } from './runtime-engine'
@@ -51,8 +51,8 @@ export function installPiServiceWorker(
     let ready: Promise<PiController> | undefined
     let unsubscribe: (() => void) | undefined
     let closed = false
-    let plannerCapabilities = { conversation: false }
-    let plannerAvailable = false
+    let resolverCapabilities = { conversation: false }
+    let resolverAvailable = false
     const peer = createPeer(port, command.binding, {
       methods: ['ready', 'send', 'stop', 'clear', 'destroy', 'ping'],
       async request(method, payload, signal) {
@@ -67,8 +67,8 @@ export function installPiServiceWorker(
             available?: boolean
             capabilities?: { conversation?: boolean }
           }
-          plannerAvailable = config?.available === true
-          plannerCapabilities = { conversation: config?.capabilities?.conversation === true }
+          resolverAvailable = config?.available === true
+          resolverCapabilities = { conversation: config?.capabilities?.conversation === true }
           ready = openRuntime({
             session: command.session,
             limits: command.limits,
@@ -77,21 +77,21 @@ export function installPiServiceWorker(
                 return (await peer.call('discover', undefined, signal)) as PiToolCatalog
               },
               async context(signal) {
-                return (await peer.call('context', undefined, signal)) as PlannerContext
+                return (await peer.call('context', undefined, signal)) as ResolverContext
               },
               async invoke(call, signal) {
                 return (await peer.call('invoke', call, signal, null)) as ToolInvocationResult
               }
             },
-            planner: {
-              name: 'Application planner',
-              available: plannerAvailable,
-              capabilities: plannerCapabilities,
-              status: plannerAvailable ? 'ready' : 'unavailable',
-              detail: 'The application owns the planner.',
-              async plan(message, tools, context, options) {
+            resolver: {
+              name: 'Application resolver',
+              available: resolverAvailable,
+              capabilities: resolverCapabilities,
+              status: resolverAvailable ? 'ready' : 'unavailable',
+              detail: 'The application owns the resolver.',
+              async resolve(message, tools, context, options) {
                 return (await peer.call(
-                  'plan',
+                  'resolve',
                   {
                     message,
                     tools: tools.map(function describe(tool) {
@@ -105,7 +105,7 @@ export function installPiServiceWorker(
                     singleStep: options?.singleStep
                   },
                   options?.signal
-                )) as ToolPlan
+                )) as ToolResolution
               }
             }
           })

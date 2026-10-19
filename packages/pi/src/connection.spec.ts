@@ -14,13 +14,13 @@ it('reports missing durable browser prerequisites without installing anything', 
     createPiHarness({
       session: { namespace: 'tests', ownerId: 'one', conversationId: 'chat' },
       worker: { url: '/pi/worker.js', scope: '/pi/' },
-      planner: {
+      resolver: {
         name: 'test',
         available: true,
         status: 'ready',
         detail: '',
-        async plan() {
-          throw new Error('must not plan')
+        async resolve() {
+          throw new Error('must not resolution')
         }
       }
     })
@@ -68,14 +68,14 @@ it('keeps a healthy turn active beyond the individual RPC timeout', async functi
     }
   })
   vi.useFakeTimers()
-  const plan = vi.fn(async function reply() {
+  const resolve = vi.fn(async function reply() {
     return { toolName: 'pi_reply', input: { text: 'Done' }, confidence: 1, reason: 'Reply' }
   })
   const harness = await createPiHarness({
     session: { namespace: 'tests', ownerId: 'one', conversationId: 'chat' },
     worker: { url: '/pi/worker.js', scope: '/pi/' },
     limits: { maxRequestBytes: 2048 },
-    planner: { name: 'test', available: true, status: 'ready', detail: '', plan },
+    resolver: { name: 'test', available: true, status: 'ready', detail: '', resolve },
     host: {
       async discover() {
         return { revision: '1', tools: [] }
@@ -91,8 +91,8 @@ it('keeps a healthy turn active beyond the individual RPC timeout', async functi
   try {
     const outcome = harness.send('Take several rounds')
     await pendingStart
-    await remote!.call('plan', { message: 'Hello', tools: [], context: {}, singleStep: true })
-    expect(plan).toHaveBeenCalledWith(
+    await remote!.call('resolve', { message: 'Hello', tools: [], context: {}, singleStep: true })
+    expect(resolve).toHaveBeenCalledWith(
       'Hello',
       [],
       {},
@@ -140,17 +140,17 @@ it('admits only user turns and remains usable after a cached page is restored', 
     return {}
   })
   const invoke = vi.fn()
-  const plan = vi.fn()
+  const resolve = vi.fn()
   const harness = await createPiHarness({
     session: { namespace: 'tests', ownerId: 'one', conversationId: 'chat' },
     worker: { url: '/pi/worker.js', scope: '/pi/' },
-    planner: {
+    resolver: {
       name: 'test',
       available: true,
       capabilities: { conversation: true },
       status: 'ready',
       detail: '',
-      plan
+      resolve
     },
     host: {
       async discover() {
@@ -162,10 +162,10 @@ it('admits only user turns and remains usable after a cached page is restored', 
   })
   try {
     await expect(remote!.call('context')).rejects.toMatchObject({ code: 'stale_document' })
-    await expect(remote!.call('plan', {})).rejects.toMatchObject({ code: 'stale_document' })
+    await expect(remote!.call('resolve', {})).rejects.toMatchObject({ code: 'stale_document' })
     await expect(remote!.call('invoke', {})).rejects.toMatchObject({ code: 'stale_document' })
     expect(context).not.toHaveBeenCalled()
-    expect(plan).not.toHaveBeenCalled()
+    expect(resolve).not.toHaveBeenCalled()
     window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))
     window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
     expect(await harness.send('A new request after Back')).toEqual({ status: 'completed' })
@@ -226,12 +226,12 @@ it('does not let an old heartbeat interrupt a subsequent user turn', async funct
   const harness = await createPiHarness({
     session: { namespace: 'tests', ownerId: 'one', conversationId: 'chat' },
     worker: { url: '/pi/worker.js', scope: '/pi/' },
-    planner: {
+    resolver: {
       name: 'test',
       available: true,
       status: 'ready',
       detail: '',
-      async plan() {
+      async resolve() {
         throw new Error('Unexpected inference')
       }
     }

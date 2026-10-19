@@ -6,18 +6,18 @@ This guide explains runtime behavior. The generated reference lists all public e
 
 ## Choose the entry point
 
-| Import                      | Main API                                                          | Additional peer                                   |
-| --------------------------- | ----------------------------------------------------------------- | ------------------------------------------------- |
-| `@vampaz/webmcp-kit`        | Tools, registry, validation, planners, command input, diagnostics | None                                              |
-| `/pi`                       | `createPiHarness`, `createPiRuntime`, `createRegistryToolHost`    | None; runtime dependencies install with the kit   |
-| `/pi/worker`                | `installPiServiceWorker`                                          | None; runtime dependencies install with the kit   |
-| `/chat`                     | `defineWebMCPChat`, `WebMCPChatElement`, `WebMCPChatOptions`      | None when supplied a controller                   |
-| `/vue`, `/react`, `/svelte` | `useWebMCPTool` and framework-specific types                      | The selected framework                            |
-| `/zod`                      | `defineZodTool`                                                   | Zod 4                                             |
-| `/devtools`                 | `mountDevtoolsOverlay`                                            | None                                              |
-| `/testing`                  | Planner evaluations and Playwright helpers                        | None; supply a planner or compatible browser page |
-| `/testing/playwright`       | Page bridge helpers without evaluation imports                    | None; supply a compatible browser page            |
-| `/mcp-bridge`               | `createLocalMCPBridge`                                            | None                                              |
+| Import                      | Main API                                                           | Additional peer                                    |
+| --------------------------- | ------------------------------------------------------------------ | -------------------------------------------------- |
+| `@vampaz/webmcp-kit`        | Tools, registry, validation, resolvers, command input, diagnostics | None                                               |
+| `/pi`                       | `createPiHarness`, `createPiRuntime`, `createRegistryToolHost`     | None; runtime dependencies install with the kit    |
+| `/pi/worker`                | `installPiServiceWorker`                                           | None; runtime dependencies install with the kit    |
+| `/chat`                     | `defineWebMCPChat`, `WebMCPChatElement`, `WebMCPChatOptions`       | None when supplied a controller                    |
+| `/vue`, `/react`, `/svelte` | `useWebMCPTool` and framework-specific types                       | The selected framework                             |
+| `/zod`                      | `defineZodTool`                                                    | Zod 4                                              |
+| `/devtools`                 | `mountDevtoolsOverlay`                                             | None                                               |
+| `/testing`                  | Resolver evaluations and Playwright helpers                        | None; supply a resolver or compatible browser page |
+| `/testing/playwright`       | Page bridge helpers without evaluation imports                     | None; supply a compatible browser page             |
+| `/mcp-bridge`               | `createLocalMCPBridge`                                             | None                                               |
 
 The package is ESM-only. Importing core, `/pi`, or `/chat` is safe during SSR. Browser initialization, DOM registration, and worker installation belong in client lifecycle code. `/pi/worker` runs in a service-worker context. See the [dependency model](./getting-started.md#dependency-model) for exact peer package names and development-only tooling.
 
@@ -49,7 +49,7 @@ The reserved core names are `tool_sequence`, `needs_clarification`, and `no_tool
 
 `setConfirmationHandler(handler)` installs the application's global approval UI. A tool's own `confirmation.handler` takes precedence. Handlers receive `(tool, input, reason, context?)`; when supplied, `context.signal` tells the UI to close a cancelled request. Passing `undefined` removes the global handler. Without a handler, the browser uses `window.confirm()`; without a browser confirmation API, approval is denied.
 
-Never pass planner-provided `confirmed` values through to `invokeTool()`. `confirmed: true` is reserved for trusted application code that has already completed approval. The test bridge strips caller-provided bypasses, and the local MCP bridge does not expose one.
+Never pass resolver-provided `confirmed` values through to `invokeTool()`. `confirmed: true` is reserved for trusted application code that has already completed approval. The test bridge strips caller-provided bypasses, and the local MCP bridge does not expose one.
 
 | `code`                | `status`      | Meaning and response                                                 |
 | --------------------- | ------------- | -------------------------------------------------------------------- |
@@ -66,7 +66,7 @@ Never pass planner-provided `confirmed` values through to `invokeTool()`. `confi
 | `invalid_output`      | `error`       | Output failed validation after execution; action may have completed. |
 | `not_registered`      | `error`       | Tool no longer exists or the name is wrong.                          |
 
-Successful results contain `status: 'success'`, `toolName`, `output`, and `durationMs`. Registry invocations also receive an `invocationId`. Missing `output` is valid. Native wrappers turn non-success results into errors for the browser API. The command input converts planning outcomes into blocked/unavailable results without executing an application tool.
+Successful results contain `status: 'success'`, `toolName`, `output`, and `durationMs`. Registry invocations also receive an `invocationId`. Missing `output` is valid. Native wrappers turn non-success results into errors for the browser API. The command input converts resolution outcomes into blocked/unavailable results without executing an application tool.
 
 ## Schemas, forms, and server actions
 
@@ -82,54 +82,54 @@ Only named, editable controls become inputs. Disabled controls, disabled fieldse
 
 `defineZodTool({ schema, ...toolOptions })` derives JSON Schema from Zod and parses input with Zod before execution. Unsupported Zod transformations/schema constructs can fail conversion; use schemas representable by the kit's JSON Schema subset. Keep Zod installed as an explicit peer.
 
-## Setup and planner factories
+## Setup and resolver factories
 
-| API                                       | Behavior                                                                                                                                                                                                                                                                                                                                 |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `initWebMCP(options)`                     | Synchronously registers tools and configures an existing or created command element. An explicit `planner` takes precedence; otherwise, `accessKey` requires `model` and creates a hosted planner. Returns registrations, element, optional planner, and `destroy()`. Duplicate tool names are rejected by this convenience initializer. |
-| `createWebMCPKit({ planner? })`           | Asynchronously resolves a planner and returns `{ planner, plannerConfig }`. It does not register tools or mount UI.                                                                                                                                                                                                                      |
-| `createBestPlanner()`                     | Selects Chrome AI when available, otherwise a heuristic planner.                                                                                                                                                                                                                                                                         |
-| `createChromeAIPlanner(strict = false)`   | Detects browser AI. Strict mode refuses heuristic fallback and advertises conversational capability when available. Session creation is deferred until planning. Cancellation reaches inference.                                                                                                                                         |
-| `createHeuristicPlanner()`                | Deterministic local command planning; not a conversational planner.                                                                                                                                                                                                                                                                      |
-| `createConfiguredPlanner(config?)`        | Dispatches `auto`, `local`, `chrome-built-in`, or remote provider configuration.                                                                                                                                                                                                                                                         |
-| `createRemotePlanner(config)`             | Creates a remote/server planner. No inference request is made until `plan()`.                                                                                                                                                                                                                                                            |
-| `createHostedOpenAIPlanner(options)`      | Uses hosted session and planning endpoints; requires the host's supported access/session setup.                                                                                                                                                                                                                                          |
-| `createHostedOpenAIPlannerOption(config)` | Wraps hosted planning as a command-input option with model choices.                                                                                                                                                                                                                                                                      |
+| API                                        | Behavior                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `initWebMCP(options)`                      | Synchronously registers tools and configures an existing or created command element. An explicit `resolver` takes precedence; otherwise, `accessKey` requires `model` and creates a hosted resolver. Returns registrations, element, optional resolver, and `destroy()`. Duplicate tool names are rejected by this convenience initializer. |
+| `createWebMCPKit({ resolver? })`           | Asynchronously resolves a resolver and returns `{ resolver, resolverConfig }`. It does not register tools or mount UI.                                                                                                                                                                                                                      |
+| `createBestResolver()`                     | Selects Chrome AI when available, otherwise a heuristic resolver.                                                                                                                                                                                                                                                                           |
+| `createChromeAIResolver(strict = false)`   | Detects browser AI. Strict mode refuses heuristic fallback and advertises conversational capability when available. Session creation is deferred until resolution. Cancellation reaches inference.                                                                                                                                          |
+| `createHeuristicResolver()`                | Deterministic local command resolution; not a conversational resolver.                                                                                                                                                                                                                                                                      |
+| `createConfiguredResolver(config?)`        | Dispatches `auto`, `local`, `chrome-built-in`, or remote provider configuration.                                                                                                                                                                                                                                                            |
+| `createRemoteResolver(config)`             | Creates a remote/server resolver. No inference request is made until `resolve()`.                                                                                                                                                                                                                                                           |
+| `createHostedOpenAIResolver(options)`      | Uses hosted session and resolution endpoints; requires the host's supported access/session setup.                                                                                                                                                                                                                                           |
+| `createHostedOpenAIResolverOption(config)` | Wraps hosted resolution as a command-input option with model choices.                                                                                                                                                                                                                                                                       |
 
-`PlannerProviderConfig` selects `provider`, optional `model` and `baseUrl`, and `auth`. Server auth sends requests to an application endpoint. User-key mode exposes the person's key to the browser in every environment. The application owns permission to offer this mode. Browser-local storage of a user key is not a place for application secrets. The unused `allowInProduction` option was removed; it never enforced a production restriction.
+`ResolverProviderConfig` selects `provider`, optional `model` and `baseUrl`, and `auth`. Server auth sends requests to an application endpoint. User-key mode exposes the person's key to the browser in every environment. The application owns permission to offer this mode. Browser-local storage of a user key is not a place for application secrets. The unused `allowInProduction` option was removed; it never enforced a production restriction.
 
-OpenAI-compatible configuration supports `responseFormat` (`json_object` by default or `json_schema`), `maxTokens` (1–65,536), `temperature` (0–2; default 0), and optional `reasoningEffort`. These provider-specific settings apply to direct OpenAI-compatible requests; a server endpoint owns its own model policy. Truncated output with finish reason `length` fails planning.
+OpenAI-compatible configuration supports `responseFormat` (`json_object` by default or `json_schema`), `maxTokens` (1–65,536), `temperature` (0–2; default 0), and optional `reasoningEffort`. These provider-specific settings apply to direct OpenAI-compatible requests; a server endpoint owns its own model policy. Truncated output with finish reason `length` fails resolution.
 
-`ToolPlanner.plan(message, tools, context?, options?)` returns a `ToolPlan`. `options` supports `signal`, `singleStep`, and `maxRequestBytes`. `singleStep` forbids `steps` and `tool_sequence`. Built-in HTTP planners enforce the byte budget on the complete serialized body. Chrome checks the prompt and response constraint; server-added content and the browser model's retained session history are outside that limit. Custom planners must enforce their transport budget themselves.
+`ToolResolver.resolve(message, tools, context?, options?)` returns a `ToolResolution`. `options` supports `signal`, `singleStep`, and `maxRequestBytes`. `singleStep` forbids `steps` and `tool_sequence`. Built-in HTTP resolvers enforce the byte budget on the complete serialized body. Chrome checks the prompt and response constraint; server-added content and the browser model's retained session history are outside that limit. Custom resolvers must enforce their transport budget themselves.
 
-`validateToolPlan(plan, tools, { singleStep?, messageStyle? })` throws for invalid output, unknown tools, invalid tool inputs, and invalid sequences. It does not execute a plan. Ordinary sequences contain 1–5 steps. `plannerOutcomeToolNames`, `isPlannerOutcomeToolName`, and `toolPlanSchema` expose the non-executing outcome names and ordinary plan schema. `normalizeJsonText()` normalizes supported JSON text wrappers; it does not validate or authorize a plan.
+`validateToolResolution(resolution, tools, { singleStep?, messageStyle? })` throws for invalid output, unknown tools, invalid tool inputs, and invalid sequences. It does not execute a resolution. Ordinary sequences contain 1–5 steps. `resolverOutcomeToolNames`, `isResolverOutcomeToolName`, and `toolResolutionSchema` expose the non-executing outcome names and ordinary resolution schema. `normalizeJsonText()` normalizes supported JSON text wrappers; it does not validate or authorize a resolution.
 
-A custom conversational planner must be available, declare `capabilities: { conversation: true }`, honor cancellation and request limits, validate its response, and report provider failures. Do not advertise conversation support for a heuristic or silent fallback. The host must call a planner's optional `dispose()` when it no longer owns that planner.
+A custom conversational resolver must be available, declare `capabilities: { conversation: true }`, honor cancellation and request limits, validate its response, and report provider failures. Do not advertise conversation support for a heuristic or silent fallback. The host must call a resolver's optional `dispose()` when it no longer owns that resolver.
 
 ## Command input
 
 `defineWebMCPCommandInput()` registers `<webmcp-command-input>`. `configure()` accepts the full `WebMCPCommandInputConfigureOptions` contract. Use properties for objects/functions; use attributes for supported primitive configuration. The element exposes `run(message?, { signal? })`, `openPanel()`, `closePanel()`, `togglePanel()`, and `panelOpen`.
 
-App-supplied `planner`, `provider`, or `model` fixes those choices. `plannerOptions` and `endpointOptions` provide developer choices; `initialPlannerOptionId`, `initialProvider`, and `initialModel` choose defaults without fixing them. `showChromeAI` controls whether browser AI appears. `context` supplies current, deliberately selected app state. `floating` controls the command panel, independently of the separate chat component.
+App-supplied `resolver`, `provider`, or `model` fixes those choices. `resolverOptions` and `endpointOptions` provide developer choices; `initialResolverOptionId`, `initialProvider`, and `initialModel` choose defaults without fixing them. `showChromeAI` controls whether browser AI appears. `context` supplies current, deliberately selected app state. `floating` controls the command panel, independently of the separate chat component.
 
-| Custom event                  | `detail`                                                                        |
-| ----------------------------- | ------------------------------------------------------------------------------- |
-| `webmcp-command-plan`         | `message`, validated `plan`, `planner`                                          |
-| `webmcp-command-planner`      | Active `planner`                                                                |
-| `webmcp-command-step`         | `message`, `phase`, `plan`, `step`, `stepIndex`, `stepCount`, optional `result` |
-| `webmcp-command-result`       | `message`, `plan`, `result`                                                     |
-| `webmcp-command-error`        | `message`, error text                                                           |
-| `webmcp-command-panel-toggle` | `open`                                                                          |
+| Custom event                  | `detail`                                                                              |
+| ----------------------------- | ------------------------------------------------------------------------------------- |
+| `webmcp-command-resolution`   | `message`, validated `resolution`, `resolver`                                         |
+| `webmcp-command-resolver`     | Active `resolver`                                                                     |
+| `webmcp-command-step`         | `message`, `phase`, `resolution`, `step`, `stepIndex`, `stepCount`, optional `result` |
+| `webmcp-command-result`       | `message`, `resolution`, `result`                                                     |
+| `webmcp-command-error`        | `message`, error text                                                                 |
+| `webmcp-command-panel-toggle` | `open`                                                                                |
 
 Events bubble and cross the shadow boundary. `run()` can return `undefined` when no command executes; inspect events/results rather than assuming a resolved promise means success. See the [README command-input examples](../README.md#ready-made-command-input) for provider controls and CSS properties.
 
-Removing the command element or changing its planner configuration cancels its pending command. Explicit Chrome AI selection reports browser AI failures. Only automatic or explicitly non-strict Chrome planning permits heuristic fallback.
+Removing the command element or changing its resolver configuration cancels its pending command. Explicit Chrome AI selection reports browser AI failures. Only automatic or explicitly non-strict Chrome resolution permits heuristic fallback.
 
 ## Pi controller and custom hosts
 
-`createPiHarness(options)` connects the page to an application-compiled worker. Required options are `session`, `worker: { url, scope }`, and `planner`. Optional `context` supplies fresh state, `host` replaces the registry-backed tool host, `limits` sets budgets, and `onCancel` closes application-owned pending UI. A custom `host` owns context selection; the separate `context` option is used only by the default host.
+`createPiHarness(options)` connects the page to an application-compiled worker. Required options are `session`, `worker: { url, scope }`, and `resolver`. Optional `context` supplies fresh state, `host` replaces the registry-backed tool host, `limits` sets budgets, and `onCancel` closes application-owned pending UI. A custom `host` owns context selection; the separate `context` option is used only by the default host.
 
-`createPiRuntime({ session, planner, host, limits? })` runs in the current browser context without the worker connection. Both factories require IndexedDB and Web Locks. The page harness additionally requires a secure context and service-worker support. Initialization can reject or return a controller whose snapshot contains a recoverable error; handle both paths.
+`createPiRuntime({ session, resolver, host, limits? })` runs in the current browser context without the worker connection. Both factories require IndexedDB and Web Locks. The page harness additionally requires a secure context and service-worker support. Initialization can reject or return a controller whose snapshot contains a recoverable error; handle both paths.
 
 | Controller method     | Contract                                                                                                                                                                  |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -138,24 +138,24 @@ Removing the command element or changing its planner configuration cancels its p
 | `send(text)`          | One active operation at a time. Accepts nonempty text up to 16,000 characters. Returns a `PiTurnOutcome`; a completed turn may be a clarification rather than a mutation. |
 | `stop()`              | Cancels work and waits for settlement. No rollback guarantee.                                                                                                             |
 | `clear()`             | Clears this session's persisted history under its lock. Rejects while a local turn is active. Does not undo application actions.                                          |
-| `destroy()`           | Stops this controller, clears its subscriptions, and preserves history. Does not unregister the shared worker or dispose the host's planner.                              |
+| `destroy()`           | Stops this controller, clears its subscriptions, and preserves history. Does not unregister the shared worker or dispose the host's resolver.                             |
 
 See [Pi](./pi.md#persistence-and-limits) for exact budget defaults and bounds. Session fields must each be 1–200 printable characters with nonblank content. The runtime requires one explicit owner partition per account/anonymous session.
 
 `PiToolHost.discover(signal)` returns `{ revision, tools }`. Change the revision whenever tool identity, schema, availability, or relevant execution scope changes. `context(signal)` returns current safe state. `invoke({ name, input, revision }, signal)` must validate the revision and enforce the same input, authorization, scope, confirmation, and guard rules as the ordinary UI. It returns a real `ToolInvocationResult`. A custom host must never treat model output as a confirmation bypass.
 
-| Pi error code       | Interpretation                                                       |
-| ------------------- | -------------------------------------------------------------------- |
-| `unsupported`       | Browser prerequisites or worker activation are unavailable.          |
-| `configuration`     | Invalid session, limits, worker layout, text, or planner capability. |
-| `storage_failed`    | History could not be opened, committed, or cleared.                  |
-| `provider_failed`   | Planning failed; no heuristic retry is performed.                    |
-| `stale_document`    | Document/catalog changed or a request was cancelled.                 |
-| `action_denied`     | Application confirmation denied the action.                          |
-| `tool_failed`       | Action failed, was unavailable, or returned an invalid outcome.      |
-| `limit_reached`     | Tool, request, or history budget was reached.                        |
-| `conversation_busy` | Another operation owns this controller or conversation lock.         |
-| `transport_failed`  | Worker communication failed; action outcome can be unknown.          |
+| Pi error code       | Interpretation                                                        |
+| ------------------- | --------------------------------------------------------------------- |
+| `unsupported`       | Browser prerequisites or worker activation are unavailable.           |
+| `configuration`     | Invalid session, limits, worker layout, text, or resolver capability. |
+| `storage_failed`    | History could not be opened, committed, or cleared.                   |
+| `provider_failed`   | Resolving failed; no heuristic retry is performed.                    |
+| `stale_document`    | Document/catalog changed or a request was cancelled.                  |
+| `action_denied`     | Application confirmation denied the action.                           |
+| `tool_failed`       | Action failed, was unavailable, or returned an invalid outcome.       |
+| `limit_reached`     | Tool, request, or history budget was reached.                         |
+| `conversation_busy` | Another operation owns this controller or conversation lock.          |
+| `transport_failed`  | Worker communication failed; action outcome can be unknown.           |
 
 `installPiServiceWorker(scope = self)` installs lifecycle/message listeners and returns a listener cleanup function. Compile the wrapper into its dedicated scope. Do not call this function in the page.
 
@@ -179,7 +179,7 @@ Use `scope()` for current business-state availability during invocation, even wh
 
 ## Diagnostics, catalogs, devtools, and bridges
 
-`isWebMCPSupported()` and `getSupportLabel()` report native registration capability; neither proves a tool is registered or a model is available. `getIntegrationHealthReport({ planner? })` reports tool, schema, confirmation, scope, and planner diagnostics. `assertWebMCPIntegration()` throws only for report status `error`; it returns warning reports for inspection.
+`isWebMCPSupported()` and `getSupportLabel()` report native registration capability; neither proves a tool is registered or a model is available. `getIntegrationHealthReport({ resolver? })` reports tool, schema, confirmation, scope, and resolver diagnostics. `assertWebMCPIntegration()` throws only for report status `error`; it returns warning reports for inspection.
 
 `createToolCatalog(listTools(), options?)` creates a descriptive catalog; `formatToolCatalogMarkdown()` renders it. `formatOpenAITool()` and `formatOpenAITools()` convert definitions to OpenAI function-tool descriptions. These functions do not execute tools or authorize a model call. `escapeHtml`, `escapeAttribute`, and `getErrorMessage` are small formatting helpers, not general sanitizers or security boundaries.
 
@@ -195,4 +195,4 @@ Use `scope()` for current business-state availability during invocation, even wh
 
 The Playwright helpers `getWebMCPRegistrySnapshot`, `listWebMCPTools`, `waitForWebMCPTool`, and `invokeWebMCPTool` require that bridge. Wait for registration before invoking. Browser-side `AbortSignal` objects cannot be transferred as ordinary Playwright arguments; create a cancellation scenario in the page when testing cancellation.
 
-`runWebMCPPlannerEvalCase` checks one plan against expected tools, inputs, sequences, or outcomes. `runWebMCPPlannerEvals` runs a list; `runWebMCPPlannerEvalSuite` adds repetitions and a pass-rate threshold. Evaluations invoke the supplied planner and can incur model usage, but do not execute application tools. See [evaluations](./evals.md) for complete cases and aggregation behavior.
+`runWebMCPResolverEvalCase` checks one resolution against expected tools, inputs, sequences, or outcomes. `runWebMCPResolverEvals` runs a list; `runWebMCPResolverEvalSuite` adds repetitions and a pass-rate threshold. Evaluations invoke the supplied resolver and can incur model usage, but do not execute application tools. See [evaluations](./evals.md) for complete cases and aggregation behavior.

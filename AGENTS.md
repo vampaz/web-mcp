@@ -9,13 +9,13 @@
 
 ## Project Shape
 
-WebMCP Kit is one ESM-only TypeScript npm package with multiple public entry points. The `packages/` directories organize its source; they are not independently installed npm workspaces. The kit exposes app actions through native browser WebMCP, with local registries and planners for unsupported browsers and tests.
+WebMCP Kit is one ESM-only TypeScript npm package with multiple public entry points. The `packages/` directories organize its source; they are not independently installed npm workspaces. The kit exposes app actions through native browser WebMCP, with local registries and resolvers for unsupported browsers and tests.
 
-- `packages/core`: tool definitions, registry, planners, schema validation, events, confirmation handling, native adapter, test bridge.
+- `packages/core`: tool definitions, registry, resolvers, schema validation, events, confirmation handling, native adapter, test bridge.
 - `packages/pi`: persistent conversation runtime, page controller, registry tool host, and service-worker entry point.
 - `packages/chat`: framework-neutral chat custom element driven by a supplied controller.
 - `packages/devtools`: in-page tool inspection/invocation overlay.
-- `packages/testing`: planner evaluations and Playwright bridge helpers.
+- `packages/testing`: resolver evaluations and Playwright bridge helpers.
 - `packages/mcp-bridge`: local MCP-style bridge over registered tools.
 - `packages/zod`: Zod-to-WebMCP tool helper.
 - `packages/vue`, `packages/react`, `packages/svelte`: thin lifecycle helpers around core `registerTool()`.
@@ -42,15 +42,15 @@ WebMCP Kit is one ESM-only TypeScript npm package with multiple public entry poi
 
 ## WebMCP Contracts
 
-- Treat all tool input as untrusted, including planner, native browser, devtools, and MCP bridge calls.
+- Treat all tool input as untrusted, including resolver, native browser, devtools, and MCP bridge calls.
 - Validate input before confirmation, guards, or execution.
 - Use stable, specific tool names and narrow tool responsibilities.
 - Prefer strict object JSON Schemas with `required` and `additionalProperties: false`.
 - Require `confirmation` for important mutations: create, delete, send, pay, charge, export, publish, checkout, or similar.
 - Use `setConfirmationHandler()` for app approval UI. Preserve fallback/native/MCP confirmation enforcement; `window.confirm()` is only a fallback when no handler exists.
 - Use `scope()` for current-state availability and `guard()` for input-specific blocking.
-- Never expose secrets or hidden server values through inputs, planner context, events, logs, docs examples, or browser user-key flows.
-- Automatic command planning prefers Chrome AI when available, with deterministic fallback otherwise. Explicit provider selection and the conversational Pi runtime must report provider failures without silently switching providers.
+- Never expose secrets or hidden server values through inputs, resolver context, events, logs, docs examples, or browser user-key flows.
+- Automatic command resolving prefers Chrome AI when available, with deterministic fallback otherwise. Explicit provider selection and the conversational Pi runtime must report provider failures without silently switching providers.
 
 ## Framework Helpers
 

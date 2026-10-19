@@ -722,7 +722,7 @@ function getToolGuidance(tool: WebMCPTool, warnings: string[]): string[] {
   const schema = tool.inputSchema
 
   if (warnings.length > 0) {
-    guidance.push('Fix registration warnings first; they directly affect planner reliability.')
+    guidance.push('Fix registration warnings first; they directly affect resolver reliability.')
   }
 
   if (schema.type !== 'object') {
@@ -738,11 +738,11 @@ function getToolGuidance(tool: WebMCPTool, warnings: string[]): string[] {
   }
 
   if (isMutationTool(tool) && tool.confirmation?.required !== true) {
-    guidance.push('Require confirmation for this mutating action before exposing it to planners.')
+    guidance.push('Require confirmation for this mutating action before exposing it to resolvers.')
   }
 
   if (!tool.examples?.length) {
-    guidance.push('Add one realistic example input for demos, evals, and planner prompts.')
+    guidance.push('Add one realistic example input for demos, evals, and resolver prompts.')
   }
 
   if (!tool.outputSchema) {

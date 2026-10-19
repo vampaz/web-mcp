@@ -1,4 +1,4 @@
-import { createRemotePlanner, type ToolPlanner } from '@vampaz/webmcp-kit'
+import { createRemoteResolver, type ToolResolver } from '@vampaz/webmcp-kit'
 import { createPiHarness, type PiController } from '@vampaz/webmcp-kit/pi'
 
 let currentHarness: PiController | undefined
@@ -15,10 +15,10 @@ export async function openDemoHarness(
   const config = (await fetch('/__demo-config').then(function json(response) {
     return response.json()
   })) as { modelId: string; fixtures: boolean }
-  let planner: ToolPlanner
+  let resolver: ToolResolver
   if (config.fixtures) {
-    const { createFixturePlanner } = await import('./fixtures/planner')
-    planner = createFixturePlanner()
+    const { createFixtureResolver } = await import('./fixtures/resolver')
+    resolver = createFixtureResolver()
   } else {
     if (!config.modelId)
       throw new Error(
@@ -34,7 +34,7 @@ export async function openDemoHarness(
       })
     )
       throw new Error(`LM Studio does not expose ${config.modelId}. Load the configured model.`)
-    planner = createRemotePlanner({
+    resolver = createRemoteResolver({
       provider: 'openai-compatible',
       baseUrl: '/__lmstudio/v1',
       model: config.modelId,
@@ -45,7 +45,7 @@ export async function openDemoHarness(
       auth: { mode: 'none' }
     })
   }
-  onStatus(config.fixtures ? planner.detail : `LM Studio · ${config.modelId}`)
+  onStatus(config.fixtures ? resolver.detail : `LM Studio · ${config.modelId}`)
   const harness = await createPiHarness({
     session: {
       namespace: 'webmcp-kit-local-lab',
@@ -53,7 +53,7 @@ export async function openDemoHarness(
       conversationId: mode
     },
     worker: { url: '/webmcp-pi/worker.ts', scope: '/webmcp-pi/' },
-    planner,
+    resolver,
     context() {
       return { counter: getValue() }
     }

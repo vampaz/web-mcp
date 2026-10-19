@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import type { ToolPlan, ToolPlanner } from '@vampaz/webmcp-kit'
+import type { ToolResolution, ToolResolver } from '@vampaz/webmcp-kit'
 import { createPiRuntime } from './runtime'
 import type { PiController } from './interfaces/controller'
 import type { PiToolHost } from './interfaces/host'
@@ -14,10 +14,13 @@ afterEach(async function cleanup() {
   vi.unstubAllGlobals()
 })
 
-function plan(name = 'pi_reply', input: Record<string, unknown> = { text: 'Answered' }): ToolPlan {
+function resolution(
+  name = 'pi_reply',
+  input: Record<string, unknown> = { text: 'Answered' }
+): ToolResolution {
   return { toolName: name, input, confidence: 1, reason: 'test' }
 }
-function options(plans: ToolPlan[], overrides: Partial<PiToolHost> = {}) {
+function options(resolutions: ToolResolution[], overrides: Partial<PiToolHost> = {}) {
   const invoke = vi.fn(async function invoke() {
     return {
       toolName: 'read_counter',
@@ -26,15 +29,15 @@ function options(plans: ToolPlan[], overrides: Partial<PiToolHost> = {}) {
       durationMs: 0
     }
   })
-  const planner: ToolPlanner = {
+  const resolver: ToolResolver = {
     name: 'Fixture',
     available: true,
     capabilities: { conversation: true },
     status: 'ready',
     detail: 'test fixture',
-    plan: vi.fn(async function next() {
-      const result = plans.shift()
-      if (!result) throw new Error('Unexpected planner round')
+    resolve: vi.fn(async function next() {
+      const result = resolutions.shift()
+      if (!result) throw new Error('Unexpected resolver round')
       return result
     })
   }
@@ -59,14 +62,14 @@ function options(plans: ToolPlan[], overrides: Partial<PiToolHost> = {}) {
   }
   return {
     session: { namespace: 'tests', ownerId: 'owner', conversationId: 'conversation' },
-    planner,
+    resolver,
     host,
     invoke
   }
 }
 
 it('runs the actual Pi loop and persists an answer across reopening', async function test() {
-  const config = options([plan()])
+  const config = options([resolution()])
   runtime = await createPiRuntime(config)
   expect(runtime.getSnapshot().state).toBe('idle')
   expect(await runtime.send('Hello')).toEqual({ status: 'completed' })
@@ -80,16 +83,18 @@ it('runs the actual Pi loop and persists an answer across reopening', async func
       return message.text === 'Answered'
     })
   ).toBe(true)
-  expect(config.planner.plan).toHaveBeenCalledTimes(1)
+  expect(config.resolver.resolve).toHaveBeenCalledTimes(1)
 })
 
 it('feeds the actual tool result back before choosing the next step', async function test() {
-  const config = options([plan('read_counter', {}), plan()])
+  const config = options([resolution('read_counter', {}), resolution()])
   runtime = await createPiRuntime(config)
   expect(await runtime.send('Read')).toEqual({ status: 'completed' })
   expect(config.invoke).toHaveBeenCalledTimes(1)
-  expect(config.planner.plan).toHaveBeenCalledTimes(2)
-  expect(JSON.stringify(vi.mocked(config.planner.plan).mock.calls[1][2])).toContain('toolResult')
+  expect(config.resolver.resolve).toHaveBeenCalledTimes(2)
+  expect(JSON.stringify(vi.mocked(config.resolver.resolve).mock.calls[1][2])).toContain(
+    'toolResult'
+  )
   expect(
     runtime.getSnapshot().messages.some(function result(message) {
       return message.role === 'tool' && message.text.includes('7')
@@ -101,39 +106,42 @@ it('refreshes available tools after an action opens a new application context', 
   let editorOpen = false
   let saved = false
   const invoked: string[] = []
-  const config = options([plan('open_editor', {}), plan('save_document', {}), plan()], {
-    async discover() {
-      return {
-        revision: editorOpen ? 'editor' : 'home',
-        tools: [
-          {
-            name: editorOpen ? 'save_document' : 'open_editor',
-            description: editorOpen ? 'Save the open document.' : 'Open the document editor.',
-            inputSchema: { type: 'object', properties: {}, additionalProperties: false }
-          }
-        ]
-      }
-    },
-    async invoke(call) {
-      invoked.push(call.name)
-      expect(call.revision).toBe(editorOpen ? 'editor' : 'home')
-      if (call.name === 'open_editor') editorOpen = true
-      else saved = true
-      return {
-        toolName: call.name,
-        status: 'success',
-        output: { editorOpen, saved },
-        durationMs: 0
+  const config = options(
+    [resolution('open_editor', {}), resolution('save_document', {}), resolution()],
+    {
+      async discover() {
+        return {
+          revision: editorOpen ? 'editor' : 'home',
+          tools: [
+            {
+              name: editorOpen ? 'save_document' : 'open_editor',
+              description: editorOpen ? 'Save the open document.' : 'Open the document editor.',
+              inputSchema: { type: 'object', properties: {}, additionalProperties: false }
+            }
+          ]
+        }
+      },
+      async invoke(call) {
+        invoked.push(call.name)
+        expect(call.revision).toBe(editorOpen ? 'editor' : 'home')
+        if (call.name === 'open_editor') editorOpen = true
+        else saved = true
+        return {
+          toolName: call.name,
+          status: 'success',
+          output: { editorOpen, saved },
+          durationMs: 0
+        }
       }
     }
-  })
+  )
   runtime = await createPiRuntime(config)
   expect(await runtime.send('Open the editor and save the document')).toEqual({
     status: 'completed'
   })
   expect(invoked).toEqual(['open_editor', 'save_document'])
   expect(saved).toBe(true)
-  const secondRound = vi.mocked(config.planner.plan).mock.calls[1][1]
+  const secondRound = vi.mocked(config.resolver.resolve).mock.calls[1][1]
   expect(
     secondRound.map(function name(tool) {
       return tool.name
@@ -142,7 +150,7 @@ it('refreshes available tools after an action opens a new application context', 
 })
 
 it('ends a denied action without another model round', async function test() {
-  const config = options([plan('read_counter', {})], {
+  const config = options([resolution('read_counter', {})], {
     async invoke() {
       return {
         toolName: 'read_counter',
@@ -158,19 +166,19 @@ it('ends a denied action without another model round', async function test() {
     status: 'error',
     error: { code: 'action_denied' }
   })
-  expect(config.planner.plan).toHaveBeenCalledTimes(1)
+  expect(config.resolver.resolve).toHaveBeenCalledTimes(1)
 })
 
-it('rejects a catalog change while the planner is choosing an action', async function test() {
+it('rejects a catalog change while the resolver is choosing an action', async function test() {
   const config = options([])
   let revision = 'initial'
   const discover = config.host.discover
   config.host.discover = async function current(signal) {
     return { ...(await discover(signal)), revision }
   }
-  config.planner.plan = vi.fn(async function changeDuringPlanning() {
+  config.resolver.resolve = vi.fn(async function changeDuringResolving() {
     revision = 'changed'
-    return plan('read_counter', {})
+    return resolution('read_counter', {})
   })
   runtime = await createPiRuntime(config)
   expect(await runtime.send('Read')).toMatchObject({
@@ -178,11 +186,11 @@ it('rejects a catalog change while the planner is choosing an action', async fun
     error: { code: 'stale_document' }
   })
   expect(config.invoke).not.toHaveBeenCalled()
-  expect(config.planner.plan).toHaveBeenCalledTimes(1)
+  expect(config.resolver.resolve).toHaveBeenCalledTimes(1)
 })
 
 it('preserves a completed action result when refreshing tools fails', async function test() {
-  const config = options([plan('read_counter', {})])
+  const config = options([resolution('read_counter', {})])
   const discover = config.host.discover
   config.host.discover = async function failAfterAction(signal) {
     if (config.invoke.mock.calls.length) throw new Error('The new context is unavailable.')
@@ -203,11 +211,11 @@ it('preserves a completed action result when refreshing tools fails', async func
       })
     ])
   )
-  expect(config.planner.plan).toHaveBeenCalledTimes(1)
+  expect(config.resolver.resolve).toHaveBeenCalledTimes(1)
 })
 
 it('rejects invalid model output without a fallback or tool call', async function test() {
-  const config = options([plan('invented_tool', {})])
+  const config = options([resolution('invented_tool', {})])
   runtime = await createPiRuntime(config)
   expect(await runtime.send('Read')).toMatchObject({
     status: 'error',
@@ -217,7 +225,7 @@ it('rejects invalid model output without a fallback or tool call', async functio
 })
 
 it('enforces the configured tool call limit', async function test() {
-  const config = options([plan('read_counter', {}), plan('read_counter', {})])
+  const config = options([resolution('read_counter', {}), resolution('read_counter', {})])
   runtime = await createPiRuntime({ ...config, limits: { maxToolCalls: 1 } })
   expect(await runtime.send('Read repeatedly')).toMatchObject({
     status: 'error',
@@ -232,7 +240,7 @@ it('stops an uncooperative provider and settles the turn', async function test()
   const started = new Promise<void>(function ready(resolve) {
     requested = resolve
   })
-  config.planner.plan = function pending() {
+  config.resolver.resolve = function pending() {
     requested()
     return new Promise(function never() {})
   }
@@ -251,7 +259,7 @@ it('rejects simultaneous sends and clear during an active turn', async function 
   const started = new Promise<void>(function ready(resolve) {
     requested = resolve
   })
-  config.planner.plan = function pending() {
+  config.resolver.resolve = function pending() {
     requested()
     return new Promise(function never() {})
   }
@@ -269,7 +277,7 @@ it('rejects simultaneous sends and clear during an active turn', async function 
 it.each(['send', 'clear', 'stop'] as const)(
   'admits the turn before a synchronous subscriber can %s',
   async function test(action) {
-    const config = options([plan()])
+    const config = options([resolution()])
     runtime = await createPiRuntime(config)
     let handled = false
     let operation: Promise<unknown> | undefined
@@ -287,7 +295,7 @@ it.each(['send', 'clear', 'stop'] as const)(
     const result = await operation
     if (action === 'stop') {
       expect(outcome.status).toBe('interrupted')
-      expect(config.planner.plan).not.toHaveBeenCalled()
+      expect(config.resolver.resolve).not.toHaveBeenCalled()
     } else {
       expect(result).toMatchObject(
         action === 'send'
@@ -295,13 +303,13 @@ it.each(['send', 'clear', 'stop'] as const)(
           : { code: 'conversation_busy' }
       )
       expect(outcome.status).toBe('completed')
-      expect(config.planner.plan).toHaveBeenCalledTimes(1)
+      expect(config.resolver.resolve).toHaveBeenCalledTimes(1)
     }
   }
 )
 
 it('keeps separate owners and rejects a changed catalog before invocation', async function test() {
-  const config = options([plan('read_counter', {})])
+  const config = options([resolution('read_counter', {})])
   let revision = 0
   const discover = config.host.discover
   config.host.discover = async function change(signal) {
@@ -315,14 +323,14 @@ it('keeps separate owners and rejects a changed catalog before invocation', asyn
   expect(config.invoke).not.toHaveBeenCalled()
   await runtime.destroy()
   runtime = await createPiRuntime({
-    ...options([plan()]),
+    ...options([resolution()]),
     session: { ...config.session, ownerId: 'someone-else' }
   })
   expect(runtime.getSnapshot().messages).toEqual([])
 })
 
 it('settles a pending clear before destruction closes the controller', async function test() {
-  const config = options([plan()])
+  const config = options([resolution()])
   runtime = await createPiRuntime(config)
   await runtime.send('Hello')
   const clearing = runtime.clear()
@@ -333,7 +341,7 @@ it('settles a pending clear before destruction closes the controller', async fun
 
 it('stops visibly at the durable history limit and still permits Clear chat', async function test() {
   runtime = await createPiRuntime({
-    ...options([plan(), plan(), plan()]),
+    ...options([resolution(), resolution(), resolution()]),
     limits: { maxHistoryBytes: 65536, maxRequestBytes: 65536 }
   })
   let failure: Awaited<ReturnType<PiController['send']>> | undefined
@@ -357,7 +365,7 @@ it('keeps an already executed effect when its acknowledgement is interrupted and
   const started = new Promise<void>(function ready(resolve) {
     executed = resolve
   })
-  const config = options([plan('read_counter', {}), plan()], {
+  const config = options([resolution('read_counter', {}), resolution()], {
     async invoke() {
       effects++
       executed()
@@ -377,7 +385,7 @@ it('keeps an already executed effect when its acknowledgement is interrupted and
   runtime = await createPiRuntime(config)
   expect(runtime.getSnapshot().state).toBe('interrupted')
   expect(effects).toBe(1)
-  expect(config.planner.plan).toHaveBeenCalledTimes(1)
+  expect(config.resolver.resolve).toHaveBeenCalledTimes(1)
   expect(await runtime.send('Explain what happened')).toEqual({ status: 'completed' })
   expect(runtime.getSnapshot().state).toBe('idle')
   expect(effects).toBe(1)

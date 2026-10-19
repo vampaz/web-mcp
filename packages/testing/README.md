@@ -9,17 +9,17 @@ await waitForWebMCPTool(page, 'select_items')
 await invokeWebMCPTool(page, {
   toolName: 'select_items',
   input: { ids: ['item_4'] },
-  source: 'planner'
+  source: 'resolver'
 })
 ```
 
-Planner evals can run without a browser:
+Resolver evals can run without a browser:
 
 ```ts
-import { createHeuristicPlanner } from '@vampaz/webmcp-kit'
-import { runWebMCPPlannerEvals } from '@vampaz/webmcp-kit/testing'
+import { createHeuristicResolver } from '@vampaz/webmcp-kit'
+import { runWebMCPResolverEvals } from '@vampaz/webmcp-kit/testing'
 
-const results = await runWebMCPPlannerEvals(createHeuristicPlanner(), tools, [
+const results = await runWebMCPResolverEvals(createHeuristicResolver(), tools, [
   {
     name: 'product search',
     message: 'Find docks',
@@ -31,6 +31,6 @@ const results = await runWebMCPPlannerEvals(createHeuristicPlanner(), tools, [
 expect(results.every((result) => result.passed)).toBe(true)
 ```
 
-Use `runWebMCPPlannerEvalSuite()` for repeated model-backed runs with a minimum pass rate. Cases can assert planner outcomes, partial inputs, and ordered chained-plan steps. The returned summary is JSON-serializable for CI artifacts.
+Use `runWebMCPResolverEvalSuite()` for repeated model-backed runs with a minimum pass rate. Cases can assert resolver outcomes, partial inputs, and ordered chained-resolution steps. The returned summary is JSON-serializable for CI artifacts.
 
 Each case should define exactly one of `expectedToolName` or `expectedOutcome`, and suites should contain at least one case.

@@ -113,12 +113,12 @@ Source in the repository: `packages/core/src/forms.ts`. [Packaged declaration](.
 export type FormInput = Record<string, string | number | boolean | string[]>
 ```
 
-### HostedOpenAIPlannerOptionConfig
+### HostedOpenAIResolverOptionConfig
 
-Source in the repository: `packages/core/src/hosted-openai-planner.ts`. [Packaged declaration](../dist/packages/core/src/hosted-openai-planner.d.ts).
+Source in the repository: `packages/core/src/hosted-openai-resolver.ts`. [Packaged declaration](../dist/packages/core/src/hosted-openai-resolver.d.ts).
 
 ```ts
-export interface HostedOpenAIPlannerOptionConfig {
+export interface HostedOpenAIResolverOptionConfig {
   accessKey?: string
   baseUrl?: string
   browserChallengeSiteKey?: string
@@ -126,17 +126,17 @@ export interface HostedOpenAIPlannerOptionConfig {
   id?: string
   label?: string
   model?: string
-  modelOptions?: WebMCPCommandInputPlannerModelOption[]
+  modelOptions?: WebMCPCommandInputResolverModelOption[]
   sessionEndpoint?: string
 }
 ```
 
-### HostedOpenAIPlannerOptions
+### HostedOpenAIResolverOptions
 
-Source in the repository: `packages/core/src/hosted-openai-planner.ts`. [Packaged declaration](../dist/packages/core/src/hosted-openai-planner.d.ts).
+Source in the repository: `packages/core/src/hosted-openai-resolver.ts`. [Packaged declaration](../dist/packages/core/src/hosted-openai-resolver.d.ts).
 
 ```ts
-export interface HostedOpenAIPlannerOptions {
+export interface HostedOpenAIResolverOptions {
   accessKey?: string
   baseUrl?: string
   browserChallengeSiteKey?: string
@@ -175,10 +175,10 @@ export interface InitWebMCPOptions {
   browserChallengeSiteKey?: string
   buttonLabel?: string
   confirmationHandler?: ConfirmationHandler
-  context?: PlannerContext | (() => PlannerContext)
+  context?: ResolverContext | (() => ResolverContext)
   model?: string
   placeholder?: string
-  planner?: ToolPlanner
+  resolver?: ToolResolver
   target?: string | WebMCPCommandInputElement
   tools?: readonly AnyWebMCPTool[]
 }
@@ -205,7 +205,7 @@ Source in the repository: `packages/core/src/diagnostics.ts`. [Packaged declarat
 
 ```ts
 export interface IntegrationHealthOptions {
-  planner?: ToolPlanner
+  resolver?: ToolResolver
 }
 ```
 
@@ -291,79 +291,6 @@ export interface OpenAIFunctionTool {
 }
 ```
 
-### PlannerAuth
-
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
-
-```ts
-export type PlannerAuth =
-  | { mode: 'none' }
-  | { mode: 'server'; endpoint: string }
-  | { mode: 'user-key'; apiKey?: string; storageKey?: string }
-```
-
-### PlannerContext
-
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
-
-```ts
-export interface PlannerContext {
-  [key: string]: unknown
-}
-```
-
-### PlannerOutcomeToolName
-
-Source in the repository: `packages/core/src/plan-validation.ts`. [Packaged declaration](../dist/packages/core/src/plan-validation.d.ts).
-
-```ts
-export type PlannerOutcomeToolName = (typeof plannerOutcomeToolNames)[number]
-```
-
-### PlannerProviderConfig
-
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
-
-```ts
-export interface PlannerProviderConfig {
-  provider: PlannerProviderKind
-  model?: string
-  baseUrl?: string
-  auth?: PlannerAuth
-  responseFormat?: 'json_object' | 'json_schema'
-  maxTokens?: number
-  temperature?: number
-  reasoningEffort?: 'none' | 'low' | 'medium' | 'high'
-}
-```
-
-### PlannerProviderKind
-
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
-
-```ts
-export type PlannerProviderKind =
-  | 'auto'
-  | 'chrome-built-in'
-  | 'local'
-  | 'openai'
-  | 'openrouter'
-  | 'openai-compatible'
-  | 'cloudflare-binding'
-```
-
-### PlannerRequest
-
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
-
-```ts
-export interface PlannerRequest {
-  message: string
-  tools: WebMCPTool[]
-  context: PlannerContext
-}
-```
-
 ### RegisterFormToolFieldOptions
 
 Source in the repository: `packages/core/src/forms.ts`. [Packaged declaration](../dist/packages/core/src/forms.d.ts).
@@ -414,6 +341,79 @@ export interface RegistrySnapshot {
   nativeWebMCP: boolean
   toolCount: number
   tools: RegisteredTool[]
+}
+```
+
+### ResolverAuth
+
+Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+
+```ts
+export type ResolverAuth =
+  | { mode: 'none' }
+  | { mode: 'server'; endpoint: string }
+  | { mode: 'user-key'; apiKey?: string; storageKey?: string }
+```
+
+### ResolverContext
+
+Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+
+```ts
+export interface ResolverContext {
+  [key: string]: unknown
+}
+```
+
+### ResolverOutcomeToolName
+
+Source in the repository: `packages/core/src/resolution-validation.ts`. [Packaged declaration](../dist/packages/core/src/resolution-validation.d.ts).
+
+```ts
+export type ResolverOutcomeToolName = (typeof resolverOutcomeToolNames)[number]
+```
+
+### ResolverProviderConfig
+
+Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+
+```ts
+export interface ResolverProviderConfig {
+  provider: ResolverProviderKind
+  model?: string
+  baseUrl?: string
+  auth?: ResolverAuth
+  responseFormat?: 'json_object' | 'json_schema'
+  maxTokens?: number
+  temperature?: number
+  reasoningEffort?: 'none' | 'low' | 'medium' | 'high'
+}
+```
+
+### ResolverProviderKind
+
+Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+
+```ts
+export type ResolverProviderKind =
+  | 'auto'
+  | 'chrome-built-in'
+  | 'local'
+  | 'openai'
+  | 'openrouter'
+  | 'openai-compatible'
+  | 'cloudflare-binding'
+```
+
+### ResolverRequest
+
+Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+
+```ts
+export interface ResolverRequest {
+  message: string
+  tools: WebMCPTool[]
+  context: ResolverContext
 }
 ```
 
@@ -547,7 +547,7 @@ Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged decl
 
 ```ts
 export interface ToolContext {
-  source: 'native' | 'fallback' | 'devtools' | 'planner'
+  source: 'native' | 'fallback' | 'devtools' | 'resolver'
   signal?: AbortSignal
 }
 ```
@@ -603,26 +603,26 @@ export interface ToolInvocationResult<TOutput = unknown> {
 }
 ```
 
-### ToolPlan
+### ToolResolution
 
 Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
 
 ```ts
-export interface ToolPlan {
+export interface ToolResolution {
   toolName: string
   input: Record<string, unknown>
   confidence: number
   reason: string
-  steps?: ToolPlanStep[]
+  steps?: ToolResolutionStep[]
 }
 ```
 
-### ToolPlanStep
+### ToolResolutionStep
 
 Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
 
 ```ts
-export interface ToolPlanStep {
+export interface ToolResolutionStep {
   toolName: string
   input: Record<string, unknown>
   confidence: number
@@ -630,45 +630,45 @@ export interface ToolPlanStep {
 }
 ```
 
-### ToolPlanValidationOptions
+### ToolResolutionValidationOptions
 
-Source in the repository: `packages/core/src/plan-validation.ts`. [Packaged declaration](../dist/packages/core/src/plan-validation.d.ts).
+Source in the repository: `packages/core/src/resolution-validation.ts`. [Packaged declaration](../dist/packages/core/src/resolution-validation.d.ts).
 
 ```ts
-export interface ToolPlanValidationOptions {
+export interface ToolResolutionValidationOptions {
   messageStyle?: 'provider' | 'server'
   singleStep?: boolean
 }
 ```
 
-### ToolPlanValidationTool
+### ToolResolutionValidationTool
 
-Source in the repository: `packages/core/src/plan-validation.ts`. [Packaged declaration](../dist/packages/core/src/plan-validation.d.ts).
+Source in the repository: `packages/core/src/resolution-validation.ts`. [Packaged declaration](../dist/packages/core/src/resolution-validation.d.ts).
 
 ```ts
-export interface ToolPlanValidationTool {
+export interface ToolResolutionValidationTool {
   name?: string
   inputSchema?: JsonSchema
 }
 ```
 
-### ToolPlanner
+### ToolResolver
 
 Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
 
 ```ts
-export interface ToolPlanner {
+export interface ToolResolver {
   capabilities?: { conversation: boolean }
   name: string
   available: boolean
   status: 'ready' | 'downloadable' | 'downloading' | 'unavailable' | 'fallback' | 'needs-key'
   detail: string
-  plan: (
+  resolve: (
     message: string,
     tools: WebMCPTool[],
-    context?: PlannerContext,
-    options?: PlannerRunOptions
-  ) => Promise<ToolPlan>
+    context?: ResolverContext,
+    options?: ResolverRunOptions
+  ) => Promise<ToolResolution>
   dispose?: () => void
 }
 ```
@@ -705,20 +705,20 @@ export interface WebMCPCommandInputConfigureOptions {
   authMode?: 'none' | 'server' | 'user-key'
   baseUrl?: string
   buttonLabel?: string
-  context?: PlannerContext | (() => PlannerContext)
+  context?: ResolverContext | (() => ResolverContext)
   disabled?: boolean
   endpoint?: string
   endpointOptions?: WebMCPCommandInputEndpointOption[]
   floating?: boolean
   initialModel?: string
-  initialPlannerOptionId?: string
-  initialProvider?: PlannerProviderKind
+  initialResolverOptionId?: string
+  initialProvider?: ResolverProviderKind
   model?: string
   placeholder?: string
-  planner?: ToolPlanner
-  plannerConfig?: PlannerProviderConfig
-  plannerOptions?: WebMCPCommandInputPlannerOption[]
-  provider?: PlannerProviderKind
+  resolver?: ToolResolver
+  resolverConfig?: ResolverProviderConfig
+  resolverOptions?: WebMCPCommandInputResolverOption[]
+  provider?: ResolverProviderKind
   settingsOpen?: boolean
   showChromeAI?: boolean
 }
@@ -734,7 +734,7 @@ export interface WebMCPCommandInputElement extends HTMLElement {
   authMode?: 'none' | 'server' | 'user-key'
   baseUrl?: string
   buttonLabel?: string
-  context?: PlannerContext | (() => PlannerContext)
+  context?: ResolverContext | (() => ResolverContext)
   disabled: boolean
   endpoint?: string
   endpointOptions?: WebMCPCommandInputEndpointOption[]
@@ -742,10 +742,10 @@ export interface WebMCPCommandInputElement extends HTMLElement {
   model?: string
   panelOpen: boolean
   placeholder: string
-  planner?: ToolPlanner
-  plannerConfig?: PlannerProviderConfig
-  plannerOptions?: WebMCPCommandInputPlannerOption[]
-  provider?: PlannerProviderKind
+  resolver?: ToolResolver
+  resolverConfig?: ResolverProviderConfig
+  resolverOptions?: WebMCPCommandInputResolverOption[]
+  provider?: ResolverProviderKind
   showChromeAI?: boolean
   closePanel: () => void
   configure: (options: WebMCPCommandInputConfigureOptions) => void
@@ -766,7 +766,7 @@ Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Pack
 export interface WebMCPCommandInputEndpointOption {
   label: string
   model?: string
-  provider: PlannerProviderKind
+  provider: ResolverProviderKind
 }
 ```
 
@@ -778,46 +778,46 @@ Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Pack
 export type WebMCPCommandInputPhase =
   | 'idle'
   | 'preparing'
-  | 'planning'
+  | 'resolving'
   | 'executing'
   | 'completed'
   | 'failed'
 ```
 
-### WebMCPCommandInputPlannerCreateOptions
+### WebMCPCommandInputResolverCreateOptions
 
 Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/command-input.d.ts).
 
 ```ts
-export interface WebMCPCommandInputPlannerCreateOptions {
+export interface WebMCPCommandInputResolverCreateOptions {
   model?: string
-  modelOption?: WebMCPCommandInputPlannerModelOption
+  modelOption?: WebMCPCommandInputResolverModelOption
 }
 ```
 
-### WebMCPCommandInputPlannerModelOption
+### WebMCPCommandInputResolverModelOption
 
 Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/command-input.d.ts).
 
 ```ts
-export interface WebMCPCommandInputPlannerModelOption {
+export interface WebMCPCommandInputResolverModelOption {
   label: string
   model: string
 }
 ```
 
-### WebMCPCommandInputPlannerOption
+### WebMCPCommandInputResolverOption
 
 Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/command-input.d.ts).
 
 ```ts
-export interface WebMCPCommandInputPlannerOption {
-  createPlanner: (
-    options?: WebMCPCommandInputPlannerCreateOptions
-  ) => Promise<ToolPlanner> | ToolPlanner
+export interface WebMCPCommandInputResolverOption {
+  createResolver: (
+    options?: WebMCPCommandInputResolverCreateOptions
+  ) => Promise<ToolResolver> | ToolResolver
   id: string
   label: string
-  modelOptions?: WebMCPCommandInputPlannerModelOption[]
+  modelOptions?: WebMCPCommandInputResolverModelOption[]
 }
 ```
 
@@ -831,25 +831,25 @@ export interface WebMCPCommandPanelToggleEventDetail {
 }
 ```
 
-### WebMCPCommandPlanEventDetail
+### WebMCPCommandResolutionEventDetail
 
 Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/command-input.d.ts).
 
 ```ts
-export interface WebMCPCommandPlanEventDetail {
+export interface WebMCPCommandResolutionEventDetail {
   message: string
-  plan: ToolPlan
-  planner: ToolPlanner
+  resolution: ToolResolution
+  resolver: ToolResolver
 }
 ```
 
-### WebMCPCommandPlannerEventDetail
+### WebMCPCommandResolverEventDetail
 
 Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/command-input.d.ts).
 
 ```ts
-export interface WebMCPCommandPlannerEventDetail {
-  planner: ToolPlanner
+export interface WebMCPCommandResolverEventDetail {
+  resolver: ToolResolver
 }
 ```
 
@@ -860,7 +860,7 @@ Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Pack
 ```ts
 export interface WebMCPCommandResultEventDetail {
   message: string
-  plan: ToolPlan
+  resolution: ToolResolution
   result: ToolInvocationResult
 }
 ```
@@ -873,9 +873,9 @@ Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Pack
 export interface WebMCPCommandStepEventDetail {
   message: string
   phase: 'started' | 'completed'
-  plan: ToolPlan
+  resolution: ToolResolution
   result?: ToolInvocationResult
-  step: ToolPlanStep
+  step: ToolResolutionStep
   stepCount: number
   stepIndex: number
 }
@@ -888,7 +888,7 @@ Source in the repository: `packages/core/src/init.ts`. [Packaged declaration](..
 ```ts
 export interface WebMCPInitHandle {
   element: WebMCPCommandInputElement
-  planner?: ToolPlanner
+  resolver?: ToolResolver
   registrations: RegisteredTool[]
   destroy: () => void
 }
@@ -900,8 +900,8 @@ Source in the repository: `packages/core/src/kit.ts`. [Packaged declaration](../
 
 ```ts
 export interface WebMCPKit {
-  planner: ToolPlanner
-  plannerConfig?: PlannerProviderConfig
+  resolver: ToolResolver
+  resolverConfig?: ResolverProviderConfig
 }
 ```
 
@@ -924,7 +924,7 @@ Source in the repository: `packages/core/src/kit.ts`. [Packaged declaration](../
 
 ```ts
 export interface WebMCPKitOptions {
-  planner?: PlannerProviderConfig
+  resolver?: ResolverProviderConfig
 }
 ```
 
@@ -995,62 +995,62 @@ Source in the repository: `packages/core/src/registry.ts`. [Packaged declaration
 declare function clearToolsForTest(): void
 ```
 
-### createBestPlanner
+### createBestResolver
 
-Source in the repository: `packages/core/src/planner.ts`. [Packaged declaration](../dist/packages/core/src/planner.d.ts).
+Source in the repository: `packages/core/src/resolver.ts`. [Packaged declaration](../dist/packages/core/src/resolver.d.ts).
 
 ```ts
-declare function createBestPlanner(): Promise<ToolPlanner>
+declare function createBestResolver(): Promise<ToolResolver>
 ```
 
-### createChromeAIPlanner
+### createChromeAIResolver
 
-Source in the repository: `packages/core/src/planner.ts`. [Packaged declaration](../dist/packages/core/src/planner.d.ts).
+Source in the repository: `packages/core/src/resolver.ts`. [Packaged declaration](../dist/packages/core/src/resolver.d.ts).
 
 ```ts
-declare function createChromeAIPlanner(strict?: boolean): Promise<ToolPlanner>
+declare function createChromeAIResolver(strict?: boolean): Promise<ToolResolver>
 ```
 
-### createConfiguredPlanner
+### createConfiguredResolver
 
-Source in the repository: `packages/core/src/planner.ts`. [Packaged declaration](../dist/packages/core/src/planner.d.ts).
+Source in the repository: `packages/core/src/resolver.ts`. [Packaged declaration](../dist/packages/core/src/resolver.d.ts).
 
 ```ts
-declare function createConfiguredPlanner(config?: PlannerProviderConfig): Promise<ToolPlanner>
+declare function createConfiguredResolver(config?: ResolverProviderConfig): Promise<ToolResolver>
 ```
 
-### createHeuristicPlanner
+### createHeuristicResolver
 
-Source in the repository: `packages/core/src/planner.ts`. [Packaged declaration](../dist/packages/core/src/planner.d.ts).
+Source in the repository: `packages/core/src/resolver.ts`. [Packaged declaration](../dist/packages/core/src/resolver.d.ts).
 
 ```ts
-declare function createHeuristicPlanner(): ToolPlanner
+declare function createHeuristicResolver(): ToolResolver
 ```
 
-### createHostedOpenAIPlanner
+### createHostedOpenAIResolver
 
-Source in the repository: `packages/core/src/hosted-openai-planner.ts`. [Packaged declaration](../dist/packages/core/src/hosted-openai-planner.d.ts).
+Source in the repository: `packages/core/src/hosted-openai-resolver.ts`. [Packaged declaration](../dist/packages/core/src/hosted-openai-resolver.d.ts).
 
 ```ts
-declare function createHostedOpenAIPlanner(rawOptions: HostedOpenAIPlannerOptions): ToolPlanner
+declare function createHostedOpenAIResolver(rawOptions: HostedOpenAIResolverOptions): ToolResolver
 ```
 
-### createHostedOpenAIPlannerOption
+### createHostedOpenAIResolverOption
 
-Source in the repository: `packages/core/src/hosted-openai-planner.ts`. [Packaged declaration](../dist/packages/core/src/hosted-openai-planner.d.ts).
+Source in the repository: `packages/core/src/hosted-openai-resolver.ts`. [Packaged declaration](../dist/packages/core/src/hosted-openai-resolver.d.ts).
 
 ```ts
-declare function createHostedOpenAIPlannerOption(
-  config: HostedOpenAIPlannerOptionConfig
-): WebMCPCommandInputPlannerOption
+declare function createHostedOpenAIResolverOption(
+  config: HostedOpenAIResolverOptionConfig
+): WebMCPCommandInputResolverOption
 ```
 
-### createRemotePlanner
+### createRemoteResolver
 
-Source in the repository: `packages/core/src/planner.ts`. [Packaged declaration](../dist/packages/core/src/planner.d.ts).
+Source in the repository: `packages/core/src/resolver.ts`. [Packaged declaration](../dist/packages/core/src/resolver.d.ts).
 
 ```ts
-declare function createRemotePlanner(config: PlannerProviderConfig): ToolPlanner
+declare function createRemoteResolver(config: ResolverProviderConfig): ToolResolver
 ```
 
 ### createToolCatalog
@@ -1228,11 +1228,11 @@ declare function inferFormInputSchema(form: HTMLFormElement): JsonSchema
 Source in the repository: `packages/core/src/init.ts`. [Packaged declaration](../dist/packages/core/src/init.d.ts).
 
 One-call setup: registers tools, defines and locates (or creates) the
-command input element, and wires a planner.
+command input element, and wires a resolver.
 
-An explicit `planner` takes precedence. Otherwise, `accessKey` requires
-`model` and creates a hosted OpenAI planner with endpoints derived from
-`baseUrl`. Without either, the element keeps its own planner behavior.
+An explicit `resolver` takes precedence. Otherwise, `accessKey` requires
+`model` and creates a hosted OpenAI resolver with endpoints derived from
+`baseUrl`. Without either, the element keeps its own resolver behavior.
 
 Tool names must be unique and must not collide with already-registered
 tools. Failed setup removes registrations and elements added by that call.
@@ -1270,12 +1270,12 @@ declare function invokeTool<TOutput = unknown>(
 ): Promise<ToolInvocationResult<TOutput>>
 ```
 
-### isPlannerOutcomeToolName
+### isResolverOutcomeToolName
 
-Source in the repository: `packages/core/src/plan-validation.ts`. [Packaged declaration](../dist/packages/core/src/plan-validation.d.ts).
+Source in the repository: `packages/core/src/resolution-validation.ts`. [Packaged declaration](../dist/packages/core/src/resolution-validation.d.ts).
 
 ```ts
-declare function isPlannerOutcomeToolName(toolName: string): toolName is PlannerOutcomeToolName
+declare function isResolverOutcomeToolName(toolName: string): toolName is ResolverOutcomeToolName
 ```
 
 ### isWebMCPSupported
@@ -1296,7 +1296,7 @@ declare function listTools(): RegisteredTool[]
 
 ### normalizeJsonText
 
-Source in the repository: `packages/core/src/planner.ts`. [Packaged declaration](../dist/packages/core/src/planner.d.ts).
+Source in the repository: `packages/core/src/resolver.ts`. [Packaged declaration](../dist/packages/core/src/resolver.d.ts).
 
 ```ts
 declare function normalizeJsonText(value: string, source?: string): string
@@ -1321,14 +1321,6 @@ declare function objectInputSchema(
 ): JsonSchema
 ```
 
-### plannerOutcomeToolNames
-
-Source in the repository: `packages/core/src/plan-validation.ts`. [Packaged declaration](../dist/packages/core/src/plan-validation.d.ts).
-
-```ts
-declare const plannerOutcomeToolNames: readonly ['needs_clarification', 'no_tools_match']
-```
-
 ### registerFormTool
 
 Source in the repository: `packages/core/src/forms.ts`. [Packaged declaration](../dist/packages/core/src/forms.d.ts).
@@ -1347,6 +1339,14 @@ Source in the repository: `packages/core/src/registry.ts`. [Packaged declaration
 declare function registerTool<TInput = Record<string, unknown>, TOutput = unknown>(
   tool: WebMCPTool<TInput, TOutput>
 ): RegisteredTool<TInput, TOutput>
+```
+
+### resolverOutcomeToolNames
+
+Source in the repository: `packages/core/src/resolution-validation.ts`. [Packaged declaration](../dist/packages/core/src/resolution-validation.d.ts).
+
+```ts
+declare const resolverOutcomeToolNames: readonly ['needs_clarification', 'no_tools_match']
 ```
 
 ### setConfirmationHandler
@@ -1373,12 +1373,12 @@ Source in the repository: `packages/core/src/events.ts`. [Packaged declaration](
 declare function subscribeWebMCPKitEvents(listener: Listener): () => void
 ```
 
-### toolPlanSchema
+### toolResolutionSchema
 
-Source in the repository: `packages/core/src/plan-validation.ts`. [Packaged declaration](../dist/packages/core/src/plan-validation.d.ts).
+Source in the repository: `packages/core/src/resolution-validation.ts`. [Packaged declaration](../dist/packages/core/src/resolution-validation.d.ts).
 
 ```ts
-declare const toolPlanSchema: {
+declare const toolResolutionSchema: {
   type: string
   properties: {
     toolName: { type: string }
@@ -1430,15 +1430,15 @@ Source in the repository: `packages/core/src/schema.ts`. [Packaged declaration](
 declare function validateJsonValue(value: unknown, schema: JsonSchema, path?: string): string[]
 ```
 
-### validateToolPlan
+### validateToolResolution
 
-Source in the repository: `packages/core/src/plan-validation.ts`. [Packaged declaration](../dist/packages/core/src/plan-validation.d.ts).
+Source in the repository: `packages/core/src/resolution-validation.ts`. [Packaged declaration](../dist/packages/core/src/resolution-validation.d.ts).
 
 ```ts
-declare function validateToolPlan(
-  plan: unknown,
-  tools: ToolPlanValidationTool[],
-  options?: ToolPlanValidationOptions
+declare function validateToolResolution(
+  resolution: unknown,
+  tools: ToolResolutionValidationTool[],
+  options?: ToolResolutionValidationOptions
 ): void
 ```
 
@@ -1630,12 +1630,12 @@ declare function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unkno
 
 ## @vampaz/webmcp-kit/testing
 
-### WebMCPPlannerEvalCase
+### WebMCPResolverEvalCase
 
 Source in the repository: `packages/testing/src/interfaces/evals.ts`. [Packaged declaration](../dist/packages/testing/src/interfaces/evals.d.ts).
 
 ```ts
-export type WebMCPPlannerEvalCase = WebMCPPlannerEvalCaseBase &
+export type WebMCPResolverEvalCase = WebMCPResolverEvalCaseBase &
   (
     | {
         expectedToolName: string
@@ -1643,99 +1643,99 @@ export type WebMCPPlannerEvalCase = WebMCPPlannerEvalCaseBase &
       }
     | {
         expectedToolName?: never
-        expectedOutcome: WebMCPPlannerOutcome
+        expectedOutcome: WebMCPResolverOutcome
       }
   )
 ```
 
-### WebMCPPlannerEvalCaseBase
+### WebMCPResolverEvalCaseBase
 
 Source in the repository: `packages/testing/src/interfaces/evals.ts`. [Packaged declaration](../dist/packages/testing/src/interfaces/evals.d.ts).
 
 ```ts
-export interface WebMCPPlannerEvalCaseBase {
+export interface WebMCPResolverEvalCaseBase {
   name: string
   message: string
-  context?: PlannerContext
+  context?: ResolverContext
   expectedInput?: Record<string, unknown>
   expectedInputSubset?: Record<string, unknown>
-  expectedSteps?: WebMCPPlannerEvalStepExpectation[]
+  expectedSteps?: WebMCPResolverEvalStepExpectation[]
 }
 ```
 
-### WebMCPPlannerEvalCaseSummary
+### WebMCPResolverEvalCaseSummary
 
 Source in the repository: `packages/testing/src/interfaces/evals.ts`. [Packaged declaration](../dist/packages/testing/src/interfaces/evals.d.ts).
 
 ```ts
-export interface WebMCPPlannerEvalCaseSummary {
+export interface WebMCPResolverEvalCaseSummary {
   name: string
   runs: number
   passes: number
   passRate: number
   passed: boolean
   averageDurationMs: number
-  results: WebMCPPlannerEvalResult[]
+  results: WebMCPResolverEvalResult[]
 }
 ```
 
-### WebMCPPlannerEvalResult
+### WebMCPResolverEvalResult
 
 Source in the repository: `packages/testing/src/interfaces/evals.ts`. [Packaged declaration](../dist/packages/testing/src/interfaces/evals.d.ts).
 
 ```ts
-export interface WebMCPPlannerEvalResult {
+export interface WebMCPResolverEvalResult {
   name: string
   passed: boolean
   message: string
   durationMs: number
-  plan?: ToolPlan
+  resolution?: ToolResolution
   errors: string[]
 }
 ```
 
-### WebMCPPlannerEvalStepExpectation
+### WebMCPResolverEvalStepExpectation
 
 Source in the repository: `packages/testing/src/interfaces/evals.ts`. [Packaged declaration](../dist/packages/testing/src/interfaces/evals.d.ts).
 
 ```ts
-export interface WebMCPPlannerEvalStepExpectation {
+export interface WebMCPResolverEvalStepExpectation {
   toolName: string
   inputSubset?: Record<string, unknown>
 }
 ```
 
-### WebMCPPlannerEvalSuiteOptions
+### WebMCPResolverEvalSuiteOptions
 
 Source in the repository: `packages/testing/src/interfaces/evals.ts`. [Packaged declaration](../dist/packages/testing/src/interfaces/evals.d.ts).
 
 ```ts
-export interface WebMCPPlannerEvalSuiteOptions {
+export interface WebMCPResolverEvalSuiteOptions {
   minimumPassRate?: number
   runsPerCase?: number
 }
 ```
 
-### WebMCPPlannerEvalSuiteResult
+### WebMCPResolverEvalSuiteResult
 
 Source in the repository: `packages/testing/src/interfaces/evals.ts`. [Packaged declaration](../dist/packages/testing/src/interfaces/evals.d.ts).
 
 ```ts
-export interface WebMCPPlannerEvalSuiteResult {
-  plannerName: string
+export interface WebMCPResolverEvalSuiteResult {
+  resolverName: string
   passed: boolean
   minimumPassRate: number
   runsPerCase: number
-  caseResults: WebMCPPlannerEvalCaseSummary[]
+  caseResults: WebMCPResolverEvalCaseSummary[]
 }
 ```
 
-### WebMCPPlannerOutcome
+### WebMCPResolverOutcome
 
 Source in the repository: `packages/testing/src/interfaces/evals.ts`. [Packaged declaration](../dist/packages/testing/src/interfaces/evals.d.ts).
 
 ```ts
-export type WebMCPPlannerOutcome = 'needs_clarification' | 'no_tools_match'
+export type WebMCPResolverOutcome = 'needs_clarification' | 'no_tools_match'
 ```
 
 ### getWebMCPRegistrySnapshot
@@ -1765,41 +1765,41 @@ Source in the repository: `packages/testing/src/playwright.ts`. [Packaged declar
 declare function listWebMCPTools(page: WebMCPTestingPage): Promise<TestBridgeTool[]>
 ```
 
-### runWebMCPPlannerEvalCase
+### runWebMCPResolverEvalCase
 
 Source in the repository: `packages/testing/src/evals.ts`. [Packaged declaration](../dist/packages/testing/src/evals.d.ts).
 
 ```ts
-declare function runWebMCPPlannerEvalCase(
-  planner: ToolPlanner,
+declare function runWebMCPResolverEvalCase(
+  resolver: ToolResolver,
   tools: readonly AnyWebMCPTool[],
-  testCase: WebMCPPlannerEvalCase
-): Promise<WebMCPPlannerEvalResult>
+  testCase: WebMCPResolverEvalCase
+): Promise<WebMCPResolverEvalResult>
 ```
 
-### runWebMCPPlannerEvalSuite
+### runWebMCPResolverEvalSuite
 
 Source in the repository: `packages/testing/src/evals.ts`. [Packaged declaration](../dist/packages/testing/src/evals.d.ts).
 
 ```ts
-declare function runWebMCPPlannerEvalSuite(
-  planner: ToolPlanner,
+declare function runWebMCPResolverEvalSuite(
+  resolver: ToolResolver,
   tools: readonly AnyWebMCPTool[],
-  testCases: readonly WebMCPPlannerEvalCase[],
-  options?: WebMCPPlannerEvalSuiteOptions
-): Promise<WebMCPPlannerEvalSuiteResult>
+  testCases: readonly WebMCPResolverEvalCase[],
+  options?: WebMCPResolverEvalSuiteOptions
+): Promise<WebMCPResolverEvalSuiteResult>
 ```
 
-### runWebMCPPlannerEvals
+### runWebMCPResolverEvals
 
 Source in the repository: `packages/testing/src/evals.ts`. [Packaged declaration](../dist/packages/testing/src/evals.d.ts).
 
 ```ts
-declare function runWebMCPPlannerEvals(
-  planner: ToolPlanner,
+declare function runWebMCPResolverEvals(
+  resolver: ToolResolver,
   tools: readonly AnyWebMCPTool[],
-  testCases: readonly WebMCPPlannerEvalCase[]
-): Promise<WebMCPPlannerEvalResult[]>
+  testCases: readonly WebMCPResolverEvalCase[]
+): Promise<WebMCPResolverEvalResult[]>
 ```
 
 ### waitForWebMCPTool
@@ -2014,8 +2014,8 @@ Source in the repository: `packages/pi/src/interfaces/controller.ts`. [Packaged 
 export interface PiHarnessOptions {
   session: PiSession
   worker: { url: string | URL; scope: string }
-  planner: ToolPlanner
-  context?: () => PlannerContext | Promise<PlannerContext>
+  resolver: ToolResolver
+  context?: () => ResolverContext | Promise<ResolverContext>
   host?: PiToolHost
   limits?: PiLimits
   /** Called when pending application approval UI must close. */
@@ -2033,7 +2033,7 @@ export interface PiLimits {
   maxToolCalls?: number
   /** UTF-8 bytes in the durable commit log; default 8 MiB. */
   maxHistoryBytes?: number
-  /** UTF-8 bytes per planner request; default 128 KiB. */
+  /** UTF-8 bytes per resolver request; default 128 KiB. */
   maxRequestBytes?: number
 }
 ```
@@ -2059,7 +2059,7 @@ Source in the repository: `packages/pi/src/interfaces/controller.ts`. [Packaged 
 ```ts
 export interface PiRuntimeOptions {
   session: PiSession
-  planner: ToolPlanner
+  resolver: ToolResolver
   host: PiToolHost
   limits?: PiLimits
 }
@@ -2134,7 +2134,7 @@ Source in the repository: `packages/pi/src/interfaces/host.ts`. [Packaged declar
 ```ts
 export interface PiToolHost {
   discover(signal: AbortSignal): Promise<PiToolCatalog>
-  context(signal: AbortSignal): Promise<PlannerContext>
+  context(signal: AbortSignal): Promise<ResolverContext>
   invoke(
     call: { name: string; input: Record<string, unknown>; revision: string },
     signal: AbortSignal
@@ -2175,7 +2175,7 @@ Source in the repository: `packages/pi/src/tool-host.ts`. [Packaged declaration]
 
 ```ts
 declare function createRegistryToolHost(
-  context?: () => PlannerContext | Promise<PlannerContext>
+  context?: () => ResolverContext | Promise<ResolverContext>
 ): PiToolHost
 ```
 
@@ -2258,15 +2258,15 @@ type InferJsonSchemaType<S> = S extends { const: infer C }
           : unknown
 ```
 
-### PlannerRunOptions
+### ResolverRunOptions
 
 Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
 
 ```ts
-export interface PlannerRunOptions {
+export interface ResolverRunOptions {
   signal?: AbortSignal
   singleStep?: boolean
-  /** Maximum UTF-8 bytes in the serialized planner request, including prompt/schema overhead. */
+  /** Maximum UTF-8 bytes in the serialized resolver request, including prompt/schema overhead. */
   maxRequestBytes?: number
 }
 ```

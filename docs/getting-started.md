@@ -72,7 +72,7 @@ Version constraints live in `package.json`; exact installed versions live in `pa
 
 ## One-Call Setup
 
-`initWebMCP()` covers the common wiring in a single call: it registers your tools, defines the `<webmcp-command-input>` element (creating a floating one when the page has none), and configures a hosted planner when you pass a publishable key:
+`initWebMCP()` covers the common wiring in a single call: it registers your tools, defines the `<webmcp-command-input>` element (creating a floating one when the page has none), and configures a hosted resolver when you pass a publishable key:
 
 ```ts
 import { defineTool, initWebMCP } from '@vampaz/webmcp-kit'
@@ -227,7 +227,7 @@ devtools.destroy()
 
 ## Add A Command Input
 
-Apps can use the built-in command input for natural-language planning against currently scope-available registered tools. The app supplies server-backed endpoint options; WebMCP Kit detects Chrome built-in AI from the browser when available.
+Apps can use the built-in command input for natural-language resolution against currently scope-available registered tools. The app supplies server-backed endpoint options; WebMCP Kit detects Chrome built-in AI from the browser when available.
 
 ```ts
 import { defineWebMCPCommandInput, type WebMCPCommandInputElement } from '@vampaz/webmcp-kit'
@@ -237,8 +237,8 @@ defineWebMCPCommandInput()
 const input = document.querySelector<WebMCPCommandInputElement>('webmcp-command-input')
 
 input?.configure({
-  context: getPlannerContext,
-  endpoint: '/api/webmcp/plan',
+  context: getResolverContext,
+  endpoint: '/api/webmcp/resolve',
   endpointOptions: [
     {
       label: 'GPT-5.4 mini',
@@ -278,4 +278,4 @@ Playwright tests can then import helpers from `@vampaz/webmcp-kit/testing/playwr
 
 ## Persistent conversation and independent chat
 
-For a result-driven conversation, configure the [Pi controller](./pi.md), compile an application-owned worker, and optionally mount [webmcp-chat](./chat.md). Core tools and application confirmations stay authoritative. The existing command input continues to offer bounded, non-conversational planning. Configure the model endpoint in the host, as described in [Where inference comes from](./planner-providers.md#where-inference-comes-from). Try all three surfaces in the [local package lab](../apps/demo/README.md).
+For a result-driven conversation, configure the [Pi controller](./pi.md), compile an application-owned worker, and optionally mount [webmcp-chat](./chat.md). Core tools and application confirmations stay authoritative. The existing command input continues to offer bounded, non-conversational resolution. Configure the model endpoint in the host, as described in [Where inference comes from](./resolver-providers.md#where-inference-comes-from). Try all three surfaces in the [local package lab](../apps/demo/README.md).

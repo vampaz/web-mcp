@@ -1,20 +1,20 @@
-import type { JsonSchema, ToolPlan, ToolPlanStep } from './interfaces/tool'
+import type { JsonSchema, ToolResolution, ToolResolutionStep } from './interfaces/tool'
 import { formatJsonValueValidationError, validateJsonValue } from './schema'
 
-export const plannerOutcomeToolNames = ['needs_clarification', 'no_tools_match'] as const
-export type PlannerOutcomeToolName = (typeof plannerOutcomeToolNames)[number]
+export const resolverOutcomeToolNames = ['needs_clarification', 'no_tools_match'] as const
+export type ResolverOutcomeToolName = (typeof resolverOutcomeToolNames)[number]
 
-export interface ToolPlanValidationTool {
+export interface ToolResolutionValidationTool {
   name?: string
   inputSchema?: JsonSchema
 }
 
-export interface ToolPlanValidationOptions {
+export interface ToolResolutionValidationOptions {
   messageStyle?: 'provider' | 'server'
   singleStep?: boolean
 }
 
-export const toolPlanSchema = {
+export const toolResolutionSchema = {
   type: 'object',
   properties: {
     toolName: { type: 'string' },
@@ -41,15 +41,15 @@ export const toolPlanSchema = {
   additionalProperties: false
 } satisfies JsonSchema
 
-export function createToolPlanSchema(
-  tools: ToolPlanValidationTool[],
+export function createToolResolutionSchema(
+  tools: ToolResolutionValidationTool[],
   singleStep = false
 ): JsonSchema {
-  if (!singleStep) return toolPlanSchema
-  const properties: Record<string, JsonSchema> = { ...toolPlanSchema.properties }
+  if (!singleStep) return toolResolutionSchema
+  const properties: Record<string, JsonSchema> = { ...toolResolutionSchema.properties }
   delete properties.steps
   return {
-    ...toolPlanSchema,
+    ...toolResolutionSchema,
     properties: {
       ...properties,
       toolName: {
@@ -60,71 +60,78 @@ export function createToolPlanSchema(
               return tool.name
             })
             .filter(Boolean),
-          ...plannerOutcomeToolNames
+          ...resolverOutcomeToolNames
         ]
       }
     }
   }
 }
 
-export function validateToolPlan(
-  plan: unknown,
-  tools: ToolPlanValidationTool[],
-  options: ToolPlanValidationOptions = {}
+export function validateToolResolution(
+  resolution: unknown,
+  tools: ToolResolutionValidationTool[],
+  options: ToolResolutionValidationOptions = {}
 ): void {
   const messages = getValidationMessages(options.messageStyle ?? 'provider')
 
-  if (!plan || typeof plan !== 'object') throw new Error(messages.invalidPlan)
-  const typedPlan = plan as Partial<ToolPlan>
+  if (!resolution || typeof resolution !== 'object') throw new Error(messages.invalidResolution)
+  const typedResolution = resolution as Partial<ToolResolution>
   if (
     options.singleStep &&
-    (typedPlan.steps !== undefined || typedPlan.toolName === 'tool_sequence')
+    (typedResolution.steps !== undefined || typedResolution.toolName === 'tool_sequence')
   )
     throw new Error('provider returned a sequence for a single-step request')
-  if (typeof typedPlan.toolName !== 'string') throw new Error(messages.invalidToolName)
-  if (!typedPlan.input || typeof typedPlan.input !== 'object' || Array.isArray(typedPlan.input)) {
+  if (typeof typedResolution.toolName !== 'string') throw new Error(messages.invalidToolName)
+  if (
+    !typedResolution.input ||
+    typeof typedResolution.input !== 'object' ||
+    Array.isArray(typedResolution.input)
+  ) {
     throw new Error(messages.invalidInput)
   }
-  if (typeof typedPlan.confidence !== 'number' || !Number.isFinite(typedPlan.confidence)) {
+  if (
+    typeof typedResolution.confidence !== 'number' ||
+    !Number.isFinite(typedResolution.confidence)
+  ) {
     throw new Error(messages.invalidConfidence)
   }
-  if (typeof typedPlan.reason !== 'string') throw new Error(messages.invalidReason)
-  if (isPlannerOutcomeToolName(typedPlan.toolName)) {
-    if (typedPlan.steps !== undefined) throw new Error(messages.invalidOutcomeSteps)
+  if (typeof typedResolution.reason !== 'string') throw new Error(messages.invalidReason)
+  if (isResolverOutcomeToolName(typedResolution.toolName)) {
+    if (typedResolution.steps !== undefined) throw new Error(messages.invalidOutcomeSteps)
     return
   }
-  if (typedPlan.steps !== undefined) {
-    validateToolPlanSequence(typedPlan as ToolPlan, tools, messages)
+  if (typedResolution.steps !== undefined) {
+    validateToolResolutionSequence(typedResolution as ToolResolution, tools, messages)
     return
   }
 
-  validateToolPlanStep(typedPlan as ToolPlanStep, tools, messages)
+  validateToolResolutionStep(typedResolution as ToolResolutionStep, tools, messages)
 }
 
-export function isPlannerOutcomeToolName(toolName: string): toolName is PlannerOutcomeToolName {
-  return plannerOutcomeToolNames.includes(toolName as PlannerOutcomeToolName)
+export function isResolverOutcomeToolName(toolName: string): toolName is ResolverOutcomeToolName {
+  return resolverOutcomeToolNames.includes(toolName as ResolverOutcomeToolName)
 }
 
-function validateToolPlanSequence(
-  plan: ToolPlan,
-  tools: ToolPlanValidationTool[],
-  messages: ToolPlanValidationMessages
+function validateToolResolutionSequence(
+  resolution: ToolResolution,
+  tools: ToolResolutionValidationTool[],
+  messages: ToolResolutionValidationMessages
 ): void {
-  if (plan.toolName !== 'tool_sequence') throw new Error(messages.invalidSequence)
-  if (!Array.isArray(plan.steps) || plan.steps.length === 0) {
+  if (resolution.toolName !== 'tool_sequence') throw new Error(messages.invalidSequence)
+  if (!Array.isArray(resolution.steps) || resolution.steps.length === 0) {
     throw new Error(messages.invalidSequenceSteps)
   }
-  if (plan.steps.length > 5) throw new Error(messages.sequenceTooLong)
+  if (resolution.steps.length > 5) throw new Error(messages.sequenceTooLong)
 
-  plan.steps.forEach(function validateSequenceStep(step) {
-    validateToolPlanStep(step, tools, messages)
+  resolution.steps.forEach(function validateSequenceStep(step) {
+    validateToolResolutionStep(step, tools, messages)
   })
 }
 
-function validateToolPlanStep(
-  step: ToolPlanStep,
-  tools: ToolPlanValidationTool[],
-  messages: ToolPlanValidationMessages
+function validateToolResolutionStep(
+  step: ToolResolutionStep,
+  tools: ToolResolutionValidationTool[],
+  messages: ToolResolutionValidationMessages
 ): void {
   if (!step || typeof step !== 'object') throw new Error(messages.invalidStep)
   if (typeof step.toolName !== 'string') throw new Error(messages.invalidStepToolName)
@@ -153,8 +160,8 @@ function validateToolPlanStep(
   }
 }
 
-interface ToolPlanValidationMessages {
-  invalidPlan: string
+interface ToolResolutionValidationMessages {
+  invalidResolution: string
   invalidToolName: string
   invalidInput: string
   invalidConfidence: string
@@ -173,19 +180,19 @@ interface ToolPlanValidationMessages {
   invalidToolInput: (toolName: string, detail: string) => string
 }
 
-function getValidationMessages(style: 'provider' | 'server'): ToolPlanValidationMessages {
+function getValidationMessages(style: 'provider' | 'server'): ToolResolutionValidationMessages {
   if (style === 'server') {
     return {
-      invalidPlan: 'Invalid plan',
+      invalidResolution: 'Invalid resolution',
       invalidToolName: 'Invalid toolName',
       invalidInput: 'Invalid input',
       invalidConfidence: 'Invalid confidence',
       invalidReason: 'Invalid reason',
-      invalidOutcomeSteps: 'Planner outcomes cannot include steps',
+      invalidOutcomeSteps: 'Resolver outcomes cannot include steps',
       invalidSequence: 'Invalid tool sequence',
       invalidSequenceSteps: 'Invalid tool sequence steps',
       sequenceTooLong: 'Tool sequence is too long',
-      invalidStep: 'Invalid plan step',
+      invalidStep: 'Invalid resolution step',
       invalidStepToolName: 'Invalid step toolName',
       invalidStepInput: 'Invalid step input',
       invalidStepConfidence: 'Invalid step confidence',
@@ -201,20 +208,20 @@ function getValidationMessages(style: 'provider' | 'server'): ToolPlanValidation
   }
 
   return {
-    invalidPlan: 'provider returned an invalid plan',
-    invalidToolName: 'provider returned a plan without toolName',
-    invalidInput: 'provider returned a plan with invalid input',
-    invalidConfidence: 'provider returned a plan without numeric confidence',
-    invalidReason: 'provider returned a plan without reason',
-    invalidOutcomeSteps: 'provider returned a planner outcome with steps',
+    invalidResolution: 'provider returned an invalid resolution',
+    invalidToolName: 'provider returned a resolution without toolName',
+    invalidInput: 'provider returned a resolution with invalid input',
+    invalidConfidence: 'provider returned a resolution without numeric confidence',
+    invalidReason: 'provider returned a resolution without reason',
+    invalidOutcomeSteps: 'provider returned a resolver outcome with steps',
     invalidSequence: 'provider returned steps without tool_sequence',
     invalidSequenceSteps: 'provider returned an empty tool sequence',
     sequenceTooLong: 'provider returned too many tool sequence steps',
-    invalidStep: 'provider returned an invalid plan step',
-    invalidStepToolName: 'provider returned a plan step without toolName',
-    invalidStepInput: 'provider returned a plan step with invalid input',
-    invalidStepConfidence: 'provider returned a plan step without numeric confidence',
-    invalidStepReason: 'provider returned a plan step without reason',
+    invalidStep: 'provider returned an invalid resolution step',
+    invalidStepToolName: 'provider returned a resolution step without toolName',
+    invalidStepInput: 'provider returned a resolution step with invalid input',
+    invalidStepConfidence: 'provider returned a resolution step without numeric confidence',
+    invalidStepReason: 'provider returned a resolution step without reason',
     unknownTool(toolName) {
       return `provider selected unknown tool "${toolName}"`
     },

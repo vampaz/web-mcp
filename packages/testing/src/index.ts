@@ -1,15 +1,15 @@
 export {
-  runWebMCPPlannerEvalCase,
-  runWebMCPPlannerEvalSuite,
-  runWebMCPPlannerEvals,
-  type WebMCPPlannerEvalCase,
-  type WebMCPPlannerEvalCaseBase,
-  type WebMCPPlannerEvalCaseSummary,
-  type WebMCPPlannerEvalResult,
-  type WebMCPPlannerEvalStepExpectation,
-  type WebMCPPlannerEvalSuiteOptions,
-  type WebMCPPlannerEvalSuiteResult,
-  type WebMCPPlannerOutcome
+  runWebMCPResolverEvalCase,
+  runWebMCPResolverEvalSuite,
+  runWebMCPResolverEvals,
+  type WebMCPResolverEvalCase,
+  type WebMCPResolverEvalCaseBase,
+  type WebMCPResolverEvalCaseSummary,
+  type WebMCPResolverEvalResult,
+  type WebMCPResolverEvalStepExpectation,
+  type WebMCPResolverEvalSuiteOptions,
+  type WebMCPResolverEvalSuiteResult,
+  type WebMCPResolverOutcome
 } from './evals'
 export {
   getWebMCPRegistrySnapshot,

@@ -1,8 +1,8 @@
 {
   "name": "@vampaz/webmcp-kit",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "type": "module",
-  "description": "WebMCP tool registration, planners, framework helpers, devtools, and testing helpers for web apps.",
+  "description": "WebMCP tool registration, resolvers, framework helpers, devtools, and testing helpers for web apps.",
   "homepage": "https://github.com/vampaz/web-mcp#readme",
   "bugs": {
     "url": "https://github.com/vampaz/web-mcp/issues"
