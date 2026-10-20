@@ -1,22 +1,27 @@
 import { isDevelopmentEnvironment } from './environment'
 import type { ConfirmationHandler, ConfirmationTool } from './interfaces/tool'
 
-export type { ConfirmationHandler, ConfirmationTool } from './interfaces/tool'
+export type { ConfirmationHandler, ConfirmationRequest, ConfirmationTool } from './interfaces/tool'
 
-let confirmationHandler: ConfirmationHandler | undefined
+const handlers = new Map<symbol, ConfirmationHandler>()
 let warnedAboutWindowConfirm = false
 
-export function setConfirmationHandler(handler: ConfirmationHandler | undefined): void {
-  confirmationHandler = handler
+export function setConfirmationHandler(handler: ConfirmationHandler | undefined): () => void {
+  const owner = Symbol('confirmation')
+  if (handler) handlers.set(owner, handler)
+  else handlers.clear()
   warnedAboutWindowConfirm = false
+  return function dispose() {
+    handlers.delete(owner)
+  }
 }
 
 export function hasConfirmationHandler(): boolean {
-  return confirmationHandler !== undefined
+  return handlers.size > 0
 }
 
 export function getConfirmationHandler(): ConfirmationHandler | undefined {
-  return confirmationHandler
+  return Array.from(handlers.values()).at(-1)
 }
 
 export async function requestToolConfirmation(
@@ -25,13 +30,11 @@ export async function requestToolConfirmation(
   signal?: AbortSignal
 ): Promise<boolean> {
   const reason = tool.confirmation?.reason ?? 'Confirm this action?'
-  const handler = tool.confirmation?.handler ?? confirmationHandler
+  const handler = tool.confirmation?.handler ?? getConfirmationHandler()
 
   if (handler) {
     try {
-      return await (signal
-        ? handler(tool, input, reason, { signal })
-        : handler(tool, input, reason))
+      return await handler({ tool, input, reason, ...(signal ? { signal } : {}) })
     } catch (error) {
       throw new Error(`Confirmation handler failed: ${getErrorMessage(error)}`)
     }

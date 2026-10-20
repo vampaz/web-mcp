@@ -17,3 +17,10 @@ export {
   listWebMCPTools,
   waitForWebMCPTool
 } from './playwright'
+export { clearToolsForTest } from '../../core/src/registry'
+export {
+  installWebMCPKitTestBridge,
+  type TestBridgeSnapshot,
+  type TestBridgeTool,
+  type WebMCPKitTestBridge
+} from '../../core/src/test-bridge'

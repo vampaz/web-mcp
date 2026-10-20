@@ -1,7 +1,5 @@
 import type {
   ResolverContext,
-  ResolverProviderConfig,
-  ResolverProviderKind,
   ToolInvocationResult,
   ToolResolution,
   ToolResolutionStep,
@@ -15,12 +13,6 @@ export type WebMCPCommandInputPhase =
   | 'executing'
   | 'completed'
   | 'failed'
-
-export interface WebMCPCommandInputEndpointOption {
-  label: string
-  model?: string
-  provider: ResolverProviderKind
-}
 
 export interface WebMCPCommandInputResolverModelOption {
   label: string
@@ -41,55 +33,37 @@ export interface WebMCPCommandInputResolverOption {
   modelOptions?: WebMCPCommandInputResolverModelOption[]
 }
 
-export interface WebMCPCommandInputConfigureOptions {
-  apiKey?: string
-  authMode?: 'none' | 'server' | 'user-key'
-  baseUrl?: string
+export type WebMCPCommandInputConfigureOptions = {
   buttonLabel?: string
   context?: ResolverContext | (() => ResolverContext)
   disabled?: boolean
-  endpoint?: string
-  endpointOptions?: WebMCPCommandInputEndpointOption[]
   floating?: boolean
   initialModel?: string
   initialResolverOptionId?: string
-  initialProvider?: ResolverProviderKind
-  model?: string
   placeholder?: string
-  resolver?: ToolResolver
-  resolverConfig?: ResolverProviderConfig
-  resolverOptions?: WebMCPCommandInputResolverOption[]
-  provider?: ResolverProviderKind
   settingsOpen?: boolean
-  showChromeAI?: boolean
-}
+} & (
+  | { resolver?: ToolResolver; resolverOptions?: never }
+  | { resolver?: never; resolverOptions?: WebMCPCommandInputResolverOption[] }
+)
 
 export interface WebMCPCommandInputElement extends HTMLElement {
-  apiKey?: string
-  authMode?: 'none' | 'server' | 'user-key'
-  baseUrl?: string
   buttonLabel?: string
   context?: ResolverContext | (() => ResolverContext)
   disabled: boolean
-  endpoint?: string
-  endpointOptions?: WebMCPCommandInputEndpointOption[]
   floating: boolean
-  model?: string
   panelOpen: boolean
   placeholder: string
   resolver?: ToolResolver
-  resolverConfig?: ResolverProviderConfig
   resolverOptions?: WebMCPCommandInputResolverOption[]
-  provider?: ResolverProviderKind
-  showChromeAI?: boolean
-  closePanel: () => void
-  configure: (options: WebMCPCommandInputConfigureOptions) => void
-  openPanel: () => void
-  run: (
+  closePanel(): void
+  configure(options: WebMCPCommandInputConfigureOptions): void
+  openPanel(): void
+  run(
     message?: string,
     options?: WebMCPCommandInputRunOptions
-  ) => Promise<ToolInvocationResult | undefined>
-  togglePanel: () => void
+  ): Promise<ToolInvocationResult | undefined>
+  togglePanel(): void
 }
 
 export interface WebMCPCommandInputRunOptions {

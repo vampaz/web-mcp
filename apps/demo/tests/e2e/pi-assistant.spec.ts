@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-test('headless controls run the real Pi loop through the explicit worker scope', async function headless({
+test('headless controls run the real Pi loop without a service worker', async function headless({
   page
 }) {
   await page.goto('/?mode=harness')
@@ -15,7 +15,7 @@ test('headless controls run the real Pi loop through the explicit worker scope',
         return new URL(registration.scope).pathname
       })
     })
-  ).toEqual(['/webmcp-pi/'])
+  ).toEqual([])
   expect(
     await page.evaluate(function controlled() {
       return navigator.serviceWorker.controller
@@ -41,7 +41,7 @@ test('coexists with an application root PWA worker', async function pwa({ page }
       controller: navigator.serviceWorker.controller?.scriptURL
     }
   })
-  expect(result.scopes).toEqual(['/', '/webmcp-pi/'])
+  expect(result.scopes).toEqual(['/'])
   expect(result.controller).toContain('/pwa-worker.js')
 })
 
@@ -68,42 +68,16 @@ test('stopping a pending approval closes the application dialog and never execut
   await expect(page.locator('#counter')).toHaveText('0')
 })
 
-test('service worker termination interrupts approval and reload does not replay', async function terminated({
-  page,
-  context
+test('navigation interrupts approval and returning does not replay', async function navigation({
+  page
 }) {
   await page.goto('/?mode=chat')
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('set 9')
   await page.getByRole('button', { name: 'Send', exact: true }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
-  const cdp = await context.newCDPSession(page)
-  await cdp.send('ServiceWorker.enable')
-  await cdp.send('ServiceWorker.stopAllWorkers')
-  await expect(page.getByRole('dialog')).not.toBeVisible()
-  await expect(page.locator('webmcp-chat').getByRole('status')).toContainText(
-    /closed|responding|interrupted/
-  )
-  await page.reload()
+  await page.goto('/?mode=core')
+  await page.goto('/?mode=chat')
   await expect(page.locator('webmcp-chat').getByRole('status')).toContainText('interrupted')
   await expect(page.locator('#counter')).toHaveText('0')
   await expect(page.getByRole('dialog')).not.toBeVisible()
-})
-
-test('a new user turn reconnects after an idle worker terminates', async function idleRecovery({
-  page,
-  context
-}) {
-  await page.goto('/?mode=chat')
-  const input = page.getByRole('textbox', { name: 'Message', exact: true })
-  await input.fill('read')
-  await input.press('Enter')
-  await expect(page.locator('webmcp-chat').getByRole('status')).toHaveText('Ready')
-  const cdp = await context.newCDPSession(page)
-  await cdp.send('ServiceWorker.enable')
-  await cdp.send('ServiceWorker.stopAllWorkers')
-  await input.fill('read again')
-  await input.press('Enter')
-  await expect(page.locator('webmcp-chat').getByRole('status')).toHaveText('Ready')
-  await expect(page.locator('webmcp-chat summary')).toHaveCount(2)
-  await expect(page.locator('#counter')).toHaveText('0')
 })

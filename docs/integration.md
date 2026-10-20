@@ -10,19 +10,21 @@ This walkthrough adds a persistent assistant to an existing HTTPS application. T
 | ----------------------------------------- | ------------------------------------------------- |
 | Expose existing app actions               | Core and `registerTool()` or a framework helper   |
 | Execute short natural-language commands   | Core plus a resolver and `<webmcp-command-input>` |
-| Persistent conversations with your own UI | `/pi` and an application worker                   |
+| Persistent conversations with your own UI | `/pi` and a conversational resolver               |
 | Persistent conversations with supplied UI | The preceding setup plus `/chat`                  |
 | Use chat with your own controller         | `/chat` and an implementation of `PiController`   |
 
-Install `0.2.1` or newer. npm installs the Pi runtime libraries automatically:
+Install WebMCP Kit:
 
 ```sh
-npm install @vampaz/webmcp-kit@^0.2.1
+npm install @vampaz/webmcp-kit
 ```
+
+The distribution bundles Pi implementation libraries; consumers do not install them separately.
 
 For local package development, use the verified tarball described in [operations](./operations.md#validation-in-this-repository). Do not use a source alias as proof that the published package works. Keep the kit dependency deduplicated so the page's tool definitions, framework helpers, and harness use one registry.
 
-The package's Node requirement for tooling is `>=24.12.0`; this repository pins its development baseline in `.nvmrc`. Browser execution requires the APIs listed in [operations](./operations.md#browser-prerequisites). Framework and Zod peers are needed only for those subpaths. The [dependency model](./getting-started.md#dependency-model) maps every feature to its peers and separates application runtime requirements from repository tooling.
+The package's Node requirement for tooling is `>=22.19.0`; this repository pins its development baseline in `.nvmrc`. Browser execution requires the APIs listed in [operations](./operations.md#browser-prerequisites). Framework and Zod peers are needed only for those subpaths. The [dependency model](./getting-started.md#dependency-model) maps every feature to its peers and separates application runtime requirements from repository tooling.
 
 ## 2. Register the application's actions
 
@@ -52,30 +54,28 @@ For a mutation, declare `confirmation`, validate all required input, and use `sc
 
 The complete [counter assistant example](./examples/counter-assistant.ts) registers read and confirmed-write actions, supplies fresh context, mounts chat, and handles teardown during asynchronous initialization. The package-consumer suite typechecks this example against the actual tarball. Copy it into your app as a starting point, then replace its in-memory counter with your application's action functions. Mount one instance because its tool names are fixed.
 
-## 3. Compile the application worker
-
-Create `worker.ts` in the application root:
+### Optional offline command input
 
 ```ts
-import { installPiServiceWorker } from '@vampaz/webmcp-kit/pi/worker'
+import { createResolver } from '@vampaz/webmcp-kit'
+import { initWebMCP } from '@vampaz/webmcp-kit/command-input'
 
-installPiServiceWorker()
+const commands = initWebMCP({ resolver: await createResolver({ provider: 'local' }) })
+// Floating panels start closed. Connect an application button to commands.element.openPanel().
+// During teardown:
+commands.destroy()
 ```
 
-Use the complete [Vite worker configuration and worker TypeScript project](./pi.md#embedded-website). Compile to `public/webmcp-pi/worker.js` before starting the site or producing the site artifact. The configuration bundles the worker's dependencies and reserves that directory for generated files. Keep the normal page Vite configuration and TLS plugin.
+This path needs no hosted service. A deterministic resolver asks for missing required inputs. For conversation, configure a conversational provider below; deterministic resolution does not provide conversation capability.
 
-The page and worker must share an origin. Use a dedicated non-root scope ending in `/`, with the worker script below that scope. For an app hosted at `/nested/`, use `/nested/webmcp-pi/worker.js` and scope `/nested/webmcp-pi/`. In Vite page code, derive both from `import.meta.env.BASE_URL`. Never replace the root PWA worker to install the assistant.
-
-During development, open the HTTPS URL advertised by the existing TLS plugin. When changing worker code, rebuild/watch the worker and reload the page. Page HMR does not update the worker runtime automatically.
-
-## 4. Configure model access
+## 3. Configure model access
 
 This example uses an application-owned resolver endpoint. It receives selected tool schemas, the request, and safe current context. Your backend chooses an approved model, keeps provider credentials, validates the request, and returns a `ToolResolution`.
 
 ```ts
-import { createRemoteResolver } from '@vampaz/webmcp-kit'
+import { createResolver } from '@vampaz/webmcp-kit'
 
-const resolver = createRemoteResolver({
+const resolver = await createResolver({
   provider: 'openai',
   model: 'your-server-approved-model',
   auth: { mode: 'server', endpoint: '/api/webmcp/resolve' }
@@ -84,9 +84,9 @@ const resolver = createRemoteResolver({
 
 Replace the example model identifier with one allowed by your server. [Resolver providers](./resolver-providers.md) describes the endpoint protocol and other providers. For Pi, the server must honor `singleStep: true` and the supplied response schema. It must return exactly one action, a clarification, an unavailable outcome, or the offered `pi_reply` tool. It must not precompute a sequence that depends on unknown results.
 
-For browser AI, use `await createChromeAIResolver(true)` and check availability before mounting the assistant. Trigger session/model setup from the required browser user interaction. For local development, the lab's same-origin HTTPS proxy keeps the model service and credentials out of browser configuration. A custom resolver needs explicit conversational capability, cancellation, response validation, and serialized-request limits; see [API behavior](./api-behavior.md#setup-and-resolver-factories).
+For browser AI, use `await createResolver({ provider: 'chrome-built-in' })` and check availability before mounting the assistant. Trigger session/model setup from the required browser user interaction. For local development, the lab's same-origin HTTPS proxy keeps the model service and credentials out of browser configuration. A custom resolver needs explicit conversational capability, cancellation, response validation, and serialized-request limits; see [API behavior](./api-behavior.md#setup-and-resolver-factories).
 
-## 5. Mount the interface and approval UI
+## 4. Mount the interface and approval UI
 
 Add application markup:
 
@@ -109,11 +109,10 @@ Copy the [example module](./examples/counter-assistant.ts) into your client sour
 ```ts
 import { createDialogApproval, mountCounterAssistant } from './counter-assistant'
 
-// `resolver` comes from step 4; `signedInUserId` comes from your authenticated application.
+// `resolver` comes from step 3; `signedInUserId` comes from your authenticated application.
 const approval = createDialogApproval(document.querySelector<HTMLDialogElement>('#approval')!)
 const assistant = mountCounterAssistant({
   container: document.querySelector<HTMLElement>('#assistant')!,
-  workerScope: `${import.meta.env.BASE_URL}webmcp-pi/`,
   session: { namespace: 'my-app', ownerId: signedInUserId, conversationId: 'counter' },
   resolver,
   approve: approval.confirm,
@@ -141,7 +140,7 @@ The module uses popup mode. Set `mode: 'inline'` in its `element.configure()` ca
 
 The sample's `ready` promise rejects on initialization failure, and its `destroy()` closes a controller that finishes initialization after teardown. Wire teardown immediately in the framework lifecycle rather than waiting for initialization to finish. Do not destroy the controller merely because a popup closes. To support the back/forward cache in a custom document teardown handler, preserve the controller when `pagehide.persisted` is true; the harness already stops the active turn in that case.
 
-## 6. Own account, route, and resolver changes
+## 5. Own account, route, and resolver changes
 
 Destroy the old controller and cancel approval UI before creating a replacement for another account, conversation partition, or resolver. Unsubscribe old views and unregister route-owned tools. A supplied resolver belongs to the host; the harness does not dispose it automatically.
 
@@ -151,7 +150,7 @@ Pass only current, visible, necessary app state through `context()`. Tool inputs
 
 Framework equivalents: [Vue](./vue.md#independent-conversation-ui), [React](./react.md#independent-conversation-ui), [Svelte](./svelte.md#independent-conversation-ui), and [Astro](./astro.md). The tool registration helpers and chat lifecycle are separate concerns.
 
-## 7. Verify the consuming application
+## 6. Verify the consuming application
 
 Test the installed artifact with the application's actual routes and authenticated actions:
 
@@ -161,7 +160,7 @@ Test the installed artifact with the application's actual routes and authenticat
 4. Reload after an interrupted turn. Confirm history restores and no action is replayed.
 5. Switch accounts and confirm storage partitions and tool permissions change.
 6. Open two tabs on the same conversation and verify writer contention is visible.
-7. Test the deployed base path, compiled worker URL, existing PWA, and production CSP over HTTPS.
+7. Test the deployed base path, existing PWA, and production CSP over HTTPS.
 8. Exercise keyboard input, popup/inline mode, narrow screens, long output, and New chat.
 
-Use a deterministic resolver for repeatable integration tests. Run separately authorized model evaluations against the intended provider. Passing package tests proves packaging and supported fixtures; it does not prove your backend policy or deployed worker path. See [operations](./operations.md) for commands and troubleshooting.
+Use a deterministic resolver for repeatable integration tests. Run separately authorized model evaluations against the intended provider. Passing package tests proves packaging and supported fixtures; it does not prove your backend policy or deployed application. See [operations](./operations.md) for commands and troubleshooting.

@@ -12,14 +12,11 @@ it('keeps the tarball limited to published code and documentation', async functi
   const { stdout } = await run('tar', ['-tzf', artifact])
   expect(stdout).not.toMatch(/package\/(apps|tests|temp-docs|scripts)\//)
   expect(stdout).not.toMatch(/\.env|\.spec\.|test-utils/)
-  expect(stdout).toContain('package/dist/pi/worker.js')
+  expect(stdout).not.toContain('package/dist/pi/worker.js')
   const { stdout: raw } = await run('tar', ['-xOf', artifact, 'package/package.json'])
   const manifest = JSON.parse(raw)
-  expect(Object.keys(manifest.dependencies).sort()).toEqual([
-    '@earendil-works/chord',
-    '@earendil-works/pi-ai',
-    '@earendil-works/pi-durable'
-  ])
+  expect(manifest.dependencies ?? {}).toEqual({})
+  expect(stdout).toContain('package/dist/THIRD-PARTY-NOTICES.md')
   expect(Object.keys(manifest.peerDependencies).sort()).toEqual(['react', 'svelte', 'vue', 'zod'])
 })
 
@@ -29,6 +26,7 @@ it.each(['core-only', 'chat-only'])(
     const fixture = await installFixture(name)
     try {
       await checkTypes(fixture.directory)
+      await checkTypes(fixture.directory, 'tsconfig.nodenext.json')
       const { stdout } = await run(process.execPath, ['check.mjs'], { cwd: fixture.directory })
       expect(stdout).toContain('passed')
       const manifest = JSON.parse(await readFile(join(fixture.directory, 'package.json'), 'utf8'))

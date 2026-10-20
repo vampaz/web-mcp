@@ -20,7 +20,6 @@ export type PiErrorCode =
   | 'tool_failed'
   | 'limit_reached'
   | 'conversation_busy'
-  | 'transport_failed'
 
 export interface PiError {
   code: PiErrorCode
@@ -64,7 +63,6 @@ export interface PiRuntimeOptions {
 
 export interface PiHarnessOptions {
   session: PiSession
-  worker: { url: string | URL; scope: string }
   resolver: ToolResolver
   context?: () => ResolverContext | Promise<ResolverContext>
   host?: PiToolHost

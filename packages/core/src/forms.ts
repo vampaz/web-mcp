@@ -1,6 +1,6 @@
 import { defineTool } from './define-tool'
 import type { JsonSchema, RegisteredTool, WebMCPTool } from './interfaces/tool'
-import { registerToolWithCleanup, unregisterTool } from './registry'
+import { registerToolWithCleanup } from './registry'
 import { formatJsonValueValidationError, validateJsonValue } from './schema'
 
 export interface RegisterFormToolOptions<TOutput = FormData> {
@@ -53,7 +53,6 @@ export function registerFormTool<TOutput = FormData>(
     }
   })
 
-  unregisterTool(options.name)
   const restoreAttributes = createFormToolAttributeRestorer(options.form, options.fields)
   applyFormToolOptions(options)
 

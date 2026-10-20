@@ -143,49 +143,45 @@ describe('React useWebMCPTool', () => {
     runtime.cleanup()
   })
 
-  it('evaluates a legacy when getter instead of treating it as truthy', async () => {
+  it('preserves approval across inline rerenders and invokes the committed callback', async () => {
     const runtime = createReactHookRuntime()
     vi.doMock('react', function mockReact() {
       return runtime
     })
-
     const { useWebMCPTool } = await import('./index')
-    const { defineTool, listTools } = await import('@vampaz/webmcp-kit')
-    const tool = defineTool({
-      name: 'create_ticket',
-      description: 'Create a support ticket from the current React screen.',
-      inputSchema: {
-        type: 'object',
-        properties: {},
-        required: [],
-        additionalProperties: false
-      },
-      execute() {
-        return {}
-      }
-    })
-
-    runtime.render(function renderHook() {
-      useWebMCPTool(tool, {
-        when: function isUnavailable() {
-          return false
-        } as unknown as boolean
+    const { defineTool, invokeTool, listTools, setConfirmationHandler } =
+      await import('@vampaz/webmcp-kit')
+    let approve!: (approved: boolean) => void
+    const dispose = setConfirmationHandler(function confirm() {
+      return new Promise<boolean>(function pending(resolve) {
+        approve = resolve
       })
     })
-
-    expect(listTools()).toEqual([])
-
-    runtime.render(function renderHook() {
-      useWebMCPTool(tool, {
-        when: function isAvailable() {
-          return true
-        } as unknown as boolean
-      })
-    })
-
-    expect(listTools()).toHaveLength(1)
-
+    let version = 1
+    function render() {
+      const committedVersion = version
+      useWebMCPTool(
+        defineTool({
+          name: 'save_note',
+          description: 'Save the note in the active workspace.',
+          inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+          confirmation: { reason: 'Save this note?' },
+          execute() {
+            return committedVersion
+          }
+        })
+      )
+    }
+    runtime.render(render)
+    const registration = listTools()[0]
+    const invocation = invokeTool({ toolName: 'save_note', input: {} })
+    version = 2
+    runtime.render(render)
+    expect(listTools()[0]).toBe(registration)
+    approve(true)
+    expect(await invocation).toMatchObject({ status: 'success', output: 2 })
     runtime.cleanup()
+    dispose()
   })
 
   it('respects a false when option', async () => {
@@ -225,47 +221,45 @@ describe('React useWebMCPTool', () => {
 function createReactHookRuntime() {
   const refs: Array<{ current: unknown }> = []
   let refIndex = 0
-  let cleanups: Array<() => void> = []
-  let effects: EffectCallback[] = []
+  let effectIndex = 0
+  const states: Array<{ dependencies?: unknown[]; cleanup?: () => void }> = []
+  let effects: Array<() => void> = []
 
   function useRef<T>(initialValue: T) {
-    const index = refIndex
-    refIndex += 1
-
-    if (!refs[index]) {
-      refs[index] = {
-        current: initialValue
-      }
-    }
-
+    const index = refIndex++
+    refs[index] ??= { current: initialValue }
     return refs[index] as { current: T }
   }
 
-  function useEffect(effect: EffectCallback) {
-    effects.push(effect)
+  function useEffect(effect: EffectCallback, dependencies?: unknown[]) {
+    const index = effectIndex++
+    const previous = states[index]
+    const changed =
+      !dependencies ||
+      !previous?.dependencies ||
+      dependencies.some(function differs(value, i) {
+        return !Object.is(value, previous.dependencies?.[i])
+      })
+    if (!changed) return
+    effects.push(function commitEffect() {
+      previous?.cleanup?.()
+      const cleanup = effect()
+      states[index] = { dependencies, cleanup: typeof cleanup === 'function' ? cleanup : undefined }
+    })
   }
 
   function render(renderHook: () => void) {
     refIndex = 0
+    effectIndex = 0
     effects = []
     renderHook()
-    cleanups = effects.flatMap(function runEffect(effect) {
-      const cleanup = effect()
-      return typeof cleanup === 'function' ? [cleanup] : []
-    })
+    for (const effect of effects) effect()
   }
 
   function cleanup() {
-    for (const cleanupEffect of cleanups) {
-      cleanupEffect()
-    }
-    cleanups = []
+    for (const state of states) state.cleanup?.()
+    states.length = 0
   }
 
-  return {
-    cleanup,
-    render,
-    useEffect,
-    useRef
-  }
+  return { cleanup, render, useEffect, useRef }
 }

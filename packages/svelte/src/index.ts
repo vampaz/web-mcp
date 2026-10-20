@@ -1,62 +1,35 @@
 import { onMount } from 'svelte'
 import type { Readable, Unsubscriber } from 'svelte/store'
 
-import { registerTool, type RegisteredTool, type WebMCPTool } from '@vampaz/webmcp-kit'
+import type { WebMCPTool } from '@vampaz/webmcp-kit'
+import { createToolRegistrationHandle } from '../../core/src/tool-registration'
 
 import type { UseWebMCPToolOptions, UseWebMCPToolResult } from './interfaces/webmcp-tool'
 
-export type {
-  SvelteWebMCPTool,
-  UseWebMCPToolOptions,
-  UseWebMCPToolResult
-} from './interfaces/webmcp-tool'
+export type { UseWebMCPToolOptions, UseWebMCPToolResult } from './interfaces/webmcp-tool'
 
 export function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unknown>(
   tool: WebMCPTool<TInput, TOutput>,
   options: UseWebMCPToolOptions = {}
 ): UseWebMCPToolResult<TInput, TOutput> {
-  let registration: RegisteredTool<TInput, TOutput> | undefined
+  const handle = createToolRegistrationHandle(tool)
   let unsubscribe: Unsubscriber | undefined
-
-  function unregister(): void {
-    registration?.unregister()
-    registration = undefined
-  }
-
-  function syncRegistration(available: boolean): void {
-    if (available && !registration) {
-      registration = registerTool(tool)
-      return
-    }
-
-    if (!available) {
-      unregister()
-    }
-  }
 
   onMount(function mountWebMCPTool() {
     if (isReadable(options.when)) {
-      unsubscribe = options.when.subscribe(syncRegistration)
+      unsubscribe = options.when.subscribe(handle.sync)
     } else {
-      syncRegistration(
-        options.when === undefined ||
-          (typeof options.when === 'function' ? options.when() : options.when)
-      )
+      handle.sync(options.when === undefined || options.when === true)
     }
 
     return function disposeWebMCPTool() {
       unsubscribe?.()
       unsubscribe = undefined
-      unregister()
+      handle.unregister()
     }
   })
 
-  return {
-    unregister,
-    getRegistration() {
-      return registration
-    }
-  }
+  return handle
 }
 
 function isReadable(value: UseWebMCPToolOptions['when']): value is Readable<boolean> {

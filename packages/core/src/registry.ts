@@ -1,5 +1,5 @@
+import { getToolAvailability } from './availability'
 import { assertValidTool } from './define-tool'
-import { isDevelopmentEnvironment } from './environment'
 import { emitWebMCPKitEvent } from './events'
 import type {
   RegisteredTool,
@@ -30,8 +30,9 @@ export function registerToolWithCleanup<TInput = Record<string, unknown>, TOutpu
   assertValidTool(tool)
 
   if (registeredTools.has(tool.name)) {
-    warnAboutDuplicateRegistration(tool.name)
-    registeredTools.get(tool.name)?.unregister()
+    throw new Error(
+      `Tool "${tool.name}" is already registered. Unregister it before registering another tool with the same name.`
+    )
   }
 
   const nativeRegistration =
@@ -100,11 +101,7 @@ export function listTools(): RegisteredTool[] {
 
 export function listAvailableTools(): RegisteredTool[] {
   return listTools().filter(function isToolAvailable(registration) {
-    try {
-      return registration.tool.scope?.().available !== false
-    } catch {
-      return false
-    }
+    return getToolAvailability(registration.tool).available
   })
 }
 
@@ -140,20 +137,8 @@ export async function invokeTool<TOutput = unknown>(
     )
   }
 
-  const invocationId = invocation.id ?? createInvocationId()
-  const trackedInvocation = {
-    ...invocation,
-    id: invocationId
-  }
-
-  emitWebMCPKitEvent({
-    type: 'invoked',
-    toolName: invocation.toolName,
-    timestamp: Date.now(),
-    detail: trackedInvocation
-  })
-
   const result = (await invokeToolPipeline(registration.tool, {
+    invocationId: invocation.id,
     confirmed: invocation.confirmed,
     isCurrent() {
       return registeredTools.get(invocation.toolName) === registration
@@ -163,33 +148,9 @@ export async function invokeTool<TOutput = unknown>(
     source: invocation.source ?? 'fallback',
     startedAt
   })) as ToolInvocationResult<TOutput>
-  result.invocationId = invocationId
-  emitWebMCPKitEvent({
-    type:
-      result.status === 'success'
-        ? 'succeeded'
-        : result.status === 'blocked' || result.status === 'unavailable'
-          ? 'blocked'
-          : 'failed',
-    toolName: invocation.toolName,
-    timestamp: Date.now(),
-    detail: result
-  })
   return result
 }
 
 export function clearToolsForTest(): void {
   registeredTools.clear()
-}
-
-function createInvocationId(): string {
-  return `invocation_${Date.now()}_${Math.random().toString(16).slice(2)}`
-}
-
-function warnAboutDuplicateRegistration(toolName: string): void {
-  if (!isDevelopmentEnvironment()) return
-
-  console.warn(
-    `[WebMCP Kit] Tool "${toolName}" was already registered; replacing the previous registration. Call unregisterTool("${toolName}") first to silence this warning.`
-  )
 }

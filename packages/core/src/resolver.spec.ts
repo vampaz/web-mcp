@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   createBestResolver,
   createChromeAIResolver,
-  createConfiguredResolver,
+  createResolver,
   createHeuristicResolver
 } from './resolver'
 import type { JsonSchema, WebMCPTool } from './interfaces/tool'
@@ -14,6 +14,7 @@ interface WindowWithLanguageModel extends Window {
       options?: unknown
     ) => Promise<'available' | 'downloadable' | 'downloading' | 'unavailable'>
     create: (options?: unknown) => Promise<{
+      clone?: (options?: unknown) => Promise<unknown>
       prompt: (message: string) => Promise<string>
       destroy?: () => void
       dispose?: () => void
@@ -52,7 +53,7 @@ describe('resolver', () => {
       )
     })
     vi.stubGlobal('fetch', fetch)
-    const resolver = await createConfiguredResolver({
+    const resolver = await createResolver({
       provider: 'openai-compatible',
       baseUrl: '/local/v1',
       responseFormat: 'json_schema'
@@ -100,7 +101,7 @@ describe('resolver', () => {
       )
     })
     vi.stubGlobal('fetch', fetch)
-    const resolver = await createConfiguredResolver({
+    const resolver = await createResolver({
       provider: 'openai-compatible',
       baseUrl: 'http://127.0.0.1:1234/v1',
       model: 'configured',
@@ -143,6 +144,9 @@ describe('resolver', () => {
 
   it('uses Chrome AI as the active resolver when the model is downloadable', async () => {
     const create = vi.fn(async () => ({
+      async clone(this: { prompt: (message: string) => Promise<string> }) {
+        return { prompt: this.prompt, destroy: vi.fn() }
+      },
       prompt: async () =>
         JSON.stringify({
           toolName: 'select_items',
@@ -181,6 +185,9 @@ describe('resolver', () => {
 
   it('uses Chrome built-in AI when available', async () => {
     const create = vi.fn(async () => ({
+      async clone(this: { prompt: (message: string) => Promise<string> }) {
+        return { prompt: this.prompt, destroy: vi.fn() }
+      },
       prompt: async () =>
         JSON.stringify({
           toolName: 'search_products',
@@ -330,7 +337,12 @@ describe('resolver', () => {
         return 'available'
       },
       async create() {
-        return { prompt }
+        return {
+          prompt,
+          async clone() {
+            return { prompt, destroy: vi.fn() }
+          }
+        }
       }
     }
     const resolver = await createChromeAIResolver(true)
@@ -351,11 +363,8 @@ describe('resolver', () => {
       }
     }
 
-    const resolver = await createConfiguredResolver({
-      provider: 'chrome-built-in',
-      auth: {
-        mode: 'none'
-      }
+    const resolver = await createResolver({
+      provider: 'chrome-built-in'
     })
 
     await expect(resolver.resolve('Add ten keyboards to the cart.', [])).rejects.toThrow(
@@ -367,6 +376,9 @@ describe('resolver', () => {
     ;(window as WindowWithLanguageModel).LanguageModel = {
       availability: async () => 'available',
       create: async () => ({
+        async clone(this: { prompt: (message: string) => Promise<string> }) {
+          return { prompt: this.prompt, destroy: vi.fn() }
+        },
         prompt: async () => 'not json'
       })
     }
@@ -391,6 +403,9 @@ describe('resolver', () => {
     ;(window as WindowWithLanguageModel).LanguageModel = {
       availability: async () => 'available',
       create: async () => ({
+        async clone(this: { prompt: (message: string) => Promise<string> }) {
+          return { prompt: this.prompt, destroy: vi.fn() }
+        },
         prompt: async () =>
           JSON.stringify({
             toolName: 'delete_everything',
@@ -425,6 +440,9 @@ describe('resolver', () => {
       availability: async () => 'available',
       create: async () => ({
         destroy,
+        async clone(this: { prompt: (message: string) => Promise<string> }) {
+          return { prompt: this.prompt, destroy: vi.fn() }
+        },
         prompt: async () =>
           JSON.stringify({
             toolName: 'search_products',
@@ -523,10 +541,43 @@ describe('resolver', () => {
       }
     )
 
-    expect(resolution.input).toEqual({
-      productId: 'product_keyboard',
-      quantity: 1
+    expect(resolution.toolName).toBe('needs_clarification')
+  })
+
+  it.each([{ type: 'boolean' }, { type: 'number' }, { type: 'string', enum: ['red', 'blue'] }])(
+    'asks instead of inventing a required value for %j',
+    async (schema) => {
+      const result = await createHeuristicResolver().resolve('Update setting', [
+        createTool('update_setting', 'Update the setting value.', {
+          type: 'object',
+          properties: { value: schema },
+          required: ['value'],
+          additionalProperties: false
+        })
+      ])
+      expect(result.toolName).toBe('needs_clarification')
+    }
+  )
+
+  it('uses a fresh clone per Chrome request and destroys each clone', async () => {
+    const destroyBase = vi.fn()
+    const destroyClone = vi.fn()
+    const prompt = vi.fn(async () =>
+      JSON.stringify({ toolName: 'no_tools_match', input: {}, confidence: 0, reason: 'None' })
+    )
+    const clone = vi.fn(async () => ({ prompt, destroy: destroyClone }))
+    Reflect.set(window, 'LanguageModel', {
+      availability: async () => 'available',
+      create: async () => ({ clone, destroy: destroyBase })
     })
+    const resolver = await createChromeAIResolver(true)
+    await resolver.resolve('First request', [])
+    await resolver.resolve('Second request', [])
+    expect(clone).toHaveBeenCalledTimes(2)
+    expect(destroyClone).toHaveBeenCalledTimes(2)
+    expect(destroyBase).not.toHaveBeenCalled()
+    resolver.dispose?.()
+    expect(destroyBase).toHaveBeenCalledOnce()
   })
 
   it('extracts numeric quantities for cart commands', async () => {
@@ -683,7 +734,7 @@ describe('resolver', () => {
       createTool('sort_inventory', 'Sort inventory.', {
         type: 'object',
         properties: {
-          direction: { type: 'string', enum: ['up', 'down'] }
+          direction: { type: 'string', enum: ['up', 'down'], default: 'up' }
         },
         required: ['direction'],
         additionalProperties: false
@@ -900,6 +951,9 @@ describe('resolver', () => {
     ;(window as WindowWithLanguageModel).LanguageModel = {
       availability: async () => 'available',
       create: async () => ({
+        async clone(this: { prompt: (message: string) => Promise<string> }) {
+          return { prompt: this.prompt, destroy: vi.fn() }
+        },
         prompt: async (message: string) => {
           promptText = message
           return JSON.stringify({
@@ -959,7 +1013,7 @@ describe('resolver', () => {
   })
 
   it('requires a user key for browser-key remote providers', async () => {
-    const resolver = await createConfiguredResolver({
+    const resolver = await createResolver({
       provider: 'openrouter',
       model: 'openrouter/auto',
       auth: {
@@ -1005,7 +1059,7 @@ describe('resolver', () => {
     )
     vi.stubGlobal('fetch', fetch)
 
-    const resolver = await createConfiguredResolver({
+    const resolver = await createResolver({
       provider: 'openrouter',
       model: 'openrouter/auto',
       auth: {
@@ -1051,7 +1105,7 @@ describe('resolver', () => {
       )
     )
 
-    const resolver = await createConfiguredResolver({
+    const resolver = await createResolver({
       provider: 'cloudflare-binding',
       model: '@cf/qwen/qwq-32b',
       auth: {
@@ -1095,7 +1149,7 @@ describe('resolver', () => {
     )
     vi.stubGlobal('fetch', fetch)
 
-    const resolver = await createConfiguredResolver({
+    const resolver = await createResolver({
       provider: 'openai',
       model: 'gpt-5.4-mini',
       auth: {
@@ -1140,7 +1194,7 @@ describe('resolver', () => {
       )
     )
 
-    const resolver = await createConfiguredResolver({
+    const resolver = await createResolver({
       provider: 'openai',
       model: 'gpt-5.4-mini',
       auth: {
@@ -1166,7 +1220,7 @@ describe('resolver', () => {
     const fetch = vi.fn()
     vi.stubGlobal('fetch', fetch)
     const controller = new AbortController()
-    const resolver = await createConfiguredResolver({
+    const resolver = await createResolver({
       provider: 'openai',
       model: 'gpt-5.4-mini',
       auth: {
@@ -1207,7 +1261,7 @@ describe('resolver', () => {
     )
     vi.stubGlobal('fetch', fetch)
 
-    const resolver = await createConfiguredResolver({
+    const resolver = await createResolver({
       provider: 'cloudflare-binding',
       model: '@cf/qwen/qwq-32b',
       auth: {
@@ -1241,7 +1295,7 @@ describe('resolver', () => {
   })
 
   it('does not allow Cloudflare binding mode without a server endpoint', async () => {
-    const resolver = await createConfiguredResolver({
+    const resolver = await createResolver({
       provider: 'cloudflare-binding',
       auth: {
         mode: 'none'

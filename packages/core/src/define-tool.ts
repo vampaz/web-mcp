@@ -7,14 +7,27 @@ const reservedToolNames = new Set<string>(['tool_sequence', ...resolverOutcomeTo
 
 export type SchemaTypedWebMCPTool<TSchema extends JsonSchema, TOutput = unknown> = Omit<
   WebMCPTool<InferToolInput<TSchema>, TOutput>,
-  'inputSchema'
-> & { inputSchema: TSchema }
+  'inputSchema' | 'execute' | 'guard'
+> & {
+  inputSchema: TSchema
+  execute: (
+    input: NoInfer<InferToolInput<TSchema>>,
+    context: import('./interfaces/tool').ToolContext
+  ) => TOutput | Promise<TOutput>
+  guard?: (input: NoInfer<InferToolInput<TSchema>>) => boolean | string | Promise<boolean | string>
+}
 
 export function defineTool<const TSchema extends JsonSchema, TOutput = unknown>(
   tool: SchemaTypedWebMCPTool<TSchema, TOutput>
 ): WebMCPTool<InferToolInput<TSchema>, TOutput>
 export function defineTool<TInput = Record<string, unknown>, TOutput = unknown>(
-  tool: WebMCPTool<TInput, TOutput>
+  tool: Omit<WebMCPTool<NoInfer<TInput>, TOutput>, 'execute' | 'guard'> & {
+    execute: (
+      input: NoInfer<TInput>,
+      context: import('./interfaces/tool').ToolContext
+    ) => TOutput | Promise<TOutput>
+    guard?: (input: NoInfer<TInput>) => boolean | string | Promise<boolean | string>
+  }
 ): WebMCPTool<TInput, TOutput>
 export function defineTool(tool: object): object {
   assertValidTool(tool as WebMCPTool<never, unknown>)

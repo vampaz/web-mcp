@@ -9,6 +9,7 @@ export interface CommandInputViewState {
   floating: boolean
   floatingExpanded: boolean
   modelControlMarkup: string
+  detail?: string
   optionsStatus: string
   phase: WebMCPCommandInputPhase
   placeholder: string
@@ -74,6 +75,7 @@ function getCommandMarkup(view: CommandInputViewState): string {
             ${escapeHtml(view.buttonLabel)}
           </button>
         </form>
+        <p data-feedback role="status" aria-atomic="true">${escapeHtml(view.detail ?? '')}</p>
         ${
           view.showSettings
             ? `

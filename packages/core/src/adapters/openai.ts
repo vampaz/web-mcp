@@ -1,4 +1,4 @@
-import type { AnyWebMCPTool, JsonSchema } from '../interfaces/tool'
+import type { WebMCPTool, JsonSchema } from '../interfaces/tool'
 
 export interface OpenAIFunctionTool {
   type: 'function'
@@ -9,7 +9,7 @@ export interface OpenAIFunctionTool {
   }
 }
 
-export function formatOpenAITool(tool: AnyWebMCPTool): OpenAIFunctionTool {
+export function formatOpenAITool(tool: WebMCPTool): OpenAIFunctionTool {
   return {
     type: 'function',
     function: {
@@ -20,7 +20,7 @@ export function formatOpenAITool(tool: AnyWebMCPTool): OpenAIFunctionTool {
   }
 }
 
-export function formatOpenAITools(tools: readonly AnyWebMCPTool[]): OpenAIFunctionTool[] {
+export function formatOpenAITools(tools: readonly WebMCPTool[]): OpenAIFunctionTool[] {
   return tools.map(formatOpenAITool)
 }
 

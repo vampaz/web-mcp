@@ -37,7 +37,7 @@ export function getToolWarnings<TInput = Record<string, unknown>, TOutput = unkn
     warnings.push('Description is too short; explain when the agent should use this tool.')
   }
 
-  if (weakWords.some((word) => tool.description.toLowerCase().includes(word))) {
+  if (weakWords.some((word) => containsWord(tool.description, word))) {
     warnings.push('Description uses vague wording; prefer concrete action language.')
   }
 
@@ -46,9 +46,9 @@ export function getToolWarnings<TInput = Record<string, unknown>, TOutput = unkn
   }
 
   const looksSensitive = sensitiveWords.some(
-    (word) => tool.name.includes(word) || tool.description.toLowerCase().includes(word)
+    (word) => containsWord(tool.name, word) || containsWord(tool.description, word)
   )
-  if (looksSensitive && !tool.confirmation?.required) {
+  if (looksSensitive && !tool.confirmation && tool.annotations?.readOnlyHint !== true) {
     warnings.push('Sensitive action likely needs explicit confirmation metadata.')
   }
 
@@ -75,8 +75,8 @@ function getFormToolWarnings<TInput = Record<string, unknown>, TOutput = unknown
     }
 
     const fieldText = `${fieldName} ${description ?? ''}`.toLowerCase()
-    const looksSensitive = sensitiveFieldWords.some((word) => fieldText.includes(word))
-    if (looksSensitive && !tool.confirmation?.required) {
+    const looksSensitive = sensitiveFieldWords.some((word) => containsWord(fieldText, word))
+    if (looksSensitive && !tool.confirmation) {
       warnings.push(
         `Sensitive form field "${fieldName}" should require explicit confirmation or be excluded.`
       )
@@ -102,4 +102,12 @@ function isUnconstrainedField(schema: WebMCPTool['inputSchema']): boolean {
   }
 
   return false
+}
+
+function containsWord(text: string, word: string): boolean {
+  const normalized = text
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/_/g, ' ')
+    .toLowerCase()
+  return new RegExp(`\\b${word.replace(/_/g, ' ')}\\b`).test(normalized)
 }

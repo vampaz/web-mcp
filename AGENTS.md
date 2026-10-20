@@ -12,7 +12,7 @@
 WebMCP Kit is one ESM-only TypeScript npm package with multiple public entry points. The `packages/` directories organize its source; they are not independently installed npm workspaces. The kit exposes app actions through native browser WebMCP, with local registries and resolvers for unsupported browsers and tests.
 
 - `packages/core`: tool definitions, registry, resolvers, schema validation, events, confirmation handling, native adapter, test bridge.
-- `packages/pi`: persistent conversation runtime, page controller, registry tool host, and service-worker entry point.
+- `packages/pi`: persistent conversation runtime, page controller, and registry tool host running in the page.
 - `packages/chat`: framework-neutral chat custom element driven by a supplied controller.
 - `packages/devtools`: in-page tool inspection/invocation overlay.
 - `packages/testing`: resolver evaluations and Playwright bridge helpers.

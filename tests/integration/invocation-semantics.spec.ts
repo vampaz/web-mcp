@@ -1,13 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import {
-  clearToolsForTest,
-  defineTool,
-  installWebMCPKitTestBridge,
-  invokeTool,
-  registerTool,
-  setConfirmationHandler
-} from '@vampaz/webmcp-kit'
+import { clearToolsForTest, installWebMCPKitTestBridge } from '@vampaz/webmcp-kit/testing'
+import { defineTool, invokeTool, registerTool, setConfirmationHandler } from '@vampaz/webmcp-kit'
 import { createLocalMCPBridge } from '@vampaz/webmcp-kit/mcp-bridge'
 
 describe('cross-surface invocation semantics', () => {
@@ -40,7 +34,6 @@ describe('cross-surface invocation semantics', () => {
           additionalProperties: false
         },
         confirmation: {
-          required: true,
           reason: 'Sending an invoice contacts the customer.'
         },
         execute

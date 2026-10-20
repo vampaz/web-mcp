@@ -11,7 +11,7 @@ flowchart TB
   User[User]
   UI[Optional chat or application UI]
   Page[Page controller and tool host]
-  Worker[Dedicated Pi service worker]
+  Pi[Pi runtime in the page]
   Storage[(IndexedDB conversation log)]
   Lock[Web Lock for the conversation]
   Resolver[Application-configured resolver]
@@ -21,13 +21,13 @@ flowchart TB
   Native[Native WebMCP, command input, devtools, test bridge]
   User --> UI
   UI --> Page
-  Page <-->|Bound MessageChannel and worker messages| Worker
-  Worker --> Lock
-  Worker --> Storage
-  Worker -->|Resolution one next action| Page
+  Page --> Pi
+  Pi --> Lock
+  Pi --> Storage
+  Pi -->|Resolution one next action| Page
   Page --> Resolver
   Resolver --> Model
-  Worker -->|Invoke one action| Page
+  Pi -->|Invoke one action| Page
   Page --> Registry
   Native --> Registry
   Registry -->|Validate, approve, guard, execute| App
@@ -35,13 +35,12 @@ flowchart TB
 
 | Surface           | Responsibility                                                                                    | Starts work on import?                                     |
 | ----------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Core              | Definitions, registry, native adapter, invocation, resolvers, command input, diagnostics          | No automatic tool registration or inference                |
+| Core              | Definitions, registry, native adapter, invocation, resolvers, diagnostics                         | No automatic tool registration or inference                |
 | `/pi`             | `createPiHarness`, current-context `createPiRuntime`, registry tool host, public controller types | No worker, storage, or model request                       |
-| `/pi/worker`      | Installs the worker message protocol and persistent runtime                                       | Only after `installPiServiceWorker()`                      |
 | `/chat`           | Text-only transcript and controls bound to a supplied controller                                  | Only after defining, mounting, and configuring the element |
 | Framework helpers | Register tools in a framework lifecycle                                                           | When the helper runs in its documented lifecycle           |
 
-Core and chat do not load the Pi runtime. npm installs the kit's Pi dependencies automatically, while `/chat` imports controller types only. A fake or application-owned controller can drive the same component. The page's default tool host uses the existing core registry; it does not create a second registry inside the worker.
+Core and chat do not load the Pi runtime. The distribution bundles Pi implementation dependencies, while `/chat` imports controller types only. A fake or application-owned controller can drive the same component. The page's default tool host uses the existing core registry; it does not create a second registry inside a worker.
 
 ## One conversational turn
 
@@ -56,7 +55,7 @@ sequenceDiagram
   participant Tools as Core and application
   User->>UI: Send a message
   UI->>Page: send(text)
-  Page->>Pi: Bound request for this document and session
+  Page->>Pi: Direct runtime call for this document and session
   Pi->>Pi: Acquire the conversation Web Lock
   Pi->>DB: Commit the user turn
   loop Until reply, failure, cancellation, or limit
@@ -116,7 +115,7 @@ stateDiagram-v2
   closed --> [*]
 ```
 
-Initialization can reject before a controller exists. `send()` reports its outcome as data; callers must inspect the returned status. `stop()` and `clear()` can reject on transport or storage failures. Closing the popup only hides the view. Removing the element unsubscribes the view. Neither action destroys the controller.
+Initialization can reject before a controller exists. `send()` reports its outcome as data; callers must inspect the returned status. `stop()` and `clear()` can reject on host or storage failures. Closing the popup only hides the view. Removing the element unsubscribes the view. Neither action destroys the controller.
 
 Stop aborts resolution and pending approval. It cannot undo an action that already reached the application or server. A lost reply can leave the action's outcome unknown. The runtime does not automatically retry the turn. Heartbeats apply only to the connection and turn that initiated them; a late failure cannot cancel a later turn.
 
@@ -128,21 +127,8 @@ Each operation opens the bounded log, replays committed entries into Pi's refere
 
 On recovery, unfinished tasks are aborted before model or tool execution is enabled. History remains visible, and the interrupted marker persists. Recovery does not replay old actions. Browser storage can be cleared or evicted, and automatic compaction is disabled.
 
-The page's `pagehide` handler stops work when the browser saves the document in the back/forward cache. The restored controller can reconnect on a new user request. Ordinary document disposal destroys it.
+The page's `pagehide` handler stops work when the browser saves the document in the back/forward cache. The restored controller can accept a new user request. Ordinary document disposal destroys it.
 
-## Worker and deployment boundaries
+## Deployment boundaries
 
-```mermaid
-flowchart LR
-  Source[Application worker.ts] --> Compile[Vite worker compilation]
-  Compile --> Asset[public/webmcp-pi/worker.js]
-  Asset --> Site[Application site build and HTTPS hosting]
-  Site --> Page[Application page]
-  Site --> Dedicated[Dedicated non-root worker scope]
-  Page -->|Direct registration and message port| Dedicated
-  PWA[Existing root PWA worker] -.->|Continues controlling application requests| Page
-```
-
-The dedicated worker has no fetch handler and does not call `clients.claim()`. It does not replace the root PWA worker. It does call `skipWaiting()` during installation. A worker update can interrupt active work; the application must show the interruption and let the user start a new turn.
-
-The host compiles the worker wrapper and serves the resulting module inside its same-origin scope. The worker URL and scope must include the deployment base path. A development `.ts` URL from this repository is not a production asset contract.
+Deploy the page and its bundled JavaScript through the application's normal workflow. Pi uses the page's IndexedDB and Web Locks. Existing PWA and dedicated inference workers are independent. Validate the production HTTPS origin and CSP with the consuming application.

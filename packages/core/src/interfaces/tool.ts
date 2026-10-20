@@ -1,11 +1,11 @@
 export interface JsonSchema {
-  type?: string | string[]
+  type?: string | readonly string[]
   properties?: Record<string, JsonSchema>
-  required?: string[]
+  required?: readonly string[]
   items?: JsonSchema
-  anyOf?: JsonSchema[]
-  oneOf?: JsonSchema[]
-  enum?: unknown[]
+  anyOf?: readonly JsonSchema[]
+  oneOf?: readonly JsonSchema[]
+  enum?: readonly unknown[]
   const?: unknown
   title?: string
   minimum?: number
@@ -33,15 +33,16 @@ export interface ConfirmationTool {
   confirmation?: ToolConfirmation
 }
 
-export type ConfirmationHandler = (
-  tool: ConfirmationTool,
-  input: unknown,
-  reason: string,
-  context?: { signal: AbortSignal }
-) => boolean | Promise<boolean>
+export interface ConfirmationRequest {
+  tool: ConfirmationTool
+  input: unknown
+  reason: string
+  signal?: AbortSignal
+}
+
+export type ConfirmationHandler = (request: ConfirmationRequest) => boolean | Promise<boolean>
 
 export interface ToolConfirmation {
-  required: boolean
   reason: string
   handler?: ConfirmationHandler
 }
@@ -66,25 +67,9 @@ export interface WebMCPTool<TInput = Record<string, unknown>, TOutput = unknown>
   confirmation?: ToolConfirmation
   examples?: TInput[]
   scope?: () => ToolScopeResult
-  guard?: (input: TInput) => boolean | string | Promise<boolean | string>
-  execute: (input: TInput, context: ToolContext) => Promise<TOutput> | TOutput
-}
-
-/**
- * A supertype of every WebMCPTool<TInput, TOutput>, usable for heterogeneous
- * tool lists without erasing per-tool input typing at the definition site.
- */
-export interface AnyWebMCPTool {
-  name: string
-  description: string
-  inputSchema: JsonSchema
-  outputSchema?: JsonSchema
-  annotations?: ToolAnnotations
-  confirmation?: ToolConfirmation
-  examples?: unknown[]
-  scope?: () => ToolScopeResult
-  guard?: (input: never) => boolean | string | Promise<boolean | string>
-  execute: (input: never, context: ToolContext) => Promise<unknown> | unknown
+  parseInput?(input: unknown): TInput | Promise<TInput>
+  guard?(input: TInput): boolean | string | Promise<boolean | string>
+  execute(input: TInput, context: ToolContext): Promise<TOutput> | TOutput
 }
 
 export interface RegisteredTool<TInput = Record<string, unknown>, TOutput = unknown> {
@@ -186,8 +171,14 @@ export type ResolverAuth =
   | { mode: 'server'; endpoint: string }
   | { mode: 'user-key'; apiKey?: string; storageKey?: string }
 
-export interface ResolverProviderConfig {
-  provider: ResolverProviderKind
+export type ResolverProviderConfig =
+  | { provider: 'auto' }
+  | { provider: 'chrome-built-in' }
+  | { provider: 'local' }
+  | RemoteResolverConfig
+
+export interface RemoteResolverConfig {
+  provider: 'openai' | 'openrouter' | 'openai-compatible' | 'cloudflare-binding'
   model?: string
   baseUrl?: string
   auth?: ResolverAuth

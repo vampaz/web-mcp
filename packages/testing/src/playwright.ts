@@ -1,9 +1,5 @@
-import type {
-  TestBridgeSnapshot,
-  TestBridgeTool,
-  ToolInvocation,
-  ToolInvocationResult
-} from '@vampaz/webmcp-kit'
+import type { TestBridgeSnapshot, TestBridgeTool } from '@vampaz/webmcp-kit/testing'
+import type { ToolInvocation, ToolInvocationResult } from '@vampaz/webmcp-kit'
 
 export interface WebMCPTestingPage {
   evaluate<TResult>(pageFunction: () => TResult | Promise<TResult>): Promise<TResult>

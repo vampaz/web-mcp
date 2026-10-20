@@ -1,6 +1,6 @@
 # Svelte Helper
 
-Use `useWebMCPTool` to register a tool while the component is mounted. `when` can be a boolean, function, or readable store.
+Use `useWebMCPTool` to register a tool while the component is mounted. `when` can be a boolean or readable store. Use a readable store for changes after mount; getter functions are not supported.
 
 ```svelte
 <script lang="ts">

@@ -164,7 +164,9 @@ function createInputFromSchema(
   const required = new Set(schema.required ?? [])
 
   for (const [key, propertySchema] of Object.entries(schema.properties)) {
-    const value = createInputValue(key, propertySchema, message, context, required.has(key))
+    const value =
+      createInputValue(key, propertySchema, message, context, required.has(key)) ??
+      propertySchema.default
     if (value !== undefined) input[key] = value
   }
 
@@ -187,7 +189,7 @@ function createInputValue(
   context: ResolverContext,
   required: boolean
 ): unknown {
-  if (Array.isArray(schema.enum)) return getEnumValue(schema.enum, message, key, required)
+  if (Array.isArray(schema.enum)) return getEnumValue(schema.enum, message, key)
 
   if (schema.type === 'array') {
     const ids = findContextIds(message, context)
@@ -203,9 +205,9 @@ function createInputValue(
   }
 
   if (schema.type === 'boolean') {
-    if (message.toLowerCase().includes('true')) return true
-    if (message.toLowerCase().includes('false')) return false
-    return required ? true : undefined
+    if (/\btrue\b/i.test(message)) return true
+    if (/\bfalse\b/i.test(message)) return false
+    return undefined
   }
 
   if (schema.type === 'string' || schema.type === undefined) {
@@ -223,7 +225,7 @@ function createInputValue(
   return undefined
 }
 
-function getEnumValue(values: unknown[], message: string, key: string, required: boolean): unknown {
+function getEnumValue(values: readonly unknown[], message: string, key: string): unknown {
   const normalizedMessage = message.toLowerCase()
   const matchingValue = values.find(function findMatchingValue(value) {
     return typeof value === 'string' && normalizedMessage.includes(value.toLowerCase())
@@ -237,12 +239,13 @@ function getEnumValue(values: unknown[], message: string, key: string, required:
       normalizedMessage.includes('most') ||
       normalizedMessage.includes('largest')
         ? 'desc'
-        : 'asc'
+        : /\b(asc|lowest|least|smallest)\b/.test(normalizedMessage)
+          ? 'asc'
+          : undefined
     if (values.includes(direction)) return direction
   }
 
-  if (!required) return undefined
-  return values[0]
+  return undefined
 }
 
 function findContextValueForKey(
@@ -258,7 +261,7 @@ function findContextValueForKey(
 function findContextIds(message: string, context: ResolverContext): string[] {
   if (message.toLowerCase().includes('first')) {
     return findContextObjects(context)
-      .slice(0, extractQuantity(message))
+      .slice(0, extractQuantity(message) ?? 1)
       .map(function mapContextId(item) {
         return item.id
       })
@@ -343,14 +346,14 @@ function tokenize(value: string): string[] {
     })
 }
 
-function extractAmount(message: string): number {
+function extractAmount(message: string): number | undefined {
   const amount = message.match(/(?:€|\$)?\s*(\d+(?:[.,]\d+)?)/)?.[1]
-  if (!amount) return 1
+  if (!amount) return undefined
 
   return Number(amount.replace(',', '.'))
 }
 
-function extractQuantity(message: string): number {
+function extractQuantity(message: string): number | undefined {
   const numericQuantity = message.match(/\b(\d+)\b/)?.[1]
   if (numericQuantity) return Number(numericQuantity)
 
@@ -359,7 +362,7 @@ function extractQuantity(message: string): number {
     if (new RegExp(`\\b${word}\\b`).test(normalizedMessage)) return value
   }
 
-  return 1
+  return undefined
 }
 
 function extractCustomerName(message: string): string {

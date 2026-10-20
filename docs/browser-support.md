@@ -65,7 +65,7 @@ Useful references:
 
 ## Pi and chat prerequisites
 
-Core fallback needs neither native WebMCP nor Pi. The independent chat accepts an application controller and does not require Pi or a framework. Chat uses Custom Elements, Shadow DOM, and ResizeObserver; popup mode also uses the Popover API. Embedded Pi requires a secure context, service workers, IndexedDB, Web Locks, and an explicitly configured conversational model. Missing prerequisites produce an error; persistent history never silently becomes in-memory history. Use the TLS plugin's advertised HTTPS domain for development and see [operations](./operations.md#browser-prerequisites) for deployment checks.
+Core fallback needs neither native WebMCP nor Pi. The independent chat accepts an application controller and does not require Pi or a framework. Chat uses Custom Elements, Shadow DOM, and ResizeObserver; popup mode also uses the Popover API. Embedded Pi requires a secure context, IndexedDB, Web Locks, and an explicitly configured conversational model. Missing prerequisites produce an error; persistent history never silently becomes in-memory history. Use the TLS plugin's advertised HTTPS domain for development and see [operations](./operations.md#browser-prerequisites) for deployment checks.
 
 The source suite selects Chromium with native WebMCP disabled, Firefox, and WebKit for portable storage/chat checks. Chromium additionally tests worker termination through CDP. A separate `native-chromium` project enables the real WebMCP API and asserts discovery/invocation/cancellation. Mocked native unit tests are separate evidence. `test:lmstudio` is a separate real-model lane.
 

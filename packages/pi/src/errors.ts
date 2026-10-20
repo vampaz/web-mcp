@@ -22,8 +22,7 @@ export function isPiError(value: unknown): value is PiError {
       'action_denied',
       'tool_failed',
       'limit_reached',
-      'conversation_busy',
-      'transport_failed'
+      'conversation_busy'
     ].includes(error.code) && typeof error.message === 'string'
   )
 }

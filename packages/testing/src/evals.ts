@@ -1,6 +1,5 @@
 import {
   validateToolResolution,
-  type AnyWebMCPTool,
   type ToolResolution,
   type ToolResolver,
   type WebMCPTool
@@ -27,11 +26,11 @@ export type {
 
 export async function runWebMCPResolverEvalCase(
   resolver: ToolResolver,
-  tools: readonly AnyWebMCPTool[],
+  tools: readonly WebMCPTool[],
   testCase: WebMCPResolverEvalCase
 ): Promise<WebMCPResolverEvalResult> {
   const errors: string[] = []
-  const resolverTools = tools as unknown as WebMCPTool[]
+  const resolverTools = [...tools]
   const startedAt = performance.now()
   const expectationError = getExpectationError(testCase)
   if (expectationError) {
@@ -73,7 +72,7 @@ export async function runWebMCPResolverEvalCase(
 
 export async function runWebMCPResolverEvalSuite(
   resolver: ToolResolver,
-  tools: readonly AnyWebMCPTool[],
+  tools: readonly WebMCPTool[],
   testCases: readonly WebMCPResolverEvalCase[],
   options: WebMCPResolverEvalSuiteOptions = {}
 ): Promise<WebMCPResolverEvalSuiteResult> {
@@ -119,7 +118,7 @@ export async function runWebMCPResolverEvalSuite(
 
 export async function runWebMCPResolverEvals(
   resolver: ToolResolver,
-  tools: readonly AnyWebMCPTool[],
+  tools: readonly WebMCPTool[],
   testCases: readonly WebMCPResolverEvalCase[]
 ): Promise<WebMCPResolverEvalResult[]> {
   const results: WebMCPResolverEvalResult[] = []

@@ -28,7 +28,6 @@ describe('server tools', () => {
           additionalProperties: false
         },
         confirmation: {
-          required: true,
           reason: 'Sending an invoice emails a customer.'
         }
       })

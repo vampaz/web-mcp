@@ -4,6 +4,7 @@ export {
   getErrorMessage,
   setConfirmationHandler,
   type ConfirmationHandler,
+  type ConfirmationRequest,
   type ConfirmationTool
 } from './confirmation'
 export {
@@ -14,7 +15,7 @@ export {
   type ToolCatalogOptions
 } from './adapters/catalog'
 export { formatOpenAITool, formatOpenAITools, type OpenAIFunctionTool } from './adapters/openai'
-export { emitWebMCPKitEvent, subscribeWebMCPKitEvents } from './events'
+export { subscribeWebMCPKitEvents } from './events'
 export {
   assertWebMCPIntegration,
   getIntegrationHealthReport,
@@ -27,39 +28,17 @@ export {
   type RegisterFormToolFieldOptions,
   type RegisterFormToolOptions
 } from './forms'
-export { defineWebMCPCommandInput } from './command-input'
-export {
-  createHostedOpenAIResolver,
-  createHostedOpenAIResolverOption,
-  type HostedOpenAIResolverOptionConfig,
-  type HostedOpenAIResolverOptions
-} from './hosted-openai-resolver'
-export { initWebMCP, type InitWebMCPOptions, type WebMCPInitHandle } from './init'
 export type {
-  WebMCPCommandErrorEventDetail,
-  WebMCPCommandInputConfigureOptions,
-  WebMCPCommandInputElement,
-  WebMCPCommandInputEndpointOption,
-  WebMCPCommandInputResolverCreateOptions,
-  WebMCPCommandInputResolverModelOption,
-  WebMCPCommandInputResolverOption,
-  WebMCPCommandInputPhase,
-  WebMCPCommandPanelToggleEventDetail,
-  WebMCPCommandResolutionEventDetail,
-  WebMCPCommandResolverEventDetail,
-  WebMCPCommandResultEventDetail,
-  WebMCPCommandStepEventDetail
-} from './interfaces/command-input'
-export type {
-  AnyWebMCPTool,
   IntegrationDiagnostic,
   IntegrationHealthReport,
   JsonSchema,
   ResolverContext,
   ResolverAuth,
   ResolverProviderConfig,
+  RemoteResolverConfig,
   ResolverProviderKind,
   ResolverRequest,
+  ResolverRunOptions,
   RegisteredTool,
   RegistrySnapshot,
   ToolConfirmation,
@@ -75,15 +54,7 @@ export type {
   WebMCPKitEvent,
   WebMCPTool
 } from './interfaces/tool'
-export { createWebMCPKit, type WebMCPKit, type WebMCPKitOptions } from './kit'
-export {
-  createBestResolver,
-  createChromeAIResolver,
-  createConfiguredResolver,
-  createHeuristicResolver,
-  createRemoteResolver,
-  normalizeJsonText
-} from './resolver'
+export { createResolver, normalizeJsonText } from './resolver'
 export {
   isResolverOutcomeToolName,
   resolverOutcomeToolNames,
@@ -94,7 +65,6 @@ export {
   type ToolResolutionValidationTool
 } from './resolution-validation'
 export {
-  clearToolsForTest,
   getRegistrySnapshot,
   getTool,
   invokeTool,
@@ -118,10 +88,3 @@ export {
 } from './schema-builders'
 export { defineServerTool, type DefineServerToolOptions, type ServerToolFetch } from './server-tool'
 export { getSupportLabel, isWebMCPSupported } from './support'
-export { escapeHtml, escapeAttribute } from './command-input-html'
-export {
-  installWebMCPKitTestBridge,
-  type TestBridgeSnapshot,
-  type TestBridgeTool,
-  type WebMCPKitTestBridge
-} from './test-bridge'

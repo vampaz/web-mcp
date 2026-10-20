@@ -151,3 +151,18 @@ This would help multi-page apps, documentation, and pre-navigation agent workflo
 ## Summary
 
 The next useful layer is resolver reliability: output-aware sequences, structured errors, and clearer clarification UX. After that, recipes, undo, observability, and manifests make WebMCP Kit easier to operate in larger applications.
+
+## Deferred from the 0.4.0 refactor
+
+These additions remain backlog work:
+
+- `mountAssistant()` and reusable dialog approval helpers.
+- A `/server` resolver endpoint helper.
+- External MCP transport and connection lifecycle, including `initialize` and `ping`. The existing local bridge remains available.
+- Bulk `registerTools()` and React `useWebMCPTools()`.
+- A command-input launcher, chat dark mode, parts, configurable labels, and renaming `harness` to `controller`.
+- Account-wide conversation deletion and development warnings for duplicate package copies.
+- Incremental durable replay, a long-lived storage connection, and cross-tab notifications. These need a separate concurrency design and measured benefit.
+- Semantic conversation compaction. The refactor removes request metadata but keeps conversation content and stored history intact.
+
+Invocation still rechecks registration, schema, scope, and cancellation across asynchronous boundaries. Replacing those checks with frozen definitions needs a separate contract decision; this refactor preserves their safety behavior.

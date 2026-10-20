@@ -16,7 +16,6 @@ Require confirmation for actions that create, delete, send, pay, charge, export,
 
 ```ts
 confirmation: {
-  required: true,
   reason: 'Checkout clears the cart and represents a purchase action.'
 }
 ```
@@ -26,12 +25,17 @@ Configure one app-level confirmation handler so tools can use your modal or appr
 ```ts
 import { setConfirmationHandler } from '@vampaz/webmcp-kit'
 
-setConfirmationHandler(async function confirmTool(tool, input, reason, context) {
+const disposeApproval = setConfirmationHandler(async function confirmTool({
+  tool,
+  input,
+  reason,
+  signal
+}) {
   return showConfirmationModal({
     title: `Run ${tool.name}?`,
     body: reason,
     preview: JSON.stringify(input, null, 2),
-    signal: context?.signal
+    signal
   })
 })
 ```
@@ -100,7 +104,7 @@ Event payloads can include invocation details in `detail`, including tool inputs
 
 ## Conversation data and application identity
 
-Pi stores conversation data in origin-local IndexedDB, partitioned by explicit namespace, owner, and conversation IDs. `ownerId` is not authentication or encryption. Use the current application identity, destroy old controllers on account changes, and apply a retention policy. Keep secrets and hidden server values out of context, inputs, results, history, and diagnostics. See [operations](./operations.md#csp-endpoints-and-application-security) for storage, CSP, and worker boundaries.
+Pi stores conversation data in origin-local IndexedDB, partitioned by explicit namespace, owner, and conversation IDs. `ownerId` is not authentication or encryption. Use the current application identity, destroy old controllers on account changes, and apply a retention policy. Keep secrets and hidden server values out of context, inputs, results, history, and diagnostics. See [operations](./operations.md#csp-endpoints-and-application-security) for storage, CSP, and lifecycle boundaries.
 
 ## Developer controls
 

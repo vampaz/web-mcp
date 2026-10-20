@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { createHeuristicResolver, defineTool } from '@vampaz/webmcp-kit'
+import { createResolver, defineTool } from '@vampaz/webmcp-kit'
 
 import {
   runWebMCPResolverEvalCase,
@@ -29,7 +29,7 @@ describe('resolver eval helpers', () => {
   ]
 
   it('returns a passing result when the resolver matches the expected tool and input', async () => {
-    const resolver = createHeuristicResolver()
+    const resolver = await createResolver({ provider: 'local' })
     const result = await runWebMCPResolverEvalCase(resolver, tools, {
       name: 'product search',
       message: 'Find docks',
@@ -48,7 +48,7 @@ describe('resolver eval helpers', () => {
   })
 
   it('reports mismatches without throwing', async () => {
-    const resolver = createHeuristicResolver()
+    const resolver = await createResolver({ provider: 'local' })
     const [result] = await runWebMCPResolverEvals(resolver, tools, [
       {
         name: 'wrong expectation',
@@ -65,7 +65,7 @@ describe('resolver eval helpers', () => {
   })
 
   it('supports resolver outcomes and partial input expectations', async () => {
-    const resolver = createHeuristicResolver()
+    const resolver = await createResolver({ provider: 'local' })
     const result = await runWebMCPResolverEvalCase(resolver, tools, {
       name: 'unsupported request',
       message: 'Send the weekly report',
@@ -187,13 +187,13 @@ describe('resolver eval helpers', () => {
   })
 
   it('rejects empty eval suites', async () => {
-    await expect(runWebMCPResolverEvalSuite(createHeuristicResolver(), tools, [])).rejects.toThrow(
-      'testCases must contain at least one eval case.'
-    )
+    await expect(
+      runWebMCPResolverEvalSuite(await createResolver({ provider: 'local' }), tools, [])
+    ).rejects.toThrow('testCases must contain at least one eval case.')
   })
 
   it('rejects ambiguous case expectations before calling the resolver', async () => {
-    const resolver = createHeuristicResolver()
+    const resolver = await createResolver({ provider: 'local' })
     const resolution = vi.spyOn(resolver, 'resolve')
     const testCase = {
       name: 'ambiguous expectation',

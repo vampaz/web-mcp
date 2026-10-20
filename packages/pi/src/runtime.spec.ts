@@ -421,11 +421,15 @@ it('settles a pending clear before destruction closes the controller', async fun
 
 it('stops visibly at the durable history limit and still permits starting a new chat', async function test() {
   runtime = await createPiRuntime({
-    ...options([resolution(), resolution(), resolution()]),
-    limits: { maxHistoryBytes: 65536, maxRequestBytes: 65536 }
+    ...options(
+      Array.from({ length: 5 }, function reply() {
+        return resolution()
+      })
+    ),
+    limits: { maxHistoryBytes: 65536, maxRequestBytes: 262144 }
   })
   let failure: Awaited<ReturnType<PiController['send']>> | undefined
-  for (let index = 0; index < 3; index++) {
+  for (let index = 0; index < 5; index++) {
     const outcome = await runtime.send('x'.repeat(16000))
     if (outcome.status === 'error') {
       failure = outcome

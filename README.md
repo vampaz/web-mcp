@@ -1,640 +1,79 @@
 # WebMCP Kit
 
-WebMCP Kit is a local-first TypeScript toolkit for exposing real web app actions as safe, typed WebMCP tools. It lets apps register narrow actions with schemas, guards, confirmations, and lifecycle cleanup, then progressively connects those tools to native browser WebMCP, local devtools, tests, and resolver-driven demos.
+Expose application actions as typed tools. WebMCP Kit connects those actions to native browser WebMCP, resolvers, tests, and optional chat. Your application owns state, approval, authorization, and execution.
 
-Developer documentation: [integration walkthrough](./docs/integration.md), [architecture and diagrams](./docs/architecture.md), [full API reference](./docs/api-reference.md), [runtime contracts](./docs/api-behavior.md), and [operations](./docs/operations.md). The [documentation index](./docs/README.md) links framework guides and runnable examples.
+The core, command input, Pi controller, and chat custom element work without a framework. Optional Vue, React, and Svelte helpers manage tool registration in their component lifecycles.
 
-Version `0.3.0` renames the model-provider adapter from _planner_ to _resolver_ and changes every related export, option, event, and endpoint path. Existing applications must apply the [0.3.0 migration](./docs/migration-0.3.md); there are no compatibility aliases.
+Version **0.4.0** introduces breaking API changes. See the [migration guide](./docs/migration-0.4.md) when upgrading from 0.3.
 
-## Status
+## Quick start
 
-This repository is an early MVP. Chrome WebMCP and Chrome built-in AI are emerging browser capabilities, so the kit is designed as progressive enhancement:
-
-1. Use native WebMCP when `document.modelContext.registerTool` is available.
-2. Keep a fallback registry for unsupported browsers, tests, demos, and devtools.
-3. Use Chrome built-in AI to resolve commands when `LanguageModel` is available.
-4. Fall back to deterministic local resolution when browser AI is unavailable.
-
-The current aim is not to replace app code or invent a new agent runtime. The kit gives existing web apps a small adoption layer for making selected user-facing actions callable by browsers, tests, local tools, or resolvers while the app keeps ownership of validation, confirmation, authorization, and execution.
-
-What is in this repo now:
-
-- Core tool registration, native WebMCP wrapping, fallback invocation, validation, confirmations, events, resolvers, and form helpers.
-- Optional Vue, React, and Svelte lifecycle helpers that delegate to core registration.
-- Devtools, Playwright helpers, and a local MCP-style bridge for development and testing.
-- A headless Pi conversation runtime, independent chat UI, and an in-repository Vite + Vue integration lab.
-- A separate Astro + Vue + Cloudflare demo app in [vampaz/web-mcp-demo](https://github.com/vampaz/web-mcp-demo) that exercises resolver providers, Cloudflare Workers AI, and fallback behavior.
-
-The npm package name is `@vampaz/webmcp-kit`. Releases publish the compiled `dist` output to npm and GitHub Packages, then create a GitHub release tagged with the package version, when a new version reaches `master`.
-
-## Independent package surfaces
-
-The Pi and chat subpaths were introduced in `0.2.0`. Use `0.2.1` or newer so npm installs the Pi runtime dependencies automatically. See the [release procedure](./docs/operations.md#release-procedure).
-
-The package separates core (`@vampaz/webmcp-kit`), the headless [Pi harness](./docs/pi.md) (`/pi`), and the framework-neutral [chat UI](./docs/chat.md) (`/chat`). `/pi/worker` installs an application-compiled service worker. Core and chat with a supplied controller do not load the Pi runtime.
-
-Run the in-repository [local lab](./apps/demo/README.md) with `npm ci --ignore-scripts` and `npm run dev:demo`. It opens in Chat, with tabs ordered Chat, Harness, Core. Harness and Chat use a developer-selected LM Studio model. Ordinary browser fixtures and real-model checks are separate suites. Package fixtures consume an unpublished tarball with source aliases disabled.
-
-Install the kit with `npm install @vampaz/webmcp-kit`. Its Pi runtime libraries are normal dependencies managed by npm; consumers do not install them separately. Framework and Zod integrations use the application's optional peers. See the [complete dependency map](./docs/getting-started.md#dependency-model).
-
-The existing standalone demo remains an independent consumer. Its later adoption follows the [integration guide](./docs/demo-integration.md). Extension/account work is a subsequent deliverable.
-
-## How It Fits
-
-Consumers keep ownership of app state, tools, secrets, and approved resolver endpoints. WebMCP Kit provides the browser-facing registration layer, the fallback registry, the command input, diagnostics, tests, and resolver clients.
-
-```mermaid
-flowchart TB
-  User["User command"]
-  Consumer["Consumer app config<br/>tools, context, endpointOptions"]
-  Command["WebMCP command input<br/>provider + model controls"]
-  Choice{"Selected resolver"}
-  ChromeAI["Browser local<br/>Chrome built-in AI"]
-  LocalResolver["Browser local<br/>deterministic fallback"]
-  Server["Consumer server endpoint<br/>/api/webmcp/resolve"]
-  Secrets["Server-owned secrets<br/>API keys + bindings"]
-  Providers["Provider APIs<br/>OpenAI / OpenRouter / Workers AI"]
-  Resolution["Validated tool resolution"]
-  Registry["WebMCP tool registry<br/>native adapter + fallback"]
-  Native["Optional integrations<br/>document.modelContext, devtools, tests, MCP bridge"]
-  Tools["Consumer tools execute<br/>guards, confirmations, app state updates"]
-
-  User --> Command
-  Consumer --> Command
-  Consumer --> Registry
-  Command --> Choice
-  Choice -->|"Chrome AI"| ChromeAI
-  Choice -->|"local fallback"| LocalResolver
-  Choice -->|"server mode"| Server
-  Server --> Secrets
-  Server --> Providers
-  ChromeAI --> Resolution
-  LocalResolver --> Resolution
-  Providers --> Resolution
-  Resolution --> Registry
-  Registry --> Tools
-  Registry -.-> Native
-```
-
-## Quick Start
-
-The fastest path is `initWebMCP()`: one call registers your tools, defines the `<webmcp-command-input>` element (creating a floating one if the page has none), and wires the hosted resolver from a publishable key:
-
-```ts
-import { defineTool, initWebMCP } from '@vampaz/webmcp-kit'
-
-initWebMCP({
-  accessKey: import.meta.env.VITE_WEBMCP_PUBLISHABLE_KEY,
-  baseUrl: 'https://webmcp.conekto.eu',
-  model: 'gpt-5.4-mini',
-  context: () => ({ page: 'products', visibleProducts: getVisibleProducts() }),
-  tools: [
-    defineTool({
-      name: 'search_products',
-      description: 'Search the local product catalog.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          query: { type: 'string' }
-        },
-        required: ['query'],
-        additionalProperties: false
-      },
-      execute(input) {
-        return searchProducts(input.query)
-      }
-    })
-  ]
-})
-```
-
-The resolution and session endpoints are derived from `baseUrl` (`/api/webmcp/resolve` and `/api/webmcp/session`). Omit `accessKey` to keep the element's default resolver behavior, pass `target` to use an element you placed in your own markup, and call the returned handle's `destroy()` to tear everything down.
-
-The hosted endpoint above belongs to the standalone demo. The kit ships no model service and no default inference endpoint. To configure your own provider, see [Where inference comes from](./docs/resolver-providers.md#where-inference-comes-from).
-
-`defineTool()` infers the `execute` and `guard` input types from the `inputSchema` literal — `input.query` above is typed `string` without generics or casts. If you already use Zod, install it alongside the kit and use the `@vampaz/webmcp-kit/zod` subpath to keep the schema and TypeScript input type in one place:
+Install the package:
 
 ```sh
-npm install @vampaz/webmcp-kit zod
+npm install @vampaz/webmcp-kit
 ```
 
-```ts
-import { registerTool } from '@vampaz/webmcp-kit'
-import { defineZodTool } from '@vampaz/webmcp-kit/zod'
-import { z } from 'zod'
-
-registerTool(
-  defineZodTool({
-    name: 'search_products',
-    description: 'Search the local product catalog.',
-    schema: z.object({
-      query: z.string().describe('Product name or category to search for.')
-    }),
-    annotations: {
-      readOnlyHint: true
-    },
-    execute(input) {
-      return searchProducts(input.query)
-    }
-  })
-)
-```
-
-The core package also accepts explicit JSON Schema. Input types are inferred from the schema literal; pass an explicit generic (`defineTool<MyInput>({ ... })`) to opt out:
+Register one action. This example works without a model, endpoint, framework, or browser WebMCP support:
 
 ```ts
-import { defineTool, registerTool } from '@vampaz/webmcp-kit'
+import { defineTool, invokeTool, registerTool } from '@vampaz/webmcp-kit'
 
-registerTool(
+const registration = registerTool(
   defineTool({
-    name: 'search_products',
-    description: 'Search the local product catalog.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: { type: 'string' }
-      },
-      required: ['query'],
-      additionalProperties: false
-    },
-    annotations: {
-      readOnlyHint: true
-    },
-    execute(input) {
-      return searchProducts(input.query)
-    }
-  })
-)
-```
-
-For tools that change important state, add confirmation metadata and configure one app-level approval handler:
-
-```ts
-import { defineTool, registerTool, setConfirmationHandler } from '@vampaz/webmcp-kit'
-
-registerTool(
-  defineTool({
-    name: 'create_invoice',
-    description: 'Create a draft invoice for a customer and add it to the invoice list.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        customerName: {
-          type: 'string',
-          description: 'The customer name to invoice.'
-        },
-        amount: {
-          type: 'number',
-          minimum: 0.01,
-          description: 'The invoice amount.'
-        }
-      },
-      required: ['customerName', 'amount'],
-      additionalProperties: false
-    },
-    confirmation: {
-      required: true,
-      reason: 'Creating an invoice changes business state.'
-    },
-    async execute(input) {
-      return createInvoice(input)
+    name: 'read_counter',
+    description: 'Read the current application counter.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    annotations: { readOnlyHint: true },
+    execute() {
+      return { value: 7 }
     }
   })
 )
 
-setConfirmationHandler(async function confirmTool(tool, input, reason) {
-  return showConfirmationModal({
-    title: `Run ${tool.name}?`,
-    body: reason,
-    preview: JSON.stringify(input, null, 2)
-  })
-})
+const result = await invokeTool({ toolName: 'read_counter', input: {} })
+console.log(result.output)
+registration.unregister()
 ```
 
-A tool can also bring its own approval UI. A `confirmation.handler` takes precedence over the global handler for that tool only:
+Replace the example handler with an action your normal interface already uses. Keep schemas narrow. Add `confirmation: { reason }` for important mutations and install your application's approval UI with `setConfirmationHandler()`.
 
-```ts
-confirmation: {
-  required: true,
-  reason: 'Checkout charges the customer.',
-  handler: (tool, input, reason) => showCheckoutReviewSheet(input)
-}
-```
+## Choose the surfaces you need
 
-## Core API
+| Import                            | Purpose                                                              |
+| --------------------------------- | -------------------------------------------------------------------- |
+| `@vampaz/webmcp-kit`              | Tools, registry, validation, approval, resolvers, diagnostics, forms |
+| `/command-input`                  | One-command custom element and `initWebMCP()`                        |
+| `/pi`                             | Persistent Pi controller running in the page                         |
+| `/chat`                           | Chat custom element driven by a supplied controller                  |
+| `/hosted`                         | Optional hosted session and resolver integration                     |
+| `/vue`, `/react`, `/svelte`       | Component lifecycle helpers                                          |
+| `/zod`                            | Zod schemas and parsing before approval                              |
+| `/devtools`                       | Tool inspection and invocation overlay                               |
+| `/testing`, `/testing/playwright` | Test bridge, evaluations, browser helpers                            |
+| `/mcp-bridge`                     | Local message adapter for `tools/list` and `tools/call`              |
 
-- `initWebMCP(options)` is the one-call setup: registers tools, defines and locates (or creates) the command input element, and wires a hosted resolver from an access key.
-- `createWebMCPKit(options)` initializes the kit and optional resolver provider.
-- `defineTool(tool)` validates and preserves a typed tool definition, inferring the input type from the `inputSchema` literal.
-- `registerTool(tool)` registers with native WebMCP when available and always stores the tool in the fallback registry. Native registration passes through WebMCP `annotations` such as `readOnlyHint` and unregisters with `AbortSignal` when supported by the browser. Re-registering an existing name replaces it and logs a non-production warning.
-- Registration handles expose `ready`, which resolves after asynchronous native registration settles. The fallback registry remains available if native registration fails.
-- `unregisterTool(name)` removes a registration by name and returns whether one existed.
-- `invokeTool({ toolName, input, confirmed, signal })` invokes fallback-registered tools for devtools, tests, and demos. The optional `AbortSignal` is passed to the tool execution context.
-- `setConfirmationHandler(handler)` configures one global async confirmation provider for tools with `confirmation.required`; a per-tool `confirmation.handler` overrides it.
-- `createHostedOpenAIResolverOption(config)` returns a ready-made resolver option for the command input's `resolverOptions` list.
-- `listTools()` returns current registrations, including tools whose scope is unavailable.
-- `getRegistrySnapshot()` returns support mode, tool count, and registered tools.
-- `getIntegrationHealthReport()` returns developer-facing diagnostics for missing tools, weak schemas, missing confirmation handlers, unavailable tools, and resolver status.
-- `assertWebMCPIntegration()` throws when the current integration has blocking errors.
-- `isWebMCPSupported()` checks for native WebMCP registration support.
-- `createBestResolver()` uses Chrome built-in AI when available, otherwise a deterministic local resolver.
-- `defineWebMCPCommandInput()` registers a ready-made `<webmcp-command-input>` web component for resolver-driven commands.
-- `defineServerTool()` creates a tool definition whose execution posts to an app-owned server endpoint. Register it with `registerTool()` or a framework helper.
-- `validateToolResolution()` validates single-tool, chained, and outcome resolutions before execution.
-- Tool outputs are validated against `outputSchema` before a successful invocation result is emitted.
-- `installWebMCPKitTestBridge()` exposes a kit-specific test bridge for Playwright and local QA.
+The package bundles its Pi implementation libraries. Consumers do not install them separately. Framework and Zod peers are optional and needed only for their own entry points. Core and chat imports do not load Pi. All entry points are ESM and support Bundler and NodeNext declaration resolution.
 
-## Supported JSON Schema
+The MCP bridge is retained as a local adapter. An external MCP client still needs a transport and connection lifecycle; that work is backlogged.
 
-WebMCP Kit evaluates this schema vocabulary at runtime: primitive and object types, `properties`, `required`, `items`, `additionalProperties`, `enum`, `const`, `anyOf`, `oneOf`, numeric and collection limits, string lengths, and `pattern`. It also accepts `title` and `description` as annotations for browsers, resolvers, and developer tooling.
+## Add command resolution or conversations
 
-The known string formats `email`, `date`, `time`, `date-time`, and `uri` receive built-in runtime checks. Unknown or app-specific format names remain annotations. Use `pattern` or a tool guard when an application needs stricter business-specific validation than the built-in format check.
+Use `await createResolver({ provider: 'local' })` for deterministic offline commands. Automatic selection uses Chrome AI when available and otherwise deterministic resolution. Explicit provider choices report failures without switching providers.
 
-## Resolver Output
+For conversation, supply an available resolver with `capabilities.conversation: true` to `createPiHarness()`. Pi runs in the page using IndexedDB and Web Locks. It needs no service worker, separate worker build, or framework adapter. Each turn chooses one action, waits for its actual result, and resolves the next step.
 
-Resolvers normally return one tool invocation:
+Chat is independent: configure `<webmcp-chat>` with a Pi controller or your own compatible controller. Application approval stays separate from chat.
 
-```ts
-{
-  toolName: 'select_items',
-  input: { ids: ['item_4'] },
-  confidence: 0.9,
-  reason: 'Selected the matching item from the current app context.'
-}
-```
+## Documentation
 
-For requests that require multiple app actions, resolvers can return a bounded chained resolution. The demo executor runs each step in order and stops on the first blocked, failed, or unavailable step:
+- [Integration walkthrough](./docs/integration.md): register a tool, add commands, then optional persistent chat.
+- [Documentation index](./docs/README.md): framework guides, examples, and API contracts.
+- [Resolver providers](./docs/resolver-providers.md): local, browser, remote, and hosted inference.
+- [Pi](./docs/pi.md) and [chat](./docs/chat.md): storage, cancellation, ownership, and UI.
+- [Security](./docs/security.md): validation, approval, and server authorization.
+- [Operations](./docs/operations.md): HTTPS, package checks, release, and troubleshooting.
+- [API reference](./docs/api-reference.md): generated public declarations with source links.
+- [Changelog](./CHANGELOG.md) and [contributing](./CONTRIBUTING.md).
 
-```ts
-{
-  toolName: 'tool_sequence',
-  input: {},
-  confidence: 0.9,
-  reason: 'Select matching invoices, then update their status.',
-  steps: [
-    {
-      toolName: 'select_invoices',
-      input: { ids: ['inv_104'] },
-      confidence: 0.9,
-      reason: 'Selected the matching Stark Industries invoice.'
-    },
-    {
-      toolName: 'update_selected_invoice_status',
-      input: { status: 'paid' },
-      confidence: 0.9,
-      reason: 'Marked the selected invoice as paid.'
-    }
-  ]
-}
-```
-
-Each step is validated against its tool schema before execution. Confirmation is still enforced per tool invocation, so a chained resolution cannot bypass approval for mutating tools.
-
-When a request cannot be executed, resolvers can return a non-executing outcome:
-
-```ts
-{
-  toolName: 'needs_clarification',
-  input: {},
-  confidence: 0,
-  reason: 'Ask which invoice should be marked paid.'
-}
-```
-
-`needs_clarification` returns a blocked result and `no_tools_match` returns an unavailable result. `tool_sequence`, `needs_clarification`, and `no_tools_match` are reserved names; app tools cannot register with those names.
-
-## Invocation Pipeline
-
-Every invocation — from resolvers, devtools, tests, or the MCP bridge — runs the same pipeline in this order:
-
-1. **Schema validation**: the input is validated against `inputSchema`. Failures return `status: 'error'`, `code: 'invalid_input'` before any tool code runs.
-2. **Scope**: `scope()` runs synchronously and answers "is this tool usable in the current app state?" Returning `{ available: false, reason }` yields `status: 'unavailable'`, `code: 'scope_unavailable'`.
-3. **Confirmation**: when `confirmation.required` is set and the invocation is not already confirmed, the per-tool `confirmation.handler` (or the global handler) is awaited. A denial yields `status: 'blocked'`, `code: 'confirmation_denied'`.
-4. **Guard**: `guard(input)` runs with the validated, typed input and answers "is this specific input acceptable right now?" It may be async. Returning `false` or any string yields `status: 'blocked'`, `code: 'guard_blocked'`; return `true` to allow execution.
-5. **Execute**: `execute(input, context)` runs. Thrown errors yield `status: 'error'`, `code: 'execution_failed'`. When the invocation carries an `AbortSignal`, it is available as `context.signal`.
-6. **Output validation**: when the tool declares `outputSchema`, the returned value is validated before success is reported. Failures return `status: 'error'`, `code: 'invalid_output'` without exposing the invalid value as a successful output.
-
-`ToolInvocationResult.code` distinguishes every non-success outcome:
-
-| code                  | status        | meaning                                                            |
-| --------------------- | ------------- | ------------------------------------------------------------------ |
-| `invalid_input`       | `error`       | Input failed schema validation.                                    |
-| `cancelled`           | `error`       | Cancellation was observed before execution.                        |
-| `tool_changed`        | `unavailable` | Registration or schema changed while awaiting approval or a guard. |
-| `scope_unavailable`   | `unavailable` | `scope()` reported the tool unavailable.                           |
-| `scope_failed`        | `error`       | `scope()` threw.                                                   |
-| `confirmation_denied` | `blocked`     | The confirmation handler denied the action.                        |
-| `confirmation_failed` | `error`       | The confirmation handler threw.                                    |
-| `guard_blocked`       | `blocked`     | `guard()` rejected the input.                                      |
-| `guard_failed`        | `error`       | `guard()` threw.                                                   |
-| `execution_failed`    | `error`       | `execute()` threw.                                                 |
-| `invalid_output`      | `error`       | Output failed schema validation.                                   |
-| `not_registered`      | `error`       | No tool with that name is registered.                              |
-
-## Server Tool Wire Format
-
-`defineServerTool()` tools execute by POSTing JSON to your endpoint:
-
-```txt
-POST <endpoint>
-Content-Type: application/json
-
-{ "toolName": "send_invoice", "input": { "invoiceId": "inv_104" }, "source": "resolver" }
-```
-
-The endpoint should return the tool output as JSON (`204 No Content` maps to `undefined`). Non-2xx responses fail the invocation; an `{ "error": "..." }` body becomes the error message. Schema validation, scope, confirmation, and guard all run in the browser before the request is sent, and a declared `outputSchema` validates the response before success is reported. Invocation cancellation is forwarded to the request. Treat the endpoint as untrusted-input territory and validate again server-side.
-
-## Custom Resolvers
-
-Anything that satisfies the `ToolResolver` interface can drive the command input:
-
-```ts
-import type { ToolResolver } from '@vampaz/webmcp-kit'
-
-const resolver: ToolResolver = {
-  name: 'My resolver',
-  available: true,
-  status: 'ready', // 'ready' | 'downloadable' | 'downloading' | 'unavailable' | 'fallback' | 'needs-key'
-  detail: 'Resolves through my own backend.',
-  async resolve(message, tools, context, options) {
-    // Return a ToolResolution: { toolName, input, confidence, reason, steps? }
-    // Throw for resolver failures; use validateToolResolution(resolution, tools) before returning.
-    return myBackendResolution(message, tools, context, options?.signal)
-  },
-  dispose() {
-    // Optional: release resources when the resolver is replaced.
-  }
-}
-```
-
-## Integration Health
-
-Use the health report while wiring WebMCP into an app:
-
-```ts
-import { getIntegrationHealthReport } from '@vampaz/webmcp-kit'
-
-const report = getIntegrationHealthReport({ resolver: kit.resolver })
-
-if (report.status !== 'ready') {
-  console.table(report.diagnostics)
-}
-```
-
-The report shape is intentionally small:
-
-```ts
-interface IntegrationHealthReport {
-  status: 'ready' | 'warning' | 'error'
-  summary: string
-  diagnostics: Array<{
-    severity: 'info' | 'warning' | 'error'
-    title: string
-    detail: string
-    action: string
-    toolName?: string
-  }>
-}
-```
-
-The devtools overlay shows the same report, so developers can see whether tools are registered, schemas are strict, confirmations are installed, and the selected resolver is usable.
-
-## Framework Helpers
-
-The framework subpaths are intentionally thin lifecycle adapters. They register tools through `@vampaz/webmcp-kit` and unregister them when the owning component scope is disposed.
-
-- `@vampaz/webmcp-kit/vue`: `useWebMCPTool()` for Vue effect scopes, with reactive `when` support.
-- `@vampaz/webmcp-kit/react`: `useWebMCPTool()` for React components, with `when` as a boolean derived during render.
-- `@vampaz/webmcp-kit/svelte`: `useWebMCPTool()` for Svelte components, including readable-store `when` support.
-
-See [Vue](./docs/vue.md), [React](./docs/react.md), [Svelte](./docs/svelte.md), and [Framework Extensions](./docs/framework-extensions.md).
-
-For copy-paste snippets, see [Examples](./docs/examples.md).
-
-## Browser WebMCP References
-
-WebMCP Kit tracks the browser proposal while keeping a local fallback for unsupported environments:
-
-- [Chrome WebMCP Imperative API](https://developer.chrome.com/docs/ai/webmcp/imperative-api)
-- [Chrome WebMCP Declarative API](https://developer.chrome.com/docs/ai/webmcp/declarative-api)
-- [Chrome WebMCP best practices](https://developer.chrome.com/docs/ai/webmcp/best-practices)
-- [Chrome WebMCP evals](https://developer.chrome.com/docs/ai/webmcp/evals)
-- [When to use WebMCP and MCP](https://developer.chrome.com/docs/ai/webmcp/compare-mcp)
-
-## Resolver Providers
-
-Developers can pass a resolver provider when initializing the kit:
-
-```ts
-import { createWebMCPKit } from '@vampaz/webmcp-kit'
-
-const kit = await createWebMCPKit({
-  resolver: {
-    provider: 'openrouter',
-    model: 'nvidia/nemotron-3-super-120b-a12b:free',
-    auth: {
-      mode: 'user-key',
-      apiKey: userProvidedKey
-    }
-  }
-})
-```
-
-User-key mode is intentionally simple and does not need a server, but the key is visible to the browser page. For app-owned production secrets, use server mode:
-
-```ts
-await createWebMCPKit({
-  resolver: {
-    provider: 'openai',
-    model: 'gpt-5.4-mini',
-    auth: {
-      mode: 'server',
-      endpoint: '/api/webmcp/resolve'
-    }
-  }
-})
-```
-
-See [Resolver Providers](./docs/resolver-providers.md) for OpenRouter, OpenAI, OpenAI-compatible, Cloudflare Workers AI, Chrome built-in AI, and local fallback examples.
-
-The `cloudflare-binding` provider requires an application-owned server endpoint backed by an `AI` binding. The separate [Astro/Cloudflare demo](https://github.com/vampaz/web-mcp-demo) owns its provider selection, permissions, and deployment setup. The local package lab uses LM Studio instead.
-
-## Ready-Made Command Input
-
-Apps that want a drop-in natural-language command box can register the framework-agnostic web component:
-
-```ts
-import { defineWebMCPCommandInput } from '@vampaz/webmcp-kit'
-
-defineWebMCPCommandInput()
-```
-
-```html
-<webmcp-command-input
-  provider="openai"
-  model="gpt-5.4-mini"
-  endpoint="/api/webmcp/resolve"
-></webmcp-command-input>
-```
-
-When `provider` and `model` are initialized by attributes or properties, the component treats them as app-owned configuration and does not show those settings to the user. If they are omitted, the component shows provider/model controls only when there is a real choice.
-
-Chrome built-in AI is detected from the browser `LanguageModel` API and appears automatically when available. Consumers can hide it with `showChromeAI: false`.
-
-For local development, leave `provider` and `model` unset and pass the endpoint options your app supports so developers can switch server-backed resolvers from the command box:
-
-```ts
-input.configure({
-  context: getResolverContext,
-  endpoint: '/api/webmcp/resolve',
-  endpointOptions: [
-    {
-      label: 'GPT-5.4 mini',
-      model: 'gpt-5.4-mini',
-      provider: 'openai'
-    },
-    {
-      label: 'Nemotron 3 Super 120B A12B',
-      model: 'nvidia/nemotron-3-super-120b-a12b:free',
-      provider: 'openrouter'
-    },
-    {
-      label: 'GLM 4.7 Flash',
-      model: '@cf/zai-org/glm-4.7-flash',
-      provider: 'cloudflare-binding'
-    },
-    {
-      label: 'Auto',
-      provider: 'auto'
-    },
-    {
-      label: 'Local deterministic',
-      provider: 'local'
-    }
-  ]
-})
-```
-
-Applications can pass an app-owned resolver/provider/model to fix those choices and hide the corresponding controls. The options panel is hidden when neither the provider nor the model control offers a choice. A single resolver option can still expose a model selector when it supplies multiple models. The local lab demonstrates the separate chat component and configures its model through server-side environment variables.
-
-For app-owned resolver objects, pass `resolverOptions`. Use `initialResolverOptionId` and `initialModel` to set development defaults without fixing the provider for users. When a resolver option exposes `modelOptions`, the selected model option is passed to `createResolver({ model, modelOption })`, so app-owned resolvers can attach metadata such as context-window size without adding provider-specific fields to core.
-
-```ts
-interface BrowserLocalAIModelOption {
-  contextWindowSize?: number
-  label: string
-  model: string
-}
-
-const browserLocalAIModels: BrowserLocalAIModelOption[] = [
-  {
-    label: 'Qwen3.5 4B (8k context)',
-    model: 'Qwen3.5-4B-q4f16_1-MLC',
-    contextWindowSize: 8192
-  }
-]
-
-input.configure({
-  initialResolverOptionId: 'browser-local-ai',
-  resolverOptions: [
-    {
-      id: 'browser-local-ai',
-      label: 'Browser local AI',
-      modelOptions: browserLocalAIModels,
-      createResolver(options) {
-        const modelOption = options?.modelOption as BrowserLocalAIModelOption | undefined
-
-        return createBrowserLocalAIResolver({
-          model: options?.model ?? browserLocalAIModels[0].model,
-          contextWindowSize: modelOption?.contextWindowSize
-        })
-      }
-    }
-  ],
-  settingsOpen: false
-})
-```
-
-For app context, assign a property before or after mounting:
-
-```ts
-import type { WebMCPCommandInputElement } from '@vampaz/webmcp-kit'
-
-const input = document.querySelector<WebMCPCommandInputElement>('webmcp-command-input')
-
-if (input) {
-  input.context = function getResolverContext() {
-    return {
-      route: location.pathname,
-      selectedIds: getSelectedIds()
-    }
-  }
-}
-```
-
-The component uses the active WebMCP registry, excludes tools whose current `scope()` reports them unavailable, invokes the returned step or bounded `tool_sequence`, and emits `webmcp-command-resolution`, `webmcp-command-step`, `webmcp-command-result`, and `webmcp-command-error` events. `run(message, { signal })` accepts an `AbortSignal` for cancelling commands before resolution, during signal-aware execution, or between sequence steps; remote resolver fetches and server-backed tool requests receive the same signal.
-
-### Theming
-
-The element's shadow styles read CSS custom properties from the host, so apps can theme it from regular page CSS:
-
-```css
-webmcp-command-input {
-  --webmcp-accent: #2458ff; /* buttons, focus, active states */
-  --webmcp-accent-dark: #141414; /* accent on dark surfaces */
-  --webmcp-dark: #141414; /* dark panel surfaces */
-  --webmcp-field: #f7f3ec; /* input field background */
-  --webmcp-ink: #141414; /* primary text */
-  --webmcp-line: rgba(36, 88, 255, 0.28); /* borders and rules */
-  --webmcp-muted: #5d5d58; /* secondary text */
-  --webmcp-paper: #fffaf1; /* panel background */
-}
-```
-
-`--webmcp-floating-panel-max-height` constrains the floating panel when your app positions it manually.
-
-## Playwright Helpers
-
-Apps can install the test bridge in development or test builds:
-
-```ts
-import { installWebMCPKitTestBridge } from '@vampaz/webmcp-kit'
-
-if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
-  installWebMCPKitTestBridge()
-}
-```
-
-Playwright tests can then inspect and invoke tools through the page:
-
-```ts
-import { invokeWebMCPTool, waitForWebMCPTool } from '@vampaz/webmcp-kit/testing/playwright'
-
-await waitForWebMCPTool(page, 'select_items')
-await invokeWebMCPTool(page, {
-  toolName: 'select_items',
-  input: { ids: ['item_4', 'item_7'] },
-  source: 'resolver'
-})
-```
-
-The test bridge does not accept caller-provided confirmation bypasses. Confirmed tools still go through the app confirmation handler or browser confirmation fallback.
-
-## Demo App
-
-The standalone demo lives in [vampaz/web-mcp-demo](https://github.com/vampaz/web-mcp-demo). Follow that repository's setup when working on it. The in-repository [local lab](./apps/demo/README.md) runs independently and does not need a sibling checkout. Verify integrations against the packed artifact before release.
-
-That repo owns the Astro app, Cloudflare Worker config, Workers AI binding, and e2e demo coverage.
-
-## Development
-
-```sh
-npm ci --ignore-scripts
-npm run dev:demo
-npm run test
-npm run typecheck
-npm run typecheck:demo
-npm run docs:api:check
-```
-
-Open the TLS plugin's advertised HTTPS URL for the lab. Use tests and typechecks during ordinary implementation. Packaging verification uses one build, pack, and consumer-test pass after the source and documentation are ready; see [operations](./docs/operations.md#validation-in-this-repository) for the full commands.
+The [local lab](./apps/demo/README.md) and the independent [WebMCP demo](https://github.com/vampaz/web-mcp-demo) exercise the kit. Deterministic browser tests and separately authorized real-model checks provide different evidence.

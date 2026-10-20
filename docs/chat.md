@@ -2,7 +2,7 @@
 
 [Documentation index](./README.md) · [Complete integration](./integration.md) · [API reference](./api-reference.md)
 
-This subpath was introduced in `0.2.0`. Use `0.2.1` or newer for automatic Pi runtime dependency installation when connecting chat to the kit's Pi harness.
+This subpath was introduced in `0.2.0`. Use `0.4.0` or newer for automatic Pi runtime dependency installation when connecting chat to the kit's Pi harness.
 
 `@vampaz/webmcp-kit/chat` defines `<webmcp-chat>` explicitly. It imports controller types only. It can render a fake or application-owned `PiController` without loading the Pi runtime or installing a UI framework. Imports are safe during server rendering; call `defineWebMCPChat()` in the browser.
 
@@ -59,4 +59,4 @@ webmcp-chat {
 }
 ```
 
-For inline mode, the height is a maximum, not a fixed panel size. Compact values such as `24rem` are supported. The transcript retains a minimum readable height that scales with its font size. When the transcript, header, and composer cannot fit, the panel scrolls to keep the conversation and controls reachable. Use inline mode for a page region or extension side panel. Popup size adapts to the viewport and can be changed by the user. Model, storage, or worker failures remain visible as controller errors; the chat never directs users to nonexistent provider settings.
+For inline mode, the height is a maximum, not a fixed panel size. Compact values such as `24rem` are supported. The transcript retains a minimum readable height that scales with its font size. When the transcript, header, and composer cannot fit, the panel scrolls to keep the conversation and controls reachable. Use inline mode for a page region or extension side panel. Popup size adapts to the viewport and can be changed by the user. Model or storage failures remain visible as controller errors; the chat never directs users to nonexistent provider settings.

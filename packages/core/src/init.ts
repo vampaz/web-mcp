@@ -1,10 +1,8 @@
 import { defineWebMCPCommandInput } from './command-input'
-import { getConfirmationHandler, setConfirmationHandler } from './confirmation'
+import { setConfirmationHandler } from './confirmation'
 import { assertValidTool } from './define-tool'
-import { createHostedOpenAIResolver } from './hosted-openai-resolver'
 import type { WebMCPCommandInputElement } from './interfaces/command-input'
 import type {
-  AnyWebMCPTool,
   ConfirmationHandler,
   ResolverContext,
   RegisteredTool,
@@ -13,26 +11,14 @@ import type {
 } from './interfaces/tool'
 import { getTool, registerTool } from './registry'
 
-interface ConfirmationHandlerFrame {
-  handler: ConfirmationHandler
-  owner: symbol
-}
-
-const confirmationHandlerFrames: ConfirmationHandlerFrame[] = []
-let baseConfirmationHandler: ConfirmationHandler | undefined
-
 export interface InitWebMCPOptions {
-  accessKey?: string
-  baseUrl?: string
-  browserChallengeSiteKey?: string
   buttonLabel?: string
   confirmationHandler?: ConfirmationHandler
   context?: ResolverContext | (() => ResolverContext)
-  model?: string
   placeholder?: string
   resolver?: ToolResolver
   target?: string | WebMCPCommandInputElement
-  tools?: readonly AnyWebMCPTool[]
+  tools?: readonly WebMCPTool[]
 }
 
 export interface WebMCPInitHandle {
@@ -42,20 +28,6 @@ export interface WebMCPInitHandle {
   destroy: () => void
 }
 
-/**
- * One-call setup: registers tools, defines and locates (or creates) the
- * command input element, and wires a resolver.
- *
- * An explicit `resolver` takes precedence. Otherwise, `accessKey` requires
- * `model` and creates a hosted OpenAI resolver with endpoints derived from
- * `baseUrl`. Without either, the element keeps its own resolver behavior.
- *
- * Tool names must be unique and must not collide with already-registered
- * tools. Failed setup removes registrations and elements added by that call.
- * `destroy()` performs the same cleanup and restores the previous confirmation
- * handler unless application code replaced it. Custom-element definition is
- * permanent; configuration on a reused element is not restored.
- */
 export function initWebMCP(options: InitWebMCPOptions = {}): WebMCPInitHandle {
   if (typeof document === 'undefined') {
     throw new Error('initWebMCP() must run in a browser document context.')
@@ -63,28 +35,28 @@ export function initWebMCP(options: InitWebMCPOptions = {}): WebMCPInitHandle {
 
   // Resolve everything that can throw before performing side effects.
   assertRegistrableInitTools(options.tools)
-  const resolver = options.resolver ?? createDefaultHostedResolver(options)
+  const resolver = options.resolver
   defineWebMCPCommandInput()
   const { created, element } = resolveCommandInputElement(options.target)
 
-  const confirmationOwner = Symbol('webmcp-init-confirmation-handler')
+  let disposeConfirmation: (() => void) | undefined
   const registrations: RegisteredTool[] = []
 
   function rollback() {
     for (const registration of registrations) {
       registration.unregister()
     }
-    releaseConfirmationHandler(confirmationOwner)
+    disposeConfirmation?.()
     if (created) element.remove()
   }
 
   try {
     for (const tool of options.tools ?? []) {
-      registrations.push(registerTool(tool as unknown as WebMCPTool))
+      registrations.push(registerTool(tool))
     }
 
     if (options.confirmationHandler) {
-      installConfirmationHandler(confirmationOwner, options.confirmationHandler)
+      disposeConfirmation = setConfirmationHandler(options.confirmationHandler)
     }
 
     element.configure({
@@ -98,8 +70,6 @@ export function initWebMCP(options: InitWebMCPOptions = {}): WebMCPInitHandle {
     throw error
   }
 
-  if (created) element.openPanel()
-
   return {
     element,
     resolver,
@@ -108,12 +78,12 @@ export function initWebMCP(options: InitWebMCPOptions = {}): WebMCPInitHandle {
   }
 }
 
-function assertRegistrableInitTools(tools: readonly AnyWebMCPTool[] | undefined): void {
+function assertRegistrableInitTools(tools: readonly WebMCPTool[] | undefined): void {
   if (!tools) return
 
   const names = new Set<string>()
   for (const tool of tools) {
-    assertValidTool(tool as unknown as WebMCPTool)
+    assertValidTool(tool)
     if (names.has(tool.name)) {
       throw new Error(`initWebMCP() received duplicate tool name "${tool.name}".`)
     }
@@ -124,49 +94,6 @@ function assertRegistrableInitTools(tools: readonly AnyWebMCPTool[] | undefined)
       )
     }
   }
-}
-
-function installConfirmationHandler(owner: symbol, handler: ConfirmationHandler): void {
-  if (confirmationHandlerFrames.length === 0) {
-    baseConfirmationHandler = getConfirmationHandler()
-  }
-  confirmationHandlerFrames.push({ handler, owner })
-  setConfirmationHandler(handler)
-}
-
-function releaseConfirmationHandler(owner: symbol): void {
-  const index = confirmationHandlerFrames.findIndex(function findOwnedFrame(frame) {
-    return frame.owner === owner
-  })
-  if (index === -1) return
-
-  const [frame] = confirmationHandlerFrames.splice(index, 1)
-  const wasActive = index === confirmationHandlerFrames.length
-  const restoredHandler = confirmationHandlerFrames.at(-1)?.handler ?? baseConfirmationHandler
-  if (confirmationHandlerFrames.length === 0) {
-    baseConfirmationHandler = undefined
-  }
-
-  if (!wasActive) return
-  // Leave a handler alone when the consumer replaced it after this install.
-  if (getConfirmationHandler() !== frame?.handler) return
-
-  setConfirmationHandler(restoredHandler)
-}
-
-function createDefaultHostedResolver(options: InitWebMCPOptions): ToolResolver | undefined {
-  if (!options.accessKey) return undefined
-
-  if (!options.model) {
-    throw new Error('initWebMCP() needs a "model" when "accessKey" is provided.')
-  }
-
-  return createHostedOpenAIResolver({
-    accessKey: options.accessKey,
-    baseUrl: options.baseUrl,
-    browserChallengeSiteKey: options.browserChallengeSiteKey,
-    model: options.model
-  })
 }
 
 function resolveCommandInputElement(target: string | WebMCPCommandInputElement | undefined): {

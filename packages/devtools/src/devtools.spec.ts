@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { clearToolsForTest, defineTool, registerTool } from '@vampaz/webmcp-kit'
+import { clearToolsForTest } from '@vampaz/webmcp-kit/testing'
+import { defineTool, registerTool } from '@vampaz/webmcp-kit'
 
 import { mountDevtoolsOverlay } from './devtools'
 
@@ -15,6 +16,29 @@ describe('devtools overlay', () => {
     clearToolsForTest()
     document.body.innerHTML = ''
     vi.restoreAllMocks()
+  })
+
+  it('batches registrations and avoids scope evaluation while closed', async () => {
+    const scope = vi.fn(() => ({ available: true }))
+    const overlay = mountDevtoolsOverlay({ initiallyOpen: false })
+    for (const name of ['read_first', 'read_second'])
+      registerTool(
+        defineTool({
+          name,
+          description: 'Read a value from the current application state.',
+          inputSchema: { type: 'object', properties: {} },
+          scope,
+          execute() {
+            return 1
+          }
+        })
+      )
+    await flushPromises()
+    expect(scope).not.toHaveBeenCalled()
+    expect(document.body.textContent).toContain('2 tools')
+    document.querySelector<HTMLButtonElement>('[data-action="toggle"]')!.click()
+    expect(scope).toHaveBeenCalledTimes(2)
+    overlay.destroy()
   })
 
   it('renders registered tools and invokes them', async () => {
@@ -58,7 +82,7 @@ describe('devtools overlay', () => {
       { customerName: 'Acme Corp', amount: 1 },
       { source: 'devtools' }
     )
-    expect(document.body.textContent).toContain('create_invoice - success')
+    await vi.waitFor(() => expect(document.body.textContent).toContain('create_invoice - success'))
     expect(document.body.textContent).toContain('Invocation history')
     expect(document.body.textContent).toContain('"input"')
     expect(document.body.textContent).toContain('"output"')
@@ -87,6 +111,7 @@ describe('devtools overlay', () => {
           properties: {
             amount: { type: 'number', minimum: 1 }
           },
+          required: ['amount'],
           additionalProperties: false
         },
         execute
@@ -223,6 +248,7 @@ describe('devtools overlay', () => {
           properties: {
             amount: { type: 'number', minimum: 1 }
           },
+          required: ['amount'],
           additionalProperties: false
         },
         execute
@@ -282,7 +308,9 @@ describe('devtools overlay', () => {
     )
     document.querySelector<HTMLButtonElement>('[data-action="invoke"]')!.click()
     await flushPromises()
-    expect(document.body.textContent).toContain('cannot be displayed as JSON')
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('cannot be displayed as JSON')
+    )
     expect(function refresh() {
       overlay.refresh()
     }).not.toThrow()

@@ -1,4 +1,4 @@
-import { createRemoteResolver, type ToolResolver } from '@vampaz/webmcp-kit'
+import { createResolver, type ToolResolver } from '@vampaz/webmcp-kit'
 import { createPiHarness, type PiController } from '@vampaz/webmcp-kit/pi'
 
 let currentHarness: PiController | undefined
@@ -34,7 +34,7 @@ export async function openDemoHarness(
       })
     )
       throw new Error(`LM Studio does not expose ${config.modelId}. Load the configured model.`)
-    resolver = createRemoteResolver({
+    resolver = await createResolver({
       provider: 'openai-compatible',
       baseUrl: '/__lmstudio/v1',
       model: config.modelId,
@@ -52,7 +52,6 @@ export async function openDemoHarness(
       ownerId: 'local-developer',
       conversationId: mode
     },
-    worker: { url: '/webmcp-pi/worker.ts', scope: '/webmcp-pi/' },
     resolver,
     context() {
       return { counter: getValue() }

@@ -1,3 +1,4 @@
+import { getToolAvailability } from './availability'
 import type {
   RegisteredTool,
   RegistrySnapshot,
@@ -64,7 +65,7 @@ export function installWebMCPKitTestBridge(target: Window = window): () => void 
 
 function createToolSummaries(): TestBridgeTool[] {
   return listTools().map(function mapTool(registration) {
-    const availability = registration.tool.scope?.()
+    const availability = getToolAvailability(registration.tool)
 
     return {
       name: registration.tool.name,

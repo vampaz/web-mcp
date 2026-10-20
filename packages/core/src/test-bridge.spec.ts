@@ -59,6 +59,33 @@ describe('test bridge', () => {
     expect(window.__webMCPKit).toBeUndefined()
   })
 
+  it('reports a failed scope without hiding other tools', () => {
+    for (const name of ['broken', 'working'])
+      registerTool(
+        defineTool({
+          name,
+          description: 'Read the current state.',
+          inputSchema: { type: 'object', properties: {} },
+          scope() {
+            if (name === 'broken') throw new Error('State missing')
+            return { available: true }
+          },
+          execute() {
+            return {}
+          }
+        })
+      )
+    installWebMCPKitTestBridge()
+    expect(window.__webMCPKit?.listTools()).toEqual([
+      expect.objectContaining({
+        name: 'broken',
+        available: false,
+        unavailableReason: 'State missing'
+      }),
+      expect.objectContaining({ name: 'working', available: true })
+    ])
+  })
+
   it('does not let test callers bypass confirmation', async () => {
     setConfirmationHandler(function rejectConfirmation() {
       return false
@@ -75,7 +102,6 @@ describe('test bridge', () => {
           additionalProperties: false
         },
         confirmation: {
-          required: true,
           reason: 'Checkout requires approval.'
         },
         execute() {

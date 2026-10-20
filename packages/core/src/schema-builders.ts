@@ -1,8 +1,8 @@
 import type { JsonSchema } from './interfaces/tool'
 
-export interface ObjectInputSchemaOptions {
+export interface ObjectInputSchemaOptions<TRequired extends readonly string[] = readonly string[]> {
   additionalProperties?: boolean | JsonSchema
-  required?: string[]
+  required?: TRequired
 }
 
 export interface StringParamOptions {
@@ -24,58 +24,82 @@ export interface ArrayParamOptions {
   minItems?: number
 }
 
+export function objectInputSchema<
+  const TProperties extends Record<string, JsonSchema>,
+  const TRequired extends readonly (keyof TProperties & string)[]
+>(
+  properties: TProperties,
+  options: ObjectInputSchemaOptions<TRequired> & { required: TRequired }
+): {
+  type: 'object'
+  properties: TProperties
+  required: TRequired
+  additionalProperties: boolean | JsonSchema
+}
+export function objectInputSchema<const TProperties extends Record<string, JsonSchema>>(
+  properties: TProperties,
+  options?: ObjectInputSchemaOptions<readonly (keyof TProperties & string)[]>
+): {
+  type: 'object'
+  properties: TProperties
+  required?: readonly (keyof TProperties & string)[]
+  additionalProperties: boolean | JsonSchema
+}
 export function objectInputSchema(
   properties: Record<string, JsonSchema>,
   options: ObjectInputSchemaOptions = {}
-): JsonSchema {
+) {
   return {
-    type: 'object',
+    type: 'object' as const,
     properties,
     required: options.required ?? [],
     additionalProperties: options.additionalProperties ?? false
   }
 }
 
-export function stringParam(options: StringParamOptions = {}): JsonSchema {
+export function stringParam(options: StringParamOptions = {}) {
   return {
-    type: 'string',
+    type: 'string' as const,
     ...options
   }
 }
 
-export function numberParam(options: NumberParamOptions = {}): JsonSchema {
+export function numberParam(options: NumberParamOptions = {}) {
   return {
-    type: 'number',
+    type: 'number' as const,
     ...options
   }
 }
 
-export function integerParam(options: NumberParamOptions = {}): JsonSchema {
+export function integerParam(options: NumberParamOptions = {}) {
   return {
-    type: 'integer',
+    type: 'integer' as const,
     ...options
   }
 }
 
-export function booleanParam(description?: string): JsonSchema {
+export function booleanParam(description?: string) {
   return {
-    type: 'boolean',
+    type: 'boolean' as const,
     ...(description ? { description } : {})
   }
 }
 
-export function arrayParam(items: JsonSchema, options: ArrayParamOptions = {}): JsonSchema {
+export function arrayParam<const TItems extends JsonSchema>(
+  items: TItems,
+  options: ArrayParamOptions = {}
+) {
   return {
-    type: 'array',
+    type: 'array' as const,
     items,
     ...options
   }
 }
 
-export function enumParam<TValue extends string | number | boolean>(
+export function enumParam<const TValue extends string | number | boolean>(
   values: readonly TValue[],
   description?: string
-): JsonSchema {
+) {
   if (values.length === 0) {
     throw new Error('enumParam() requires at least one value.')
   }

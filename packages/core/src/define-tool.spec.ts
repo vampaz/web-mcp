@@ -73,6 +73,32 @@ describe('defineTool', () => {
     })
   })
 
+  it('accepts readonly schemas and rejects incompatible executor types', () => {
+    const schema = {
+      type: 'object',
+      properties: { count: { type: 'number' } },
+      required: ['count']
+    } as const
+    defineTool({
+      name: 'read_count',
+      description: 'Read the requested count.',
+      inputSchema: schema,
+      execute(input) {
+        expectTypeOf(input.count).toEqualTypeOf<number>()
+        return input.count
+      }
+    })
+    defineTool({
+      name: 'bad_count',
+      description: 'An incompatible executor.',
+      inputSchema: schema,
+      // @ts-expect-error The schema determines count, not the executor annotation.
+      execute(input: { count: string }) {
+        return input.count
+      }
+    })
+  })
+
   it('keeps explicit input generics working', () => {
     interface UpdateInvoiceInput {
       id: string

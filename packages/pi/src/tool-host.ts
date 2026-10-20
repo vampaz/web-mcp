@@ -1,4 +1,5 @@
-import { invokeTool, listTools } from '@vampaz/webmcp-kit'
+import { invokeTool } from '@vampaz/webmcp-kit'
+import { listAvailableTools } from '../../core/src/registry'
 import type { ResolverContext } from '@vampaz/webmcp-kit'
 import type { PiToolHost } from './interfaces/host'
 import { PiFailure } from './errors'
@@ -13,13 +14,7 @@ export function createRegistryToolHost(
   let schema = ''
   async function discover(signal: AbortSignal) {
     signal.throwIfAborted()
-    const registrations = listTools().filter(function available({ tool }) {
-      try {
-        return tool.scope?.().available !== false
-      } catch {
-        return false
-      }
-    })
+    const registrations = listAvailableTools()
     const tools = registrations.map(function describe({ tool }) {
       return {
         name: tool.name,
