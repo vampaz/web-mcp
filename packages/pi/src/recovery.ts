@@ -1,5 +1,6 @@
 import type { ConversationView } from '@earendil-works/pi-durable'
 import type { PiMessage } from './interfaces/controller'
+import { piRefreshCatalogToolName } from './resolver-adapter'
 
 export function lastTurnState(
   view: ConversationView
@@ -23,6 +24,7 @@ export function normalizeMessages(view: ConversationView): PiMessage[] {
   return view.entries.flatMap(function entryMessages(entry) {
     return (entry.model ?? []).flatMap(function normalize(message, index): PiMessage[] {
       if (message.role === 'system') return []
+      if (message.role === 'toolResult' && message.toolName === piRefreshCatalogToolName) return []
       const text =
         typeof message.content === 'string'
           ? message.content
