@@ -1,54 +1,37 @@
-import { onScopeDispose, toValue, watch } from 'vue'
+import { getCurrentInstance, onMounted, onScopeDispose, toValue, watch } from 'vue'
 
-import { registerTool, type RegisteredTool, type WebMCPTool } from '@vampaz/webmcp-kit'
+import type { WebMCPTool } from '@vampaz/webmcp-kit'
+import { createToolRegistrationHandle } from '../../core/src/tool-registration'
 
 import type { UseWebMCPToolOptions, UseWebMCPToolResult } from './interfaces/webmcp-tool'
 
-export type {
-  UseWebMCPToolOptions,
-  UseWebMCPToolResult,
-  VueWebMCPTool
-} from './interfaces/webmcp-tool'
+export type { UseWebMCPToolOptions, UseWebMCPToolResult } from './interfaces/webmcp-tool'
 
 export function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unknown>(
   tool: WebMCPTool<TInput, TOutput>,
   options: UseWebMCPToolOptions = {}
 ): UseWebMCPToolResult<TInput, TOutput> {
-  let registration: RegisteredTool<TInput, TOutput> | undefined
+  const handle = createToolRegistrationHandle(tool)
+  const component = getCurrentInstance()
+  let mounted = component ? component.isMounted : typeof window !== 'undefined'
 
-  function unregister(): void {
-    registration?.unregister()
-    registration = undefined
+  function available() {
+    return options.when === undefined || toValue(options.when)
   }
 
-  function syncRegistration(available: boolean): void {
-    if (available && !registration) {
-      registration = registerTool(tool)
-      return
-    }
-
-    if (!available) {
-      unregister()
-    }
+  function sync() {
+    handle.sync(mounted && available())
   }
 
-  const stop = watch(
-    function getAvailability() {
-      return options.when === undefined || toValue(options.when)
-    },
-    syncRegistration,
-    { immediate: true }
-  )
-
+  if (component && !mounted)
+    onMounted(function mount() {
+      mounted = true
+      sync()
+    })
+  const stop = watch(available, sync, { immediate: true })
   onScopeDispose(function disposeWebMCPTool() {
     stop()
-    unregister()
+    handle.unregister()
   })
-
-  return {
-    unregister,
-    getRegistration() {
-      return registration
-    }
-  }
+  return handle
 }

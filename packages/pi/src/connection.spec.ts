@@ -1,377 +1,45 @@
-import { MessageChannel } from 'node:worker_threads'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createPiHarness } from './connection'
-import { createPeer } from './protocol'
-import { piProtocolVersion } from './interfaces/protocol'
-import type { PiConnect, PiEnvelope, PiPeer } from './interfaces/protocol'
+import { createPiRuntime } from './runtime'
+import type { PiController, PiHarnessOptions } from './interfaces/controller'
 
-afterEach(function cleanup() {
-  vi.useRealTimers()
+vi.mock('./runtime', function runtime() {
+  return { createPiRuntime: vi.fn() }
+})
+
+let harness: PiController | undefined
+let runtime: PiController
+
+beforeEach(function setup() {
+  vi.stubGlobal('isSecureContext', true)
+  runtime = {
+    getSnapshot: vi.fn(function snapshot() {
+      return { state: 'idle' as const, messages: [] }
+    }),
+    subscribe: vi.fn(function subscribe() {
+      return function unsubscribe() {}
+    }),
+    send: vi.fn(async function send() {
+      return { status: 'completed' as const }
+    }),
+    clear: vi.fn(async function clear() {}),
+    stop: vi.fn(async function stop() {}),
+    destroy: vi.fn(async function destroy() {})
+  }
+  vi.mocked(createPiRuntime).mockResolvedValue(runtime)
+})
+
+afterEach(async function cleanup() {
+  await harness?.destroy()
+  harness = undefined
+  vi.restoreAllMocks()
+  vi.clearAllMocks()
   vi.unstubAllGlobals()
 })
 
-it('reports missing durable browser prerequisites without installing anything', async function test() {
-  await expect(
-    createPiHarness({
-      session: { namespace: 'tests', ownerId: 'one', conversationId: 'chat' },
-      worker: { url: '/pi/worker.js', scope: '/pi/' },
-      resolver: {
-        name: 'test',
-        available: true,
-        status: 'ready',
-        detail: '',
-        async resolve() {
-          throw new Error('must not resolution')
-        }
-      }
-    })
-  ).rejects.toMatchObject({ code: 'unsupported' })
-})
-
-it('keeps a healthy turn active beyond the individual RPC timeout', async function test() {
-  vi.stubGlobal('MessageChannel', MessageChannel)
-  vi.stubGlobal('isSecureContext', true)
-  vi.stubGlobal('indexedDB', {})
-  let remote: PiPeer | undefined
-  let finish: (() => void) | undefined
-  let started!: () => void
-  const pendingStart = new Promise<void>(function wait(resolve) {
-    started = resolve
-  })
-  const worker = Object.assign(new EventTarget(), {
-    state: 'activated',
-    postMessage(message: PiConnect | PiEnvelope, ports?: MessagePort[]) {
-      if (message.op === 'connect') {
-        remote = createPeer(ports![0], message.binding, {
-          methods: ['ready', 'send', 'ping', 'destroy'],
-          async request(method) {
-            if (method === 'ready') return { state: 'idle', messages: [] }
-            if (method === 'send') {
-              return new Promise(function pending(resolve) {
-                finish = function done() {
-                  resolve({ status: 'completed' })
-                }
-                started()
-              })
-            }
-            return null
-          }
-        })
-      } else void remote!.receive(message)
-    }
-  })
-  vi.stubGlobal('navigator', {
-    locks: {},
-    serviceWorker: {
-      async register() {
-        return { active: worker }
-      }
-    }
-  })
-  vi.useFakeTimers()
-  const resolve = vi.fn(async function reply() {
-    return { toolName: 'pi_reply', input: { text: 'Done' }, confidence: 1, reason: 'Reply' }
-  })
-  const harness = await createPiHarness({
+function options(): PiHarnessOptions {
+  return {
     session: { namespace: 'tests', ownerId: 'one', conversationId: 'chat' },
-    worker: { url: '/pi/worker.js', scope: '/pi/' },
-    limits: { maxRequestBytes: 2048 },
-    resolver: { name: 'test', available: true, status: 'ready', detail: '', resolve },
-    host: {
-      async discover() {
-        return { revision: '1', tools: [] }
-      },
-      async context() {
-        return {}
-      },
-      async invoke() {
-        throw new Error('Unexpected tool')
-      }
-    }
-  })
-  try {
-    const outcome = harness.send('Take several rounds')
-    await pendingStart
-    await remote!.call('resolve', { message: 'Hello', tools: [], context: {}, singleStep: true })
-    expect(resolve).toHaveBeenCalledWith(
-      'Hello',
-      [],
-      {},
-      expect.objectContaining({ maxRequestBytes: 2048 })
-    )
-    await vi.advanceTimersByTimeAsync(260000)
-    expect(harness.getSnapshot().state).toBe('running')
-    finish!()
-    expect(await outcome).toEqual({ status: 'completed' })
-  } finally {
-    finish?.()
-    await harness.destroy()
-    remote?.close()
-  }
-})
-
-it('registers the worker script under a protocol-versioned URL', async function test() {
-  vi.stubGlobal('MessageChannel', MessageChannel)
-  vi.stubGlobal('isSecureContext', true)
-  vi.stubGlobal('indexedDB', {})
-  let remote: PiPeer | undefined
-  const worker = Object.assign(new EventTarget(), {
-    state: 'activated',
-    postMessage(message: PiConnect | PiEnvelope, ports?: MessagePort[]) {
-      if (message.op === 'connect') {
-        remote = createPeer(ports![0], message.binding, {
-          methods: ['ready', 'destroy', 'stop', 'ping', 'send'],
-          async request(method) {
-            return method === 'ready' ? { state: 'idle', messages: [] } : null
-          }
-        })
-      } else void remote!.receive(message)
-    }
-  })
-  const registered: string[] = []
-  vi.stubGlobal('navigator', {
-    locks: {},
-    serviceWorker: {
-      async register(url: string) {
-        registered.push(url)
-        return { active: worker }
-      }
-    }
-  })
-  const harness = await createPiHarness({
-    session: { namespace: 'tests', ownerId: 'one', conversationId: 'chat' },
-    worker: { url: '/pi/worker.js', scope: '/pi/' },
-    resolver: {
-      name: 'test',
-      available: true,
-      status: 'ready',
-      detail: '',
-      async resolve() {
-        throw new Error('must not resolve')
-      }
-    },
-    host: {
-      async discover() {
-        return { revision: '1', tools: [] }
-      },
-      async context() {
-        return {}
-      },
-      async invoke() {
-        throw new Error('Unexpected tool')
-      }
-    }
-  })
-  try {
-    expect(registered).toHaveLength(1)
-    expect(registered[0]).toContain(`wmpcv=${piProtocolVersion}`)
-  } finally {
-    await harness.destroy()
-    remote?.close()
-  }
-})
-
-it('connects to a freshly updated worker instead of a stale active one', async function test() {
-  vi.stubGlobal('MessageChannel', MessageChannel)
-  vi.stubGlobal('isSecureContext', true)
-  vi.stubGlobal('indexedDB', {})
-  const stalePostMessage = vi.fn()
-  const stale = Object.assign(new EventTarget(), {
-    state: 'activated',
-    postMessage: stalePostMessage
-  })
-  let remote: PiPeer | undefined
-  const freshPostMessage = vi.fn(function post(
-    message: PiConnect | PiEnvelope,
-    ports?: MessagePort[]
-  ) {
-    if (message.op === 'connect') {
-      remote = createPeer(ports![0], message.binding, {
-        methods: ['ready', 'destroy', 'stop', 'ping', 'send'],
-        async request(method) {
-          if (method === 'ready') return { state: 'idle', messages: [] }
-          return null
-        }
-      })
-    } else void remote!.receive(message)
-  })
-  const fresh = Object.assign(new EventTarget(), {
-    state: 'installing',
-    postMessage: freshPostMessage
-  })
-  const registration = {
-    active: stale as unknown as ServiceWorker,
-    installing: undefined as ServiceWorker | undefined,
-    waiting: undefined as ServiceWorker | undefined,
-    async update() {
-      registration.installing = fresh as unknown as ServiceWorker
-      queueMicrotask(function activate() {
-        ;(fresh as unknown as { state: string }).state = 'activated'
-        registration.active = fresh as unknown as ServiceWorker
-        fresh.dispatchEvent(new Event('statechange'))
-      })
-      return registration
-    }
-  }
-  vi.stubGlobal('navigator', {
-    locks: {},
-    serviceWorker: {
-      async register() {
-        return registration
-      }
-    }
-  })
-  const harness = await createPiHarness({
-    session: { namespace: 'tests', ownerId: 'one', conversationId: 'chat' },
-    worker: { url: '/pi/worker.js', scope: '/pi/' },
-    resolver: {
-      name: 'test',
-      available: true,
-      capabilities: { conversation: true },
-      status: 'ready',
-      detail: '',
-      async resolve() {
-        throw new Error('must not resolve')
-      }
-    },
-    host: {
-      async discover() {
-        return { revision: '1', tools: [] }
-      },
-      async context() {
-        return {}
-      },
-      async invoke() {
-        throw new Error('Unexpected tool')
-      }
-    }
-  })
-  try {
-    expect(freshPostMessage).toHaveBeenCalled()
-    expect(stalePostMessage).not.toHaveBeenCalled()
-  } finally {
-    await harness.destroy()
-    remote?.close()
-  }
-})
-
-it('admits only user turns and remains usable after a cached page is restored', async function test() {
-  vi.stubGlobal('MessageChannel', MessageChannel)
-  vi.stubGlobal('isSecureContext', true)
-  vi.stubGlobal('indexedDB', {})
-  let remote: PiPeer | undefined
-  const worker = Object.assign(new EventTarget(), {
-    state: 'activated',
-    postMessage(message: PiConnect | PiEnvelope, ports?: MessagePort[]) {
-      if (message.op === 'connect') {
-        remote = createPeer(ports![0], message.binding, {
-          methods: ['ready', 'destroy', 'stop', 'ping', 'send'],
-          async request(method) {
-            if (method === 'send') return { status: 'completed' }
-            return method === 'ready' ? { state: 'idle', messages: [] } : null
-          }
-        })
-      } else void remote!.receive(message)
-    }
-  })
-  vi.stubGlobal('navigator', {
-    locks: {},
-    serviceWorker: {
-      async register() {
-        return { active: worker }
-      }
-    }
-  })
-  const context = vi.fn(async function context() {
-    return {}
-  })
-  const invoke = vi.fn()
-  const resolve = vi.fn()
-  const harness = await createPiHarness({
-    session: { namespace: 'tests', ownerId: 'one', conversationId: 'chat' },
-    worker: { url: '/pi/worker.js', scope: '/pi/' },
-    resolver: {
-      name: 'test',
-      available: true,
-      capabilities: { conversation: true },
-      status: 'ready',
-      detail: '',
-      resolve
-    },
-    host: {
-      async discover() {
-        return { revision: '1', tools: [] }
-      },
-      context,
-      invoke
-    }
-  })
-  try {
-    await expect(remote!.call('context')).rejects.toMatchObject({ code: 'stale_document' })
-    await expect(remote!.call('resolve', {})).rejects.toMatchObject({ code: 'stale_document' })
-    await expect(remote!.call('invoke', {})).rejects.toMatchObject({ code: 'stale_document' })
-    expect(context).not.toHaveBeenCalled()
-    expect(resolve).not.toHaveBeenCalled()
-    window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))
-    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
-    expect(await harness.send('A new request after Back')).toEqual({ status: 'completed' })
-    expect(invoke).not.toHaveBeenCalled()
-  } finally {
-    await harness.destroy()
-    remote?.close()
-  }
-})
-
-it('does not let an old heartbeat interrupt a subsequent user turn', async function test() {
-  vi.stubGlobal('MessageChannel', MessageChannel)
-  vi.stubGlobal('isSecureContext', true)
-  vi.stubGlobal('indexedDB', {})
-  let remote: PiPeer | undefined
-  let pingCount = 0
-  const finish: Array<() => void> = []
-  const started: Array<() => void> = []
-  const starts = [0, 1].map(function start() {
-    return new Promise<void>(function pending(resolve) {
-      started.push(resolve)
-    })
-  })
-  const worker = Object.assign(new EventTarget(), {
-    state: 'activated',
-    postMessage(message: PiConnect | PiEnvelope, ports?: MessagePort[]) {
-      if (message.op === 'connect') {
-        remote = createPeer(ports![0], message.binding, {
-          methods: ['ready', 'send', 'ping', 'destroy'],
-          async request(method) {
-            if (method === 'ready') return { state: 'idle', messages: [] }
-            if (method === 'ping' && ++pingCount === 2)
-              return new Promise(function lostHeartbeat() {})
-            if (method === 'send') {
-              return new Promise(function pending(resolve) {
-                const index = finish.length
-                finish.push(function done() {
-                  resolve({ status: 'completed' })
-                })
-                started[index]!()
-              })
-            }
-            return null
-          }
-        })
-      } else void remote!.receive(message)
-    }
-  })
-  vi.stubGlobal('navigator', {
-    locks: {},
-    serviceWorker: {
-      async register() {
-        return { active: worker }
-      }
-    }
-  })
-  vi.useFakeTimers()
-  const harness = await createPiHarness({
-    session: { namespace: 'tests', ownerId: 'one', conversationId: 'chat' },
-    worker: { url: '/pi/worker.js', scope: '/pi/' },
     resolver: {
       name: 'test',
       available: true,
@@ -381,23 +49,84 @@ it('does not let an old heartbeat interrupt a subsequent user turn', async funct
         throw new Error('Unexpected inference')
       }
     }
-  })
-  try {
-    const first = harness.send('First turn')
-    await starts[0]
-    await vi.advanceTimersByTimeAsync(2000)
-    expect(pingCount).toBe(2)
-    finish[0]!()
-    expect(await first).toEqual({ status: 'completed' })
-    const second = harness.send('Second turn')
-    await starts[1]
-    await vi.advanceTimersByTimeAsync(3000)
-    finish[1]!()
-    expect(await second).toEqual({ status: 'completed' })
-    expect(harness.getSnapshot().state).toBe('idle')
-  } finally {
-    for (const done of finish) done()
-    await harness.destroy()
-    remote?.close()
   }
+}
+
+it('requires a secure browser context before opening storage', async function prerequisites() {
+  vi.stubGlobal('isSecureContext', false)
+  await expect(createPiHarness(options())).rejects.toMatchObject({ code: 'unsupported' })
+  expect(createPiRuntime).not.toHaveBeenCalled()
+})
+
+it('opens the in-page runtime with the registry host and no service worker', async function inPage() {
+  const config = options()
+  harness = await createPiHarness(config)
+  expect(createPiRuntime).toHaveBeenCalledWith({
+    ...config,
+    host: {
+      discover: expect.any(Function),
+      context: expect.any(Function),
+      invoke: expect.any(Function)
+    },
+    limits: undefined
+  })
+  expect(await harness.send('Hello')).toEqual({ status: 'completed' as const })
+  expect(runtime.send).toHaveBeenCalledWith('Hello')
+})
+
+it('preserves the supplied tool host and request limits', async function customHost() {
+  const host = { discover: vi.fn(), context: vi.fn(), invoke: vi.fn() }
+  harness = await createPiHarness({ ...options(), host, limits: { maxRequestBytes: 2048 } })
+  expect(createPiRuntime).toHaveBeenCalledWith(
+    expect.objectContaining({ host, limits: { maxRequestBytes: 2048 } })
+  )
+})
+
+it('finishes cancellation before accepting a turn after back-forward cache restoration', async function cached() {
+  let finish!: () => void
+  vi.mocked(runtime.stop).mockImplementationOnce(function stopping() {
+    return new Promise<void>(function pending(resolve) {
+      finish = resolve
+    })
+  })
+  const onCancel = vi.fn()
+  harness = await createPiHarness({ ...options(), onCancel })
+  window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))
+  const turn = harness.send('Continue')
+  expect(onCancel).toHaveBeenCalledOnce()
+  expect(runtime.send).not.toHaveBeenCalled()
+  expect(runtime.destroy).not.toHaveBeenCalled()
+  finish()
+  expect(await turn).toEqual({ status: 'completed' as const })
+})
+
+it('destroys the runtime on navigation and detaches its page listener', async function navigation() {
+  harness = await createPiHarness(options())
+  window.dispatchEvent(new PageTransitionEvent('pagehide'))
+  await harness.destroy()
+  expect(runtime.destroy).toHaveBeenCalledOnce()
+  window.dispatchEvent(new PageTransitionEvent('pagehide'))
+  expect(runtime.stop).toHaveBeenCalledOnce()
+})
+
+it('closes a runtime that finishes initialization after navigation', async function lateInitialization() {
+  let finish!: (value: PiController) => void
+  vi.mocked(createPiRuntime).mockReturnValueOnce(
+    new Promise(function pending(resolve) {
+      finish = resolve
+    })
+  )
+  const opening = createPiHarness(options())
+  window.dispatchEvent(new PageTransitionEvent('pagehide'))
+  finish(runtime)
+  await expect(opening).rejects.toMatchObject({ code: 'stale_document' })
+  expect(runtime.destroy).toHaveBeenCalled()
+})
+
+it('detaches its listener when initialization fails', async function failedInitialization() {
+  const onCancel = vi.fn()
+  vi.mocked(createPiRuntime).mockRejectedValueOnce(new Error('Storage unavailable'))
+  await expect(createPiHarness({ ...options(), onCancel })).rejects.toThrow('Storage unavailable')
+  window.dispatchEvent(new PageTransitionEvent('pagehide'))
+  expect(onCancel).not.toHaveBeenCalled()
 })

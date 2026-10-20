@@ -2,7 +2,7 @@ import {
   defineTool,
   registerTool,
   type ConfirmationHandler,
-  type ConfirmationTool,
+  type ConfirmationRequest,
   type ToolResolver
 } from '@vampaz/webmcp-kit'
 import { createPiHarness, type PiController, type PiSession } from '@vampaz/webmcp-kit/pi'
@@ -11,7 +11,6 @@ import { defineWebMCPChat, type WebMCPChatElement } from '@vampaz/webmcp-kit/cha
 // Call this in the browser. The host owns the resolver and approval dialog.
 export function mountCounterAssistant(options: {
   container: HTMLElement
-  workerScope: string
   session: PiSession
   resolver: ToolResolver
   approve: ConfirmationHandler
@@ -42,7 +41,7 @@ export function mountCounterAssistant(options: {
         required: ['value'],
         additionalProperties: false
       },
-      confirmation: { required: true, reason: 'Change the counter?', handler: options.approve },
+      confirmation: { reason: 'Change the counter?', handler: options.approve },
       execute(input) {
         value = input.value
         options.onValue(value)
@@ -56,7 +55,6 @@ export function mountCounterAssistant(options: {
       const next = await createPiHarness({
         session: options.session,
         resolver: options.resolver,
-        worker: { url: `${options.workerScope}worker.js`, scope: options.workerScope },
         context() {
           return { counter: value }
         }
@@ -103,17 +101,12 @@ export function createDialogApproval(dialog: HTMLDialogElement) {
     pending?.(false)
   }
 
-  function confirm(
-    tool: ConfirmationTool,
-    input: unknown,
-    reason: string,
-    context?: { signal: AbortSignal }
-  ) {
+  function confirm({ tool, input, reason, signal }: ConfirmationRequest) {
     cancel()
     return new Promise<boolean>(function approval(resolve) {
       function finish(approved: boolean) {
         pending = undefined
-        context?.signal.removeEventListener('abort', cancel)
+        signal?.removeEventListener('abort', cancel)
         dialog.removeEventListener('close', close)
         dialog.removeEventListener('cancel', cancel)
         if (dialog.open) dialog.close()
@@ -127,8 +120,8 @@ export function createDialogApproval(dialog: HTMLDialogElement) {
       dialog.returnValue = ''
       dialog.addEventListener('close', close)
       dialog.addEventListener('cancel', cancel, { once: true })
-      context?.signal.addEventListener('abort', cancel, { once: true })
-      if (context?.signal.aborted) cancel()
+      signal?.addEventListener('abort', cancel, { once: true })
+      if (signal?.aborted) cancel()
       else dialog.showModal()
     })
   }

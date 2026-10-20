@@ -1,4 +1,5 @@
-import { getErrorMessage, hasConfirmationHandler } from './confirmation'
+import { getToolAvailability } from './availability'
+import { hasConfirmationHandler } from './confirmation'
 import type {
   IntegrationDiagnostic,
   IntegrationHealthReport,
@@ -90,7 +91,7 @@ function getToolDiagnostics(tools: RegisteredTool[]): IntegrationDiagnostic[] {
       })
     }
 
-    if (tool.confirmation?.required && !tool.confirmation.handler && !confirmationConfigured) {
+    if (tool.confirmation && !tool.confirmation.handler && !confirmationConfigured) {
       diagnostics.push({
         id: `missing-confirmation-handler:${tool.name}`,
         severity: 'warning',
@@ -114,10 +115,9 @@ function getScopeDiagnostic(registration: RegisteredTool): IntegrationDiagnostic
   const tool = registration.tool
   if (!tool.scope) return undefined
 
-  try {
-    const availability = tool.scope()
-    if (!availability || availability.available) return undefined
-
+  const availability = getToolAvailability(tool)
+  if (availability.available) return undefined
+  if (!availability.failed) {
     return {
       id: `tool-unavailable:${tool.name}`,
       severity: 'info',
@@ -126,12 +126,12 @@ function getScopeDiagnostic(registration: RegisteredTool): IntegrationDiagnostic
       action: 'This is okay when it matches the current app state.',
       toolName: tool.name
     }
-  } catch (error) {
+  } else {
     return {
       id: `tool-scope-failed:${tool.name}`,
       severity: 'error',
       title: `${tool.name} scope failed`,
-      detail: getErrorMessage(error),
+      detail: availability.reason ?? 'Tool scope failed.',
       action: 'Fix the scope() function so devtools and resolvers can safely check availability.',
       toolName: tool.name
     }

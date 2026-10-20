@@ -1,12 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import {
-  clearToolsForTest,
-  defineTool,
-  getRegistrySnapshot,
-  installWebMCPKitTestBridge,
-  registerTool
-} from '@vampaz/webmcp-kit'
+import { clearToolsForTest, installWebMCPKitTestBridge } from '@vampaz/webmcp-kit/testing'
+import { defineTool, getRegistrySnapshot, registerTool } from '@vampaz/webmcp-kit'
 
 describe('fallback integration', () => {
   beforeEach(() => {

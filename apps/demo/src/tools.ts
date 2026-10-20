@@ -24,7 +24,7 @@ export function registerCounterTools(onChange: (value: number) => void) {
         required: ['value'],
         additionalProperties: false
       },
-      confirmation: { required: true, reason: 'Change the application counter?' },
+      confirmation: { reason: 'Change the application counter?' },
       execute(input) {
         value = input.value
         onChange(value)
@@ -49,12 +49,12 @@ export function installApprovalDialog(dialog: HTMLDialogElement): () => void {
   function cancel() {
     pending?.(false)
   }
-  setConfirmationHandler(function confirm(_tool, input, reason, context) {
+  const disposeConfirmation = setConfirmationHandler(function confirm({ input, reason, signal }) {
     cancel()
     return new Promise<boolean>(function approval(resolve) {
       function finish(approved: boolean) {
         pending = undefined
-        context?.signal.removeEventListener('abort', cancel)
+        signal?.removeEventListener('abort', cancel)
         dialog.removeEventListener('close', close)
         dialog.removeEventListener('cancel', cancel)
         if (dialog.open) dialog.close()
@@ -74,13 +74,13 @@ export function installApprovalDialog(dialog: HTMLDialogElement): () => void {
       dialog.returnValue = ''
       dialog.addEventListener('close', close)
       dialog.addEventListener('cancel', cancel, { once: true })
-      context?.signal.addEventListener('abort', cancel, { once: true })
+      signal?.addEventListener('abort', cancel, { once: true })
       dialog.showModal()
-      if (context?.signal.aborted) cancel()
+      if (signal?.aborted) cancel()
     })
   })
   return function remove() {
     cleanup?.()
-    setConfirmationHandler(undefined)
+    disposeConfirmation()
   }
 }

@@ -20,7 +20,7 @@ function setup() {
     name: 'set_counter',
     description: 'Set the visible counter after the user approves this change.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
-    confirmation: { required: true, reason: 'Change the counter?' },
+    confirmation: { reason: 'Change the counter?' },
     execute
   })
   registerTool(tool)
@@ -53,7 +53,7 @@ it('executes the input shown for approval even if the caller changes it', async 
         required: ['amount'],
         additionalProperties: false
       },
-      confirmation: { required: true, reason: 'Pay this amount?' },
+      confirmation: { reason: 'Pay this amount?' },
       execute
     })
   )
@@ -66,7 +66,7 @@ it('executes the input shown for approval even if the caller changes it', async 
   const input = { amount: 10 }
   const pending = invokeTool({ toolName: 'pay_invoice', input })
   input.amount = 1000
-  expect(confirm.mock.calls[0]?.[1]).toEqual({ amount: 10 })
+  expect(confirm.mock.calls[0]?.[0].input).toEqual({ amount: 10 })
   approve(true)
   expect(await pending).toMatchObject({ status: 'success', output: 10 })
 })
@@ -104,6 +104,7 @@ it.each(['removed', 'replaced', 'schema', 'scope'] as const)(
     if (change === 'removed') unregisterTool('set_counter')
     if (change === 'replaced') {
       vi.spyOn(console, 'warn').mockImplementation(function ignore() {})
+      unregisterTool('set_counter')
       registerTool({ ...fixture.tool })
     }
     if (change === 'schema') fixture.tool.inputSchema.required = ['new_field']

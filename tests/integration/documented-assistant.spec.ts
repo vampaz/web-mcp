@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { clearToolsForTest, listTools, type ToolResolver } from '@vampaz/webmcp-kit'
+import { clearToolsForTest } from '@vampaz/webmcp-kit/testing'
+import { listTools, type ToolResolver } from '@vampaz/webmcp-kit'
 import { createPiHarness, type PiController } from '@vampaz/webmcp-kit/pi'
 import { createDialogApproval, mountCounterAssistant } from '../../docs/examples/counter-assistant'
 
@@ -26,7 +27,6 @@ const resolver: ToolResolver = {
 function mount() {
   return mountCounterAssistant({
     container: document.body,
-    workerScope: '/webmcp-pi/',
     session: { namespace: 'docs', ownerId: 'test', conversationId: 'counter' },
     resolver,
     approve() {
@@ -79,7 +79,12 @@ const tool = { name: 'set_counter', description: 'Change the counter', inputSche
 it('closes and denies an application approval when the invocation aborts', async function abort() {
   const { dialog, approval } = dialogFixture()
   const controller = new AbortController()
-  const result = approval.confirm(tool, { value: 7 }, 'Change?', { signal: controller.signal })
+  const result = approval.confirm({
+    tool,
+    input: { value: 7 },
+    reason: 'Change?',
+    signal: controller.signal
+  })
   expect(dialog.open).toBe(true)
   controller.abort()
   await expect(result).resolves.toBe(false)
@@ -88,8 +93,8 @@ it('closes and denies an application approval when the invocation aborts', async
 
 it('does not deny a replacement approval when an old close event arrives', async function replacement() {
   const { dialog, approval } = dialogFixture()
-  const first = approval.confirm(tool, { value: 1 }, 'First?')
-  const second = approval.confirm(tool, { value: 2 }, 'Second?')
+  const first = approval.confirm({ tool, input: { value: 1 }, reason: 'First?' })
+  const second = approval.confirm({ tool, input: { value: 2 }, reason: 'Second?' })
   await expect(first).resolves.toBe(false)
   dialog.dispatchEvent(new Event('close'))
   expect(dialog.open).toBe(true)

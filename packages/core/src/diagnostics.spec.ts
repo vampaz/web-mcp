@@ -43,7 +43,6 @@ describe('integration diagnostics', () => {
           required: ['invoiceId']
         },
         confirmation: {
-          required: true,
           reason: 'This sends an invoice email to the customer.'
         },
         execute() {

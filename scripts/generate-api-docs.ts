@@ -27,9 +27,10 @@ const program = ts.createProgram(config.fileNames, config.options)
 const checker = program.getTypeChecker()
 const manifest = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8')) as {
   name: string
-  exports: Record<string, { types: string }>
+  exports: Record<string, string | { types: string }>
 }
-const surfaces = Object.entries(manifest.exports).map(function surface([path, entry]) {
+const surfaces = Object.entries(manifest.exports).flatMap(function surface([path, entry]) {
+  if (typeof entry === 'string') return []
   const sourcePath = resolve(root, entry.types.replace('./dist/', '').replace(/\.d\.ts$/, '.ts'))
   const source = program.getSourceFile(sourcePath)
   const module = source && checker.getSymbolAtLocation(source)
@@ -114,7 +115,7 @@ function render(symbol: ts.Symbol): string {
   } else throw new Error(`Unsupported public declaration: ${symbol.name}`)
   const description = ts.displayPartsToString(symbol.getDocumentationComment(checker))
   const path = relative(root, source.fileName).replaceAll('\\', '/')
-  return `### ${symbol.name}\n\nSource in the repository: \`${path}\`. [Packaged declaration](../dist/${path.replace(/\.ts$/, '.d.ts')}).${description ? `\n\n${description}` : ''}\n\n\`\`\`ts\n${code}\n\`\`\``
+  return `### ${symbol.name}\n\n[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/${path}).${description ? `\n\n${description}` : ''}\n\n\`\`\`ts\n${code}\n\`\`\``
 }
 
 function collectTypes(node: ts.Node | undefined): void {

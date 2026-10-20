@@ -1,12 +1,8 @@
-/**
- * True only with a positive development signal, so warnings stay silent by
- * default in production browsers.
- *
- * Browser runtimes may not expose `process`, so read through `globalThis`.
- */
+/** Keep the conventional expression so consumer bundlers can replace NODE_ENV. */
 export function isDevelopmentEnvironment(): boolean {
-  const runtime = globalThis as { process?: { env?: { NODE_ENV?: string } } }
-  const nodeEnv = runtime.process?.env?.NODE_ENV
-
-  return nodeEnv === 'development' || nodeEnv === 'test'
+  try {
+    return process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test'
+  } catch {
+    return false
+  }
 }

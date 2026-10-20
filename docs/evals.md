@@ -48,10 +48,10 @@ Commerce:
 For resolver-only checks, import the helper API from `@vampaz/webmcp-kit/testing`:
 
 ```ts
-import { createHeuristicResolver } from '@vampaz/webmcp-kit'
+import { createResolver } from '@vampaz/webmcp-kit'
 import { runWebMCPResolverEvals, runWebMCPResolverEvalSuite } from '@vampaz/webmcp-kit/testing'
 
-const results = await runWebMCPResolverEvals(createHeuristicResolver(), tools, [
+const results = await runWebMCPResolverEvals(await createResolver({ provider: 'local' }), tools, [
   {
     name: 'product search',
     message: 'Find laptop stands',

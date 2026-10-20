@@ -6,119 +6,39 @@
 
 `resolver` in this guide means the model-provider adapter you configure (type `ToolResolver`) and pass to `createPiHarness()` or `createPiRuntime()`. It is not a UI mode, and the kit ships no model endpoint of its own; configure your provider as described in [Where inference comes from](./resolver-providers.md#where-inference-comes-from).
 
-Install `0.2.1` or newer. The kit declares its Pi runtime libraries as dependencies, so npm installs them automatically:
-
-```sh
-npm install @vampaz/webmcp-kit@^0.2.1
-```
-
-Core and chat with an application-supplied controller do not load the Pi runtime. Importing `/pi` does not start a worker, access storage, or contact a model. Public controller types do not contain Pi or Chord types.
+From 0.4.0, Pi's implementation libraries are bundled in the package. Core and chat with an application-supplied controller do not load Pi. Imports do not access storage or contact a model.
 
 ## Embedded website
 
-Create an application-owned worker wrapper and serve its compiled JavaScript below a dedicated same-origin scope. The following recipe targets Vite 8 applications, including Vue. It uses the application's existing Vite and TypeScript dependencies.
-
-Create `worker.ts` in the application root:
+Initialize after the browser page mounts:
 
 ```ts
-import { installPiServiceWorker } from '@vampaz/webmcp-kit/pi/worker'
-
-installPiServiceWorker()
-```
-
-Create `vite.worker.config.mjs` next to it:
-
-```js
-import { fileURLToPath } from 'node:url'
-
-export default {
-  publicDir: false,
-  build: {
-    outDir: 'public/webmcp-pi',
-    emptyOutDir: true,
-    lib: {
-      entry: fileURLToPath(new URL('./worker.ts', import.meta.url)),
-      formats: ['es'],
-      fileName: function name() {
-        return 'worker.js'
-      }
-    },
-    rollupOptions: { output: { codeSplitting: false } }
-  }
-}
-```
-
-This bundles the worker and its runtime dependencies into one module. `publicDir: false` prevents the worker build from copying the application's public assets into its own output. Reserve `public/webmcp-pi/` for generated files; this build empties that directory. Add it to `.gitignore`.
-
-Give the worker its own `tsconfig.worker.json`. Page code uses DOM types; the worker uses WebWorker types:
-
-```json
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "strict": true,
-    "noEmit": true,
-    "skipLibCheck": false,
-    "lib": ["ES2022", "WebWorker"],
-    "types": []
-  },
-  "include": ["worker.ts"]
-}
-```
-
-Exclude `worker.ts` from the page's TypeScript project if that project includes all root TypeScript files. Add these scripts to the application's `package.json`, preserving any existing page typecheck and build steps:
-
-```json
-{
-  "scripts": {
-    "typecheck:worker": "tsc --project tsconfig.worker.json",
-    "build:worker": "vite build --config vite.worker.config.mjs",
-    "watch:worker": "npm run build:worker -- --watch",
-    "dev": "npm run build:worker && vite",
-    "build": "npm run typecheck:worker && npm run build:worker && vite build"
-  }
-}
-```
-
-Run `npm run dev` for local development and open the HTTPS domain advertised by your TLS plugin. When changing worker code, also run `npm run watch:worker` in another terminal, then reload the page after compilation. The worker does not use page HMR. Production builds compile the worker first so Vite copies it from `public/` into the final site. Deploy both the page and generated worker assets over HTTPS.
-
-Configure the page independently from the chat. Use Vite's base path for both the worker URL and scope, including deployments below paths such as `/nested/`:
-
-The page registers the worker script under a protocol-versioned URL and checks for a newer script before it connects. A browser that still holds an older worker script therefore fetches the current one instead of pairing a stale worker with a newer page. Application changes to the worker bundle are picked up by the same check, so the script must be served with revalidation headers.
-
-```ts
-import { createRemoteResolver } from '@vampaz/webmcp-kit'
+import { createResolver } from '@vampaz/webmcp-kit'
 import { createPiHarness } from '@vampaz/webmcp-kit/pi'
 
-const workerScope = `${import.meta.env.BASE_URL}webmcp-pi/`
+const resolver = await createResolver({
+  provider: 'openai',
+  model: 'your-server-approved-model',
+  auth: { mode: 'server', endpoint: '/api/webmcp/resolve' }
+})
 const harness = await createPiHarness({
   session: { namespace: 'my-app', ownerId: 'anonymous-session', conversationId: 'support' },
-  worker: { url: `${workerScope}worker.js`, scope: workerScope },
-  resolver: createRemoteResolver({
-    provider: 'openai-compatible',
-    baseUrl: '/my-local-model-proxy/v1',
-    model: appConfig.modelId,
-    responseFormat: 'json_schema',
-    maxTokens: 1024,
-    temperature: 0.2,
-    reasoningEffort: 'none',
-    auth: { mode: 'none' }
-  }),
-  context: getSafeCurrentApplicationContext
+  resolver,
+  context() {
+    return { page: 'support' }
+  }
 })
 ```
 
-The host defines `appConfig`, the proxy, and the context callback. For hosted inference, supply `createHostedOpenAIResolver()` instead. Provider credentials belong on the server. A custom `ToolResolver` must declare `capabilities: { conversation: true }`, honor `ResolverRunOptions.singleStep` and `maxRequestBytes`, and reject failures instead of returning a heuristic fallback. Check the UTF-8 size of the complete serialized request before dispatch, including prompts and schemas. Hosted endpoints receive a single-step schema and flag; they must honor that contract before production conversational use. Strict Chrome resolvers advertise this capability; deterministic resolvers do not.
+Register application tools and approval handling before accepting requests. Add `/chat` or subscribe from your own UI. Catch initialization errors and display them. If initialization finishes after unmount, destroy the late controller. The complete [example](./examples/counter-assistant.ts) handles these races.
 
-Catch initialization errors in the host's mounting code and show them next to the assistant launcher. The [Vue](./vue.md#independent-conversation-ui), [React](./react.md#independent-conversation-ui), and [Svelte](./svelte.md#independent-conversation-ui) examples include this handling and cleanup. A missing worker usually means `build:worker` did not run or the deployed base path differs. Check that the worker URL returns JavaScript rather than the site's HTML fallback. The packaged consumer fixture uses this worker configuration under a nested base path.
+Pi runs in the page. No Pi service worker, wrapper, worker configuration, watch process, or worker CSP exception is needed. Use HTTPS, IndexedDB, and Web Locks. An existing PWA remains independent.
 
-The worker does not install a fetch handler, claim pages, or replace the application's root PWA worker. The page connects to the activated registration directly; the page need not be controlled by the dedicated scope. Worker replacement or failed communication interrupts the current turn. A new user turn checks the connection and reconnects deliberately if the idle worker terminated. An already dispatched turn is never retried.
+The resolver must be available, declare `capabilities: { conversation: true }`, honor cancellation and serialized request limits, and return exactly one next action. Explicit providers never silently switch to heuristics. Server endpoints must honor `singleStep: true` and the offered response schema. See [providers](./resolver-providers.md).
 
 ## Controller and tool hosts
 
-Both `createPiHarness()` and `createPiRuntime()` return `PiController`. The latter runs Pi in the current browser context and requires an explicit `PiToolHost`; it is useful for a future extension side panel. `createRegistryToolHost(context)` supplies the application's existing registry and shared invocation pipeline.
+Both `createPiHarness()` and `createPiRuntime()` return `PiController`. Both run in the current browser context. The harness adds page lifecycle handling and a default registry host; the runtime requires an explicit `PiToolHost`. `createRegistryToolHost(context)` supplies the application's existing registry and shared invocation pipeline.
 
 | Method                | Behavior                                                                       |
 | --------------------- | ------------------------------------------------------------------------------ |
@@ -135,11 +55,11 @@ States are `loading`, `idle`, `running`, `stopping`, `interrupted`, `error`, and
 
 Call `destroy()` on framework teardown, navigation, sign-out, account switch, or provider change. Create a new controller for the new partition/configuration. Removing the chat element only unsubscribes its view; the host owns controller destruction.
 
-Application confirmation handlers can receive an optional fourth argument, `{ signal }`. Close pending approval UI when that signal aborts. The harness also accepts `onCancel` for host UI cleanup. Input validation precedes approval. Scope, registration identity, schema, cancellation, and guards are checked before execution. Cancellation after execution starts is cooperative. An interrupted channel can leave an unknown action outcome; check current application state before another request. Stop never promises rollback.
+Application confirmation handlers can receive one object, `{ tool, input, reason, signal }`. Close pending approval UI when that signal aborts. The harness also accepts `onCancel` for host UI cleanup. Input validation precedes approval. Scope, registration identity, schema, cancellation, and guards are checked before execution. Cancellation after execution starts is cooperative. An interrupted page can leave an unknown action outcome; check current application state before another request. Stop never promises rollback.
 
 ## Persistence and limits
 
-History is stored in `webmcp-kit-pi-v1:` IndexedDB databases partitioned by the explicit namespace, owner, and conversation. The owner is a storage partition, not verified account identity. Each conversation uses one Web Lock across readers, writers, clear, tabs, and worker replacements. Contention reports `conversation_busy`; it never interrupts another tab's active work.
+History is stored in `webmcp-kit-pi-v1:` IndexedDB databases partitioned by the explicit namespace, owner, and conversation. The owner is a storage partition, not verified account identity. Each conversation uses one Web Lock across readers, writers, clear, tabs, and controller instances. Contention reports `conversation_busy`; it never interrupts another tab's active work.
 
 Commits reach IndexedDB before snapshots are published. Reopening aborts unfinished Pi tasks before allowing resolver or application requests. Completed dialogue and outcomes remain visible. The interrupted state survives reopening until a new user turn completes or the conversation is cleared. Recovery never replays previous actions.
 

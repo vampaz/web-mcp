@@ -30,6 +30,30 @@ describe('form helpers', () => {
     delete (navigator as NavigatorWithModelContext).modelContext
   })
 
+  it('rejects duplicate tool names and restores the rejected form attributes', () => {
+    const first = document.createElement('form')
+    const second = document.createElement('form')
+    second.setAttribute('tooldescription', 'Original form')
+    const registration = registerFormTool({
+      form: first,
+      name: 'submit_form',
+      description: 'Submit the first form.'
+    })
+    expect(() =>
+      registerFormTool({
+        form: second,
+        name: 'submit_form',
+        description: 'Submit the second form.'
+      })
+    ).toThrow('already registered')
+    expect(listTools()).toEqual([registration])
+    expect(second.getAttribute('toolname')).toBeNull()
+    expect(second.getAttribute('tooldescription')).toBe('Original form')
+    expect(first.getAttribute('toolname')).toBe('submit_form')
+    registration.unregister()
+    expect(first.getAttribute('toolname')).toBeNull()
+  })
+
   it('infers schema from named form fields', () => {
     document.body.innerHTML = `
       <form>

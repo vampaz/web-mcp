@@ -100,6 +100,32 @@ describe('createHostedOpenAIResolver', function describeHostedOpenAIResolver() {
     ).toHaveLength(1)
   })
 
+  it('reuses sessions without expiresAt and renews after an authentication failure', async () => {
+    let expired = false
+    const challenge = vi.fn(async () => 'challenge')
+    window.webmcpCreateTurnstileToken = challenge
+    const fetch = vi.fn(async function respond(url: string) {
+      if (url === '/api/webmcp/session') return Response.json({ token: 'session' })
+      if (expired) return Response.json({ error: 'Expired' }, { status: 401 })
+      return Response.json({
+        toolName: 'select_items',
+        input: { ids: ['item_8'] },
+        confidence: 1,
+        reason: 'Select'
+      })
+    })
+    vi.stubGlobal('fetch', fetch)
+    const resolver = createHostedOpenAIResolver({ model: 'fixture', accessKey: paidAccessKey })
+    await resolver.resolve('Select', [createSelectItemsTool()])
+    await resolver.resolve('Select again', [createSelectItemsTool()])
+    expect(challenge).toHaveBeenCalledOnce()
+    expired = true
+    await expect(resolver.resolve('Select', [createSelectItemsTool()])).rejects.toThrow()
+    expired = false
+    await resolver.resolve('Select', [createSelectItemsTool()])
+    expect(challenge).toHaveBeenCalledTimes(2)
+  })
+
   it('passes browser challenge tokens when a provider is registered', async function testChallengeToken() {
     const createToken = vi.fn(async () => 'turnstile-token')
     window.webmcpCreateTurnstileToken = createToken

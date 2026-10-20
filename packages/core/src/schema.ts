@@ -392,7 +392,7 @@ function validateStringValue(
   }
 }
 
-function matchesJsonSchemaType(value: unknown, type: string | string[]): boolean {
+function matchesJsonSchemaType(value: unknown, type: string | readonly string[]): boolean {
   if (Array.isArray(type)) {
     return type.some(function matchesAllowedType(allowedType) {
       return matchesJsonSchemaType(value, allowedType)
@@ -408,13 +408,13 @@ function matchesJsonSchemaType(value: unknown, type: string | string[]): boolean
   return typeof value === type
 }
 
-function matchesAnyOf(value: unknown, schemas: JsonSchema[]): boolean {
+function matchesAnyOf(value: unknown, schemas: readonly JsonSchema[]): boolean {
   return schemas.some(function matchesAnyOfSchema(schema) {
     return validateJsonValue(value, schema).length === 0
   })
 }
 
-function countMatchingSchemas(value: unknown, schemas: JsonSchema[]): number {
+function countMatchingSchemas(value: unknown, schemas: readonly JsonSchema[]): number {
   return schemas.filter(function matchesSchema(schema) {
     return validateJsonValue(value, schema).length === 0
   }).length
@@ -471,8 +471,8 @@ function isLeapYear(year: number): boolean {
   return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
 }
 
-function formatExpectedType(type: string | string[]): string {
-  return Array.isArray(type) ? type.join(' or ') : type
+function formatExpectedType(type: string | readonly string[]): string {
+  return typeof type === 'string' ? type : type.join(' or ')
 }
 
 function getJsonValueType(value: unknown): string {

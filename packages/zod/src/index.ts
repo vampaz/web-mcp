@@ -9,7 +9,7 @@ export type { DefineZodToolOptions, ZodWebMCPTool } from './interfaces/zod-tool'
 export function defineZodTool<TSchema extends z.ZodType, TOutput = unknown>(
   options: DefineZodToolOptions<TSchema, TOutput>
 ): ZodWebMCPTool<TSchema, TOutput> {
-  const inputSchema = toJSONSchema(options.schema) as JsonSchema
+  const inputSchema = toJSONSchema(options.schema, { io: 'input' }) as JsonSchema
 
   return defineTool<z.infer<TSchema>, TOutput>({
     name: options.name,
@@ -21,8 +21,9 @@ export function defineZodTool<TSchema extends z.ZodType, TOutput = unknown>(
     examples: options.examples,
     scope: options.scope,
     guard: options.guard,
-    execute(input, context) {
-      return options.execute(options.schema.parse(input), context)
-    }
+    parseInput(input) {
+      return options.schema.parseAsync(input)
+    },
+    execute: options.execute
   })
 }

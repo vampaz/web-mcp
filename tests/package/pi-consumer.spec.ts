@@ -2,13 +2,13 @@ import { cp } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { chromium } from '@playwright/test'
-import { build, createServer } from 'vite'
+import { createServer } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import localTls from '@vampaz/vite-plugin-local-tls'
-import { checkTypes, installFixture, root, run } from './fixtures'
+import { installFixture, root, run } from './fixtures'
 import '../../scripts/playwright-trust'
 
-it('runs a packed Vite + Vue consumer with a compiled nested worker and one page registry', async function worker() {
+it('runs a packed Vite + Vue consumer under a nested path and one page registry', async function piConsumer() {
   const fixture = await installFixture('pi-chat')
   const browser = await chromium.launch({ args: ['--disable-blink-features=WebMCP'] })
   let server: Awaited<ReturnType<typeof createServer>> | undefined
@@ -27,12 +27,6 @@ it('runs a packed Vite + Vue consumer with a compiled nested worker and one page
       ],
       { cwd: fixture.directory, timeout: 60000 }
     )
-    await checkTypes(fixture.directory, 'tsconfig.worker.json')
-    await build({
-      configFile: join(fixture.directory, 'vite.worker.config.mjs'),
-      root: fixture.directory,
-      logLevel: 'error'
-    })
     server = await createServer({
       configFile: false,
       plugins: [vue(), localTls({ domain: 'webmcp-kit-package.localtest.me' })],
@@ -60,13 +54,13 @@ it('runs a packed Vite + Vue consumer with a compiled nested worker and one page
     await page.goto(url)
     await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Read')
     await page.getByRole('button', { name: 'Send', exact: true }).click()
-    await page.getByText('Packed worker read 7', { exact: true }).waitFor()
+    await page.getByText('Packed Pi read 7', { exact: true }).waitFor()
     await page.getByRole('button', { name: 'Use popup', exact: true }).click()
     await page.getByRole('button', { name: 'Open Assistant', exact: true }).click()
     expect(await page.getByRole('dialog', { name: 'Assistant', exact: true }).isVisible()).toBe(
       true
     )
-    expect(await page.getByText('Packed worker read 7', { exact: true }).isVisible()).toBe(true)
+    expect(await page.getByText('Packed Pi read 7', { exact: true }).isVisible()).toBe(true)
     expect(await page.locator('#registry-count').textContent()).toBe('1')
     expect(
       await page.evaluate(async function registrations() {
@@ -74,7 +68,7 @@ it('runs a packed Vite + Vue consumer with a compiled nested worker and one page
           return new URL(registration.scope).pathname
         })
       })
-    ).toEqual(['/nested/webmcp-pi/'])
+    ).toEqual([])
   } finally {
     await server?.close()
     await browser.close()

@@ -1,6 +1,6 @@
 # Vue Composable
 
-Use `useWebMCPTool` to register a tool for the current Vue effect scope. The tool unregisters automatically when the component unmounts, and `when` can be a ref, computed value, or getter.
+Component registration starts on mount and never runs during SSR. Use `useWebMCPTool` to register a tool for the current Vue effect scope. The tool unregisters automatically when the component unmounts, and `when` can be a ref, computed value, or getter.
 
 ```vue
 <script setup lang="ts">
@@ -21,7 +21,7 @@ useWebMCPTool(
       required: ['subject'],
       additionalProperties: false
     },
-    confirmation: { required: true, reason: 'Create this support ticket?' },
+    confirmation: { reason: 'Create this support ticket?' },
     execute(input) {
       return createSupportTicket(input.subject)
     }

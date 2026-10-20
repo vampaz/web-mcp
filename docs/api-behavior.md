@@ -6,20 +6,21 @@ This guide explains runtime behavior. The generated reference lists all public e
 
 ## Choose the entry point
 
-| Import                      | Main API                                                           | Additional peer                                    |
-| --------------------------- | ------------------------------------------------------------------ | -------------------------------------------------- |
-| `@vampaz/webmcp-kit`        | Tools, registry, validation, resolvers, command input, diagnostics | None                                               |
-| `/pi`                       | `createPiHarness`, `createPiRuntime`, `createRegistryToolHost`     | None; runtime dependencies install with the kit    |
-| `/pi/worker`                | `installPiServiceWorker`                                           | None; runtime dependencies install with the kit    |
-| `/chat`                     | `defineWebMCPChat`, `WebMCPChatElement`, `WebMCPChatOptions`       | None when supplied a controller                    |
-| `/vue`, `/react`, `/svelte` | `useWebMCPTool` and framework-specific types                       | The selected framework                             |
-| `/zod`                      | `defineZodTool`                                                    | Zod 4                                              |
-| `/devtools`                 | `mountDevtoolsOverlay`                                             | None                                               |
-| `/testing`                  | Resolver evaluations and Playwright helpers                        | None; supply a resolver or compatible browser page |
-| `/testing/playwright`       | Page bridge helpers without evaluation imports                     | None; supply a compatible browser page             |
-| `/mcp-bridge`               | `createLocalMCPBridge`                                             | None                                               |
+| Import                      | Main API                                                       | Additional peer                                    |
+| --------------------------- | -------------------------------------------------------------- | -------------------------------------------------- |
+| `@vampaz/webmcp-kit`        | Tools, registry, validation, resolvers, diagnostics            | None                                               |
+| `/pi`                       | `createPiHarness`, `createPiRuntime`, `createRegistryToolHost` | None; Pi libraries are bundled                     |
+| `/command-input`            | Command element and initializer                                | None                                               |
+| `/hosted`                   | Hosted session resolver                                        | None                                               |
+| `/chat`                     | `defineWebMCPChat`, `WebMCPChatElement`, `WebMCPChatOptions`   | None when supplied a controller                    |
+| `/vue`, `/react`, `/svelte` | `useWebMCPTool` and framework-specific types                   | The selected framework                             |
+| `/zod`                      | `defineZodTool`                                                | Zod 4                                              |
+| `/devtools`                 | `mountDevtoolsOverlay`                                         | None                                               |
+| `/testing`                  | Resolver evaluations and Playwright helpers                    | None; supply a resolver or compatible browser page |
+| `/testing/playwright`       | Page bridge helpers without evaluation imports                 | None; supply a compatible browser page             |
+| `/mcp-bridge`               | `createLocalMCPBridge`                                         | None                                               |
 
-The package is ESM-only. Importing core, `/pi`, or `/chat` is safe during SSR. Browser initialization, DOM registration, and worker installation belong in client lifecycle code. `/pi/worker` runs in a service-worker context. See the [dependency model](./getting-started.md#dependency-model) for exact peer package names and development-only tooling.
+The package is ESM-only. Importing core, `/pi`, or `/chat` is safe during SSR. Browser initialization and DOM registration belong in client lifecycle code. See the [dependency model](./getting-started.md#dependency-model) for exact peer package names and development-only tooling.
 
 ## Define and register tools
 
@@ -31,23 +32,24 @@ The package is ESM-only. Importing core, `/pi`, or `/chat` is safe during SSR. B
 | `inputSchema`             | Required schema, checked at definition and before invocation. Prefer strict object schemas.                              |
 | `outputSchema`            | Optional schema checked after execution. An invalid output does not roll back an action.                                 |
 | `annotations`             | Browser/tooling hints such as `readOnlyHint`; hints are not authorization.                                               |
-| `confirmation`            | `required`, user-facing `reason`, and optional per-tool `handler`.                                                       |
+| `confirmation`            | Presence requires approval; user-facing `reason` and optional per-tool `handler`.                                        |
 | `scope()`                 | Synchronous current-state availability. Throwing fails the invocation.                                                   |
+| `parseInput(input)`       | Optional parser before approval; invalid input stops invocation.                                                         |
 | `guard(input)`            | Input-specific check, optionally async. `false` or any string blocks execution. Return `true` to allow.                  |
 | `execute(input, context)` | Returns output or a promise. `context.source` identifies the caller; `context.signal` supports cooperative cancellation. |
 | `examples`                | Example inputs for documentation and tooling; not executable tests.                                                      |
 
 `registerTool()` adds the tool to the shared fallback registry and attempts native registration when supported. The returned `RegisteredTool` contains `tool`, `mode`, `warnings`, `ready`, and `unregister()`. Await `ready` before asserting native registration has settled. Native failure preserves fallback registration and records a warning.
 
-Re-registering a name replaces the current registration. An old handle cannot unregister its replacement. Prefer unregistering on component or route teardown. `unregisterTool(name)` returns whether it found a registration. `getTool(name)` returns a registration or `undefined`; `listTools()` and `getRegistrySnapshot()` expose current registrations. Treat those definitions as application-owned objects, not detached serialized snapshots.
+Re-registering an existing name throws; unregister it explicitly first. An old handle cannot unregister its replacement. Prefer unregistering on component or route teardown. `unregisterTool(name)` returns whether it found a registration. `getTool(name)` returns a registration or `undefined`; `listTools()` and `getRegistrySnapshot()` expose current registrations. Treat those definitions as application-owned objects, not detached serialized snapshots.
 
 The reserved core names are `tool_sequence`, `needs_clarification`, and `no_tools_match`. Pi additionally rejects a catalog containing `pi_reply`. The runtime owns that reply tool.
 
 ## Invocation, approval, and results
 
-`invokeTool({ toolName, input, source?, signal?, confirmed? })` returns a `ToolInvocationResult`. Default source is `fallback`. The normal path copies the input, validates it, checks availability, asks for approval, checks the guard, executes, and validates output. Changes to the caller's input during approval cannot change the copied invocation. Input must support structured cloning. Cancellation and stale registration/schema/scope checks run again across asynchronous approval and guard boundaries.
+`invokeTool({ toolName, input, source?, signal?, confirmed? })` returns a `ToolInvocationResult`. Default source is `fallback`. The normal path copies the input, validates it, checks availability, parses optional `parseInput`, asks for approval, checks the guard, executes, and validates output. Changes to the caller's input during approval cannot change the copied invocation. Input must support structured cloning. Cancellation and stale registration/schema/scope checks run again across asynchronous approval and guard boundaries.
 
-`setConfirmationHandler(handler)` installs the application's global approval UI. A tool's own `confirmation.handler` takes precedence. Handlers receive `(tool, input, reason, context?)`; when supplied, `context.signal` tells the UI to close a cancelled request. Passing `undefined` removes the global handler. Without a handler, the browser uses `window.confirm()`; without a browser confirmation API, approval is denied.
+`setConfirmationHandler(handler)` installs the application's global approval UI. A tool's own `confirmation.handler` takes precedence. Handlers receive `{ tool, input, reason, signal }`; the signal tells the UI to close a cancelled request. The returned disposer removes only this handler. Passing `undefined` clears all handlers. Without a handler, the browser uses `window.confirm()`; without a browser confirmation API, approval is denied.
 
 Never pass resolver-provided `confirmed` values through to `invokeTool()`. `confirmed: true` is reserved for trusted application code that has already completed approval. The test bridge strips caller-provided bypasses, and the local MCP bridge does not expose one.
 
@@ -66,7 +68,7 @@ Never pass resolver-provided `confirmed` values through to `invokeTool()`. `conf
 | `invalid_output`      | `error`       | Output failed validation after execution; action may have completed. |
 | `not_registered`      | `error`       | Tool no longer exists or the name is wrong.                          |
 
-Successful results contain `status: 'success'`, `toolName`, `output`, and `durationMs`. Registry invocations also receive an `invocationId`. Missing `output` is valid. Native wrappers turn non-success results into errors for the browser API. The command input converts resolution outcomes into blocked/unavailable results without executing an application tool.
+Successful results contain `status: 'success'`, `toolName`, `output`, and `durationMs`. Native and registry invocations receive an `invocationId`. Missing `output` is valid. Native wrappers turn non-success results into errors for the browser API. The command input converts resolution outcomes into blocked/unavailable results without executing an application tool.
 
 ## Schemas, forms, and server actions
 
@@ -80,56 +82,29 @@ Only named, editable controls become inputs. Disabled controls, disabled fieldse
 
 `defineServerTool(options)` creates a definition; call `registerTool()` or a framework helper to register it. Its `endpoint`, optional `headers`, and optional `fetch` determine the request. Server tools POST `{ toolName, input, source }` as JSON. A successful response must contain JSON, or use status 204 for `undefined`. A non-2xx response fails the invocation. The browser forwards cancellation, but the server must independently authenticate, authorize, validate, and enforce idempotency where needed.
 
-`defineZodTool({ schema, ...toolOptions })` derives JSON Schema from Zod and parses input with Zod before execution. Unsupported Zod transformations/schema constructs can fail conversion; use schemas representable by the kit's JSON Schema subset. Keep Zod installed as an explicit peer.
+`defineZodTool({ schema, ...toolOptions })` derives JSON Schema from Zod and parses input with Zod before confirmation, guards, or execution. Unsupported Zod transformations/schema constructs can fail conversion; use schemas representable by the kit's JSON Schema subset. Keep Zod installed as an explicit peer.
 
 ## Setup and resolver factories
 
-| API                                        | Behavior                                                                                                                                                                                                                                                                                                                                    |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `initWebMCP(options)`                      | Synchronously registers tools and configures an existing or created command element. An explicit `resolver` takes precedence; otherwise, `accessKey` requires `model` and creates a hosted resolver. Returns registrations, element, optional resolver, and `destroy()`. Duplicate tool names are rejected by this convenience initializer. |
-| `createWebMCPKit({ resolver? })`           | Asynchronously resolves a resolver and returns `{ resolver, resolverConfig }`. It does not register tools or mount UI.                                                                                                                                                                                                                      |
-| `createBestResolver()`                     | Selects Chrome AI when available, otherwise a heuristic resolver.                                                                                                                                                                                                                                                                           |
-| `createChromeAIResolver(strict = false)`   | Detects browser AI. Strict mode refuses heuristic fallback and advertises conversational capability when available. Session creation is deferred until resolution. Cancellation reaches inference.                                                                                                                                          |
-| `createHeuristicResolver()`                | Deterministic local command resolution; not a conversational resolver.                                                                                                                                                                                                                                                                      |
-| `createConfiguredResolver(config?)`        | Dispatches `auto`, `local`, `chrome-built-in`, or remote provider configuration.                                                                                                                                                                                                                                                            |
-| `createRemoteResolver(config)`             | Creates a remote/server resolver. No inference request is made until `resolve()`.                                                                                                                                                                                                                                                           |
-| `createHostedOpenAIResolver(options)`      | Uses hosted session and resolution endpoints; requires the host's supported access/session setup.                                                                                                                                                                                                                                           |
-| `createHostedOpenAIResolverOption(config)` | Wraps hosted resolution as a command-input option with model choices.                                                                                                                                                                                                                                                                       |
+`await createResolver(config?)` selects `auto`, `local`, `chrome-built-in`, or a remote provider. Automatic mode alone may fall back to deterministic resolution. Explicit providers report failure. `/hosted` provides the separate hosted session adapter. See [resolver providers](./resolver-providers.md) for request contracts and configuration.
 
-`ResolverProviderConfig` selects `provider`, optional `model` and `baseUrl`, and `auth`. Server auth sends requests to an application endpoint. User-key mode exposes the person's key to the browser in every environment. The application owns permission to offer this mode. Browser-local storage of a user key is not a place for application secrets. The unused `allowInProduction` option was removed; it never enforced a production restriction.
+`ToolResolver.resolve(message, tools, context?, options?)` returns a `ToolResolution`. Options include cancellation, `singleStep`, and `maxRequestBytes`. Built-in resolvers enforce the byte limit on serialized requests; custom resolvers must implement that boundary too.
 
-OpenAI-compatible configuration supports `responseFormat` (`json_object` by default or `json_schema`), `maxTokens` (1–65,536), `temperature` (0–2; default 0), and optional `reasoningEffort`. These provider-specific settings apply to direct OpenAI-compatible requests; a server endpoint owns its own model policy. Truncated output with finish reason `length` fails resolution.
-
-`ToolResolver.resolve(message, tools, context?, options?)` returns a `ToolResolution`. `options` supports `signal`, `singleStep`, and `maxRequestBytes`. `singleStep` forbids `steps` and `tool_sequence`. Built-in HTTP resolvers enforce the byte budget on the complete serialized body. Chrome checks the prompt and response constraint; server-added content and the browser model's retained session history are outside that limit. Custom resolvers must enforce their transport budget themselves.
-
-`validateToolResolution(resolution, tools, { singleStep?, messageStyle? })` throws for invalid output, unknown tools, invalid tool inputs, and invalid sequences. It does not execute a resolution. Ordinary sequences contain 1–5 steps. `resolverOutcomeToolNames`, `isResolverOutcomeToolName`, and `toolResolutionSchema` expose the non-executing outcome names and ordinary resolution schema. `normalizeJsonText()` normalizes supported JSON text wrappers; it does not validate or authorize a resolution.
-
-A custom conversational resolver must be available, declare `capabilities: { conversation: true }`, honor cancellation and request limits, validate its response, and report provider failures. Do not advertise conversation support for a heuristic or silent fallback. The host must call a resolver's optional `dispose()` when it no longer owns that resolver.
+`initWebMCP()` from `/command-input` registers optional tools and configures a supplied or newly created command element. It returns registrations, element, optional supplied resolver, and `destroy()`. Duplicate names fail before mounting. Floating elements start closed. Hosts supply a resolver explicitly for hosted integration.
 
 ## Command input
 
-`defineWebMCPCommandInput()` registers `<webmcp-command-input>`. `configure()` accepts the full `WebMCPCommandInputConfigureOptions` contract. Use properties for objects/functions; use attributes for supported primitive configuration. The element exposes `run(message?, { signal? })`, `openPanel()`, `closePanel()`, `togglePanel()`, and `panelOpen`.
+Configure one resolver instance or a list of `resolverOptions`. Each option has a unique ID, label, factory, and optional model choices. The first is selected unless the host specifies an initial choice. User selections survive cosmetic reconfiguration.
 
-App-supplied `resolver`, `provider`, or `model` fixes those choices. `resolverOptions` and `endpointOptions` provide developer choices; `initialResolverOptionId`, `initialProvider`, and `initialModel` choose defaults without fixing them. `showChromeAI` controls whether browser AI appears. `context` supplies current, deliberately selected app state. `floating` controls the command panel, independently of the separate chat component.
+Only presentation attributes are supported: `button-label`, `disabled`, `floating`, and `placeholder`. Provider credentials and resolver settings belong in JavaScript factories. Errors and clarification appear in a visible status region. Changing resolver/model cancels active work; cosmetic configuration preserves it.
 
-| Custom event                  | `detail`                                                                              |
-| ----------------------------- | ------------------------------------------------------------------------------------- |
-| `webmcp-command-resolution`   | `message`, validated `resolution`, `resolver`                                         |
-| `webmcp-command-resolver`     | Active `resolver`                                                                     |
-| `webmcp-command-step`         | `message`, `phase`, `resolution`, `step`, `stepIndex`, `stepCount`, optional `result` |
-| `webmcp-command-result`       | `message`, `resolution`, `result`                                                     |
-| `webmcp-command-error`        | `message`, error text                                                                 |
-| `webmcp-command-panel-toggle` | `open`                                                                                |
-
-Events bubble and cross the shadow boundary. `run()` can return `undefined` when no command executes; inspect events/results rather than assuming a resolved promise means success. See the [README command-input examples](../README.md#ready-made-command-input) for provider controls and CSS properties.
-
-Removing the command element or changing its resolver configuration cancels its pending command. Explicit Chrome AI selection reports browser AI failures. Only automatic or explicitly non-strict Chrome resolution permits heuristic fallback.
+`run(message?, { signal }?)` resolves and executes a command and returns a result. Events include resolution, result, error, resolver status, step progress, and floating-panel toggles; see the generated interfaces. A supplied resolver belongs to the host. Factory-created resolvers belong to the element and are disposed when replaced or disconnected.
 
 ## Pi controller and custom hosts
 
-`createPiHarness(options)` connects the page to an application-compiled worker. Required options are `session`, `worker: { url, scope }`, and `resolver`. Optional `context` supplies fresh state, `host` replaces the registry-backed tool host, `limits` sets budgets, and `onCancel` closes application-owned pending UI. A custom `host` owns context selection; the separate `context` option is used only by the default host.
+`createPiHarness(options)` runs Pi in the page. Required options are `session` and `resolver`. Optional `context` supplies fresh state, `host` replaces the registry-backed tool host, `limits` sets budgets, and `onCancel` closes application-owned pending UI. A custom `host` owns context selection; the separate `context` option is used only by the default host.
 
-`createPiRuntime({ session, resolver, host, limits? })` runs in the current browser context without the worker connection. Both factories require IndexedDB and Web Locks. The page harness additionally requires a secure context and service-worker support. Initialization can reject or return a controller whose snapshot contains a recoverable error; handle both paths.
+`createPiRuntime({ session, resolver, host, limits? })` runs in the current browser context with an explicit tool host. Both factories require IndexedDB and Web Locks. The page harness additionally requires a secure context. Initialization can reject or return a controller whose snapshot contains a recoverable error; handle both paths.
 
 | Controller method     | Contract                                                                                                                                                                  |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -138,26 +113,23 @@ Removing the command element or changing its resolver configuration cancels its 
 | `send(text)`          | One active operation at a time. Accepts nonempty text up to 16,000 characters. Returns a `PiTurnOutcome`; a completed turn may be a clarification rather than a mutation. |
 | `stop()`              | Cancels work and waits for settlement. No rollback guarantee.                                                                                                             |
 | `clear()`             | Clears this session's persisted history under its lock. Rejects while a local turn is active. Does not undo application actions.                                          |
-| `destroy()`           | Stops this controller, clears its subscriptions, and preserves history. Does not unregister the shared worker or dispose the host's resolver.                             |
+| `destroy()`           | Stops this controller, clears its subscriptions, and preserves history. Does not dispose the host's resolver.                                                             |
 
 See [Pi](./pi.md#persistence-and-limits) for exact budget defaults and bounds. Session fields must each be 1–200 printable characters with nonblank content. The runtime requires one explicit owner partition per account/anonymous session.
 
 `PiToolHost.discover(signal)` returns `{ revision, tools }`. Change the revision whenever tool identity, schema, availability, or relevant execution scope changes. `context(signal)` returns current safe state. `invoke({ name, input, revision }, signal)` must validate the revision and enforce the same input, authorization, scope, confirmation, and guard rules as the ordinary UI. It returns a real `ToolInvocationResult`. A custom host must never treat model output as a confirmation bypass.
 
-| Pi error code       | Interpretation                                                        |
-| ------------------- | --------------------------------------------------------------------- |
-| `unsupported`       | Browser prerequisites or worker activation are unavailable.           |
-| `configuration`     | Invalid session, limits, worker layout, text, or resolver capability. |
-| `storage_failed`    | History could not be opened, committed, or cleared.                   |
-| `provider_failed`   | Resolving failed; no heuristic retry is performed.                    |
-| `stale_document`    | Document/catalog changed or a request was cancelled.                  |
-| `action_denied`     | Application confirmation denied the action.                           |
-| `tool_failed`       | Action failed, was unavailable, or returned an invalid outcome.       |
-| `limit_reached`     | Tool, request, or history budget was reached.                         |
-| `conversation_busy` | Another operation owns this controller or conversation lock.          |
-| `transport_failed`  | Worker communication failed; action outcome can be unknown.           |
-
-`installPiServiceWorker(scope = self)` installs lifecycle/message listeners and returns a listener cleanup function. Compile the wrapper into its dedicated scope. Do not call this function in the page.
+| Pi error code       | Interpretation                                                  |
+| ------------------- | --------------------------------------------------------------- |
+| `unsupported`       | Browser prerequisites are unavailable.                          |
+| `configuration`     | Invalid session, limits, text, or resolver capability.          |
+| `storage_failed`    | History could not be opened, committed, or cleared.             |
+| `provider_failed`   | Resolving failed; no heuristic retry is performed.              |
+| `stale_document`    | Document/catalog changed or a request was cancelled.            |
+| `action_denied`     | Application confirmation denied the action.                     |
+| `tool_failed`       | Action failed, was unavailable, or returned an invalid outcome. |
+| `limit_reached`     | Tool, request, or history budget was reached.                   |
+| `conversation_busy` | Another operation owns this controller or conversation lock.    |
 
 ## Chat UI
 
@@ -172,8 +144,8 @@ The component has no public imperative send or open-popup method. Use `harness.s
 Each framework's `useWebMCPTool(tool, options?)` returns `unregister()` and `getRegistration()`. Use the helper inside the owning component/effect scope. Helpers delegate to the core registry.
 
 - Vue watches `when`, which can be a boolean, ref, or getter, and unregisters on scope disposal.
-- React synchronizes registration in an effect and accepts a boolean `when` from render. Stabilize a tool definition when appropriate so renders do not repeatedly replace it.
-- Svelte registers in `onMount`; a readable-store `when` updates availability. A plain getter is evaluated on mount, not tracked as a reactive store.
+- React synchronizes registration in an effect and accepts a boolean `when` from render. Inline rerenders update committed callbacks without replacing registration; changed schemas or metadata replace it.
+- Svelte registers in `onMount`; a readable-store `when` updates availability. Getter functions are not supported; use a readable store for changes after mount.
 
 Use `scope()` for current business-state availability during invocation, even when `when` controls registration. See each framework guide for the separate chat lifecycle.
 
@@ -181,9 +153,9 @@ Use `scope()` for current business-state availability during invocation, even wh
 
 `isWebMCPSupported()` and `getSupportLabel()` report native registration capability; neither proves a tool is registered or a model is available. `getIntegrationHealthReport({ resolver? })` reports tool, schema, confirmation, scope, and resolver diagnostics. `assertWebMCPIntegration()` throws only for report status `error`; it returns warning reports for inspection.
 
-`createToolCatalog(listTools(), options?)` creates a descriptive catalog; `formatToolCatalogMarkdown()` renders it. `formatOpenAITool()` and `formatOpenAITools()` convert definitions to OpenAI function-tool descriptions. These functions do not execute tools or authorize a model call. `escapeHtml`, `escapeAttribute`, and `getErrorMessage` are small formatting helpers, not general sanitizers or security boundaries.
+`createToolCatalog(listTools(), options?)` creates a descriptive catalog; `formatToolCatalogMarkdown()` renders it. `formatOpenAITool()` and `formatOpenAITools()` convert definitions to OpenAI function-tool descriptions. These functions do not execute tools or authorize a model call. `getErrorMessage` formats errors.
 
-`subscribeWebMCPKitEvents(listener)` receives registry events and returns an unsubscribe function. Event types are `registered`, `unregistered`, `invoked`, `succeeded`, `failed`, and `blocked`. `detail` can include inputs and results; redact before logging or forwarding it. `emitWebMCPKitEvent()` publishes an application event to those listeners and does not execute an action.
+`subscribeWebMCPKitEvents(listener)` receives registry events and returns an unsubscribe function. Event types are `registered`, `unregistered`, `invoked`, `succeeded`, `failed`, and `blocked`. `detail` can include inputs and results; redact before logging or forwarding it.
 
 `mountDevtoolsOverlay({ container?, initiallyOpen?, placement? })` mounts a developer tool catalog/invocation UI. The returned handle has `refresh()` and `destroy()`. Restrict developer tooling to environments where its actions are appropriate.
 

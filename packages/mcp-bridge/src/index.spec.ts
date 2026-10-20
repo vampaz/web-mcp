@@ -1,11 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import {
-  clearToolsForTest,
-  defineTool,
-  registerTool,
-  setConfirmationHandler
-} from '@vampaz/webmcp-kit'
+import { clearToolsForTest } from '@vampaz/webmcp-kit/testing'
+import { defineTool, registerTool, setConfirmationHandler } from '@vampaz/webmcp-kit'
 
 import { createLocalMCPBridge } from './index'
 
@@ -116,7 +112,6 @@ describe('local MCP bridge', () => {
           additionalProperties: false
         },
         confirmation: {
-          required: true,
           reason: 'Checkout clears the cart.'
         },
         execute() {

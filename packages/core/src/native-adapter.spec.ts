@@ -198,7 +198,7 @@ describe('native WebMCP adapter', () => {
     expect(signal?.aborted).toBe(true)
   })
 
-  it('unregisters a previous native handle when a tool is replaced', () => {
+  it('unregisters a previous native handle before a replacement is registered', () => {
     const firstUnregister = vi.fn()
     const secondUnregister = vi.fn()
     const registerNativeTool = vi
@@ -225,7 +225,7 @@ describe('native WebMCP adapter', () => {
       }
     }
 
-    registerTool(defineTool(baseTool))
+    registerTool(defineTool(baseTool)).unregister()
     registerTool(
       defineTool({
         ...baseTool,
@@ -235,6 +235,34 @@ describe('native WebMCP adapter', () => {
 
     expect(firstUnregister).toHaveBeenCalledOnce()
     expect(secondUnregister).not.toHaveBeenCalled()
+  })
+
+  it('emits correlated registry events for native calls', async () => {
+    const native = vi.fn()
+    ;(navigator as NavigatorWithModelContext).modelContext = { registerTool: native }
+    const events: Array<{ type: string; detail?: unknown }> = []
+    const unsubscribe = subscribeWebMCPKitEvents(function capture(event) {
+      events.push(event)
+    })
+    const registration = registerTool(
+      defineTool({
+        name: 'read_value',
+        description: 'Read the current value from the application.',
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        execute() {
+          return 7
+        }
+      })
+    )
+    const nativeTool = native.mock.calls[0]![0]
+    expect(await nativeTool.execute({})).toBe(7)
+    expect(events.map((event) => event.type)).toEqual(['registered', 'invoked', 'succeeded'])
+    const call = events[1]!.detail as { id: string; source: string }
+    expect(call.source).toBe('native')
+    expect(events[2]!.detail).toMatchObject({ invocationId: call.id, output: 7 })
+    registration.unregister()
+    await expect(nativeTool.execute({})).rejects.toThrow('tool changed')
+    unsubscribe()
   })
 
   it('supports dispose-only native handles', () => {
@@ -397,7 +425,6 @@ describe('native WebMCP adapter', () => {
           required: ['invoiceId']
         },
         confirmation: {
-          required: true,
           reason: 'Voiding an invoice cannot be undone in this demo.'
         },
         execute
@@ -405,11 +432,11 @@ describe('native WebMCP adapter', () => {
     )
 
     await expect(nativeExecute?.({ invoiceId: 'inv_1' })).resolves.toEqual({ invoiceId: 'inv_1' })
-    expect(confirm).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'void_invoice' }),
-      { invoiceId: 'inv_1' },
-      'Voiding an invoice cannot be undone in this demo.'
-    )
+    expect(confirm).toHaveBeenCalledWith({
+      tool: expect.objectContaining({ name: 'void_invoice' }),
+      input: { invoiceId: 'inv_1' },
+      reason: 'Voiding an invoice cannot be undone in this demo.'
+    })
     expect(execute).toHaveBeenCalledWith({ invoiceId: 'inv_1' }, { source: 'native' })
   })
 
@@ -486,7 +513,6 @@ describe('native WebMCP adapter', () => {
           required: ['invoiceId']
         },
         confirmation: {
-          required: true,
           reason: 'Voiding an invoice cannot be undone in this demo.'
         },
         execute

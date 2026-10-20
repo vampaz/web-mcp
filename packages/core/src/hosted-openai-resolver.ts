@@ -28,7 +28,7 @@ interface ResolvedHostedOpenAIResolverOptions extends HostedOpenAIResolverOption
 }
 
 interface PaidAccessSession {
-  expiresAt: string
+  expiresAt?: string
   token: string
   tokenType: 'Bearer'
 }
@@ -122,7 +122,7 @@ export function createHostedOpenAIResolver(rawOptions: HostedOpenAIResolverOptio
         token: paidAccessSession.token
       })
 
-      if (response.status === 403) {
+      if (response.status === 401 || response.status === 403) {
         paidAccessSession = null
       }
 
@@ -272,6 +272,7 @@ async function getBrowserChallengeToken(
 }
 
 function isPaidAccessSessionFresh(session: PaidAccessSession): boolean {
+  if (!session.expiresAt) return true
   return Date.parse(session.expiresAt) - sessionRefreshSkewMs > Date.now()
 }
 

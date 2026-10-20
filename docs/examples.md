@@ -82,7 +82,6 @@ registerTool(
       additionalProperties: false
     },
     confirmation: {
-      required: true,
       reason: 'Checkout clears the cart and represents a purchase action.'
     },
     scope() {
@@ -97,11 +96,12 @@ registerTool(
   })
 )
 
-setConfirmationHandler(async function confirmTool(tool, input, reason) {
+setConfirmationHandler(async function confirmTool({ tool, input, reason, signal }) {
   return showConfirmationModal({
     title: `Run ${tool.name}?`,
     body: reason,
-    preview: JSON.stringify(input, null, 2)
+    preview: JSON.stringify(input, null, 2),
+    signal
   })
 })
 ```
@@ -147,7 +147,6 @@ registerTool(
       { required: ['invoiceId'] }
     ),
     confirmation: {
-      required: true,
       reason: 'Sending an invoice emails a customer.'
     }
   })
@@ -185,10 +184,10 @@ The helper applies `toolname`, `tooldescription`, and official field metadata at
 ## Eval Fixtures
 
 ```ts
-import { createHeuristicResolver } from '@vampaz/webmcp-kit'
+import { createResolver } from '@vampaz/webmcp-kit'
 import { runWebMCPResolverEvals } from '@vampaz/webmcp-kit/testing'
 
-const results = await runWebMCPResolverEvals(createHeuristicResolver(), tools, [
+const results = await runWebMCPResolverEvals(await createResolver({ provider: 'local' }), tools, [
   {
     name: 'product search',
     message: 'Find laptop stands',

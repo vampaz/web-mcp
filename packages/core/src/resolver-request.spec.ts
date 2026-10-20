@@ -76,7 +76,12 @@ it('bounds Chrome prompts and response constraints without falling back', async 
       return 'available'
     },
     async create() {
-      return { prompt }
+      return {
+        prompt,
+        async clone() {
+          return { prompt }
+        }
+      }
     }
   })
   const resolver = await createChromeAIResolver()

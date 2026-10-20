@@ -1,8 +1,8 @@
+import { clearToolsForTest } from './registry'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { defineTool } from './define-tool'
 import {
-  clearToolsForTest,
   getTool,
   invokeTool,
   listTools,
@@ -67,7 +67,6 @@ describe('registry', () => {
           required: ['invoiceId']
         },
         confirmation: {
-          required: true,
           reason: 'Voiding an invoice cannot be undone in this demo.'
         },
         execute() {
@@ -110,7 +109,6 @@ describe('registry', () => {
           required: ['invoiceId']
         },
         confirmation: {
-          required: true,
           reason: 'Voiding an invoice cannot be undone in this demo.'
         },
         execute() {
@@ -125,11 +123,11 @@ describe('registry', () => {
     })
 
     expect(result.status).toBe('success')
-    expect(confirm).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'void_invoice' }),
-      { invoiceId: 'inv_1' },
-      'Voiding an invoice cannot be undone in this demo.'
-    )
+    expect(confirm).toHaveBeenCalledWith({
+      tool: expect.objectContaining({ name: 'void_invoice' }),
+      input: { invoiceId: 'inv_1' },
+      reason: 'Voiding an invoice cannot be undone in this demo.'
+    })
   })
 
   it('returns an error when the confirmation handler fails', async () => {
@@ -152,7 +150,6 @@ describe('registry', () => {
           required: ['invoiceId']
         },
         confirmation: {
-          required: true,
           reason: 'Voiding an invoice cannot be undone in this demo.'
         },
         execute
@@ -189,7 +186,6 @@ describe('registry', () => {
           required: ['invoiceId']
         },
         confirmation: {
-          required: true,
           reason: 'Voiding an invoice cannot be undone in this demo.'
         },
         execute(input) {
@@ -240,7 +236,6 @@ describe('registry', () => {
           additionalProperties: false
         },
         confirmation: {
-          required: true,
           reason: 'Creates a billable invoice.'
         },
         scope,
@@ -317,16 +312,12 @@ describe('registry hygiene', () => {
     expect(unregisterTool('select_items')).toBe(false)
   })
 
-  it('warns when a duplicate registration replaces an existing tool', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-
-    registerTool(createHygieneTool('select_items'))
-    registerTool(createHygieneTool('select_items'))
-
-    expect(listTools()).toHaveLength(1)
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('Tool "select_items" was already registered')
-    )
+  it('rejects a duplicate name without replacing the registered tool', function duplicate() {
+    const first = registerTool(createHygieneTool('select_items'))
+    expect(function registerDuplicate() {
+      registerTool(createHygieneTool('select_items'))
+    }).toThrow('already registered')
+    expect(listTools()).toEqual([first])
   })
 })
 
@@ -388,7 +379,7 @@ describe('invocation result codes', () => {
     setConfirmationHandler(() => false)
     registerTool({
       ...createHygieneTool('select_items'),
-      confirmation: { required: true, reason: 'Selection changes workspace state.' }
+      confirmation: { reason: 'Selection changes workspace state.' }
     })
 
     const result = await invokeTool({ toolName: 'select_items', input: { ids: [] } })
@@ -413,7 +404,7 @@ describe('invocation result codes', () => {
 
   it('reports invalid_output when execute violates the output schema', async () => {
     registerTool(
-      defineTool({
+      defineTool<{ ids: string[] }, number[]>({
         ...createHygieneTool('select_items'),
         outputSchema: {
           type: 'array',
@@ -452,7 +443,6 @@ describe('per-tool confirmation handlers', () => {
     registerTool({
       ...createHygieneTool('select_items'),
       confirmation: {
-        required: true,
         reason: 'Selection changes workspace state.',
         handler: toolHandler
       }
@@ -469,7 +459,6 @@ describe('per-tool confirmation handlers', () => {
     registerTool({
       ...createHygieneTool('select_items'),
       confirmation: {
-        required: true,
         reason: 'Selection changes workspace state.',
         handler: () => false
       }
@@ -515,6 +504,7 @@ describe('stale unregister handles', () => {
   it('ignores stale handles after a name is re-registered', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     const first = registerTool(createHygieneTool('select_items'))
+    first.unregister()
     const second = registerTool(createHygieneTool('select_items'))
 
     first.unregister()

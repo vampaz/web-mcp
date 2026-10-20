@@ -85,9 +85,22 @@ export async function resolvePiRound(
               .join('\n')
       return content ? [{ role: message.role, content }] : []
     }),
-    piConversation: messages.slice(start).filter(function withoutSystem(message) {
-      return message.role !== 'system'
-    })
+    piConversation: messages
+      .slice(start)
+      .filter(function withoutSystem(message) {
+        return message.role !== 'system'
+      })
+      .map(function dialogue(message) {
+        if (message.role === 'toolResult')
+          return {
+            role: message.role,
+            toolCallId: message.toolCallId,
+            toolName: message.toolName,
+            content: message.content,
+            isError: message.isError
+          }
+        return { role: message.role, content: message.content }
+      })
   }
   if (jsonBytes({ message, tools, context: currentContext }) > maxBytes)
     throw new PiFailure(

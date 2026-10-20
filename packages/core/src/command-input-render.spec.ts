@@ -8,23 +8,30 @@ import { clearToolsForTest, registerTool } from './registry'
 
 let tagCounter = 0
 
-const multiProviderEndpointOptions = [
+const resolverChoices = [
   {
-    label: 'Nemotron 3 Super 120B A12B',
-    model: 'nvidia/nemotron-3-super-120b-a12b:free',
-    provider: 'openrouter' as const
+    id: 'first',
+    label: 'First provider',
+    modelOptions: [
+      { label: 'Small', model: 'small' },
+      { label: 'Large', model: 'large' }
+    ],
+    createResolver: resolver
   },
-  {
-    label: 'Nemotron Nano 9B V2',
-    model: 'nvidia/nemotron-nano-9b-v2:free',
-    provider: 'openrouter' as const
-  },
-  {
-    label: 'GLM 4.7 Flash',
-    model: '@cf/zai-org/glm-4.7-flash',
-    provider: 'cloudflare-binding' as const
-  }
+  { id: 'second', label: 'Second provider', createResolver: resolver }
 ]
+
+function resolver() {
+  return {
+    name: 'Fixture resolver',
+    available: true,
+    status: 'ready' as const,
+    detail: 'Ready.',
+    async resolve(): Promise<ToolResolution> {
+      throw new Error('Not used by rendering tests.')
+    }
+  }
+}
 
 describe('WebMCP command input rendering', () => {
   it('renders the default inline layout', async () => {
@@ -36,10 +43,10 @@ describe('WebMCP command input rendering', () => {
     element.remove()
   })
 
-  it('renders provider and model controls for endpoint options', async () => {
+  it('renders provider and model controls for resolver choices', async () => {
     const element = createRenderedElement()
     element.configure({
-      endpointOptions: multiProviderEndpointOptions
+      resolverOptions: resolverChoices
     })
     document.body.append(element)
     await Promise.resolve()
@@ -51,7 +58,6 @@ describe('WebMCP command input rendering', () => {
   it('renders a selected resolver option with open settings', async () => {
     const element = createRenderedElement()
     element.configure({
-      endpointOptions: multiProviderEndpointOptions,
       initialResolverOptionId: 'browser-local-ai',
       resolverOptions: [
         {
@@ -119,9 +125,7 @@ describe('WebMCP command input rendering', () => {
   it('renders fixed provider and model without controls', async () => {
     const element = createRenderedElement()
     element.configure({
-      endpoint: '/api/webmcp/resolve',
-      model: 'gpt-5.4-mini',
-      provider: 'openai'
+      resolver: resolver()
     })
     document.body.append(element)
     await Promise.resolve()

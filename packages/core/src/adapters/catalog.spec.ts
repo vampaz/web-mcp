@@ -86,7 +86,6 @@ function createRegistration(
       required: ['productId', 'quantity']
     },
     confirmation: {
-      required: true,
       reason: 'Adding a product changes cart state.'
     },
     examples: [

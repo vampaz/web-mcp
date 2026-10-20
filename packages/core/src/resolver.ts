@@ -2,6 +2,7 @@ import type {
   ResolverAuth,
   ResolverContext,
   ResolverProviderConfig,
+  RemoteResolverConfig,
   ResolverRunOptions,
   ToolResolution,
   ToolResolver,
@@ -13,6 +14,7 @@ import { createToolResolutionSchema, validateToolResolution } from './resolution
 import { ResolverRequestLimitError, serializeResolverRequest } from './resolver-request'
 
 interface LanguageModelSession {
+  clone: (options?: { signal?: AbortSignal }) => Promise<LanguageModelSession>
   prompt: (message: string, options?: ChromeAIPromptOptions) => Promise<string>
   destroy?: () => void
   dispose?: () => void
@@ -147,9 +149,7 @@ export async function createBestResolver(): Promise<ToolResolver> {
   return createHeuristicResolver()
 }
 
-export async function createConfiguredResolver(
-  config?: ResolverProviderConfig
-): Promise<ToolResolver> {
+export async function createResolver(config?: ResolverProviderConfig): Promise<ToolResolver> {
   if (!config || config.provider === 'auto') return createBestResolver()
 
   if (config.provider === 'chrome-built-in') return createChromeAIResolver(true)
@@ -158,7 +158,7 @@ export async function createConfiguredResolver(
   return createRemoteResolver(config)
 }
 
-export function createRemoteResolver(config: ResolverProviderConfig): ToolResolver {
+export function createRemoteResolver(config: RemoteResolverConfig): ToolResolver {
   if (
     config.maxTokens !== undefined &&
     (!Number.isSafeInteger(config.maxTokens) || config.maxTokens < 1 || config.maxTokens > 65536)
@@ -271,7 +271,7 @@ function createChromeAISession(languageModel: LanguageModelApi): Promise<Languag
 }
 
 async function resolveWithRemoteProvider(
-  config: ResolverProviderConfig,
+  config: RemoteResolverConfig,
   auth: ResolverAuth,
   apiKey: string | undefined,
   model: string,
@@ -289,7 +289,7 @@ async function resolveWithRemoteProvider(
 
 async function resolveWithServerEndpoint(
   endpoint: string,
-  config: ResolverProviderConfig,
+  config: RemoteResolverConfig,
   model: string,
   message: string,
   tools: WebMCPTool[],
@@ -324,7 +324,7 @@ async function resolveWithServerEndpoint(
 }
 
 async function resolveWithOpenAICompatible(
-  config: ResolverProviderConfig,
+  config: RemoteResolverConfig,
   apiKey: string | undefined,
   model: string,
   message: string,
@@ -419,8 +419,8 @@ function createResolverPrompt(
 ): string {
   return [
     `User request: ${message}`,
-    `Current app context:\n${JSON.stringify(context, null, 2)}`,
-    `Available tools:\n${JSON.stringify(createToolCatalog(tools), null, 2)}`,
+    `Current app context:\n${JSON.stringify(context)}`,
+    `Available tools:\n${JSON.stringify(createToolCatalog(tools))}`,
     'Choose the best tool and exact parameters from the current app context. Prefer stable IDs from context over labels.',
     singleStep
       ? 'Choose only the next unfinished action. Return one tool invocation, never a sequence or steps. Wait for the actual result before choosing another action. Never invent future tool results or placeholders.'
@@ -428,7 +428,7 @@ function createResolverPrompt(
     'If the request is missing required information that is not present in context, return {"toolName":"needs_clarification","input":{},"confidence":0,"reason":"Ask for the missing information."}.',
     'If none of the available tools can satisfy the request, return {"toolName":"no_tools_match","input":{},"confidence":0,"reason":"Explain what kind of app action is available instead."}.',
     'Return only valid JSON matching this schema:',
-    JSON.stringify(createToolResolutionSchema(tools, singleStep), null, 2)
+    JSON.stringify(createToolResolutionSchema(tools, singleStep))
   ].join('\n\n')
 }
 
@@ -454,6 +454,7 @@ function createActiveChromeResolver(
   let session: LanguageModelSession | undefined
   let pendingSession: Promise<LanguageModelSession> | undefined
   let disposed = false
+  const activeSessions = new Set<LanguageModelSession>()
 
   return {
     capabilities: { conversation: strict },
@@ -483,12 +484,20 @@ function createActiveChromeResolver(
             pendingSession = undefined
             throw error
           })
-        session = await pendingSession
-        const resolution = await resolveWithChromeAI(session, message, tools, context, options)
-        if (disposed) throw new Error('The resolver was disposed.')
-        validateToolResolution(resolution, tools, { singleStep: options?.singleStep })
+        const base = await pendingSession
         throwIfAborted(options?.signal)
-        return resolution
+        const current = await base.clone({ signal: options?.signal })
+        try {
+          activeSessions.add(current)
+          if (disposed) throw new Error('The resolver was disposed.')
+          const resolution = await resolveWithChromeAI(current, message, tools, context, options)
+          if (disposed) throw new Error('The resolver was disposed.')
+          validateToolResolution(resolution, tools, { singleStep: options?.singleStep })
+          throwIfAborted(options?.signal)
+          return resolution
+        } finally {
+          if (activeSessions.delete(current)) disposeChromeAISession(current)
+        }
       } catch (error) {
         throwIfAborted(options?.signal)
         if (disposed) throw new Error('The resolver was disposed.')
@@ -508,6 +517,8 @@ function createActiveChromeResolver(
       disposed = true
       disposeChromeAISession(session)
       session = undefined
+      for (const active of activeSessions) disposeChromeAISession(active)
+      activeSessions.clear()
     }
   }
 }
@@ -592,20 +603,15 @@ function getBrowserStorage(): Storage | undefined {
   return storage
 }
 
-function requiresBrowserKey(config: ResolverProviderConfig, auth: ResolverAuth): boolean {
-  return (
-    auth.mode === 'user-key' &&
-    config.provider !== 'chrome-built-in' &&
-    config.provider !== 'local' &&
-    config.provider !== 'cloudflare-binding'
-  )
+function requiresBrowserKey(config: RemoteResolverConfig, auth: ResolverAuth): boolean {
+  return auth.mode === 'user-key' && config.provider !== 'cloudflare-binding'
 }
 
-function requiresServerBinding(config: ResolverProviderConfig, auth: ResolverAuth): boolean {
+function requiresServerBinding(config: RemoteResolverConfig, auth: ResolverAuth): boolean {
   return config.provider === 'cloudflare-binding' && auth.mode !== 'server'
 }
 
-function getRemoteResolverDetail(config: ResolverProviderConfig, auth: ResolverAuth): string {
+function getRemoteResolverDetail(config: RemoteResolverConfig, auth: ResolverAuth): string {
   const provider = getProviderLabel(config)
   if (config.provider === 'cloudflare-binding')
     return `${provider} will resolve through ${auth.mode === 'server' ? auth.endpoint : 'a server endpoint'} using a Cloudflare AI binding.`
@@ -616,7 +622,7 @@ function getRemoteResolverDetail(config: ResolverProviderConfig, auth: ResolverA
   return `${provider} will resolve without an API key.`
 }
 
-function getOpenAICompatibleBaseUrl(config: ResolverProviderConfig): string {
+function getOpenAICompatibleBaseUrl(config: RemoteResolverConfig): string {
   if (config.provider === 'openrouter') return config.baseUrl ?? 'https://openrouter.ai/api/v1'
   if (config.provider === 'openai') return config.baseUrl ?? 'https://api.openai.com/v1'
   if (!config.baseUrl) throw new Error('OpenAI-compatible resolving needs baseUrl')
@@ -624,7 +630,7 @@ function getOpenAICompatibleBaseUrl(config: ResolverProviderConfig): string {
   return config.baseUrl
 }
 
-function getDefaultModel(config: ResolverProviderConfig): string {
+function getDefaultModel(config: RemoteResolverConfig): string {
   if (config.provider === 'openrouter') return 'openrouter/auto'
   if (config.provider === 'openai') return 'gpt-5.4-mini'
   if (config.provider === 'cloudflare-binding') return '@cf/zai-org/glm-4.7-flash'
@@ -632,7 +638,7 @@ function getDefaultModel(config: ResolverProviderConfig): string {
   return 'default'
 }
 
-function getProviderLabel(config: ResolverProviderConfig): string {
+function getProviderLabel(config: RemoteResolverConfig): string {
   if (config.provider === 'openrouter') return 'OpenRouter'
   if (config.provider === 'openai') return 'OpenAI'
   if (config.provider === 'openai-compatible') return 'OpenAI-compatible provider'

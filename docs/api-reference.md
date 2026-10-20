@@ -24,37 +24,17 @@ Start with the [integration guide](./integration.md) for a working application, 
 
 - [`@vampaz/webmcp-kit/pi`](#vampazwebmcp-kitpi)
 
-- [`@vampaz/webmcp-kit/pi/worker`](#vampazwebmcp-kitpiworker)
-
 - [`@vampaz/webmcp-kit/chat`](#vampazwebmcp-kitchat)
+
+- [`@vampaz/webmcp-kit/command-input`](#vampazwebmcp-kitcommand-input)
+
+- [`@vampaz/webmcp-kit/hosted`](#vampazwebmcp-kithosted)
 
 ## @vampaz/webmcp-kit
 
-### AnyWebMCPTool
-
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
-
-A supertype of every WebMCPTool<TInput, TOutput>, usable for heterogeneous
-tool lists without erasing per-tool input typing at the definition site.
-
-```ts
-export interface AnyWebMCPTool {
-  name: string
-  description: string
-  inputSchema: JsonSchema
-  outputSchema?: JsonSchema
-  annotations?: ToolAnnotations
-  confirmation?: ToolConfirmation
-  examples?: unknown[]
-  scope?: () => ToolScopeResult
-  guard?: (input: never) => boolean | string | Promise<boolean | string>
-  execute: (input: never, context: ToolContext) => Promise<unknown> | unknown
-}
-```
-
 ### ArrayParamOptions
 
-Source in the repository: `packages/core/src/schema-builders.ts`. [Packaged declaration](../dist/packages/core/src/schema-builders.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/schema-builders.ts).
 
 ```ts
 export interface ArrayParamOptions {
@@ -66,20 +46,28 @@ export interface ArrayParamOptions {
 
 ### ConfirmationHandler
 
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
 
 ```ts
-export type ConfirmationHandler = (
-  tool: ConfirmationTool,
-  input: unknown,
-  reason: string,
-  context?: { signal: AbortSignal }
-) => boolean | Promise<boolean>
+export type ConfirmationHandler = (request: ConfirmationRequest) => boolean | Promise<boolean>
+```
+
+### ConfirmationRequest
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
+
+```ts
+export interface ConfirmationRequest {
+  tool: ConfirmationTool
+  input: unknown
+  reason: string
+  signal?: AbortSignal
+}
 ```
 
 ### ConfirmationTool
 
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
 
 ```ts
 export interface ConfirmationTool {
@@ -92,7 +80,7 @@ export interface ConfirmationTool {
 
 ### DefineServerToolOptions
 
-Source in the repository: `packages/core/src/server-tool.ts`. [Packaged declaration](../dist/packages/core/src/server-tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/server-tool.ts).
 
 ```ts
 export interface DefineServerToolOptions<
@@ -107,48 +95,15 @@ export interface DefineServerToolOptions<
 
 ### FormInput
 
-Source in the repository: `packages/core/src/forms.ts`. [Packaged declaration](../dist/packages/core/src/forms.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/forms.ts).
 
 ```ts
 export type FormInput = Record<string, string | number | boolean | string[]>
 ```
 
-### HostedOpenAIResolverOptionConfig
-
-Source in the repository: `packages/core/src/hosted-openai-resolver.ts`. [Packaged declaration](../dist/packages/core/src/hosted-openai-resolver.d.ts).
-
-```ts
-export interface HostedOpenAIResolverOptionConfig {
-  accessKey?: string
-  baseUrl?: string
-  browserChallengeSiteKey?: string
-  endpoint?: string
-  id?: string
-  label?: string
-  model?: string
-  modelOptions?: WebMCPCommandInputResolverModelOption[]
-  sessionEndpoint?: string
-}
-```
-
-### HostedOpenAIResolverOptions
-
-Source in the repository: `packages/core/src/hosted-openai-resolver.ts`. [Packaged declaration](../dist/packages/core/src/hosted-openai-resolver.d.ts).
-
-```ts
-export interface HostedOpenAIResolverOptions {
-  accessKey?: string
-  baseUrl?: string
-  browserChallengeSiteKey?: string
-  endpoint?: string
-  model: string
-  sessionEndpoint?: string
-}
-```
-
 ### InferToolInput
 
-Source in the repository: `packages/core/src/interfaces/schema-inference.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/schema-inference.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/schema-inference.ts).
 
 Derives the TypeScript input type from a JSON Schema literal, covering the
 schema subset validated by validateJsonSchema(): object/properties/required,
@@ -164,29 +119,9 @@ export type InferToolInput<TSchema extends JsonSchema> = UnknownToRecord<
 >
 ```
 
-### InitWebMCPOptions
-
-Source in the repository: `packages/core/src/init.ts`. [Packaged declaration](../dist/packages/core/src/init.d.ts).
-
-```ts
-export interface InitWebMCPOptions {
-  accessKey?: string
-  baseUrl?: string
-  browserChallengeSiteKey?: string
-  buttonLabel?: string
-  confirmationHandler?: ConfirmationHandler
-  context?: ResolverContext | (() => ResolverContext)
-  model?: string
-  placeholder?: string
-  resolver?: ToolResolver
-  target?: string | WebMCPCommandInputElement
-  tools?: readonly AnyWebMCPTool[]
-}
-```
-
 ### IntegrationDiagnostic
 
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
 
 ```ts
 export interface IntegrationDiagnostic {
@@ -201,7 +136,7 @@ export interface IntegrationDiagnostic {
 
 ### IntegrationHealthOptions
 
-Source in the repository: `packages/core/src/diagnostics.ts`. [Packaged declaration](../dist/packages/core/src/diagnostics.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/diagnostics.ts).
 
 ```ts
 export interface IntegrationHealthOptions {
@@ -211,7 +146,7 @@ export interface IntegrationHealthOptions {
 
 ### IntegrationHealthReport
 
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
 
 ```ts
 export interface IntegrationHealthReport {
@@ -226,17 +161,17 @@ export interface IntegrationHealthReport {
 
 ### JsonSchema
 
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
 
 ```ts
 export interface JsonSchema {
-  type?: string | string[]
+  type?: string | readonly string[]
   properties?: Record<string, JsonSchema>
-  required?: string[]
+  required?: readonly string[]
   items?: JsonSchema
-  anyOf?: JsonSchema[]
-  oneOf?: JsonSchema[]
-  enum?: unknown[]
+  anyOf?: readonly JsonSchema[]
+  oneOf?: readonly JsonSchema[]
+  enum?: readonly unknown[]
   const?: unknown
   title?: string
   minimum?: number
@@ -255,7 +190,7 @@ export interface JsonSchema {
 
 ### NumberParamOptions
 
-Source in the repository: `packages/core/src/schema-builders.ts`. [Packaged declaration](../dist/packages/core/src/schema-builders.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/schema-builders.ts).
 
 ```ts
 export interface NumberParamOptions {
@@ -267,18 +202,18 @@ export interface NumberParamOptions {
 
 ### ObjectInputSchemaOptions
 
-Source in the repository: `packages/core/src/schema-builders.ts`. [Packaged declaration](../dist/packages/core/src/schema-builders.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/schema-builders.ts).
 
 ```ts
-export interface ObjectInputSchemaOptions {
+export interface ObjectInputSchemaOptions<TRequired extends readonly string[] = readonly string[]> {
   additionalProperties?: boolean | JsonSchema
-  required?: string[]
+  required?: TRequired
 }
 ```
 
 ### OpenAIFunctionTool
 
-Source in the repository: `packages/core/src/adapters/openai.ts`. [Packaged declaration](../dist/packages/core/src/adapters/openai.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/adapters/openai.ts).
 
 ```ts
 export interface OpenAIFunctionTool {
@@ -293,7 +228,7 @@ export interface OpenAIFunctionTool {
 
 ### RegisterFormToolFieldOptions
 
-Source in the repository: `packages/core/src/forms.ts`. [Packaged declaration](../dist/packages/core/src/forms.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/forms.ts).
 
 ```ts
 export interface RegisterFormToolFieldOptions {
@@ -304,7 +239,7 @@ export interface RegisterFormToolFieldOptions {
 
 ### RegisterFormToolOptions
 
-Source in the repository: `packages/core/src/forms.ts`. [Packaged declaration](../dist/packages/core/src/forms.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/forms.ts).
 
 ```ts
 export interface RegisterFormToolOptions<TOutput = FormData> {
@@ -319,7 +254,7 @@ export interface RegisterFormToolOptions<TOutput = FormData> {
 
 ### RegisteredTool
 
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
 
 ```ts
 export interface RegisteredTool<TInput = Record<string, unknown>, TOutput = unknown> {
@@ -333,7 +268,7 @@ export interface RegisteredTool<TInput = Record<string, unknown>, TOutput = unkn
 
 ### RegistrySnapshot
 
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
 
 ```ts
 export interface RegistrySnapshot {
@@ -344,42 +279,13 @@ export interface RegistrySnapshot {
 }
 ```
 
-### ResolverAuth
+### RemoteResolverConfig
 
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
-
-```ts
-export type ResolverAuth =
-  | { mode: 'none' }
-  | { mode: 'server'; endpoint: string }
-  | { mode: 'user-key'; apiKey?: string; storageKey?: string }
-```
-
-### ResolverContext
-
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
 
 ```ts
-export interface ResolverContext {
-  [key: string]: unknown
-}
-```
-
-### ResolverOutcomeToolName
-
-Source in the repository: `packages/core/src/resolution-validation.ts`. [Packaged declaration](../dist/packages/core/src/resolution-validation.d.ts).
-
-```ts
-export type ResolverOutcomeToolName = (typeof resolverOutcomeToolNames)[number]
-```
-
-### ResolverProviderConfig
-
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
-
-```ts
-export interface ResolverProviderConfig {
-  provider: ResolverProviderKind
+export interface RemoteResolverConfig {
+  provider: 'openai' | 'openrouter' | 'openai-compatible' | 'cloudflare-binding'
   model?: string
   baseUrl?: string
   auth?: ResolverAuth
@@ -390,9 +296,50 @@ export interface ResolverProviderConfig {
 }
 ```
 
+### ResolverAuth
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
+
+```ts
+export type ResolverAuth =
+  | { mode: 'none' }
+  | { mode: 'server'; endpoint: string }
+  | { mode: 'user-key'; apiKey?: string; storageKey?: string }
+```
+
+### ResolverContext
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
+
+```ts
+export interface ResolverContext {
+  [key: string]: unknown
+}
+```
+
+### ResolverOutcomeToolName
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/resolution-validation.ts).
+
+```ts
+export type ResolverOutcomeToolName = (typeof resolverOutcomeToolNames)[number]
+```
+
+### ResolverProviderConfig
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
+
+```ts
+export type ResolverProviderConfig =
+  | { provider: 'auto' }
+  | { provider: 'chrome-built-in' }
+  | { provider: 'local' }
+  | RemoteResolverConfig
+```
+
 ### ResolverProviderKind
 
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
 
 ```ts
 export type ResolverProviderKind =
@@ -407,7 +354,7 @@ export type ResolverProviderKind =
 
 ### ResolverRequest
 
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
 
 ```ts
 export interface ResolverRequest {
@@ -417,20 +364,40 @@ export interface ResolverRequest {
 }
 ```
 
+### ResolverRunOptions
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
+
+```ts
+export interface ResolverRunOptions {
+  signal?: AbortSignal
+  singleStep?: boolean
+  /** Maximum UTF-8 bytes in the serialized resolver request, including prompt/schema overhead. */
+  maxRequestBytes?: number
+}
+```
+
 ### SchemaTypedWebMCPTool
 
-Source in the repository: `packages/core/src/define-tool.ts`. [Packaged declaration](../dist/packages/core/src/define-tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/define-tool.ts).
 
 ```ts
 export type SchemaTypedWebMCPTool<TSchema extends JsonSchema, TOutput = unknown> = Omit<
   WebMCPTool<InferToolInput<TSchema>, TOutput>,
-  'inputSchema'
-> & { inputSchema: TSchema }
+  'inputSchema' | 'execute' | 'guard'
+> & {
+  inputSchema: TSchema
+  execute: (
+    input: NoInfer<InferToolInput<TSchema>>,
+    context: import('./interfaces/tool').ToolContext
+  ) => TOutput | Promise<TOutput>
+  guard?: (input: NoInfer<InferToolInput<TSchema>>) => boolean | string | Promise<boolean | string>
+}
 ```
 
 ### ServerToolFetch
 
-Source in the repository: `packages/core/src/server-tool.ts`. [Packaged declaration](../dist/packages/core/src/server-tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/server-tool.ts).
 
 ```ts
 export type ServerToolFetch = (input: string | URL, init?: RequestInit) => Promise<Response>
@@ -438,7 +405,7 @@ export type ServerToolFetch = (input: string | URL, init?: RequestInit) => Promi
 
 ### StringParamOptions
 
-Source in the repository: `packages/core/src/schema-builders.ts`. [Packaged declaration](../dist/packages/core/src/schema-builders.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/schema-builders.ts).
 
 ```ts
 export interface StringParamOptions {
@@ -449,37 +416,9 @@ export interface StringParamOptions {
 }
 ```
 
-### TestBridgeSnapshot
-
-Source in the repository: `packages/core/src/test-bridge.ts`. [Packaged declaration](../dist/packages/core/src/test-bridge.d.ts).
-
-```ts
-export interface TestBridgeSnapshot extends Omit<RegistrySnapshot, 'tools'> {
-  tools: TestBridgeTool[]
-}
-```
-
-### TestBridgeTool
-
-Source in the repository: `packages/core/src/test-bridge.ts`. [Packaged declaration](../dist/packages/core/src/test-bridge.d.ts).
-
-```ts
-export interface TestBridgeTool {
-  name: string
-  description: string
-  inputSchema: RegisteredTool['tool']['inputSchema']
-  outputSchema?: RegisteredTool['tool']['outputSchema']
-  confirmation?: RegisteredTool['tool']['confirmation']
-  mode: RegisteredTool['mode']
-  warnings: string[]
-  available: boolean
-  unavailableReason?: string
-}
-```
-
 ### ToolAnnotations
 
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
 
 ```ts
 export interface ToolAnnotations {
@@ -491,7 +430,7 @@ export interface ToolAnnotations {
 
 ### ToolCatalog
 
-Source in the repository: `packages/core/src/adapters/catalog.ts`. [Packaged declaration](../dist/packages/core/src/adapters/catalog.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/adapters/catalog.ts).
 
 ```ts
 export interface ToolCatalog {
@@ -502,7 +441,7 @@ export interface ToolCatalog {
 
 ### ToolCatalogEntry
 
-Source in the repository: `packages/core/src/adapters/catalog.ts`. [Packaged declaration](../dist/packages/core/src/adapters/catalog.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/adapters/catalog.ts).
 
 ```ts
 export interface ToolCatalogEntry {
@@ -521,7 +460,7 @@ export interface ToolCatalogEntry {
 
 ### ToolCatalogOptions
 
-Source in the repository: `packages/core/src/adapters/catalog.ts`. [Packaged declaration](../dist/packages/core/src/adapters/catalog.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/adapters/catalog.ts).
 
 ```ts
 export interface ToolCatalogOptions {
@@ -531,11 +470,10 @@ export interface ToolCatalogOptions {
 
 ### ToolConfirmation
 
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
 
 ```ts
 export interface ToolConfirmation {
-  required: boolean
   reason: string
   handler?: ConfirmationHandler
 }
@@ -543,7 +481,7 @@ export interface ToolConfirmation {
 
 ### ToolContext
 
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
 
 ```ts
 export interface ToolContext {
@@ -554,7 +492,7 @@ export interface ToolContext {
 
 ### ToolInvocation
 
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
 
 ```ts
 export interface ToolInvocation<TInput = Record<string, unknown>> {
@@ -569,7 +507,7 @@ export interface ToolInvocation<TInput = Record<string, unknown>> {
 
 ### ToolInvocationErrorCode
 
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
 
 ```ts
 export type ToolInvocationErrorCode =
@@ -589,7 +527,7 @@ export type ToolInvocationErrorCode =
 
 ### ToolInvocationResult
 
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
 
 ```ts
 export interface ToolInvocationResult<TOutput = unknown> {
@@ -605,7 +543,7 @@ export interface ToolInvocationResult<TOutput = unknown> {
 
 ### ToolResolution
 
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
 
 ```ts
 export interface ToolResolution {
@@ -619,7 +557,7 @@ export interface ToolResolution {
 
 ### ToolResolutionStep
 
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
 
 ```ts
 export interface ToolResolutionStep {
@@ -632,7 +570,7 @@ export interface ToolResolutionStep {
 
 ### ToolResolutionValidationOptions
 
-Source in the repository: `packages/core/src/resolution-validation.ts`. [Packaged declaration](../dist/packages/core/src/resolution-validation.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/resolution-validation.ts).
 
 ```ts
 export interface ToolResolutionValidationOptions {
@@ -643,7 +581,7 @@ export interface ToolResolutionValidationOptions {
 
 ### ToolResolutionValidationTool
 
-Source in the repository: `packages/core/src/resolution-validation.ts`. [Packaged declaration](../dist/packages/core/src/resolution-validation.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/resolution-validation.ts).
 
 ```ts
 export interface ToolResolutionValidationTool {
@@ -654,7 +592,7 @@ export interface ToolResolutionValidationTool {
 
 ### ToolResolver
 
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
 
 ```ts
 export interface ToolResolver {
@@ -675,7 +613,7 @@ export interface ToolResolver {
 
 ### ToolScopeResult
 
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
 
 ```ts
 export interface ToolScopeResult {
@@ -684,230 +622,9 @@ export interface ToolScopeResult {
 }
 ```
 
-### WebMCPCommandErrorEventDetail
-
-Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/command-input.d.ts).
-
-```ts
-export interface WebMCPCommandErrorEventDetail {
-  error: string
-  message: string
-}
-```
-
-### WebMCPCommandInputConfigureOptions
-
-Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/command-input.d.ts).
-
-```ts
-export interface WebMCPCommandInputConfigureOptions {
-  apiKey?: string
-  authMode?: 'none' | 'server' | 'user-key'
-  baseUrl?: string
-  buttonLabel?: string
-  context?: ResolverContext | (() => ResolverContext)
-  disabled?: boolean
-  endpoint?: string
-  endpointOptions?: WebMCPCommandInputEndpointOption[]
-  floating?: boolean
-  initialModel?: string
-  initialResolverOptionId?: string
-  initialProvider?: ResolverProviderKind
-  model?: string
-  placeholder?: string
-  resolver?: ToolResolver
-  resolverConfig?: ResolverProviderConfig
-  resolverOptions?: WebMCPCommandInputResolverOption[]
-  provider?: ResolverProviderKind
-  settingsOpen?: boolean
-  showChromeAI?: boolean
-}
-```
-
-### WebMCPCommandInputElement
-
-Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/command-input.d.ts).
-
-```ts
-export interface WebMCPCommandInputElement extends HTMLElement {
-  apiKey?: string
-  authMode?: 'none' | 'server' | 'user-key'
-  baseUrl?: string
-  buttonLabel?: string
-  context?: ResolverContext | (() => ResolverContext)
-  disabled: boolean
-  endpoint?: string
-  endpointOptions?: WebMCPCommandInputEndpointOption[]
-  floating: boolean
-  model?: string
-  panelOpen: boolean
-  placeholder: string
-  resolver?: ToolResolver
-  resolverConfig?: ResolverProviderConfig
-  resolverOptions?: WebMCPCommandInputResolverOption[]
-  provider?: ResolverProviderKind
-  showChromeAI?: boolean
-  closePanel: () => void
-  configure: (options: WebMCPCommandInputConfigureOptions) => void
-  openPanel: () => void
-  run: (
-    message?: string,
-    options?: WebMCPCommandInputRunOptions
-  ) => Promise<ToolInvocationResult | undefined>
-  togglePanel: () => void
-}
-```
-
-### WebMCPCommandInputEndpointOption
-
-Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/command-input.d.ts).
-
-```ts
-export interface WebMCPCommandInputEndpointOption {
-  label: string
-  model?: string
-  provider: ResolverProviderKind
-}
-```
-
-### WebMCPCommandInputPhase
-
-Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/command-input.d.ts).
-
-```ts
-export type WebMCPCommandInputPhase =
-  | 'idle'
-  | 'preparing'
-  | 'resolving'
-  | 'executing'
-  | 'completed'
-  | 'failed'
-```
-
-### WebMCPCommandInputResolverCreateOptions
-
-Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/command-input.d.ts).
-
-```ts
-export interface WebMCPCommandInputResolverCreateOptions {
-  model?: string
-  modelOption?: WebMCPCommandInputResolverModelOption
-}
-```
-
-### WebMCPCommandInputResolverModelOption
-
-Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/command-input.d.ts).
-
-```ts
-export interface WebMCPCommandInputResolverModelOption {
-  label: string
-  model: string
-}
-```
-
-### WebMCPCommandInputResolverOption
-
-Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/command-input.d.ts).
-
-```ts
-export interface WebMCPCommandInputResolverOption {
-  createResolver: (
-    options?: WebMCPCommandInputResolverCreateOptions
-  ) => Promise<ToolResolver> | ToolResolver
-  id: string
-  label: string
-  modelOptions?: WebMCPCommandInputResolverModelOption[]
-}
-```
-
-### WebMCPCommandPanelToggleEventDetail
-
-Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/command-input.d.ts).
-
-```ts
-export interface WebMCPCommandPanelToggleEventDetail {
-  open: boolean
-}
-```
-
-### WebMCPCommandResolutionEventDetail
-
-Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/command-input.d.ts).
-
-```ts
-export interface WebMCPCommandResolutionEventDetail {
-  message: string
-  resolution: ToolResolution
-  resolver: ToolResolver
-}
-```
-
-### WebMCPCommandResolverEventDetail
-
-Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/command-input.d.ts).
-
-```ts
-export interface WebMCPCommandResolverEventDetail {
-  resolver: ToolResolver
-}
-```
-
-### WebMCPCommandResultEventDetail
-
-Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/command-input.d.ts).
-
-```ts
-export interface WebMCPCommandResultEventDetail {
-  message: string
-  resolution: ToolResolution
-  result: ToolInvocationResult
-}
-```
-
-### WebMCPCommandStepEventDetail
-
-Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/command-input.d.ts).
-
-```ts
-export interface WebMCPCommandStepEventDetail {
-  message: string
-  phase: 'started' | 'completed'
-  resolution: ToolResolution
-  result?: ToolInvocationResult
-  step: ToolResolutionStep
-  stepCount: number
-  stepIndex: number
-}
-```
-
-### WebMCPInitHandle
-
-Source in the repository: `packages/core/src/init.ts`. [Packaged declaration](../dist/packages/core/src/init.d.ts).
-
-```ts
-export interface WebMCPInitHandle {
-  element: WebMCPCommandInputElement
-  resolver?: ToolResolver
-  registrations: RegisteredTool[]
-  destroy: () => void
-}
-```
-
-### WebMCPKit
-
-Source in the repository: `packages/core/src/kit.ts`. [Packaged declaration](../dist/packages/core/src/kit.d.ts).
-
-```ts
-export interface WebMCPKit {
-  resolver: ToolResolver
-  resolverConfig?: ResolverProviderConfig
-}
-```
-
 ### WebMCPKitEvent
 
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
 
 ```ts
 export interface WebMCPKitEvent {
@@ -918,33 +635,9 @@ export interface WebMCPKitEvent {
 }
 ```
 
-### WebMCPKitOptions
-
-Source in the repository: `packages/core/src/kit.ts`. [Packaged declaration](../dist/packages/core/src/kit.d.ts).
-
-```ts
-export interface WebMCPKitOptions {
-  resolver?: ResolverProviderConfig
-}
-```
-
-### WebMCPKitTestBridge
-
-Source in the repository: `packages/core/src/test-bridge.ts`. [Packaged declaration](../dist/packages/core/src/test-bridge.d.ts).
-
-```ts
-export interface WebMCPKitTestBridge {
-  getRegistrySnapshot: () => TestBridgeSnapshot
-  listTools: () => TestBridgeTool[]
-  invokeTool: <TOutput = unknown>(
-    invocation: ToolInvocation
-  ) => Promise<ToolInvocationResult<TOutput>>
-}
-```
-
 ### WebMCPTool
 
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
 
 ```ts
 export interface WebMCPTool<TInput = Record<string, unknown>, TOutput = unknown> {
@@ -956,22 +649,26 @@ export interface WebMCPTool<TInput = Record<string, unknown>, TOutput = unknown>
   confirmation?: ToolConfirmation
   examples?: TInput[]
   scope?: () => ToolScopeResult
-  guard?: (input: TInput) => boolean | string | Promise<boolean | string>
-  execute: (input: TInput, context: ToolContext) => Promise<TOutput> | TOutput
+  parseInput?(input: unknown): TInput | Promise<TInput>
+  guard?(input: TInput): boolean | string | Promise<boolean | string>
+  execute(input: TInput, context: ToolContext): Promise<TOutput> | TOutput
 }
 ```
 
 ### arrayParam
 
-Source in the repository: `packages/core/src/schema-builders.ts`. [Packaged declaration](../dist/packages/core/src/schema-builders.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/schema-builders.ts).
 
 ```ts
-declare function arrayParam(items: JsonSchema, options?: ArrayParamOptions): JsonSchema
+declare function arrayParam<const TItems extends JsonSchema>(
+  items: TItems,
+  options?: ArrayParamOptions
+): { description?: string; maxItems?: number; minItems?: number; type: 'array'; items: TItems }
 ```
 
 ### assertWebMCPIntegration
 
-Source in the repository: `packages/core/src/diagnostics.ts`. [Packaged declaration](../dist/packages/core/src/diagnostics.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/diagnostics.ts).
 
 ```ts
 declare function assertWebMCPIntegration(
@@ -981,81 +678,26 @@ declare function assertWebMCPIntegration(
 
 ### booleanParam
 
-Source in the repository: `packages/core/src/schema-builders.ts`. [Packaged declaration](../dist/packages/core/src/schema-builders.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/schema-builders.ts).
 
 ```ts
-declare function booleanParam(description?: string): JsonSchema
+declare function booleanParam(description?: string): {
+  description?: string | undefined
+  type: 'boolean'
+}
 ```
 
-### clearToolsForTest
+### createResolver
 
-Source in the repository: `packages/core/src/registry.ts`. [Packaged declaration](../dist/packages/core/src/registry.d.ts).
-
-```ts
-declare function clearToolsForTest(): void
-```
-
-### createBestResolver
-
-Source in the repository: `packages/core/src/resolver.ts`. [Packaged declaration](../dist/packages/core/src/resolver.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/resolver.ts).
 
 ```ts
-declare function createBestResolver(): Promise<ToolResolver>
-```
-
-### createChromeAIResolver
-
-Source in the repository: `packages/core/src/resolver.ts`. [Packaged declaration](../dist/packages/core/src/resolver.d.ts).
-
-```ts
-declare function createChromeAIResolver(strict?: boolean): Promise<ToolResolver>
-```
-
-### createConfiguredResolver
-
-Source in the repository: `packages/core/src/resolver.ts`. [Packaged declaration](../dist/packages/core/src/resolver.d.ts).
-
-```ts
-declare function createConfiguredResolver(config?: ResolverProviderConfig): Promise<ToolResolver>
-```
-
-### createHeuristicResolver
-
-Source in the repository: `packages/core/src/resolver.ts`. [Packaged declaration](../dist/packages/core/src/resolver.d.ts).
-
-```ts
-declare function createHeuristicResolver(): ToolResolver
-```
-
-### createHostedOpenAIResolver
-
-Source in the repository: `packages/core/src/hosted-openai-resolver.ts`. [Packaged declaration](../dist/packages/core/src/hosted-openai-resolver.d.ts).
-
-```ts
-declare function createHostedOpenAIResolver(rawOptions: HostedOpenAIResolverOptions): ToolResolver
-```
-
-### createHostedOpenAIResolverOption
-
-Source in the repository: `packages/core/src/hosted-openai-resolver.ts`. [Packaged declaration](../dist/packages/core/src/hosted-openai-resolver.d.ts).
-
-```ts
-declare function createHostedOpenAIResolverOption(
-  config: HostedOpenAIResolverOptionConfig
-): WebMCPCommandInputResolverOption
-```
-
-### createRemoteResolver
-
-Source in the repository: `packages/core/src/resolver.ts`. [Packaged declaration](../dist/packages/core/src/resolver.d.ts).
-
-```ts
-declare function createRemoteResolver(config: ResolverProviderConfig): ToolResolver
+declare function createResolver(config?: ResolverProviderConfig): Promise<ToolResolver>
 ```
 
 ### createToolCatalog
 
-Source in the repository: `packages/core/src/adapters/catalog.ts`. [Packaged declaration](../dist/packages/core/src/adapters/catalog.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/adapters/catalog.ts).
 
 ```ts
 declare function createToolCatalog(
@@ -1064,17 +706,9 @@ declare function createToolCatalog(
 ): ToolCatalog
 ```
 
-### createWebMCPKit
-
-Source in the repository: `packages/core/src/kit.ts`. [Packaged declaration](../dist/packages/core/src/kit.d.ts).
-
-```ts
-declare function createWebMCPKit(options?: WebMCPKitOptions): Promise<WebMCPKit>
-```
-
 ### defineServerTool
 
-Source in the repository: `packages/core/src/server-tool.ts`. [Packaged declaration](../dist/packages/core/src/server-tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/server-tool.ts).
 
 ```ts
 declare function defineServerTool<TInput = Record<string, unknown>, TOutput = unknown>(
@@ -1084,63 +718,41 @@ declare function defineServerTool<TInput = Record<string, unknown>, TOutput = un
 
 ### defineTool
 
-Source in the repository: `packages/core/src/define-tool.ts`. [Packaged declaration](../dist/packages/core/src/define-tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/define-tool.ts).
 
 ```ts
 declare function defineTool<const TSchema extends JsonSchema, TOutput = unknown>(
   tool: SchemaTypedWebMCPTool<TSchema, TOutput>
 ): WebMCPTool<InferToolInput<TSchema>, TOutput>
 declare function defineTool<TInput = Record<string, unknown>, TOutput = unknown>(
-  tool: WebMCPTool<TInput, TOutput>
+  tool: Omit<WebMCPTool<NoInfer<TInput>, TOutput>, 'execute' | 'guard'> & {
+    execute: (
+      input: NoInfer<TInput>,
+      context: import('./interfaces/tool').ToolContext
+    ) => TOutput | Promise<TOutput>
+    guard?: (input: NoInfer<TInput>) => boolean | string | Promise<boolean | string>
+  }
 ): WebMCPTool<TInput, TOutput>
-```
-
-### defineWebMCPCommandInput
-
-Source in the repository: `packages/core/src/command-input.ts`. [Packaged declaration](../dist/packages/core/src/command-input.d.ts).
-
-```ts
-declare function defineWebMCPCommandInput(tagName?: string): CommandInputConstructor
-```
-
-### emitWebMCPKitEvent
-
-Source in the repository: `packages/core/src/events.ts`. [Packaged declaration](../dist/packages/core/src/events.d.ts).
-
-```ts
-declare function emitWebMCPKitEvent(event: WebMCPKitEvent): void
 ```
 
 ### enumParam
 
-Source in the repository: `packages/core/src/schema-builders.ts`. [Packaged declaration](../dist/packages/core/src/schema-builders.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/schema-builders.ts).
 
 ```ts
-declare function enumParam<TValue extends string | number | boolean>(
+declare function enumParam<const TValue extends string | number | boolean>(
   values: readonly TValue[],
   description?: string
-): JsonSchema
-```
-
-### escapeAttribute
-
-Source in the repository: `packages/core/src/command-input-html.ts`. [Packaged declaration](../dist/packages/core/src/command-input-html.d.ts).
-
-```ts
-declare function escapeAttribute(value: string): string
-```
-
-### escapeHtml
-
-Source in the repository: `packages/core/src/command-input-html.ts`. [Packaged declaration](../dist/packages/core/src/command-input-html.d.ts).
-
-```ts
-declare function escapeHtml(value: string): string
+): {
+  description?: string | undefined
+  enum: TValue[]
+  type?: string | readonly string[] | undefined
+}
 ```
 
 ### formatJsonValueValidationError
 
-Source in the repository: `packages/core/src/schema.ts`. [Packaged declaration](../dist/packages/core/src/schema.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/schema.ts).
 
 ```ts
 declare function formatJsonValueValidationError(
@@ -1151,23 +763,23 @@ declare function formatJsonValueValidationError(
 
 ### formatOpenAITool
 
-Source in the repository: `packages/core/src/adapters/openai.ts`. [Packaged declaration](../dist/packages/core/src/adapters/openai.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/adapters/openai.ts).
 
 ```ts
-declare function formatOpenAITool(tool: AnyWebMCPTool): OpenAIFunctionTool
+declare function formatOpenAITool(tool: WebMCPTool): OpenAIFunctionTool
 ```
 
 ### formatOpenAITools
 
-Source in the repository: `packages/core/src/adapters/openai.ts`. [Packaged declaration](../dist/packages/core/src/adapters/openai.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/adapters/openai.ts).
 
 ```ts
-declare function formatOpenAITools(tools: readonly AnyWebMCPTool[]): OpenAIFunctionTool[]
+declare function formatOpenAITools(tools: readonly WebMCPTool[]): OpenAIFunctionTool[]
 ```
 
 ### formatToolCatalogMarkdown
 
-Source in the repository: `packages/core/src/adapters/catalog.ts`. [Packaged declaration](../dist/packages/core/src/adapters/catalog.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/adapters/catalog.ts).
 
 ```ts
 declare function formatToolCatalogMarkdown(catalog: ToolCatalog): string
@@ -1175,7 +787,7 @@ declare function formatToolCatalogMarkdown(catalog: ToolCatalog): string
 
 ### getErrorMessage
 
-Source in the repository: `packages/core/src/confirmation.ts`. [Packaged declaration](../dist/packages/core/src/confirmation.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/confirmation.ts).
 
 ```ts
 declare function getErrorMessage(error: unknown): string
@@ -1183,7 +795,7 @@ declare function getErrorMessage(error: unknown): string
 
 ### getIntegrationHealthReport
 
-Source in the repository: `packages/core/src/diagnostics.ts`. [Packaged declaration](../dist/packages/core/src/diagnostics.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/diagnostics.ts).
 
 ```ts
 declare function getIntegrationHealthReport(
@@ -1193,7 +805,7 @@ declare function getIntegrationHealthReport(
 
 ### getRegistrySnapshot
 
-Source in the repository: `packages/core/src/registry.ts`. [Packaged declaration](../dist/packages/core/src/registry.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/registry.ts).
 
 ```ts
 declare function getRegistrySnapshot(): RegistrySnapshot
@@ -1201,7 +813,7 @@ declare function getRegistrySnapshot(): RegistrySnapshot
 
 ### getSupportLabel
 
-Source in the repository: `packages/core/src/support.ts`. [Packaged declaration](../dist/packages/core/src/support.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/support.ts).
 
 ```ts
 declare function getSupportLabel(): string
@@ -1209,7 +821,7 @@ declare function getSupportLabel(): string
 
 ### getTool
 
-Source in the repository: `packages/core/src/registry.ts`. [Packaged declaration](../dist/packages/core/src/registry.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/registry.ts).
 
 ```ts
 declare function getTool(name: string): RegisteredTool | undefined
@@ -1217,52 +829,28 @@ declare function getTool(name: string): RegisteredTool | undefined
 
 ### inferFormInputSchema
 
-Source in the repository: `packages/core/src/forms.ts`. [Packaged declaration](../dist/packages/core/src/forms.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/forms.ts).
 
 ```ts
 declare function inferFormInputSchema(form: HTMLFormElement): JsonSchema
 ```
 
-### initWebMCP
-
-Source in the repository: `packages/core/src/init.ts`. [Packaged declaration](../dist/packages/core/src/init.d.ts).
-
-One-call setup: registers tools, defines and locates (or creates) the
-command input element, and wires a resolver.
-
-An explicit `resolver` takes precedence. Otherwise, `accessKey` requires
-`model` and creates a hosted OpenAI resolver with endpoints derived from
-`baseUrl`. Without either, the element keeps its own resolver behavior.
-
-Tool names must be unique and must not collide with already-registered
-tools. Failed setup removes registrations and elements added by that call.
-`destroy()` performs the same cleanup and restores the previous confirmation
-handler unless application code replaced it. Custom-element definition is
-permanent; configuration on a reused element is not restored.
-
-```ts
-declare function initWebMCP(options?: InitWebMCPOptions): WebMCPInitHandle
-```
-
-### installWebMCPKitTestBridge
-
-Source in the repository: `packages/core/src/test-bridge.ts`. [Packaged declaration](../dist/packages/core/src/test-bridge.d.ts).
-
-```ts
-declare function installWebMCPKitTestBridge(target?: Window): () => void
-```
-
 ### integerParam
 
-Source in the repository: `packages/core/src/schema-builders.ts`. [Packaged declaration](../dist/packages/core/src/schema-builders.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/schema-builders.ts).
 
 ```ts
-declare function integerParam(options?: NumberParamOptions): JsonSchema
+declare function integerParam(options?: NumberParamOptions): {
+  description?: string
+  maximum?: number
+  minimum?: number
+  type: 'integer'
+}
 ```
 
 ### invokeTool
 
-Source in the repository: `packages/core/src/registry.ts`. [Packaged declaration](../dist/packages/core/src/registry.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/registry.ts).
 
 ```ts
 declare function invokeTool<TOutput = unknown>(
@@ -1272,7 +860,7 @@ declare function invokeTool<TOutput = unknown>(
 
 ### isResolverOutcomeToolName
 
-Source in the repository: `packages/core/src/resolution-validation.ts`. [Packaged declaration](../dist/packages/core/src/resolution-validation.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/resolution-validation.ts).
 
 ```ts
 declare function isResolverOutcomeToolName(toolName: string): toolName is ResolverOutcomeToolName
@@ -1280,7 +868,7 @@ declare function isResolverOutcomeToolName(toolName: string): toolName is Resolv
 
 ### isWebMCPSupported
 
-Source in the repository: `packages/core/src/support.ts`. [Packaged declaration](../dist/packages/core/src/support.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/support.ts).
 
 ```ts
 declare function isWebMCPSupported(): boolean
@@ -1288,7 +876,7 @@ declare function isWebMCPSupported(): boolean
 
 ### listTools
 
-Source in the repository: `packages/core/src/registry.ts`. [Packaged declaration](../dist/packages/core/src/registry.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/registry.ts).
 
 ```ts
 declare function listTools(): RegisteredTool[]
@@ -1296,7 +884,7 @@ declare function listTools(): RegisteredTool[]
 
 ### normalizeJsonText
 
-Source in the repository: `packages/core/src/resolver.ts`. [Packaged declaration](../dist/packages/core/src/resolver.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/resolver.ts).
 
 ```ts
 declare function normalizeJsonText(value: string, source?: string): string
@@ -1304,26 +892,48 @@ declare function normalizeJsonText(value: string, source?: string): string
 
 ### numberParam
 
-Source in the repository: `packages/core/src/schema-builders.ts`. [Packaged declaration](../dist/packages/core/src/schema-builders.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/schema-builders.ts).
 
 ```ts
-declare function numberParam(options?: NumberParamOptions): JsonSchema
+declare function numberParam(options?: NumberParamOptions): {
+  description?: string
+  maximum?: number
+  minimum?: number
+  type: 'number'
+}
 ```
 
 ### objectInputSchema
 
-Source in the repository: `packages/core/src/schema-builders.ts`. [Packaged declaration](../dist/packages/core/src/schema-builders.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/schema-builders.ts).
 
 ```ts
-declare function objectInputSchema(
-  properties: Record<string, JsonSchema>,
-  options?: ObjectInputSchemaOptions
-): JsonSchema
+declare function objectInputSchema<
+  const TProperties extends Record<string, JsonSchema>,
+  const TRequired extends readonly (keyof TProperties & string)[]
+>(
+  properties: TProperties,
+  options: ObjectInputSchemaOptions<TRequired> & { required: TRequired }
+): {
+  type: 'object'
+  properties: TProperties
+  required: TRequired
+  additionalProperties: boolean | JsonSchema
+}
+declare function objectInputSchema<const TProperties extends Record<string, JsonSchema>>(
+  properties: TProperties,
+  options?: ObjectInputSchemaOptions<readonly (keyof TProperties & string)[]>
+): {
+  type: 'object'
+  properties: TProperties
+  required?: readonly (keyof TProperties & string)[]
+  additionalProperties: boolean | JsonSchema
+}
 ```
 
 ### registerFormTool
 
-Source in the repository: `packages/core/src/forms.ts`. [Packaged declaration](../dist/packages/core/src/forms.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/forms.ts).
 
 ```ts
 declare function registerFormTool<TOutput = FormData>(
@@ -1333,7 +943,7 @@ declare function registerFormTool<TOutput = FormData>(
 
 ### registerTool
 
-Source in the repository: `packages/core/src/registry.ts`. [Packaged declaration](../dist/packages/core/src/registry.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/registry.ts).
 
 ```ts
 declare function registerTool<TInput = Record<string, unknown>, TOutput = unknown>(
@@ -1343,7 +953,7 @@ declare function registerTool<TInput = Record<string, unknown>, TOutput = unknow
 
 ### resolverOutcomeToolNames
 
-Source in the repository: `packages/core/src/resolution-validation.ts`. [Packaged declaration](../dist/packages/core/src/resolution-validation.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/resolution-validation.ts).
 
 ```ts
 declare const resolverOutcomeToolNames: readonly ['needs_clarification', 'no_tools_match']
@@ -1351,23 +961,29 @@ declare const resolverOutcomeToolNames: readonly ['needs_clarification', 'no_too
 
 ### setConfirmationHandler
 
-Source in the repository: `packages/core/src/confirmation.ts`. [Packaged declaration](../dist/packages/core/src/confirmation.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/confirmation.ts).
 
 ```ts
-declare function setConfirmationHandler(handler: ConfirmationHandler | undefined): void
+declare function setConfirmationHandler(handler: ConfirmationHandler | undefined): () => void
 ```
 
 ### stringParam
 
-Source in the repository: `packages/core/src/schema-builders.ts`. [Packaged declaration](../dist/packages/core/src/schema-builders.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/schema-builders.ts).
 
 ```ts
-declare function stringParam(options?: StringParamOptions): JsonSchema
+declare function stringParam(options?: StringParamOptions): {
+  description?: string
+  maxLength?: number
+  minLength?: number
+  pattern?: string
+  type: 'string'
+}
 ```
 
 ### subscribeWebMCPKitEvents
 
-Source in the repository: `packages/core/src/events.ts`. [Packaged declaration](../dist/packages/core/src/events.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/events.ts).
 
 ```ts
 declare function subscribeWebMCPKitEvents(listener: Listener): () => void
@@ -1375,7 +991,7 @@ declare function subscribeWebMCPKitEvents(listener: Listener): () => void
 
 ### toolResolutionSchema
 
-Source in the repository: `packages/core/src/resolution-validation.ts`. [Packaged declaration](../dist/packages/core/src/resolution-validation.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/resolution-validation.ts).
 
 ```ts
 declare const toolResolutionSchema: {
@@ -1408,7 +1024,7 @@ declare const toolResolutionSchema: {
 
 ### unregisterTool
 
-Source in the repository: `packages/core/src/registry.ts`. [Packaged declaration](../dist/packages/core/src/registry.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/registry.ts).
 
 ```ts
 declare function unregisterTool(name: string): boolean
@@ -1416,7 +1032,7 @@ declare function unregisterTool(name: string): boolean
 
 ### validateJsonSchema
 
-Source in the repository: `packages/core/src/schema.ts`. [Packaged declaration](../dist/packages/core/src/schema.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/schema.ts).
 
 ```ts
 declare function validateJsonSchema(schema: JsonSchema, path?: string): string[]
@@ -1424,7 +1040,7 @@ declare function validateJsonSchema(schema: JsonSchema, path?: string): string[]
 
 ### validateJsonValue
 
-Source in the repository: `packages/core/src/schema.ts`. [Packaged declaration](../dist/packages/core/src/schema.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/schema.ts).
 
 ```ts
 declare function validateJsonValue(value: unknown, schema: JsonSchema, path?: string): string[]
@@ -1432,7 +1048,7 @@ declare function validateJsonValue(value: unknown, schema: JsonSchema, path?: st
 
 ### validateToolResolution
 
-Source in the repository: `packages/core/src/resolution-validation.ts`. [Packaged declaration](../dist/packages/core/src/resolution-validation.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/resolution-validation.ts).
 
 ```ts
 declare function validateToolResolution(
@@ -1446,7 +1062,7 @@ declare function validateToolResolution(
 
 ### DevtoolsOverlay
 
-Source in the repository: `packages/devtools/src/devtools.ts`. [Packaged declaration](../dist/packages/devtools/src/devtools.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/devtools/src/devtools.ts).
 
 ```ts
 export interface DevtoolsOverlay {
@@ -1457,7 +1073,7 @@ export interface DevtoolsOverlay {
 
 ### MountDevtoolsOptions
 
-Source in the repository: `packages/devtools/src/devtools.ts`. [Packaged declaration](../dist/packages/devtools/src/devtools.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/devtools/src/devtools.ts).
 
 ```ts
 export interface MountDevtoolsOptions {
@@ -1469,7 +1085,7 @@ export interface MountDevtoolsOptions {
 
 ### mountDevtoolsOverlay
 
-Source in the repository: `packages/devtools/src/devtools.ts`. [Packaged declaration](../dist/packages/devtools/src/devtools.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/devtools/src/devtools.ts).
 
 ```ts
 declare function mountDevtoolsOverlay(options?: MountDevtoolsOptions): DevtoolsOverlay
@@ -1479,7 +1095,7 @@ declare function mountDevtoolsOverlay(options?: MountDevtoolsOptions): DevtoolsO
 
 ### MCPBridge
 
-Source in the repository: `packages/mcp-bridge/src/index.ts`. [Packaged declaration](../dist/packages/mcp-bridge/src/index.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/mcp-bridge/src/index.ts).
 
 ```ts
 export interface MCPBridge {
@@ -1491,7 +1107,7 @@ export interface MCPBridge {
 
 ### MCPBridgeRequest
 
-Source in the repository: `packages/mcp-bridge/src/index.ts`. [Packaged declaration](../dist/packages/mcp-bridge/src/index.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/mcp-bridge/src/index.ts).
 
 ```ts
 export interface MCPBridgeRequest {
@@ -1504,7 +1120,7 @@ export interface MCPBridgeRequest {
 
 ### MCPBridgeResponse
 
-Source in the repository: `packages/mcp-bridge/src/index.ts`. [Packaged declaration](../dist/packages/mcp-bridge/src/index.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/mcp-bridge/src/index.ts).
 
 ```ts
 export interface MCPBridgeResponse {
@@ -1520,7 +1136,7 @@ export interface MCPBridgeResponse {
 
 ### MCPBridgeTool
 
-Source in the repository: `packages/mcp-bridge/src/index.ts`. [Packaged declaration](../dist/packages/mcp-bridge/src/index.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/mcp-bridge/src/index.ts).
 
 ```ts
 export interface MCPBridgeTool {
@@ -1532,7 +1148,7 @@ export interface MCPBridgeTool {
 
 ### createLocalMCPBridge
 
-Source in the repository: `packages/mcp-bridge/src/index.ts`. [Packaged declaration](../dist/packages/mcp-bridge/src/index.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/mcp-bridge/src/index.ts).
 
 ```ts
 declare function createLocalMCPBridge(): MCPBridge
@@ -1540,20 +1156,9 @@ declare function createLocalMCPBridge(): MCPBridge
 
 ## @vampaz/webmcp-kit/react
 
-### ReactWebMCPTool
-
-Source in the repository: `packages/react/src/interfaces/webmcp-tool.ts`. [Packaged declaration](../dist/packages/react/src/interfaces/webmcp-tool.d.ts).
-
-```ts
-export type ReactWebMCPTool<TInput = Record<string, unknown>, TOutput = unknown> = WebMCPTool<
-  TInput,
-  TOutput
->
-```
-
 ### UseWebMCPToolOptions
 
-Source in the repository: `packages/react/src/interfaces/webmcp-tool.ts`. [Packaged declaration](../dist/packages/react/src/interfaces/webmcp-tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/react/src/interfaces/webmcp-tool.ts).
 
 ```ts
 export interface UseWebMCPToolOptions {
@@ -1563,7 +1168,7 @@ export interface UseWebMCPToolOptions {
 
 ### UseWebMCPToolResult
 
-Source in the repository: `packages/react/src/interfaces/webmcp-tool.ts`. [Packaged declaration](../dist/packages/react/src/interfaces/webmcp-tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/react/src/interfaces/webmcp-tool.ts).
 
 ```ts
 export interface UseWebMCPToolResult<TInput = Record<string, unknown>, TOutput = unknown> {
@@ -1574,7 +1179,7 @@ export interface UseWebMCPToolResult<TInput = Record<string, unknown>, TOutput =
 
 ### useWebMCPTool
 
-Source in the repository: `packages/react/src/index.ts`. [Packaged declaration](../dist/packages/react/src/index.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/react/src/index.ts).
 
 ```ts
 declare function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unknown>(
@@ -1585,30 +1190,19 @@ declare function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unkno
 
 ## @vampaz/webmcp-kit/svelte
 
-### SvelteWebMCPTool
-
-Source in the repository: `packages/svelte/src/interfaces/webmcp-tool.ts`. [Packaged declaration](../dist/packages/svelte/src/interfaces/webmcp-tool.d.ts).
-
-```ts
-export type SvelteWebMCPTool<TInput = Record<string, unknown>, TOutput = unknown> = WebMCPTool<
-  TInput,
-  TOutput
->
-```
-
 ### UseWebMCPToolOptions
 
-Source in the repository: `packages/svelte/src/interfaces/webmcp-tool.ts`. [Packaged declaration](../dist/packages/svelte/src/interfaces/webmcp-tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/svelte/src/interfaces/webmcp-tool.ts).
 
 ```ts
 export interface UseWebMCPToolOptions {
-  when?: boolean | (() => boolean) | Readable<boolean>
+  when?: boolean | Readable<boolean>
 }
 ```
 
 ### UseWebMCPToolResult
 
-Source in the repository: `packages/svelte/src/interfaces/webmcp-tool.ts`. [Packaged declaration](../dist/packages/svelte/src/interfaces/webmcp-tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/svelte/src/interfaces/webmcp-tool.ts).
 
 ```ts
 export interface UseWebMCPToolResult<TInput = Record<string, unknown>, TOutput = unknown> {
@@ -1619,7 +1213,7 @@ export interface UseWebMCPToolResult<TInput = Record<string, unknown>, TOutput =
 
 ### useWebMCPTool
 
-Source in the repository: `packages/svelte/src/index.ts`. [Packaged declaration](../dist/packages/svelte/src/index.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/svelte/src/index.ts).
 
 ```ts
 declare function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unknown>(
@@ -1630,9 +1224,51 @@ declare function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unkno
 
 ## @vampaz/webmcp-kit/testing
 
+### TestBridgeSnapshot
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/test-bridge.ts).
+
+```ts
+export interface TestBridgeSnapshot extends Omit<RegistrySnapshot, 'tools'> {
+  tools: TestBridgeTool[]
+}
+```
+
+### TestBridgeTool
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/test-bridge.ts).
+
+```ts
+export interface TestBridgeTool {
+  name: string
+  description: string
+  inputSchema: RegisteredTool['tool']['inputSchema']
+  outputSchema?: RegisteredTool['tool']['outputSchema']
+  confirmation?: RegisteredTool['tool']['confirmation']
+  mode: RegisteredTool['mode']
+  warnings: string[]
+  available: boolean
+  unavailableReason?: string
+}
+```
+
+### WebMCPKitTestBridge
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/test-bridge.ts).
+
+```ts
+export interface WebMCPKitTestBridge {
+  getRegistrySnapshot: () => TestBridgeSnapshot
+  listTools: () => TestBridgeTool[]
+  invokeTool: <TOutput = unknown>(
+    invocation: ToolInvocation
+  ) => Promise<ToolInvocationResult<TOutput>>
+}
+```
+
 ### WebMCPResolverEvalCase
 
-Source in the repository: `packages/testing/src/interfaces/evals.ts`. [Packaged declaration](../dist/packages/testing/src/interfaces/evals.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/interfaces/evals.ts).
 
 ```ts
 export type WebMCPResolverEvalCase = WebMCPResolverEvalCaseBase &
@@ -1650,7 +1286,7 @@ export type WebMCPResolverEvalCase = WebMCPResolverEvalCaseBase &
 
 ### WebMCPResolverEvalCaseBase
 
-Source in the repository: `packages/testing/src/interfaces/evals.ts`. [Packaged declaration](../dist/packages/testing/src/interfaces/evals.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/interfaces/evals.ts).
 
 ```ts
 export interface WebMCPResolverEvalCaseBase {
@@ -1665,7 +1301,7 @@ export interface WebMCPResolverEvalCaseBase {
 
 ### WebMCPResolverEvalCaseSummary
 
-Source in the repository: `packages/testing/src/interfaces/evals.ts`. [Packaged declaration](../dist/packages/testing/src/interfaces/evals.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/interfaces/evals.ts).
 
 ```ts
 export interface WebMCPResolverEvalCaseSummary {
@@ -1681,7 +1317,7 @@ export interface WebMCPResolverEvalCaseSummary {
 
 ### WebMCPResolverEvalResult
 
-Source in the repository: `packages/testing/src/interfaces/evals.ts`. [Packaged declaration](../dist/packages/testing/src/interfaces/evals.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/interfaces/evals.ts).
 
 ```ts
 export interface WebMCPResolverEvalResult {
@@ -1696,7 +1332,7 @@ export interface WebMCPResolverEvalResult {
 
 ### WebMCPResolverEvalStepExpectation
 
-Source in the repository: `packages/testing/src/interfaces/evals.ts`. [Packaged declaration](../dist/packages/testing/src/interfaces/evals.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/interfaces/evals.ts).
 
 ```ts
 export interface WebMCPResolverEvalStepExpectation {
@@ -1707,7 +1343,7 @@ export interface WebMCPResolverEvalStepExpectation {
 
 ### WebMCPResolverEvalSuiteOptions
 
-Source in the repository: `packages/testing/src/interfaces/evals.ts`. [Packaged declaration](../dist/packages/testing/src/interfaces/evals.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/interfaces/evals.ts).
 
 ```ts
 export interface WebMCPResolverEvalSuiteOptions {
@@ -1718,7 +1354,7 @@ export interface WebMCPResolverEvalSuiteOptions {
 
 ### WebMCPResolverEvalSuiteResult
 
-Source in the repository: `packages/testing/src/interfaces/evals.ts`. [Packaged declaration](../dist/packages/testing/src/interfaces/evals.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/interfaces/evals.ts).
 
 ```ts
 export interface WebMCPResolverEvalSuiteResult {
@@ -1732,23 +1368,39 @@ export interface WebMCPResolverEvalSuiteResult {
 
 ### WebMCPResolverOutcome
 
-Source in the repository: `packages/testing/src/interfaces/evals.ts`. [Packaged declaration](../dist/packages/testing/src/interfaces/evals.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/interfaces/evals.ts).
 
 ```ts
 export type WebMCPResolverOutcome = 'needs_clarification' | 'no_tools_match'
 ```
 
+### clearToolsForTest
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/registry.ts).
+
+```ts
+declare function clearToolsForTest(): void
+```
+
 ### getWebMCPRegistrySnapshot
 
-Source in the repository: `packages/testing/src/playwright.ts`. [Packaged declaration](../dist/packages/testing/src/playwright.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/playwright.ts).
 
 ```ts
 declare function getWebMCPRegistrySnapshot(page: WebMCPTestingPage): Promise<TestBridgeSnapshot>
 ```
 
+### installWebMCPKitTestBridge
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/test-bridge.ts).
+
+```ts
+declare function installWebMCPKitTestBridge(target?: Window): () => void
+```
+
 ### invokeWebMCPTool
 
-Source in the repository: `packages/testing/src/playwright.ts`. [Packaged declaration](../dist/packages/testing/src/playwright.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/playwright.ts).
 
 ```ts
 declare function invokeWebMCPTool<TOutput = unknown>(
@@ -1759,7 +1411,7 @@ declare function invokeWebMCPTool<TOutput = unknown>(
 
 ### listWebMCPTools
 
-Source in the repository: `packages/testing/src/playwright.ts`. [Packaged declaration](../dist/packages/testing/src/playwright.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/playwright.ts).
 
 ```ts
 declare function listWebMCPTools(page: WebMCPTestingPage): Promise<TestBridgeTool[]>
@@ -1767,24 +1419,24 @@ declare function listWebMCPTools(page: WebMCPTestingPage): Promise<TestBridgeToo
 
 ### runWebMCPResolverEvalCase
 
-Source in the repository: `packages/testing/src/evals.ts`. [Packaged declaration](../dist/packages/testing/src/evals.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/evals.ts).
 
 ```ts
 declare function runWebMCPResolverEvalCase(
   resolver: ToolResolver,
-  tools: readonly AnyWebMCPTool[],
+  tools: readonly WebMCPTool[],
   testCase: WebMCPResolverEvalCase
 ): Promise<WebMCPResolverEvalResult>
 ```
 
 ### runWebMCPResolverEvalSuite
 
-Source in the repository: `packages/testing/src/evals.ts`. [Packaged declaration](../dist/packages/testing/src/evals.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/evals.ts).
 
 ```ts
 declare function runWebMCPResolverEvalSuite(
   resolver: ToolResolver,
-  tools: readonly AnyWebMCPTool[],
+  tools: readonly WebMCPTool[],
   testCases: readonly WebMCPResolverEvalCase[],
   options?: WebMCPResolverEvalSuiteOptions
 ): Promise<WebMCPResolverEvalSuiteResult>
@@ -1792,19 +1444,19 @@ declare function runWebMCPResolverEvalSuite(
 
 ### runWebMCPResolverEvals
 
-Source in the repository: `packages/testing/src/evals.ts`. [Packaged declaration](../dist/packages/testing/src/evals.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/evals.ts).
 
 ```ts
 declare function runWebMCPResolverEvals(
   resolver: ToolResolver,
-  tools: readonly AnyWebMCPTool[],
+  tools: readonly WebMCPTool[],
   testCases: readonly WebMCPResolverEvalCase[]
 ): Promise<WebMCPResolverEvalResult[]>
 ```
 
 ### waitForWebMCPTool
 
-Source in the repository: `packages/testing/src/playwright.ts`. [Packaged declaration](../dist/packages/testing/src/playwright.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/playwright.ts).
 
 ```ts
 declare function waitForWebMCPTool(
@@ -1817,7 +1469,7 @@ declare function waitForWebMCPTool(
 
 ### WebMCPTestingPage
 
-Source in the repository: `packages/testing/src/playwright.ts`. [Packaged declaration](../dist/packages/testing/src/playwright.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/playwright.ts).
 
 ```ts
 export interface WebMCPTestingPage {
@@ -1837,7 +1489,7 @@ export interface WebMCPTestingPage {
 
 ### getWebMCPRegistrySnapshot
 
-Source in the repository: `packages/testing/src/playwright.ts`. [Packaged declaration](../dist/packages/testing/src/playwright.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/playwright.ts).
 
 ```ts
 declare function getWebMCPRegistrySnapshot(page: WebMCPTestingPage): Promise<TestBridgeSnapshot>
@@ -1845,7 +1497,7 @@ declare function getWebMCPRegistrySnapshot(page: WebMCPTestingPage): Promise<Tes
 
 ### invokeWebMCPTool
 
-Source in the repository: `packages/testing/src/playwright.ts`. [Packaged declaration](../dist/packages/testing/src/playwright.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/playwright.ts).
 
 ```ts
 declare function invokeWebMCPTool<TOutput = unknown>(
@@ -1856,7 +1508,7 @@ declare function invokeWebMCPTool<TOutput = unknown>(
 
 ### listWebMCPTools
 
-Source in the repository: `packages/testing/src/playwright.ts`. [Packaged declaration](../dist/packages/testing/src/playwright.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/playwright.ts).
 
 ```ts
 declare function listWebMCPTools(page: WebMCPTestingPage): Promise<TestBridgeTool[]>
@@ -1864,7 +1516,7 @@ declare function listWebMCPTools(page: WebMCPTestingPage): Promise<TestBridgeToo
 
 ### waitForWebMCPTool
 
-Source in the repository: `packages/testing/src/playwright.ts`. [Packaged declaration](../dist/packages/testing/src/playwright.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/playwright.ts).
 
 ```ts
 declare function waitForWebMCPTool(
@@ -1877,7 +1529,7 @@ declare function waitForWebMCPTool(
 
 ### UseWebMCPToolOptions
 
-Source in the repository: `packages/vue/src/interfaces/webmcp-tool.ts`. [Packaged declaration](../dist/packages/vue/src/interfaces/webmcp-tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/vue/src/interfaces/webmcp-tool.ts).
 
 ```ts
 export interface UseWebMCPToolOptions {
@@ -1887,7 +1539,7 @@ export interface UseWebMCPToolOptions {
 
 ### UseWebMCPToolResult
 
-Source in the repository: `packages/vue/src/interfaces/webmcp-tool.ts`. [Packaged declaration](../dist/packages/vue/src/interfaces/webmcp-tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/vue/src/interfaces/webmcp-tool.ts).
 
 ```ts
 export interface UseWebMCPToolResult<TInput = Record<string, unknown>, TOutput = unknown> {
@@ -1896,20 +1548,9 @@ export interface UseWebMCPToolResult<TInput = Record<string, unknown>, TOutput =
 }
 ```
 
-### VueWebMCPTool
-
-Source in the repository: `packages/vue/src/interfaces/webmcp-tool.ts`. [Packaged declaration](../dist/packages/vue/src/interfaces/webmcp-tool.d.ts).
-
-```ts
-export type VueWebMCPTool<TInput = Record<string, unknown>, TOutput = unknown> = WebMCPTool<
-  TInput,
-  TOutput
->
-```
-
 ### useWebMCPTool
 
-Source in the repository: `packages/vue/src/index.ts`. [Packaged declaration](../dist/packages/vue/src/index.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/vue/src/index.ts).
 
 ```ts
 declare function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unknown>(
@@ -1922,7 +1563,7 @@ declare function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unkno
 
 ### DefineZodToolOptions
 
-Source in the repository: `packages/zod/src/interfaces/zod-tool.ts`. [Packaged declaration](../dist/packages/zod/src/interfaces/zod-tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/zod/src/interfaces/zod-tool.ts).
 
 ```ts
 export interface DefineZodToolOptions<TSchema extends z.ZodType, TOutput = unknown> {
@@ -1941,7 +1582,7 @@ export interface DefineZodToolOptions<TSchema extends z.ZodType, TOutput = unkno
 
 ### ZodWebMCPTool
 
-Source in the repository: `packages/zod/src/interfaces/zod-tool.ts`. [Packaged declaration](../dist/packages/zod/src/interfaces/zod-tool.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/zod/src/interfaces/zod-tool.ts).
 
 ```ts
 export type ZodWebMCPTool<TSchema extends z.ZodType, TOutput = unknown> = WebMCPTool<
@@ -1952,7 +1593,7 @@ export type ZodWebMCPTool<TSchema extends z.ZodType, TOutput = unknown> = WebMCP
 
 ### defineZodTool
 
-Source in the repository: `packages/zod/src/index.ts`. [Packaged declaration](../dist/packages/zod/src/index.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/zod/src/index.ts).
 
 ```ts
 declare function defineZodTool<TSchema extends z.ZodType, TOutput = unknown>(
@@ -1964,7 +1605,7 @@ declare function defineZodTool<TSchema extends z.ZodType, TOutput = unknown>(
 
 ### PiController
 
-Source in the repository: `packages/pi/src/interfaces/controller.ts`. [Packaged declaration](../dist/packages/pi/src/interfaces/controller.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/controller.ts).
 
 ```ts
 export interface PiController {
@@ -1979,7 +1620,7 @@ export interface PiController {
 
 ### PiError
 
-Source in the repository: `packages/pi/src/interfaces/controller.ts`. [Packaged declaration](../dist/packages/pi/src/interfaces/controller.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/controller.ts).
 
 ```ts
 export interface PiError {
@@ -1990,7 +1631,7 @@ export interface PiError {
 
 ### PiErrorCode
 
-Source in the repository: `packages/pi/src/interfaces/controller.ts`. [Packaged declaration](../dist/packages/pi/src/interfaces/controller.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/controller.ts).
 
 ```ts
 export type PiErrorCode =
@@ -2003,17 +1644,15 @@ export type PiErrorCode =
   | 'tool_failed'
   | 'limit_reached'
   | 'conversation_busy'
-  | 'transport_failed'
 ```
 
 ### PiHarnessOptions
 
-Source in the repository: `packages/pi/src/interfaces/controller.ts`. [Packaged declaration](../dist/packages/pi/src/interfaces/controller.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/controller.ts).
 
 ```ts
 export interface PiHarnessOptions {
   session: PiSession
-  worker: { url: string | URL; scope: string }
   resolver: ToolResolver
   context?: () => ResolverContext | Promise<ResolverContext>
   host?: PiToolHost
@@ -2025,7 +1664,7 @@ export interface PiHarnessOptions {
 
 ### PiLimits
 
-Source in the repository: `packages/pi/src/interfaces/session.ts`. [Packaged declaration](../dist/packages/pi/src/interfaces/session.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/session.ts).
 
 ```ts
 export interface PiLimits {
@@ -2040,7 +1679,7 @@ export interface PiLimits {
 
 ### PiMessage
 
-Source in the repository: `packages/pi/src/interfaces/controller.ts`. [Packaged declaration](../dist/packages/pi/src/interfaces/controller.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/controller.ts).
 
 ```ts
 export interface PiMessage {
@@ -2054,7 +1693,7 @@ export interface PiMessage {
 
 ### PiRuntimeOptions
 
-Source in the repository: `packages/pi/src/interfaces/controller.ts`. [Packaged declaration](../dist/packages/pi/src/interfaces/controller.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/controller.ts).
 
 ```ts
 export interface PiRuntimeOptions {
@@ -2067,7 +1706,7 @@ export interface PiRuntimeOptions {
 
 ### PiSession
 
-Source in the repository: `packages/pi/src/interfaces/session.ts`. [Packaged declaration](../dist/packages/pi/src/interfaces/session.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/session.ts).
 
 ```ts
 export interface PiSession {
@@ -2079,7 +1718,7 @@ export interface PiSession {
 
 ### PiSnapshot
 
-Source in the repository: `packages/pi/src/interfaces/controller.ts`. [Packaged declaration](../dist/packages/pi/src/interfaces/controller.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/controller.ts).
 
 ```ts
 export interface PiSnapshot {
@@ -2091,7 +1730,7 @@ export interface PiSnapshot {
 
 ### PiState
 
-Source in the repository: `packages/pi/src/interfaces/controller.ts`. [Packaged declaration](../dist/packages/pi/src/interfaces/controller.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/controller.ts).
 
 ```ts
 export type PiState =
@@ -2106,7 +1745,7 @@ export type PiState =
 
 ### PiToolCatalog
 
-Source in the repository: `packages/pi/src/interfaces/host.ts`. [Packaged declaration](../dist/packages/pi/src/interfaces/host.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/host.ts).
 
 ```ts
 export interface PiToolCatalog {
@@ -2117,7 +1756,7 @@ export interface PiToolCatalog {
 
 ### PiToolDescription
 
-Source in the repository: `packages/pi/src/interfaces/host.ts`. [Packaged declaration](../dist/packages/pi/src/interfaces/host.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/host.ts).
 
 ```ts
 export interface PiToolDescription {
@@ -2129,7 +1768,7 @@ export interface PiToolDescription {
 
 ### PiToolHost
 
-Source in the repository: `packages/pi/src/interfaces/host.ts`. [Packaged declaration](../dist/packages/pi/src/interfaces/host.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/host.ts).
 
 ```ts
 export interface PiToolHost {
@@ -2144,7 +1783,7 @@ export interface PiToolHost {
 
 ### PiTurnOutcome
 
-Source in the repository: `packages/pi/src/interfaces/controller.ts`. [Packaged declaration](../dist/packages/pi/src/interfaces/controller.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/controller.ts).
 
 ```ts
 export interface PiTurnOutcome {
@@ -2155,7 +1794,7 @@ export interface PiTurnOutcome {
 
 ### createPiHarness
 
-Source in the repository: `packages/pi/src/connection.ts`. [Packaged declaration](../dist/packages/pi/src/connection.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/connection.ts).
 
 ```ts
 declare function createPiHarness(options: PiHarnessOptions): Promise<PiController>
@@ -2163,7 +1802,7 @@ declare function createPiHarness(options: PiHarnessOptions): Promise<PiControlle
 
 ### createPiRuntime
 
-Source in the repository: `packages/pi/src/runtime.ts`. [Packaged declaration](../dist/packages/pi/src/runtime.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/runtime.ts).
 
 ```ts
 declare function createPiRuntime(options: PiRuntimeOptions): Promise<PiController>
@@ -2171,7 +1810,7 @@ declare function createPiRuntime(options: PiRuntimeOptions): Promise<PiControlle
 
 ### createRegistryToolHost
 
-Source in the repository: `packages/pi/src/tool-host.ts`. [Packaged declaration](../dist/packages/pi/src/tool-host.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/tool-host.ts).
 
 ```ts
 declare function createRegistryToolHost(
@@ -2179,21 +1818,11 @@ declare function createRegistryToolHost(
 ): PiToolHost
 ```
 
-## @vampaz/webmcp-kit/pi/worker
-
-### installPiServiceWorker
-
-Source in the repository: `packages/pi/src/worker.ts`. [Packaged declaration](../dist/packages/pi/src/worker.d.ts).
-
-```ts
-declare function installPiServiceWorker(scope?: ServiceWorkerGlobalScope): () => void
-```
-
 ## @vampaz/webmcp-kit/chat
 
 ### WebMCPChatElement
 
-Source in the repository: `packages/chat/src/interfaces/chat.ts`. [Packaged declaration](../dist/packages/chat/src/interfaces/chat.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/chat/src/interfaces/chat.ts).
 
 ```ts
 export interface WebMCPChatElement extends HTMLElement {
@@ -2203,7 +1832,7 @@ export interface WebMCPChatElement extends HTMLElement {
 
 ### WebMCPChatOptions
 
-Source in the repository: `packages/chat/src/interfaces/chat.ts`. [Packaged declaration](../dist/packages/chat/src/interfaces/chat.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/chat/src/interfaces/chat.ts).
 
 ```ts
 export interface WebMCPChatOptions {
@@ -2220,10 +1849,277 @@ export interface WebMCPChatOptions {
 
 ### defineWebMCPChat
 
-Source in the repository: `packages/chat/src/chat.ts`. [Packaged declaration](../dist/packages/chat/src/chat.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/chat/src/chat.ts).
 
 ```ts
 declare function defineWebMCPChat(): void
+```
+
+## @vampaz/webmcp-kit/command-input
+
+### InitWebMCPOptions
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/init.ts).
+
+```ts
+export interface InitWebMCPOptions {
+  buttonLabel?: string
+  confirmationHandler?: ConfirmationHandler
+  context?: ResolverContext | (() => ResolverContext)
+  placeholder?: string
+  resolver?: ToolResolver
+  target?: string | WebMCPCommandInputElement
+  tools?: readonly WebMCPTool[]
+}
+```
+
+### WebMCPCommandErrorEventDetail
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/command-input.ts).
+
+```ts
+export interface WebMCPCommandErrorEventDetail {
+  error: string
+  message: string
+}
+```
+
+### WebMCPCommandInputConfigureOptions
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/command-input.ts).
+
+```ts
+export type WebMCPCommandInputConfigureOptions = {
+  buttonLabel?: string
+  context?: ResolverContext | (() => ResolverContext)
+  disabled?: boolean
+  floating?: boolean
+  initialModel?: string
+  initialResolverOptionId?: string
+  placeholder?: string
+  settingsOpen?: boolean
+} & (
+  | { resolver?: ToolResolver; resolverOptions?: never }
+  | { resolver?: never; resolverOptions?: WebMCPCommandInputResolverOption[] }
+)
+```
+
+### WebMCPCommandInputElement
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/command-input.ts).
+
+```ts
+export interface WebMCPCommandInputElement extends HTMLElement {
+  buttonLabel?: string
+  context?: ResolverContext | (() => ResolverContext)
+  disabled: boolean
+  floating: boolean
+  panelOpen: boolean
+  placeholder: string
+  resolver?: ToolResolver
+  resolverOptions?: WebMCPCommandInputResolverOption[]
+  closePanel(): void
+  configure(options: WebMCPCommandInputConfigureOptions): void
+  openPanel(): void
+  run(
+    message?: string,
+    options?: WebMCPCommandInputRunOptions
+  ): Promise<ToolInvocationResult | undefined>
+  togglePanel(): void
+}
+```
+
+### WebMCPCommandInputPhase
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/command-input.ts).
+
+```ts
+export type WebMCPCommandInputPhase =
+  | 'idle'
+  | 'preparing'
+  | 'resolving'
+  | 'executing'
+  | 'completed'
+  | 'failed'
+```
+
+### WebMCPCommandInputResolverCreateOptions
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/command-input.ts).
+
+```ts
+export interface WebMCPCommandInputResolverCreateOptions {
+  model?: string
+  modelOption?: WebMCPCommandInputResolverModelOption
+}
+```
+
+### WebMCPCommandInputResolverModelOption
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/command-input.ts).
+
+```ts
+export interface WebMCPCommandInputResolverModelOption {
+  label: string
+  model: string
+}
+```
+
+### WebMCPCommandInputResolverOption
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/command-input.ts).
+
+```ts
+export interface WebMCPCommandInputResolverOption {
+  createResolver: (
+    options?: WebMCPCommandInputResolverCreateOptions
+  ) => Promise<ToolResolver> | ToolResolver
+  id: string
+  label: string
+  modelOptions?: WebMCPCommandInputResolverModelOption[]
+}
+```
+
+### WebMCPCommandPanelToggleEventDetail
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/command-input.ts).
+
+```ts
+export interface WebMCPCommandPanelToggleEventDetail {
+  open: boolean
+}
+```
+
+### WebMCPCommandResolutionEventDetail
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/command-input.ts).
+
+```ts
+export interface WebMCPCommandResolutionEventDetail {
+  message: string
+  resolution: ToolResolution
+  resolver: ToolResolver
+}
+```
+
+### WebMCPCommandResolverEventDetail
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/command-input.ts).
+
+```ts
+export interface WebMCPCommandResolverEventDetail {
+  resolver: ToolResolver
+}
+```
+
+### WebMCPCommandResultEventDetail
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/command-input.ts).
+
+```ts
+export interface WebMCPCommandResultEventDetail {
+  message: string
+  resolution: ToolResolution
+  result: ToolInvocationResult
+}
+```
+
+### WebMCPCommandStepEventDetail
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/command-input.ts).
+
+```ts
+export interface WebMCPCommandStepEventDetail {
+  message: string
+  phase: 'started' | 'completed'
+  resolution: ToolResolution
+  result?: ToolInvocationResult
+  step: ToolResolutionStep
+  stepCount: number
+  stepIndex: number
+}
+```
+
+### WebMCPInitHandle
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/init.ts).
+
+```ts
+export interface WebMCPInitHandle {
+  element: WebMCPCommandInputElement
+  resolver?: ToolResolver
+  registrations: RegisteredTool[]
+  destroy: () => void
+}
+```
+
+### defineWebMCPCommandInput
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/command-input.ts).
+
+```ts
+declare function defineWebMCPCommandInput(tagName?: string): CommandInputConstructor
+```
+
+### initWebMCP
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/init.ts).
+
+```ts
+declare function initWebMCP(options?: InitWebMCPOptions): WebMCPInitHandle
+```
+
+## @vampaz/webmcp-kit/hosted
+
+### HostedOpenAIResolverOptionConfig
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/hosted-openai-resolver.ts).
+
+```ts
+export interface HostedOpenAIResolverOptionConfig {
+  accessKey?: string
+  baseUrl?: string
+  browserChallengeSiteKey?: string
+  endpoint?: string
+  id?: string
+  label?: string
+  model?: string
+  modelOptions?: WebMCPCommandInputResolverModelOption[]
+  sessionEndpoint?: string
+}
+```
+
+### HostedOpenAIResolverOptions
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/hosted-openai-resolver.ts).
+
+```ts
+export interface HostedOpenAIResolverOptions {
+  accessKey?: string
+  baseUrl?: string
+  browserChallengeSiteKey?: string
+  endpoint?: string
+  model: string
+  sessionEndpoint?: string
+}
+```
+
+### createHostedOpenAIResolver
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/hosted-openai-resolver.ts).
+
+```ts
+declare function createHostedOpenAIResolver(rawOptions: HostedOpenAIResolverOptions): ToolResolver
+```
+
+### createHostedOpenAIResolverOption
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/hosted-openai-resolver.ts).
+
+```ts
+declare function createHostedOpenAIResolverOption(
+  config: HostedOpenAIResolverOptionConfig
+): WebMCPCommandInputResolverOption
 ```
 
 ## Supporting types
@@ -2232,7 +2128,7 @@ These types are referenced by exported contracts. Use the owning public type to 
 
 ### UnknownToRecord
 
-Source in the repository: `packages/core/src/interfaces/schema-inference.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/schema-inference.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/schema-inference.ts).
 
 ```ts
 type UnknownToRecord<T> = [unknown] extends [T] ? Record<string, unknown> : T
@@ -2240,7 +2136,7 @@ type UnknownToRecord<T> = [unknown] extends [T] ? Record<string, unknown> : T
 
 ### InferJsonSchemaType
 
-Source in the repository: `packages/core/src/interfaces/schema-inference.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/schema-inference.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/schema-inference.ts).
 
 ```ts
 type InferJsonSchemaType<S> = S extends { const: infer C }
@@ -2258,32 +2154,9 @@ type InferJsonSchemaType<S> = S extends { const: infer C }
           : unknown
 ```
 
-### ResolverRunOptions
-
-Source in the repository: `packages/core/src/interfaces/tool.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/tool.d.ts).
-
-```ts
-export interface ResolverRunOptions {
-  signal?: AbortSignal
-  singleStep?: boolean
-  /** Maximum UTF-8 bytes in the serialized resolver request, including prompt/schema overhead. */
-  maxRequestBytes?: number
-}
-```
-
-### WebMCPCommandInputRunOptions
-
-Source in the repository: `packages/core/src/interfaces/command-input.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/command-input.d.ts).
-
-```ts
-export interface WebMCPCommandInputRunOptions {
-  signal?: AbortSignal
-}
-```
-
 ### CatalogRegistration
 
-Source in the repository: `packages/core/src/adapters/catalog.ts`. [Packaged declaration](../dist/packages/core/src/adapters/catalog.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/adapters/catalog.ts).
 
 ```ts
 interface CatalogRegistration {
@@ -2301,9 +2174,27 @@ interface CatalogRegistration {
 }
 ```
 
+### Listener
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/events.ts).
+
+```ts
+type Listener = (event: WebMCPKitEvent) => void
+```
+
+### WebMCPCommandInputRunOptions
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/command-input.ts).
+
+```ts
+export interface WebMCPCommandInputRunOptions {
+  signal?: AbortSignal
+}
+```
+
 ### CommandInputConstructor
 
-Source in the repository: `packages/core/src/command-input.ts`. [Packaged declaration](../dist/packages/core/src/command-input.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/command-input.ts).
 
 ```ts
 type CommandInputConstructor = CustomElementConstructor & {
@@ -2311,17 +2202,9 @@ type CommandInputConstructor = CustomElementConstructor & {
 }
 ```
 
-### Listener
-
-Source in the repository: `packages/core/src/events.ts`. [Packaged declaration](../dist/packages/core/src/events.d.ts).
-
-```ts
-type Listener = (event: WebMCPKitEvent) => void
-```
-
 ### InferNamedType
 
-Source in the repository: `packages/core/src/interfaces/schema-inference.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/schema-inference.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/schema-inference.ts).
 
 ```ts
 type InferNamedType<T, S> = T extends 'string'
@@ -2341,7 +2224,7 @@ type InferNamedType<T, S> = T extends 'string'
 
 ### InferArrayType
 
-Source in the repository: `packages/core/src/interfaces/schema-inference.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/schema-inference.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/schema-inference.ts).
 
 ```ts
 type InferArrayType<S> = S extends { items: infer I } ? InferJsonSchemaType<I>[] : unknown[]
@@ -2349,7 +2232,7 @@ type InferArrayType<S> = S extends { items: infer I } ? InferJsonSchemaType<I>[]
 
 ### InferObjectType
 
-Source in the repository: `packages/core/src/interfaces/schema-inference.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/schema-inference.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/schema-inference.ts).
 
 ```ts
 type InferObjectType<S> = S extends { properties: infer P }
@@ -2363,7 +2246,7 @@ type InferObjectType<S> = S extends { properties: infer P }
 
 ### Simplify
 
-Source in the repository: `packages/core/src/interfaces/schema-inference.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/schema-inference.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/schema-inference.ts).
 
 ```ts
 type Simplify<T> = { [K in keyof T]: T[K] } & {}
@@ -2371,7 +2254,7 @@ type Simplify<T> = { [K in keyof T]: T[K] } & {}
 
 ### RequiredPropertyKeys
 
-Source in the repository: `packages/core/src/interfaces/schema-inference.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/schema-inference.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/schema-inference.ts).
 
 ```ts
 type RequiredPropertyKeys<S, P> = S extends { required: readonly (infer R)[] }
@@ -2381,7 +2264,7 @@ type RequiredPropertyKeys<S, P> = S extends { required: readonly (infer R)[] }
 
 ### OptionalPropertyKeys
 
-Source in the repository: `packages/core/src/interfaces/schema-inference.ts`. [Packaged declaration](../dist/packages/core/src/interfaces/schema-inference.d.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/schema-inference.ts).
 
 ```ts
 type OptionalPropertyKeys<S, P> = Exclude<keyof P, RequiredPropertyKeys<S, P>>

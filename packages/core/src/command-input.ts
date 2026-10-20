@@ -1,7 +1,5 @@
 import type {
   ResolverContext,
-  ResolverProviderConfig,
-  ResolverProviderKind,
   ToolInvocationResult,
   ToolResolution,
   ToolResolver
@@ -10,7 +8,6 @@ import type {
   WebMCPCommandErrorEventDetail,
   WebMCPCommandInputConfigureOptions,
   WebMCPCommandInputElement,
-  WebMCPCommandInputEndpointOption,
   WebMCPCommandInputResolverOption,
   WebMCPCommandInputPhase,
   WebMCPCommandPanelToggleEventDetail,
@@ -28,27 +25,12 @@ import {
 import { invokeResolvedSteps, throwIfAborted } from './command-input-runner'
 import { getErrorMessage } from './confirmation'
 import {
-  createCommandInputResolver,
-  defaultEndpoint,
-  defaultModel,
-  getDefaultModelForProvider,
   getDefaultModelForResolverOption,
-  getDefaultProvider,
-  getModelControlMarkup,
-  getModelOptionCount,
-  getOptionsStatusText,
   getResolverOptionModelControlMarkup,
-  getResolverOptionModelOptionCount,
-  getResolverOptionId,
   getResolverOptionStatusText,
-  getResolverOptionValue,
-  getProviderControlMarkup,
-  getProviderOptionCount,
-  isAuthMode,
-  isResolverAttribute,
-  isResolverProviderKind
+  getProviderControlMarkup
 } from './command-input-options'
-import { createChromeAIResolver } from './resolver'
+import { createResolver } from './resolver'
 import { listAvailableTools } from './registry'
 import { validateToolResolution } from './resolution-validation'
 
@@ -59,8 +41,6 @@ type CommandInputConstructor = CustomElementConstructor & {
 type CommandInputRuntimeState = {
   buttonLabel: string
   disabled: boolean
-  fixedModel?: string
-  fixedProvider?: ResolverProviderKind
   floating: boolean
   floatingExpanded: boolean
   hasDiagnostics: boolean
@@ -72,7 +52,6 @@ type CommandInputRuntimeState = {
   prompt: string
   resolverDetail: string
   resolverName: string
-  provider: ResolverProviderKind
   settingsOpen: boolean
 }
 
@@ -80,18 +59,7 @@ const defaultPlaceholder = 'Tell this app what to do'
 const defaultButtonLabel = 'Run'
 const supersededResolverRefreshMessage = 'Resolver refresh was superseded.'
 const webMCPCommandInputTagName = 'webmcp-command-input'
-const observedAttributes = [
-  'api-key',
-  'auth-mode',
-  'base-url',
-  'button-label',
-  'disabled',
-  'endpoint',
-  'floating',
-  'model',
-  'placeholder',
-  'provider'
-]
+const observedAttributes = ['button-label', 'disabled', 'floating', 'placeholder']
 
 export function defineWebMCPCommandInput(
   tagName = webMCPCommandInputTagName
@@ -104,30 +72,17 @@ export function defineWebMCPCommandInput(
   class WebMCPCommandInput extends HTMLElement implements WebMCPCommandInputElement {
     static observedAttributes = observedAttributes
 
-    apiKey?: string
-    authMode?: 'none' | 'server' | 'user-key'
-    baseUrl?: string
     context?: ResolverContext | (() => ResolverContext)
-    endpoint?: string
-    endpointOptions?: WebMCPCommandInputEndpointOption[]
-    resolverOptions?: WebMCPCommandInputResolverOption[]
-    showChromeAI = true
-    private chromeAIAvailable = false
-    private chromeAILoadId = 0
+    private providedResolverOptions?: WebMCPCommandInputResolverOption[]
+    private pendingResolver?: Promise<ToolResolver>
     private currentResolver?: ToolResolver
-    private currentResolverSignature = ''
-    private currentResolverWasCreated = false
     private isConnectedToDom = false
-    private providerWasChosen = false
     private lightDomObserver?: MutationObserver
-    private resolverLoadId = 0
     private resolverRevision = 0
     private providedResolver?: ToolResolver
-    private providedResolverConfig?: ResolverProviderConfig
     private renderedStructureSignature = ''
     private running = false
     private activeCommand?: AbortController
-    private userSelectedModel = false
     private userSelectedResolver = false
     private readonly state: CommandInputRuntimeState = {
       buttonLabel: defaultButtonLabel,
@@ -136,13 +91,12 @@ export function defineWebMCPCommandInput(
       floating: false,
       floatingExpanded: false,
       hasDiagnostics: false,
-      model: defaultModel,
+      model: '',
       phase: 'idle',
       placeholder: defaultPlaceholder,
       prompt: '',
       resolverDetail: 'Resolver is waiting for a command.',
       resolverName: 'Resolver',
-      provider: 'auto',
       settingsOpen: false
     }
 
@@ -158,7 +112,6 @@ export function defineWebMCPCommandInput(
       this.observeLightDom()
       this.render()
       if (this.state.floatingExpanded) this.focusPromptInput()
-      void this.refreshChromeAIAvailability()
       void this.refreshResolverStatus()
     }
 
@@ -174,10 +127,6 @@ export function defineWebMCPCommandInput(
       this.applyAttribute(name, newValue)
       if (!this.isConnectedToDom) return
       this.render()
-      if (isResolverAttribute(name)) {
-        this.invalidateResolver()
-        void this.refreshResolverStatus()
-      }
     }
 
     get buttonLabel(): string {
@@ -215,17 +164,6 @@ export function defineWebMCPCommandInput(
       this.setPanelOpen(value)
     }
 
-    get model(): string | undefined {
-      return this.state.fixedModel
-    }
-
-    set model(value: string | undefined) {
-      this.applyModelState(value)
-      this.invalidateResolver()
-      this.renderIfConnected()
-      void this.refreshResolverStatus()
-    }
-
     get placeholder(): string {
       return this.state.placeholder
     }
@@ -240,114 +178,78 @@ export function defineWebMCPCommandInput(
     }
 
     set resolver(value: ToolResolver | undefined) {
-      this.providedResolver = value
-      this.invalidateResolver()
-      this.renderIfConnected()
-      void this.refreshResolverStatus()
+      this.configure({ resolver: value })
     }
 
-    get resolverConfig(): ResolverProviderConfig | undefined {
-      return this.providedResolverConfig
+    get resolverOptions(): WebMCPCommandInputResolverOption[] | undefined {
+      return this.providedResolverOptions
     }
 
-    set resolverConfig(value: ResolverProviderConfig | undefined) {
-      this.providedResolverConfig = value
-      this.invalidateResolver()
-      this.renderIfConnected()
-      void this.refreshResolverStatus()
-    }
-
-    get provider(): ResolverProviderKind | undefined {
-      return this.state.fixedProvider
-    }
-
-    set provider(value: ResolverProviderKind | undefined) {
-      this.applyProviderState(value)
-      this.invalidateResolver()
-      this.renderIfConnected()
-      void this.refreshResolverStatus()
+    set resolverOptions(value: WebMCPCommandInputResolverOption[] | undefined) {
+      this.configure({ resolverOptions: value })
     }
 
     configure(options: WebMCPCommandInputConfigureOptions) {
-      this.apiKey = options.apiKey ?? this.apiKey
-      this.authMode = options.authMode ?? this.authMode
-      this.baseUrl = options.baseUrl ?? this.baseUrl
-      this.context = options.context ?? this.context
-      this.endpoint = options.endpoint ?? this.endpoint
-      this.endpointOptions = options.endpointOptions ?? this.endpointOptions
-      this.resolverOptions = options.resolverOptions ?? this.resolverOptions
-      if (options.showChromeAI !== undefined) {
-        this.showChromeAI = options.showChromeAI
-        if (!this.showChromeAI) {
-          this.chromeAIAvailable = false
-          if (!this.state.fixedProvider && this.state.provider === 'chrome-built-in') {
-            this.state.provider = getDefaultProvider(this.endpointOptions, false)
-            this.state.model = getDefaultModelForProvider(this.state.provider, this.endpointOptions)
-          }
-        }
-      }
-      if (options.floating !== undefined) this.applyFloatingState(options.floating)
-      if (
-        options.initialProvider !== undefined &&
-        !this.state.fixedProvider &&
-        !this.userSelectedResolver
-      ) {
-        this.providerWasChosen = true
-        this.state.resolverOptionId = undefined
-        this.state.provider = options.initialProvider
-      } else if (
-        options.endpointOptions !== undefined &&
-        !this.state.fixedProvider &&
-        this.state.provider === 'auto'
-      ) {
-        this.state.provider = getDefaultProvider(
-          options.endpointOptions,
-          this.shouldShowChromeAIOption()
+      if (options.resolver !== undefined && options.resolverOptions !== undefined)
+        throw new Error('Configure either resolver or resolverOptions.')
+      if (options.resolverOptions) {
+        const ids = options.resolverOptions.map(function id(option) {
+          return option.id
+        })
+        if (
+          ids.some(function empty(id) {
+            return !id.trim()
+          }) ||
+          new Set(ids).size !== ids.length
         )
+          throw new Error('Resolver choices require unique, nonempty IDs.')
       }
-      if (
-        options.initialModel !== undefined &&
-        !this.state.fixedModel &&
-        !this.userSelectedResolver &&
-        !this.userSelectedModel
-      ) {
-        this.state.model = options.initialModel
-      } else if (
-        options.endpointOptions !== undefined &&
-        !this.state.fixedModel &&
-        !this.userSelectedModel
-      ) {
-        this.state.model = getDefaultModelForProvider(this.state.provider, options.endpointOptions)
+      const previousResolver = this.providedResolver
+      const previousOptions = this.providedResolverOptions
+      const previousId = this.state.resolverOptionId
+      const previousModel = this.state.model
+      if ('resolver' in options) {
+        this.providedResolver = options.resolver
+        this.providedResolverOptions = undefined
       }
-      if (
-        options.initialResolverOptionId !== undefined &&
-        !this.state.fixedProvider &&
-        !this.userSelectedResolver
-      ) {
-        const initialResolverOption = this.getResolverOptionById(options.initialResolverOptionId)
-        if (initialResolverOption) {
-          this.providerWasChosen = true
-          this.state.resolverOptionId = initialResolverOption.id
-          this.state.provider = 'auto'
-          if (!this.state.fixedModel) {
-            this.state.model = getDefaultModelForResolverOption(initialResolverOption)
-          }
+      if ('resolverOptions' in options) {
+        this.providedResolverOptions = options.resolverOptions
+        this.providedResolver = undefined
+      }
+      const selected = this.getResolverOptionById(this.state.resolverOptionId ?? '')
+      if (!selected) {
+        this.state.resolverOptionId = this.providedResolverOptions?.[0]?.id
+        this.state.model = getDefaultModelForResolverOption(this.getSelectedResolverOption())
+      } else if (!selected.modelOptions?.some((option) => option.model === this.state.model)) {
+        this.state.model = getDefaultModelForResolverOption(selected)
+      }
+      if (!this.userSelectedResolver && options.initialResolverOptionId !== undefined) {
+        const initial = this.getResolverOptionById(options.initialResolverOptionId)
+        if (initial) {
+          this.state.resolverOptionId = initial.id
+          this.state.model = getDefaultModelForResolverOption(initial)
         }
       }
+      if (!this.userSelectedResolver && options.initialModel !== undefined) {
+        const model = this.getSelectedResolverOption()?.modelOptions?.find(function matches(item) {
+          return item.model === options.initialModel
+        })
+        if (model) this.state.model = model.model
+      }
+      if ('context' in options) this.context = options.context
+      if (options.floating !== undefined) this.applyFloatingState(options.floating)
       if (options.settingsOpen !== undefined) this.state.settingsOpen = options.settingsOpen
-      if (options.resolver !== undefined) this.providedResolver = options.resolver
-      if (options.resolverConfig !== undefined) this.providedResolverConfig = options.resolverConfig
-
       if (options.buttonLabel !== undefined) this.applyButtonLabelState(options.buttonLabel)
       if (options.disabled !== undefined) this.state.disabled = options.disabled
       if (options.placeholder !== undefined) this.applyPlaceholderState(options.placeholder)
-      if (options.model !== undefined) this.applyModelState(options.model)
-      if (options.provider !== undefined) this.applyProviderState(options.provider)
-
-      this.invalidateResolver()
+      const changed =
+        previousResolver !== this.providedResolver ||
+        previousOptions !== this.providedResolverOptions ||
+        previousId !== this.state.resolverOptionId ||
+        previousModel !== this.state.model
+      if (changed) this.invalidateResolver()
       this.renderIfConnected()
-      void this.refreshChromeAIAvailability()
-      void this.refreshResolverStatus()
+      if (changed) void this.refreshResolverStatus()
     }
 
     openPanel() {
@@ -406,6 +308,7 @@ export function defineWebMCPCommandInput(
           (detail) => this.dispatchStepEvent(command, detail),
           signal
         )
+        this.state.resolverDetail = result.error ?? resolution.reason
         this.setPhase(result.status === 'success' ? 'completed' : 'failed')
         this.dispatchResultEvent(command, resolution, result)
         return result
@@ -462,16 +365,10 @@ export function defineWebMCPCommandInput(
     }
 
     private applyAttribute(name: string, value: string | null) {
-      if (name === 'api-key') this.apiKey = value ?? undefined
-      if (name === 'auth-mode') this.authMode = isAuthMode(value) ? value : undefined
-      if (name === 'base-url') this.baseUrl = value ?? undefined
       if (name === 'button-label') this.applyButtonLabelState(value ?? undefined)
       if (name === 'disabled') this.state.disabled = value !== null
-      if (name === 'endpoint') this.endpoint = value ?? undefined
       if (name === 'floating') this.applyFloatingState(value !== null)
-      if (name === 'model') this.applyModelState(value ?? undefined)
       if (name === 'placeholder') this.applyPlaceholderState(value ?? undefined)
-      if (name === 'provider') this.applyProviderState(value)
     }
 
     private applyButtonLabelState(value: string | undefined) {
@@ -487,120 +384,39 @@ export function defineWebMCPCommandInput(
       if (!value) this.state.floatingExpanded = false
     }
 
-    private applyModelState(value: string | undefined) {
-      this.state.fixedModel = value || undefined
-      this.state.model = value || defaultModel
-    }
-
-    private applyProviderState(value: string | null | undefined) {
-      this.state.fixedProvider = isResolverProviderKind(value) ? value : undefined
-      this.providerWasChosen = Boolean(this.state.fixedProvider)
-      this.state.resolverOptionId = undefined
-      this.state.provider = this.state.fixedProvider ?? 'auto'
-    }
-
     private async getCurrentResolver(): Promise<ToolResolver> {
-      if (this.resolver) {
-        this.state.resolverName = `${this.resolver.name} (${this.resolver.status})`
-        this.state.resolverDetail = this.resolver.detail
-        this.dispatchResolverEvent(this.resolver)
-        return this.resolver
-      }
-
-      const resolverOption = this.getSelectedResolverOption()
-      if (resolverOption) {
-        const resolverModel = this.state.fixedModel ?? this.state.model
-        const resolverSignature = JSON.stringify({
-          resolverOption: resolverOption.id,
-          model: resolverModel || undefined
-        })
-        if (this.currentResolver && this.currentResolverSignature === resolverSignature)
-          return this.currentResolver
-
-        this.disposeCreatedResolver()
-        const loadId = this.resolverLoadId + 1
-        this.resolverLoadId = loadId
-        const revision = this.resolverRevision
-        const resolver = await resolverOption.createResolver({
-          model: resolverModel || undefined,
-          modelOption: resolverOption.modelOptions?.find(function findModelOption(option) {
-            return option.model === resolverModel
-          })
-        })
-        if (revision !== this.resolverRevision || loadId !== this.resolverLoadId) {
-          resolver.dispose?.()
-          throw new Error(supersededResolverRefreshMessage)
-        }
-
-        this.currentResolver = resolver
-        this.currentResolverWasCreated = true
-        this.currentResolverSignature = resolverSignature
-        this.state.resolverName = `${this.currentResolver.name} (${this.currentResolver.status})`
-        this.state.resolverDetail = this.currentResolver.detail
-        this.dispatchResolverEvent(this.currentResolver)
-        return this.currentResolver
-      }
-
-      const resolverConfig = this.getResolverConfig()
-      const resolverSignature = JSON.stringify(resolverConfig ?? { provider: 'auto' })
-      if (this.currentResolver && this.currentResolverSignature === resolverSignature)
-        return this.currentResolver
-
-      this.disposeCreatedResolver()
-      const loadId = this.resolverLoadId + 1
-      this.resolverLoadId = loadId
+      if (this.providedResolver) return this.providedResolver
+      if (this.currentResolver) return this.currentResolver
+      if (this.pendingResolver) return this.pendingResolver
       const revision = this.resolverRevision
-      const resolver = await createCommandInputResolver(resolverConfig)
-      if (revision !== this.resolverRevision || loadId !== this.resolverLoadId) {
-        resolver.dispose?.()
-        throw new Error(supersededResolverRefreshMessage)
+      const option = this.getSelectedResolverOption()
+      const model = this.state.model
+      // Share one creation between status refresh and a command that starts immediately.
+      const pending = Promise.resolve()
+        .then(async function create() {
+          return option
+            ? option.createResolver({
+                model: model || undefined,
+                modelOption: option.modelOptions?.find(function selected(item) {
+                  return item.model === model
+                })
+              })
+            : createResolver()
+        })
+        .then((resolver) => {
+          if (revision !== this.resolverRevision) {
+            resolver.dispose?.()
+            throw new Error(supersededResolverRefreshMessage)
+          }
+          this.currentResolver = resolver
+          return resolver
+        })
+      this.pendingResolver = pending
+      try {
+        return await pending
+      } finally {
+        if (this.pendingResolver === pending) this.pendingResolver = undefined
       }
-
-      this.currentResolver = resolver
-      this.currentResolverWasCreated = true
-      this.currentResolverSignature = resolverSignature
-      this.state.resolverName = `${this.currentResolver.name} (${this.currentResolver.status})`
-      this.state.resolverDetail = this.currentResolver.detail
-      this.dispatchResolverEvent(this.currentResolver)
-      return this.currentResolver
-    }
-
-    private getResolverConfig(): ResolverProviderConfig | undefined {
-      if (this.resolverConfig) return this.resolverConfig
-
-      const provider = this.state.fixedProvider ?? this.state.provider
-      if (provider === 'auto') return undefined
-      if (provider === 'chrome-built-in' || provider === 'local') {
-        return {
-          provider,
-          auth: { mode: 'none' }
-        }
-      }
-
-      const model = this.state.fixedModel ?? this.state.model
-      const authMode = this.getAuthMode(provider)
-      return {
-        provider,
-        model: model || undefined,
-        baseUrl: this.baseUrl || undefined,
-        auth:
-          authMode === 'server'
-            ? {
-                mode: 'server',
-                endpoint: this.endpoint || defaultEndpoint
-              }
-            : {
-                mode: authMode,
-                apiKey: this.apiKey || undefined
-              }
-      }
-    }
-
-    private getAuthMode(provider: ResolverProviderKind): 'none' | 'server' | 'user-key' {
-      if (this.authMode) return this.authMode
-      if (provider === 'cloudflare-binding') return 'server'
-      if (this.endpoint && provider !== 'openai-compatible') return 'server'
-      return 'user-key'
     }
 
     private getResolverContext(): ResolverContext {
@@ -613,7 +429,10 @@ export function defineWebMCPCommandInput(
       if (!this.isConnectedToDom) return
 
       try {
-        await this.getCurrentResolver()
+        const resolver = await this.getCurrentResolver()
+        this.state.resolverName = `${resolver.name} (${resolver.status})`
+        this.state.resolverDetail = resolver.detail
+        this.dispatchResolverEvent(resolver)
       } catch (error) {
         if (getErrorMessage(error) === supersededResolverRefreshMessage) return
         this.state.resolverName = 'Resolver'
@@ -623,59 +442,16 @@ export function defineWebMCPCommandInput(
       this.renderIfConnected()
     }
 
-    private async refreshChromeAIAvailability() {
-      const loadId = this.chromeAILoadId + 1
-      this.chromeAILoadId = loadId
-      if (!this.showChromeAI) {
-        this.chromeAIAvailable = false
-        this.renderIfConnected()
-        return
-      }
-
-      const resolver = await createChromeAIResolver()
-      resolver.dispose?.()
-      if (!this.isConnectedToDom || loadId !== this.chromeAILoadId) return
-      if (this.chromeAIAvailable === resolver.available) return
-      const wasAvailable = this.chromeAIAvailable
-      this.chromeAIAvailable = resolver.available
-      if (
-        !wasAvailable &&
-        this.chromeAIAvailable &&
-        !this.providerWasChosen &&
-        !this.state.fixedProvider &&
-        !this.state.resolverOptionId
-      ) {
-        this.state.provider = 'chrome-built-in'
-        this.state.model = ''
-        this.invalidateResolver()
-        void this.refreshResolverStatus()
-      }
-      this.renderIfConnected()
-    }
-
-    private disposeCreatedResolver() {
-      if (this.currentResolverWasCreated) this.currentResolver?.dispose?.()
-      this.currentResolver = undefined
-      this.currentResolverSignature = ''
-      this.currentResolverWasCreated = false
-    }
-
     private invalidateResolver() {
       this.activeCommand?.abort()
       this.resolverRevision += 1
-      this.resolverLoadId += 1
-      this.disposeCreatedResolver()
+      this.pendingResolver = undefined
+      this.currentResolver?.dispose?.()
+      this.currentResolver = undefined
     }
 
     private invalidateAutoResolverBeforeRun() {
-      if (this.resolver || this.resolverConfig) return
-      if (this.state.resolverOptionId) return
-      const provider = this.state.fixedProvider ?? this.state.provider
-      if (provider === 'auto') this.invalidateResolver()
-    }
-
-    private shouldShowChromeAIOption(): boolean {
-      return this.showChromeAI && this.chromeAIAvailable
+      if (!this.providedResolver && !this.getSelectedResolverOption()) this.invalidateResolver()
     }
 
     private setPhase(phase: WebMCPCommandInputPhase) {
@@ -777,15 +553,11 @@ export function defineWebMCPCommandInput(
     private handleProviderChanged(event: Event) {
       const target = event.target
       if (!(target instanceof HTMLSelectElement)) return
-      const resolverOptionId = getResolverOptionId(target.value)
-      const provider = isResolverProviderKind(target.value) ? target.value : 'auto'
-      this.providerWasChosen = true
+      const option = this.getResolverOptionById(target.value)
+      if (!option || option.id === this.state.resolverOptionId) return
       this.userSelectedResolver = true
-      this.state.resolverOptionId = resolverOptionId
-      this.state.provider = provider
-      this.state.model = resolverOptionId
-        ? getDefaultModelForResolverOption(this.getResolverOptionById(resolverOptionId))
-        : getDefaultModelForProvider(provider, this.endpointOptions)
+      this.state.resolverOptionId = option.id
+      this.state.model = getDefaultModelForResolverOption(option)
       this.state.settingsOpen = true
       this.invalidateResolver()
       this.render()
@@ -795,7 +567,8 @@ export function defineWebMCPCommandInput(
     private handleModelChanged(event: Event) {
       const target = event.target
       if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLSelectElement)) return
-      this.userSelectedModel = true
+      if (this.state.model === target.value) return
+      this.userSelectedResolver = true
       this.state.model = target.value
       this.invalidateResolver()
       void this.refreshResolverStatus()
@@ -869,30 +642,14 @@ export function defineWebMCPCommandInput(
 
     private getViewState(): CommandInputViewState {
       const resolverOption = this.getSelectedResolverOption()
-      const provider =
-        this.resolverConfig?.provider ?? this.state.fixedProvider ?? this.state.provider
-      const model = this.resolverConfig?.model ?? this.state.fixedModel ?? this.state.model
-      const providerControlValue = resolverOption
-        ? getResolverOptionValue(resolverOption.id)
-        : provider
-      const showChromeAIOption = this.shouldShowChromeAIOption()
+      const model = this.state.model
       const showProviderControl =
-        !this.resolver &&
-        !this.resolverConfig &&
-        !this.state.fixedProvider &&
-        getProviderOptionCount(this.endpointOptions, showChromeAIOption, this.resolverOptions) > 1
+        !this.providedResolver && (this.providedResolverOptions?.length ?? 0) > 1
       const showModelControl =
-        !this.resolver &&
-        !this.resolverConfig &&
-        !this.state.fixedModel &&
-        (resolverOption
-          ? getResolverOptionModelOptionCount(resolverOption) > 1
-          : getModelOptionCount(provider, this.endpointOptions) > 1)
-      const optionsStatus = this.resolver
-        ? this.state.resolverName
-        : resolverOption
-          ? getResolverOptionStatusText(resolverOption, model)
-          : getOptionsStatusText(provider, model, this.endpointOptions)
+        !this.providedResolver && (resolverOption?.modelOptions?.length ?? 0) > 1
+      const optionsStatus = resolverOption
+        ? getResolverOptionStatusText(resolverOption, model)
+        : this.state.resolverName
 
       return {
         buttonLabel: this.running ? getStatusLabel(this.state.phase) : this.state.buttonLabel,
@@ -900,22 +657,17 @@ export function defineWebMCPCommandInput(
         disabled: this.state.disabled,
         floating: this.state.floating,
         floatingExpanded: this.state.floatingExpanded,
-        modelControlMarkup: showModelControl
-          ? resolverOption
+        modelControlMarkup:
+          showModelControl && resolverOption
             ? getResolverOptionModelControlMarkup(resolverOption, model)
-            : getModelControlMarkup(provider, model, this.endpointOptions)
-          : '',
+            : '',
+        detail: this.state.resolverDetail,
         optionsStatus,
         phase: this.state.phase,
         placeholder: this.state.placeholder,
         prompt: this.state.prompt,
         providerControlMarkup: showProviderControl
-          ? getProviderControlMarkup(
-              providerControlValue,
-              this.endpointOptions,
-              showChromeAIOption,
-              this.resolverOptions
-            )
+          ? getProviderControlMarkup(resolverOption?.id ?? '', this.providedResolverOptions ?? [])
           : '',
         running: this.running,
         settingsOpen: this.state.settingsOpen,
@@ -927,7 +679,11 @@ export function defineWebMCPCommandInput(
     private renderStructure(view: CommandInputViewState) {
       if (!this.shadowRoot) return
       const previousInput = this.getPromptInput()
-      const shouldRestorePromptFocus = this.shadowRoot.activeElement === previousInput
+      const active = this.shadowRoot.activeElement
+      const shouldRestorePromptFocus = active === previousInput
+      const selectedControl = ['[data-provider]', '[data-model]'].find(function focused(selector) {
+        return active?.matches(selector)
+      })
       const selectionStart = previousInput?.selectionStart
       const selectionEnd = previousInput?.selectionEnd
 
@@ -950,8 +706,9 @@ export function defineWebMCPCommandInput(
       settingsControl?.addEventListener('toggle', this.handleSettingsToggled.bind(this))
       diagnosticsControl?.addEventListener('toggle', this.handleDiagnosticsToggled.bind(this))
       providerControl?.addEventListener('change', this.handleProviderChanged.bind(this))
-      modelControl?.addEventListener('input', this.handleModelChanged.bind(this))
       modelControl?.addEventListener('change', this.handleModelChanged.bind(this))
+      if (selectedControl)
+        this.shadowRoot.querySelector<HTMLElement>(selectedControl)?.focus({ preventScroll: true })
       if (shouldRestorePromptFocus) {
         input?.focus({ preventScroll: true })
         if (selectionStart !== null && selectionEnd !== null) {
@@ -964,6 +721,8 @@ export function defineWebMCPCommandInput(
       const root = this.shadowRoot
       if (!root) return
 
+      const feedback = root.querySelector<HTMLElement>('[data-feedback]')
+      if (feedback) feedback.textContent = view.detail ?? ''
       const input = this.getPromptInput()
       if (input) {
         input.placeholder = view.placeholder

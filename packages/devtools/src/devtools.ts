@@ -1,6 +1,5 @@
+import { escapeHtml, escapeAttribute } from '../../core/src/command-input-html'
 import {
-  escapeAttribute,
-  escapeHtml,
   getIntegrationHealthReport,
   getSupportLabel,
   invokeTool,
@@ -396,6 +395,8 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
   target.append(style, root)
 
   let open = options.initiallyOpen ?? true
+  let renderPending = false
+  let destroyed = false
   let nextHistoryId = 1
   const history: HistoryItem[] = []
   const pendingInvocations = new Map<string, ToolInvocation>()
@@ -422,7 +423,7 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
       }
       history.splice(5)
     }
-    render()
+    scheduleRender()
   })
 
   root.addEventListener('click', function handleClick(event) {
@@ -482,10 +483,20 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
   return {
     refresh: render,
     destroy() {
+      destroyed = true
       unsubscribe()
       root.remove()
       style.remove()
     }
+  }
+
+  function scheduleRender() {
+    if (renderPending) return
+    renderPending = true
+    queueMicrotask(function flushRender() {
+      renderPending = false
+      if (!destroyed) render()
+    })
   }
 
   function render() {
@@ -495,6 +506,10 @@ export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): Devtoo
         ? ([active.selectionStart, active.selectionEnd] as const)
         : undefined
     const registrations = listTools()
+    if (!open) {
+      root.innerHTML = `<button class="wmk-devtools__toggle" type="button" data-action="toggle">Show inspector · ${registrations.length} tools</button>`
+      return
+    }
     const healthReport = getIntegrationHealthReport()
     pruneDraftInputs(registrations)
     root.innerHTML = `
@@ -737,7 +752,7 @@ function getToolGuidance(tool: WebMCPTool, warnings: string[]): string[] {
     }
   }
 
-  if (isMutationTool(tool) && tool.confirmation?.required !== true) {
+  if (isMutationTool(tool) && tool.confirmation === undefined) {
     guidance.push('Require confirmation for this mutating action before exposing it to resolvers.')
   }
 

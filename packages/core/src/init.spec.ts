@@ -5,8 +5,6 @@ import { initWebMCP } from './init'
 import { hasConfirmationHandler, setConfirmationHandler } from './confirmation'
 import { clearToolsForTest, getTool, invokeTool, listTools, registerTool } from './registry'
 
-const paidAccessKey = 'wmcp_pk_test_access123_secret123secret456'
-
 describe('initWebMCP', () => {
   beforeEach(() => {
     clearToolsForTest()
@@ -53,26 +51,6 @@ describe('initWebMCP', () => {
       initWebMCP({ target: '#missing-command-input' })
     }).toThrowError('found no element matching "#missing-command-input"')
   })
-
-  it('wires a hosted resolver from an access key', () => {
-    const handle = initWebMCP({
-      accessKey: paidAccessKey,
-      baseUrl: 'https://webmcp.example',
-      model: 'gpt-5.4-mini'
-    })
-
-    expect(handle.resolver?.name).toBe('Hosted OpenAI')
-    expect(handle.resolver?.status).toBe('ready')
-    expect(handle.element.resolver).toBe(handle.resolver)
-
-    handle.destroy()
-  })
-
-  it('throws when an access key is provided without a model', () => {
-    expect(function initWithoutModel() {
-      initWebMCP({ accessKey: paidAccessKey })
-    }).toThrowError('needs a "model"')
-  })
 })
 
 function createInitTool(name: string) {
@@ -105,20 +83,6 @@ describe('initWebMCP failure handling', () => {
   afterEach(() => {
     setConfirmationHandler(undefined)
     document.body.innerHTML = ''
-  })
-
-  it('leaves no side effects when the hosted resolver options are invalid', () => {
-    expect(function initWithoutModel() {
-      initWebMCP({
-        accessKey: paidAccessKey,
-        confirmationHandler: () => true,
-        tools: [createInitTool('select_items')]
-      })
-    }).toThrowError('needs a "model"')
-
-    expect(listTools()).toHaveLength(0)
-    expect(hasConfirmationHandler()).toBe(false)
-    expect(document.querySelector('webmcp-command-input')).toBeNull()
   })
 
   it('rolls back registrations and a created element when a tool is invalid', () => {
@@ -200,7 +164,6 @@ function createConfirmedTool(name: string) {
       additionalProperties: false
     },
     confirmation: {
-      required: true,
       reason: 'Deleting an invoice cannot be undone.'
     },
     execute(input) {

@@ -10,9 +10,13 @@ export async function sourceDigest(root: string): Promise<string> {
     'package.json',
     'package-lock.json',
     'vite.config.ts',
+    'source-aliases.ts',
     'tsconfig.base.json',
     'tsconfig.json',
-    'README.md'
+    'README.md',
+    'CHANGELOG.md',
+    'CONTRIBUTING.md',
+    'licenses/pi-MIT.txt'
   ]
   async function walk(directory: string) {
     for (const entry of await readdir(join(root, directory), { withFileTypes: true })) {

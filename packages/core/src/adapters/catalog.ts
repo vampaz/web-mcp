@@ -1,3 +1,4 @@
+import { getToolAvailability } from '../availability'
 import type {
   JsonSchema,
   RegisteredTool,
@@ -48,15 +49,7 @@ export function createToolCatalog(
   return {
     title: options.title ?? 'WebMCP Tool Catalog',
     tools: registrations.map(function mapRegistration(registration) {
-      let availability: ToolScopeResult | undefined
-      try {
-        availability = registration.tool.scope?.()
-      } catch (error) {
-        availability = {
-          available: false,
-          reason: error instanceof Error ? error.message : 'Tool scope failed.'
-        }
-      }
+      const availability = getToolAvailability(registration.tool)
 
       return {
         name: registration.tool.name,
@@ -98,7 +91,7 @@ function formatCatalogEntry(entry: ToolCatalogEntry): string {
     lines.push(`- Unavailable reason: ${entry.unavailableReason}`)
   }
 
-  if (entry.confirmation?.required) {
+  if (entry.confirmation) {
     lines.push(`- Confirmation: ${entry.confirmation.reason}`)
   }
 

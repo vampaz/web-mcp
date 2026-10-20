@@ -1,0 +1,26 @@
+# Changelog
+
+## 0.4.0 — 2026-10-20
+
+- Run Pi in the page; remove the Pi service worker and worker protocol.
+- Bundle Pi implementation dependencies and emit NodeNext-compatible declarations.
+- Use one `createResolver()` factory and separate `/command-input`, `/hosted`, and `/testing` entry points.
+- Configure command input with a resolver or resolver choices; remove credential attributes.
+- Require confirmation when metadata is present; use object handler arguments and owner-specific disposal.
+- Reject duplicate names consistently and keep framework registration tied to lifecycle.
+- Parse Zod inputs before approval and retain schema-builder input types.
+- Repair command feedback, resolver/session behavior, and native invocation events.
+
+See the [migration guide](./docs/migration-0.4.md).
+
+## 0.3.0
+
+Renamed the model-provider adapter from planner to resolver. See [migration](./docs/migration-0.3.md).
+
+## 0.2.1
+
+Made Pi libraries runtime dependencies so consumers did not need to install them separately.
+
+## 0.2.0
+
+Introduced the Pi controller and independent chat entry points.

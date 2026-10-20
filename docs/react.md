@@ -1,6 +1,6 @@
 # React Hook
 
-Use `useWebMCPTool` to register a tool while the component is mounted. The hook syncs after renders. `when` is a boolean computed during render, so derive it from props, state, or your router.
+Use `useWebMCPTool` to register a tool while the component is mounted. The hook registers after commit and keeps registration stable across inline rerenders. It updates callbacks after each committed render. Changing schemas, metadata, or availability replaces the registration and invalidates pending calls. `when` is a boolean computed during render, so derive it from props, state, or your router.
 
 ```tsx
 import { defineTool } from '@vampaz/webmcp-kit'

@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { z } from 'zod'
 
-import { clearToolsForTest, invokeTool, registerTool } from '@vampaz/webmcp-kit'
+import { clearToolsForTest } from '@vampaz/webmcp-kit/testing'
+import { invokeTool, registerTool, setConfirmationHandler } from '@vampaz/webmcp-kit'
 
 import { defineZodTool } from './index'
 
 describe('defineZodTool', () => {
   beforeEach(() => {
     clearToolsForTest()
+    setConfirmationHandler(undefined)
   })
 
   it('converts a Zod schema into a typed WebMCP tool', async () => {
@@ -43,8 +45,7 @@ describe('defineZodTool', () => {
           description: 'Invoice amount in euros.'
         }
       },
-      required: ['customerName', 'amount'],
-      additionalProperties: false
+      required: ['customerName', 'amount']
     })
 
     registerTool(tool)
@@ -86,6 +87,54 @@ describe('defineZodTool', () => {
       'input validation failed: /customerName expected string, got integer. /amount expected number, got string.'
     )
     expect(execute).not.toHaveBeenCalled()
+  })
+
+  it('checks refinements before confirmation and guards', async () => {
+    const approval = vi.fn(() => true)
+    const guard = vi.fn(() => true)
+    const execute = vi.fn()
+    setConfirmationHandler(approval)
+    registerTool(
+      defineZodTool({
+        name: 'save_note',
+        description: 'Save a valid note in the active workspace.',
+        schema: z.object({ note: z.string().refine((value) => value !== 'blocked') }),
+        confirmation: { reason: 'Save?' },
+        guard,
+        execute
+      })
+    )
+    expect(await invokeTool({ toolName: 'save_note', input: { note: 'blocked' } })).toMatchObject({
+      code: 'invalid_input'
+    })
+    expect(approval).not.toHaveBeenCalled()
+    expect(guard).not.toHaveBeenCalled()
+    expect(execute).not.toHaveBeenCalled()
+  })
+
+  it('applies defaults and transforms before approving the value that executes', async () => {
+    const approval = vi.fn(() => true)
+    const execute = vi.fn()
+    setConfirmationHandler(approval)
+    registerTool(
+      defineZodTool({
+        name: 'save_note',
+        description: 'Save the normalized note.',
+        schema: z.object({
+          note: z
+            .string()
+            .default(' draft ')
+            .transform((value) => value.trim())
+        }),
+        confirmation: { reason: 'Save?' },
+        execute
+      })
+    )
+    expect(await invokeTool({ toolName: 'save_note', input: {} })).toMatchObject({
+      status: 'success'
+    })
+    expect(approval).toHaveBeenCalledWith(expect.objectContaining({ input: { note: 'draft' } }))
+    expect(execute).toHaveBeenCalledWith({ note: 'draft' }, { source: 'fallback' })
   })
 
   it('forwards tool annotations to the core tool definition', () => {

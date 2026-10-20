@@ -1,3 +1,5 @@
+import { getToolAvailability } from './availability'
+import { emitWebMCPKitEvent } from './events'
 import { requestToolConfirmation } from './confirmation'
 import type {
   ToolContext,
@@ -8,6 +10,7 @@ import type {
 import { formatJsonValueValidationError, validateJsonValue } from './schema'
 
 export interface ToolInvocationPipelineOptions {
+  invocationId?: string
   confirmed?: boolean
   isCurrent?: () => boolean
   input: unknown
@@ -17,6 +20,34 @@ export interface ToolInvocationPipelineOptions {
 }
 
 export async function invokeToolPipeline<TInput, TOutput>(
+  tool: WebMCPTool<TInput, TOutput>,
+  options: ToolInvocationPipelineOptions
+): Promise<ToolInvocationResult<TOutput>> {
+  const id =
+    options.invocationId ?? `invocation_${Date.now()}_${Math.random().toString(16).slice(2)}`
+  emitWebMCPKitEvent({
+    type: 'invoked',
+    toolName: tool.name,
+    timestamp: Date.now(),
+    detail: { id, toolName: tool.name, input: options.input, source: options.source }
+  })
+  const result = await executePipeline(tool, options)
+  result.invocationId = id
+  emitWebMCPKitEvent({
+    type:
+      result.status === 'success'
+        ? 'succeeded'
+        : result.status === 'blocked' || result.status === 'unavailable'
+          ? 'blocked'
+          : 'failed',
+    toolName: tool.name,
+    timestamp: Date.now(),
+    detail: result
+  })
+  return result
+}
+
+async function executePipeline<TInput, TOutput>(
   tool: WebMCPTool<TInput, TOutput>,
   options: ToolInvocationPipelineOptions
 ): Promise<ToolInvocationResult<TOutput>> {
@@ -69,26 +100,15 @@ export async function invokeToolPipeline<TInput, TOutput>(
         'tool_changed'
       )
     }
-    try {
-      const availability = tool.scope?.()
-      if (availability && !availability.available) {
-        return createInvocationResult<TOutput>(
-          tool.name,
-          'unavailable',
-          startedAt,
-          undefined,
-          availability.reason ?? 'Tool is not available in the current state.',
-          'scope_unavailable'
-        )
-      }
-    } catch (error) {
+    const availability = getToolAvailability(tool)
+    if (!availability.available) {
       return createInvocationResult<TOutput>(
         tool.name,
-        'error',
+        availability.failed ? 'error' : 'unavailable',
         startedAt,
         undefined,
-        error instanceof Error ? error.message : 'Tool scope failed.',
-        'scope_failed'
+        availability.reason ?? 'Tool is not available in the current state.',
+        availability.failed ? 'scope_failed' : 'scope_unavailable'
       )
     }
   }
@@ -96,7 +116,25 @@ export async function invokeToolPipeline<TInput, TOutput>(
   const initialFailure = checkAvailability()
   if (initialFailure) return initialFailure
 
-  let confirmed = options.confirmed === true || !tool.confirmation?.required
+  if (tool.parseInput) {
+    try {
+      input = await waitForInvocation(Promise.resolve(tool.parseInput(input)), options.signal)
+    } catch (error) {
+      if (options.signal?.aborted) return checkAvailability()!
+      return createInvocationResult<TOutput>(
+        tool.name,
+        'error',
+        startedAt,
+        undefined,
+        error instanceof Error ? error.message : 'Tool input parsing failed.',
+        'invalid_input'
+      )
+    }
+    const parsingFailure = checkAvailability()
+    if (parsingFailure) return parsingFailure
+  }
+
+  let confirmed = options.confirmed === true || !tool.confirmation
   if (!confirmed) {
     try {
       confirmed = await waitForInvocation(
@@ -119,7 +157,7 @@ export async function invokeToolPipeline<TInput, TOutput>(
   const approvalFailure = checkAvailability()
   if (approvalFailure) return approvalFailure
 
-  if (tool.confirmation?.required && !confirmed) {
+  if (tool.confirmation && !confirmed) {
     return createInvocationResult<TOutput>(
       tool.name,
       'blocked',

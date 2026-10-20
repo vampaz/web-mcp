@@ -1,9 +1,11 @@
-import { defineComponent, nextTick, ref } from 'vue'
+import { createSSRApp, defineComponent, nextTick, onMounted, ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { clearToolsForTest, defineTool, invokeTool, listTools } from '@vampaz/webmcp-kit'
+import { clearToolsForTest } from '@vampaz/webmcp-kit/testing'
+import { defineTool, invokeTool, listTools } from '@vampaz/webmcp-kit'
 
 import { useWebMCPTool } from './index'
+import { renderToString } from 'vue/server-renderer'
 import { mountWithDeps } from './test-utils/mount-with-deps'
 
 describe('useWebMCPTool', () => {
@@ -52,6 +54,55 @@ describe('useWebMCPTool', () => {
 
     wrapper.unmount()
 
+    expect(listTools()).toEqual([])
+  })
+
+  it('registers when called from an already mounted component effect scope', () => {
+    const component = defineComponent({
+      setup() {
+        onMounted(function mounted() {
+          useWebMCPTool(
+            defineTool({
+              name: 'read_mounted',
+              description: 'Read the mounted application state.',
+              inputSchema: { type: 'object', properties: {} },
+              execute() {
+                return 1
+              }
+            })
+          )
+        })
+        return function render() {
+          return null
+        }
+      }
+    })
+    const wrapper = mountWithDeps(component)
+    expect(listTools().map((registration) => registration.tool.name)).toEqual(['read_mounted'])
+    wrapper.unmount()
+    expect(listTools()).toEqual([])
+  })
+
+  it('does not register component tools during SSR', async () => {
+    const component = defineComponent({
+      setup() {
+        useWebMCPTool(
+          defineTool({
+            name: 'read_value',
+            description: 'Read the current value.',
+            inputSchema: { type: 'object', properties: {} },
+            execute() {
+              return 1
+            }
+          })
+        )
+        return function render() {
+          return null
+        }
+      }
+    })
+    await renderToString(createSSRApp(component))
+    await renderToString(createSSRApp(component))
     expect(listTools()).toEqual([])
   })
 
