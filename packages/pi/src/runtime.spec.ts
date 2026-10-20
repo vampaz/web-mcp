@@ -229,6 +229,62 @@ it('refreshes available tools after an action opens a new application context', 
   ).toEqual(['save_document', 'pi_reply'])
 })
 
+it('refreshes tools that finish mounting between the action result and the next model round', async function test() {
+  let editorReady = false
+  let saved = false
+  const invoked: string[] = []
+  const config = options(
+    [resolution('open_editor', {}), resolution('save_document', {}), resolution()],
+    {
+      async discover() {
+        return {
+          revision: editorReady ? 'editor' : 'home',
+          tools: [
+            {
+              name: editorReady ? 'save_document' : 'open_editor',
+              description: editorReady ? 'Save the open document.' : 'Open the document editor.',
+              inputSchema: { type: 'object', properties: {}, additionalProperties: false }
+            }
+          ]
+        }
+      },
+      async invoke(call) {
+        invoked.push(call.name)
+        expect(call.revision).toBe(editorReady ? 'editor' : 'home')
+        if (call.name === 'save_document') saved = true
+        return { toolName: call.name, status: 'success', output: { saved }, durationMs: 0 }
+      }
+    }
+  )
+  runtime = await createPiRuntime(config)
+  const unsubscribe = runtime.subscribe(function finishMounting(snapshot) {
+    if (snapshot.messages.some((message) => message.toolName === 'open_editor')) editorReady = true
+  })
+  try {
+    expect(await runtime.send('Open the editor and save the document')).toEqual({
+      status: 'completed'
+    })
+    expect(invoked).toEqual(['open_editor', 'save_document'])
+    expect(saved).toBe(true)
+    expect(vi.mocked(config.resolver.resolve).mock.calls[1][1].map((tool) => tool.name)).toEqual([
+      'save_document',
+      'pi_reply'
+    ])
+    expect(config.resolver.resolve).toHaveBeenCalledTimes(3)
+    const history = runtime.getSnapshot().messages
+    expect(
+      history.filter((message) => message.role === 'tool').map((message) => message.toolName)
+    ).toEqual(['open_editor', 'save_document'])
+    await runtime.destroy()
+    runtime = await createPiRuntime(config)
+    expect(runtime.getSnapshot().messages).toEqual(history)
+    expect(invoked).toEqual(['open_editor', 'save_document'])
+    expect(config.resolver.resolve).toHaveBeenCalledTimes(3)
+  } finally {
+    unsubscribe()
+  }
+})
+
 it('ends a denied action without another model round', async function test() {
   const config = options([resolution('read_counter', {})], {
     async invoke() {
@@ -249,7 +305,7 @@ it('ends a denied action without another model round', async function test() {
   expect(config.resolver.resolve).toHaveBeenCalledTimes(1)
 })
 
-it('rejects a catalog change while the resolver is choosing an action', async function test() {
+it('discards a stale choice and resolves again when tools change during inference', async function test() {
   const config = options([])
   let revision = 'initial'
   const discover = config.host.discover
@@ -257,16 +313,19 @@ it('rejects a catalog change while the resolver is choosing an action', async fu
     return { ...(await discover(signal)), revision }
   }
   config.resolver.resolve = vi.fn(async function changeDuringResolving() {
-    revision = 'changed'
-    return resolution('read_counter', {})
+    if (revision === 'initial') {
+      revision = 'changed'
+      return resolution('read_counter', {})
+    }
+    return resolution('pi_reply', { text: 'The application changed. No action was performed.' })
   })
   runtime = await createPiRuntime(config)
-  expect(await runtime.send('Read')).toMatchObject({
-    status: 'error',
-    error: { code: 'stale_document' }
-  })
+  expect(await runtime.send('Read')).toEqual({ status: 'completed' })
   expect(config.invoke).not.toHaveBeenCalled()
-  expect(config.resolver.resolve).toHaveBeenCalledTimes(1)
+  expect(config.resolver.resolve).toHaveBeenCalledTimes(2)
+  expect(runtime.getSnapshot().messages.at(-1)?.text).toBe(
+    'The application changed. No action was performed.'
+  )
 })
 
 it('preserves a completed action result when refreshing tools fails', async function test() {

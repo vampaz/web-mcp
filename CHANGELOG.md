@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1 — 2026-10-20
+
+- Refresh Pi's tool snapshot when components finish mounting between model rounds.
+- Discard choices made against a catalog that changed during inference, then resolve again before invoking an application action.
+- Keep invocation-time stale checks, cancellation, tool budgets, and recovery without replay.
+
 ## 0.4.0 — 2026-10-20
 
 - Run Pi in the page; remove the Pi service worker and worker protocol.

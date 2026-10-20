@@ -9,6 +9,8 @@ import {
 import type { PiToolDescription } from './interfaces/host'
 import { abortable, jsonBytes, PiFailure } from './errors'
 
+export const piRefreshCatalogToolName = 'pi_refresh_catalog'
+
 export const piReplyTool: WebMCPTool = {
   name: 'pi_reply',
   description:
@@ -48,9 +50,13 @@ export async function resolvePiRound(
   })
   if (
     tools.some(function reserved(tool) {
-      return ['pi_reply', 'tool_sequence', 'needs_clarification', 'no_tools_match'].includes(
-        tool.name
-      )
+      return [
+        piRefreshCatalogToolName,
+        'pi_reply',
+        'tool_sequence',
+        'needs_clarification',
+        'no_tools_match'
+      ].includes(tool.name)
     })
   )
     throw new PiFailure('configuration', 'The tool catalog uses a reserved resolver name.')

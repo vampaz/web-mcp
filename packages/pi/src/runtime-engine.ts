@@ -11,7 +11,7 @@ import type {
 } from './interfaces/controller'
 import { abortable, jsonBytes, piError, PiFailure } from './errors'
 import { createPiModels, piModel } from './model-adapter'
-import { resolvePiRound } from './resolver-adapter'
+import { piRefreshCatalogToolName, resolvePiRound } from './resolver-adapter'
 import { normalizeMessages, lastTurnState } from './recovery'
 import type { PiToolCatalog } from './interfaces/host'
 import { piSessionKey, resolvePiLimits } from './session'
@@ -66,6 +66,7 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
     let interrupted = false
     let aborting: Promise<void> | undefined
     let toolCalls = 0
+    let catalogRefreshed = false
     function abort() {
       accepting = false
       aborting ??= conversation?.abort(context)
@@ -76,7 +77,28 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
           signal.throwIfAborted()
           let catalog = await abortable(options.host.discover(signal), signal)
           const registry = createRegistry()
+          registry.install(
+            defineExtension({
+              name: 'webmcp-runtime',
+              tools: [
+                defineTool({
+                  name: piRefreshCatalogToolName,
+                  description: 'Refresh available tools without invoking an application action.',
+                  parameters: Type.Object({}, { additionalProperties: false }),
+                  replay: 'unsafe',
+                  async execute() {
+                    return { output: [{ type: 'text', text: 'Available tools refreshed.' }] }
+                  }
+                })
+              ]
+            })
+          )
           function installCatalog(roundCatalog: PiToolCatalog) {
+            if (roundCatalog.tools.some((tool) => tool.name === piRefreshCatalogToolName))
+              throw new PiFailure(
+                'configuration',
+                'The tool catalog uses a reserved resolver name.'
+              )
             registry.install(
               defineExtension({
                 name: 'webmcp-kit',
@@ -173,6 +195,25 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
             )
           }
           installCatalog(catalog)
+          function refreshCatalog(current: PiToolCatalog) {
+            if (catalogRefreshed)
+              throw new PiFailure('stale_document', 'The tool catalog changed. Send a new request.')
+            if (++toolCalls > limits.maxToolCalls)
+              throw new PiFailure(
+                'limit_reached',
+                'This turn reached its tool limit. Send a new request to continue.'
+              )
+            installCatalog(current)
+            catalog = current
+            catalogRefreshed = true
+            // Pi captured its tools before this request; an internal round refreshes that snapshot.
+            return {
+              toolName: piRefreshCatalogToolName,
+              input: {},
+              confidence: 1,
+              reason: 'Refresh available tools.'
+            }
+          }
           const models = createPiModels(async function resolution(messages, requestSignal) {
             if (!accepting)
               throw new PiFailure(
@@ -185,12 +226,9 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
             ])
             try {
               const current = await abortable(options.host.discover(currentSignal), currentSignal)
-              if (current.revision !== catalog.revision)
-                throw new PiFailure(
-                  'stale_document',
-                  'The tool catalog changed. Send a new request.'
-                )
-              return await resolvePiRound(
+              if (current.revision !== catalog.revision) return refreshCatalog(current)
+              catalogRefreshed = false
+              const resolution = await resolvePiRound(
                 options.resolver,
                 messages,
                 current.tools,
@@ -198,6 +236,9 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                 currentSignal,
                 limits.maxRequestBytes
               )
+              const latest = await abortable(options.host.discover(currentSignal), currentSignal)
+              if (latest.revision !== current.revision) return refreshCatalog(latest)
+              return resolution
             } catch (error) {
               failure = piError(error)
               throw error
