@@ -45,12 +45,15 @@ interface ResolverEndpointRequest {
   context: ResolverContext
   responseSchema: JsonSchema
   singleStep?: true
+  purpose?: 'summary'
 }
 ```
 
 This is a wire-format description. The client sends `Content-Type: application/json`, forwards cancellation, and uses normal fetch session behavior. Return a JSON `ToolResolution` directly. A non-2xx response with `{ "error": "Explanation" }` reports failure. Cross-origin endpoints need their own deliberate CORS and authentication configuration.
 
 Validate the request, restrict provider/model selection, and treat tool descriptions and context as untrusted data. For Pi, honor `singleStep: true` and the supplied schema. Return one offered action, `needs_clarification`, `no_tools_match`, or the offered `pi_reply`. Never predict future tool results.
+
+For `purpose: 'summary'`, summarize the supplied history through the offered `pi_reply` tool. Do not select application actions, answer the original request, or offer `needs_clarification` or `no_tools_match`. The supplied response schema excludes these outcomes. Preserve this purpose when forwarding requests to another resolver, and validate the response against the summary contract. Hosted endpoint integrations receive the same field.
 
 ## OpenAI-compatible endpoint
 
@@ -140,5 +143,7 @@ With an OpenAI-compatible provider and `responseFormat: 'json_schema'`, a single
 an `action` envelope. Its schema pairs each tool name with that tool's input schema, preventing
 arguments for another tool from satisfying the selected branch. The resolver validates and unwraps
 this transport envelope; callers still receive `{ toolName, input, confidence, reason }`.
-The provider receives the schema through `response_format`; the prompt does not duplicate it.
+The prompt still lists each tool's input schema, including property descriptions. Some providers, including LM Studio, apply `response_format` only as an output constraint and never show it to the model, so the prompt is the only place the model can read what each argument means. All JSON examples use the same `action` envelope.
 App-owned server resolvers and bounded Resolver mode retain their existing response contracts.
+
+Provider-side enforcement depends on the selected endpoint and model. The kit sends `json_schema` without `strict: true`; it validates returned actions locally before execution. OpenAI's [strict structured output](https://developers.openai.com/api/docs/guides/structured-outputs) supports a subset of JSON Schema and rejects unsupported strict schemas. [LM Studio](https://lmstudio.ai/docs/developer/openai-compat/structured-output) documents schema-constrained output through this endpoint. Verify support for the actual provider, model, and tool schemas; neither provider enforcement nor valid JSON replaces application validation and approval.

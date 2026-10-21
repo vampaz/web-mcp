@@ -2,6 +2,7 @@ import type { Message } from '@earendil-works/pi-ai'
 import {
   validateToolResolution,
   type ResolverContext,
+  type ResolverRunOptions,
   type ToolResolution,
   type ToolResolver,
   type WebMCPTool
@@ -121,7 +122,8 @@ export async function requestPiResolution(
   tools: WebMCPTool[],
   context: ResolverContext,
   signal: AbortSignal,
-  maxBytes: number
+  maxBytes: number,
+  purpose?: ResolverRunOptions['purpose']
 ): Promise<ToolResolution> {
   if (!resolver.available || resolver.capabilities?.conversation !== true)
     throw new PiFailure(
@@ -143,12 +145,13 @@ export async function requestPiResolution(
       resolver.resolve(message, tools, context, {
         signal: requestSignal,
         singleStep: true,
+        ...(purpose ? { purpose } : {}),
         maxRequestBytes: maxBytes
       }),
       requestSignal
     )
     requestSignal.throwIfAborted()
-    validateToolResolution(resolution, tools, { singleStep: true })
+    validateToolResolution(resolution, tools, { singleStep: true, purpose })
     return resolution
   } catch (error) {
     if (deadline.signal.aborted && !signal.aborted)

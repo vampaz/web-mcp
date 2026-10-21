@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.5 — 2026-10-21
+
+- Align structured single-step JSON examples with the action envelope.
+- Add an LM Studio check that the model fills arguments whose meaning only the input schema descriptions state. LM Studio applies `response_format` only as an output constraint, so prompts keep tool input schemas.
+- Mark history-summary requests explicitly and exclude action-selection prompts and resolver outcomes from their schemas and validation, including server and hosted request contracts.
+- Strengthen repeated-compaction coverage and correct runtime, provider, and browser-test documentation.
+
 ## 0.4.4 — 2026-10-21
 
 - Constrain OpenAI-compatible single-step structured output to the selected tool's argument schema, including conversation replies. Keep the public tool-resolution result unchanged.

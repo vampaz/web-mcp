@@ -102,7 +102,8 @@ export async function summarizePiHistory(
           transcript: transcript.slice(Math.max(0, offset - 256), end)
         },
         signal,
-        maxRequestBytes
+        maxRequestBytes,
+        'summary'
       )
     } catch (error) {
       if ((piError(error).code !== 'limit_reached' && !isPiContextOverflow(error)) || size === 1)
@@ -120,7 +121,8 @@ export async function summarizePiHistory(
           tools,
           { objective: request, previousCheckpoint: summary },
           signal,
-          maxRequestBytes
+          maxRequestBytes,
+          'summary'
         )
       )
     if (jsonBytes(summary) > checkpointBytes)

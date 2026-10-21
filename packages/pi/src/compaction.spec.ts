@@ -1,71 +1,90 @@
 // @vitest-environment node
 import { afterEach, expect, it, vi } from 'vitest'
-import { createResolver, type ToolResolver } from '@vampaz/webmcp-kit'
+import { createResolver, validateJsonValue, type ToolResolver } from '@vampaz/webmcp-kit'
 import { summarizePiHistory } from './compaction'
 
 afterEach(function cleanup() {
   vi.unstubAllGlobals()
 })
 
-it('summarizes large history through bounded requests without offering application actions', async function test() {
-  const bodies: string[] = []
-  vi.stubGlobal('fetch', async function summarize(_url: string, options: RequestInit) {
-    const body = String(options.body)
-    bodies.push(body)
-    expect(new TextEncoder().encode(body).byteLength).toBeLessThanOrEqual(8192)
-    const request = JSON.parse(body)
-    const prompt = request.messages[1].content as string
-    expect(prompt).toContain('Completed actions must stay completed')
-    expect(prompt).not.toContain('"name":"accept_proposal"')
-    return Response.json({
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
-              action: {
-                toolName: 'pi_reply',
-                input: {
-                  text: 'Goal: finish category C. Proposal p-1 saved; never replay it. Continue with p-2.'
-                },
-                confidence: 1,
-                reason: 'History checkpoint'
-              }
-            })
-          }
-        }
-      ]
-    })
-  })
-  const resolver = await createResolver({
-    provider: 'openai-compatible',
-    baseUrl: 'https://resolver.test/v1',
-    model: 'fixture',
-    responseFormat: 'json_schema'
-  })
-  const summary = await summarizePiHistory(
-    resolver,
-    [
-      {
-        role: 'user',
-        content: 'FIRST-ID-p-1 ' + 'Evidence \\" 🧾 '.repeat(1200) + ' LAST-ID-p-2',
-        timestamp: 0
+it.each(['json_schema', 'json_object'] as const)(
+  'summarizes large history through bounded %s requests without offering application actions',
+  async function test(responseFormat) {
+    const bodies: string[] = []
+    vi.stubGlobal('fetch', async function summarize(_url: string, options: RequestInit) {
+      const body = String(options.body)
+      bodies.push(body)
+      expect(new TextEncoder().encode(body).byteLength).toBeLessThanOrEqual(8192)
+      const request = JSON.parse(body)
+      const prompt = request.messages[1].content as string
+      expect(request.messages[0].content).toContain('Summarize the supplied conversation')
+      expect(prompt).not.toContain('Choose only the next unfinished action')
+      expect(prompt).not.toContain('needs_clarification')
+      expect(prompt).not.toContain('no_tools_match')
+      expect(prompt).toContain('Completed actions must stay completed')
+      expect(prompt).not.toContain('"name":"accept_proposal"')
+      const checkpoint = {
+        toolName: 'pi_reply',
+        input: {
+          text: 'Goal: finish category C. Proposal p-1 saved; never replay it. Continue with p-2.'
+        },
+        confidence: 1,
+        reason: 'History checkpoint'
       }
-    ],
-    'Accept category C',
-    new AbortController().signal,
-    8192
-  )
-
-  expect(bodies.length).toBeGreaterThan(1)
-  expect(bodies[0]).toContain('FIRST-ID-p-1')
-  expect(bodies.at(-1)).toContain('LAST-ID-p-2')
-  expect(
-    bodies.slice(1).every(function checkpoint(body) {
-      return body.includes('Proposal p-1 saved')
+      const structured = responseFormat === 'json_schema'
+      const schema = structured
+        ? request.response_format.json_schema.schema
+        : JSON.parse(prompt.split('\n\n').at(-1)!)
+      expect(validateJsonValue(structured ? { action: checkpoint } : checkpoint, schema)).toEqual(
+        []
+      )
+      for (const toolName of ['needs_clarification', 'no_tools_match', 'accept_proposal']) {
+        const outcome = { ...checkpoint, toolName, input: {} }
+        expect(validateJsonValue(structured ? { action: outcome } : outcome, schema)).not.toEqual(
+          []
+        )
+      }
+      return Response.json({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify(structured ? { action: checkpoint } : checkpoint)
+            }
+          }
+        ]
+      })
     })
-  ).toBe(true)
-  expect(summary).toContain('Continue with p-2')
-})
+    const resolver = await createResolver({
+      provider: 'openai-compatible',
+      baseUrl: 'https://resolver.test/v1',
+      model: 'fixture',
+      responseFormat
+    })
+    const summary = await summarizePiHistory(
+      resolver,
+      [
+        {
+          role: 'user',
+          content: 'FIRST-ID-p-1 ' + 'Evidence \\" 🧾 '.repeat(1200) + ' LAST-ID-p-2',
+          timestamp: 0
+        }
+      ],
+      'Accept category C',
+      new AbortController().signal,
+      8192
+    )
+
+    expect(bodies.length).toBeGreaterThan(1)
+    expect(bodies[0]).toContain('FIRST-ID-p-1')
+    expect(bodies.at(-1)).toContain('LAST-ID-p-2')
+    expect(
+      bodies.slice(1).every(function checkpoint(body) {
+        return body.includes('Proposal p-1 saved')
+      })
+    ).toBe(true)
+    expect(summary).toContain('Continue with p-2')
+  }
+)
 
 it('does not summarize system-only entries or expose their tool catalog', async function test() {
   const resolve = vi.fn()
@@ -91,7 +110,8 @@ it('does not summarize system-only entries or expose their tool catalog', async 
 
 it('keeps an earlier checkpoint separate from user history and omits action-selection instructions', async function checkpoint() {
   const resolve = vi.fn<ToolResolver['resolve']>(
-    async function summarize(message, _tools, context) {
+    async function summarize(message, _tools, context, options) {
+      expect(options).toMatchObject({ singleStep: true, purpose: 'summary' })
       expect(message).not.toContain('ONE next unfinished action')
       expect(context).not.toHaveProperty('piInstructions')
       expect(context).not.toHaveProperty('piConversation')
@@ -185,6 +205,11 @@ it('condenses an oversized checkpoint once before accepting it', async function 
   )
   expect(result).toContain('p-1 saved')
   expect(resolve).toHaveBeenCalledTimes(2)
+  expect(
+    resolve.mock.calls.map(function purpose(call) {
+      return call[3]?.purpose
+    })
+  ).toEqual(['summary', 'summary'])
   expect(resolve.mock.calls[1]?.[2]).toMatchObject({ previousCheckpoint: 'x'.repeat(600) })
 })
 
@@ -247,7 +272,7 @@ it('does not mistake a provider rate limit for context overflow', async function
   expect(resolve).toHaveBeenCalledOnce()
 })
 
-it.each(['needs_clarification', 'accept_proposal', 'oversized'])(
+it.each(['needs_clarification', 'no_tools_match', 'accept_proposal', 'oversized'])(
   'rejects an unusable checkpoint (%s)',
   async function test(kind) {
     const resolver: ToolResolver = {

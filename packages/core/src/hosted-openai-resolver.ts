@@ -108,8 +108,15 @@ export function createHostedOpenAIResolver(rawOptions: HostedOpenAIResolverOptio
           message,
           model: options.model,
           provider: 'openai',
-          responseSchema: createToolResolutionSchema(tools, runOptions?.singleStep),
-          ...(runOptions?.singleStep ? { singleStep: true } : {}),
+          responseSchema: createToolResolutionSchema(
+            tools,
+            runOptions?.singleStep,
+            runOptions?.purpose
+          ),
+          ...(runOptions?.singleStep || runOptions?.purpose === 'summary'
+            ? { singleStep: true }
+            : {}),
+          ...(runOptions?.purpose ? { purpose: runOptions.purpose } : {}),
           tools: createHostedToolCatalog(tools)
         },
         runOptions?.maxRequestBytes
@@ -132,7 +139,7 @@ export function createHostedOpenAIResolver(rawOptions: HostedOpenAIResolverOptio
 
       const resolution = (await response.json()) as ToolResolution
       runOptions?.signal?.throwIfAborted()
-      validateToolResolution(resolution, tools, { singleStep: runOptions?.singleStep })
+      validateToolResolution(resolution, tools, runOptions)
       return resolution
     }
   }

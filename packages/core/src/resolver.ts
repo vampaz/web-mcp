@@ -230,7 +230,7 @@ export function createRemoteResolver(config: RemoteResolverConfig): ToolResolver
           options
         )
         throwIfAborted(options?.signal)
-        validateToolResolution(resolution, tools, { singleStep: options?.singleStep })
+        validateToolResolution(resolution, tools, options)
         return resolution
       } catch (error) {
         throwIfAborted(options?.signal)
@@ -251,8 +251,19 @@ async function resolveWithChromeAI(
   options?: ResolverRunOptions
 ): Promise<ToolResolution> {
   throwIfAborted(options?.signal)
-  const prompt = createResolverPrompt(message, tools, context, options?.singleStep)
-  const responseConstraint = createToolResolutionSchema(tools, options?.singleStep)
+  const prompt = createResolverPrompt(
+    message,
+    tools,
+    context,
+    options?.singleStep,
+    false,
+    options?.purpose
+  )
+  const responseConstraint = createToolResolutionSchema(
+    tools,
+    options?.singleStep,
+    options?.purpose
+  )
   serializeResolverRequest({ prompt, responseConstraint }, options?.maxRequestBytes)
   const response = await session.prompt(prompt, {
     responseConstraint,
@@ -268,8 +279,7 @@ function createChromeAISession(languageModel: LanguageModelApi): Promise<Languag
     initialPrompts: [
       {
         role: 'system',
-        content:
-          'Choose one app tool, a short ordered tool_sequence, needs_clarification, or no_tools_match. Return only JSON matching the requested schema.'
+        content: 'Follow the request instructions. Return only JSON matching the requested schema.'
       }
     ]
   })
@@ -313,8 +323,9 @@ async function resolveWithServerEndpoint(
         message,
         tools: createToolCatalog(tools),
         context,
-        responseSchema: createToolResolutionSchema(tools, options?.singleStep),
-        ...(options?.singleStep ? { singleStep: true } : {})
+        responseSchema: createToolResolutionSchema(tools, options?.singleStep, options?.purpose),
+        ...(options?.singleStep || options?.purpose === 'summary' ? { singleStep: true } : {}),
+        ...(options?.purpose ? { purpose: options.purpose } : {})
       },
       options?.maxRequestBytes
     ),
@@ -352,10 +363,11 @@ async function resolveWithOpenAICompatible(
   }
 
   const structured = config.responseFormat === 'json_schema'
-  const wrapped = structured && options?.singleStep === true
+  const singleStep = options?.singleStep === true || options?.purpose === 'summary'
+  const wrapped = structured && singleStep
   const responseSchema = wrapped
-    ? createStructuredToolResolutionSchema(tools)
-    : createToolResolutionSchema(tools, options?.singleStep)
+    ? createStructuredToolResolutionSchema(tools, options?.purpose)
+    : createToolResolutionSchema(tools, singleStep, options?.purpose)
 
   const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST',
@@ -363,7 +375,14 @@ async function resolveWithOpenAICompatible(
     body: serializeResolverRequest(
       {
         model,
-        messages: createResolverMessages(message, tools, context, options?.singleStep, structured),
+        messages: createResolverMessages(
+          message,
+          tools,
+          context,
+          singleStep,
+          structured,
+          options?.purpose
+        ),
         response_format:
           config.responseFormat === 'json_schema'
             ? {
@@ -402,7 +421,7 @@ async function resolveWithOpenAICompatible(
   const parsed = parseToolResolutionJson(content, getProviderLabel(config))
   if (!wrapped) return parsed
   const action = (parsed as unknown as { action?: unknown } | null)?.action
-  validateToolResolution(action, tools, { singleStep: true })
+  validateToolResolution(action, tools, { singleStep: true, purpose: options?.purpose })
   const errors = validateJsonValue(parsed, responseSchema)
   if (errors.length)
     throw new Error(
@@ -416,21 +435,28 @@ function createResolverMessages(
   tools: WebMCPTool[],
   context: ResolverContext,
   singleStep = false,
-  structured = false
+  structured = false,
+  purpose?: ResolverRunOptions['purpose']
 ) {
   return [
     {
       role: 'system',
-      content: singleStep
-        ? 'Choose exactly one next app tool, needs_clarification, or no_tools_match. Never return tool_sequence or steps. ' +
-          (structured
-            ? 'Return only JSON with an action object containing toolName, input, confidence, and reason.'
-            : 'Return only JSON with toolName, input, confidence, and reason.')
-        : 'Choose one app tool, a short ordered tool_sequence, needs_clarification, or no_tools_match. Return only JSON with toolName, input, confidence, reason, and optional steps.'
+      content:
+        purpose === 'summary'
+          ? 'Summarize the supplied conversation through the offered tool. Do not select application actions, ask for clarification, or answer the original request. ' +
+            (structured
+              ? 'Return only JSON with an action object containing toolName, input, confidence, and reason.'
+              : 'Return only JSON with toolName, input, confidence, and reason.')
+          : singleStep
+            ? 'Choose exactly one next app tool, needs_clarification, or no_tools_match. Never return tool_sequence or steps. ' +
+              (structured
+                ? 'Return only JSON with an action object containing toolName, input, confidence, and reason.'
+                : 'Return only JSON with toolName, input, confidence, and reason.')
+            : 'Choose one app tool, a short ordered tool_sequence, needs_clarification, or no_tools_match. Return only JSON with toolName, input, confidence, reason, and optional steps.'
     },
     {
       role: 'user',
-      content: createResolverPrompt(message, tools, context, singleStep, structured)
+      content: createResolverPrompt(message, tools, context, singleStep, structured, purpose)
     }
   ]
 }
@@ -440,19 +466,29 @@ function createResolverPrompt(
   tools: WebMCPTool[],
   context: ResolverContext,
   singleStep = false,
-  structured = false
+  structured = false,
+  purpose?: ResolverRunOptions['purpose']
 ): string {
+  singleStep ||= purpose === 'summary'
+  function outcomeExample(toolName: string, reason: string) {
+    const resolution = { toolName, input: {}, confidence: 0, reason }
+    return JSON.stringify(structured && singleStep ? { action: resolution } : resolution)
+  }
   return [
     `User request: ${message}`,
     `Current app context:\n${JSON.stringify(context)}`,
     `Available tools:\n${JSON.stringify(createToolCatalog(tools))}`,
     'Put only the selected tool arguments inside input. confidence and reason are siblings of toolName, never inside input unless the tool explicitly defines them.',
-    'Choose the best tool and exact parameters from the current app context. Prefer stable IDs from context over labels.',
-    singleStep
-      ? 'Choose only the next unfinished action. Return one tool invocation, never a sequence or steps. Wait for the actual result before choosing another action. Never invent future tool results or placeholders.'
-      : 'If the request requires multiple app actions, return a chained resolution with toolName "tool_sequence", input {}, and steps ordered by dependency. Use at most 5 steps. Each step must use one available tool and must be executable after the previous step updates app state.',
-    'If the request is missing required information that is not present in context, return {"toolName":"needs_clarification","input":{},"confidence":0,"reason":"Ask for the missing information."}.',
-    'If none of the available tools can satisfy the request, return {"toolName":"no_tools_match","input":{},"confidence":0,"reason":"Explain what kind of app action is available instead."}.',
+    ...(purpose === 'summary'
+      ? []
+      : [
+          'Choose the best tool and exact parameters from the current app context. Prefer stable IDs from context over labels.',
+          singleStep
+            ? 'Choose only the next unfinished action. Return one tool invocation, never a sequence or steps. Wait for the actual result before choosing another action. Never invent future tool results or placeholders.'
+            : 'If the request requires multiple app actions, return a chained resolution with toolName "tool_sequence", input {}, and steps ordered by dependency. Use at most 5 steps. Each step must use one available tool and must be executable after the previous step updates app state.',
+          `If the request is missing required information that is not present in context, return ${outcomeExample('needs_clarification', 'Ask for the missing information.')}.`,
+          `If none of the available tools can satisfy the request, return ${outcomeExample('no_tools_match', 'Explain what kind of app action is available instead.')}.`
+        ]),
     ...(structured
       ? [
           'Follow the response schema supplied by the model API.' +
@@ -460,7 +496,7 @@ function createResolverPrompt(
         ]
       : [
           'Return only valid JSON matching this schema:',
-          JSON.stringify(createToolResolutionSchema(tools, singleStep))
+          JSON.stringify(createToolResolutionSchema(tools, singleStep, purpose))
         ])
   ].join('\n\n')
 }
@@ -525,7 +561,7 @@ function createActiveChromeResolver(
           if (disposed) throw new Error('The resolver was disposed.')
           const resolution = await resolveWithChromeAI(current, message, tools, context, options)
           if (disposed) throw new Error('The resolver was disposed.')
-          validateToolResolution(resolution, tools, { singleStep: options?.singleStep })
+          validateToolResolution(resolution, tools, options)
           throwIfAborted(options?.signal)
           return resolution
         } finally {

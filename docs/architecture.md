@@ -88,7 +88,7 @@ sequenceDiagram
   Pi-->>Page: completed, interrupted, or error
 ```
 
-The runtime never predicts the result of an unfinished action. After a successful action, it discovers tools again. An action that opens an editor can expose a save tool for the next round. A catalog change during resolution rejects the old action. Core also rechecks registration identity, schema, scope, and cancellation after approval and guards.
+The runtime never predicts the result of an unfinished action. After a successful action, it discovers tools again. An action that opens an editor can expose a save tool for the next round. A catalog change during resolution discards the old choice and triggers a new resolution with the refreshed catalog. Core also rechecks registration identity, schema, scope, and cancellation after approval and guards.
 
 The standalone command input has a different contract: it can execute a validated sequence of up to five resolved steps. Pi always requests one next action and re-resolves from actual results. Heuristic fallback is available for ordinary commands; the conversational runtime requires an available resolver with `capabilities.conversation === true`.
 
@@ -106,7 +106,7 @@ stateDiagram-v2
   running --> stopping: Stop
   running --> idle: Completed and persisted
   running --> error: Provider, tool, storage, or budget failure
-  running --> interrupted: Worker or document lost
+  running --> interrupted: Document lost or turn cancelled
   stopping --> interrupted: Cancellation settled
   idle --> closed: Destroy
   error --> closed: Destroy
