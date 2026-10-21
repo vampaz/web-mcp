@@ -125,7 +125,7 @@ The session key contains `namespace`, `ownerId`, and `conversationId`. These val
 
 Each operation opens the bounded log, replays committed entries into Pi's reference store, and closes resources when finished. Writes reach IndexedDB before snapshots become visible. Web Locks prevent competing tabs or controllers from reading, clearing, or writing the same conversation during an active operation. A competing operation receives `conversation_busy` rather than stealing the lock.
 
-On recovery, unfinished tasks are aborted before model or tool execution is enabled. History remains visible, and the interrupted marker persists. Recovery does not replay old actions. Browser storage can be cleared or evicted, and automatic compaction is disabled.
+On recovery, unfinished tasks are aborted before model or tool execution is enabled. History remains visible, and the interrupted marker persists. Recovery does not replay old actions. Automatic compaction summarizes older model context through the configured resolver without offering application actions. The durable log and visible history retain the original messages and saved outcomes. Browser storage can still be cleared or evicted.
 
 The page's `pagehide` handler stops work when the browser saves the document in the back/forward cache. The restored controller can accept a new user request. Ordinary document disposal destroys it.
 

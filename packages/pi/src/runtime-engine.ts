@@ -1,6 +1,13 @@
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context'
 import { Type } from '@earendil-works/pi-ai'
-import { createRegistry, defineExtension, defineTool, Harness } from '@earendil-works/pi-durable'
+import {
+  CompactionTask,
+  createRegistry,
+  defineExtension,
+  defineTool,
+  Harness,
+  hook
+} from '@earendil-works/pi-durable'
 import type { Conversation, ConversationWatch, ConversationView } from '@earendil-works/pi-durable'
 import type {
   PiController,
@@ -12,10 +19,12 @@ import type {
 import { abortable, jsonBytes, piError, PiFailure } from './errors'
 import { createPiModels, piModel } from './model-adapter'
 import { piRefreshCatalogToolName, resolvePiRound } from './resolver-adapter'
-import { normalizeMessages, lastTurnState } from './recovery'
+import { normalizeMessages, lastTurnState, readPiHistory } from './recovery'
 import type { PiToolCatalog } from './interfaces/host'
+import type { PiActionOutcome } from './interfaces/action-outcome'
 import { piSessionKey, resolvePiLimits } from './session'
 import { clearPiStorage, openPiStorage } from './storage'
+import { piCompactionPolicy, summarizePiHistory } from './compaction'
 
 const context = BACKGROUND_CONTEXT
 
@@ -66,6 +75,7 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
     let interrupted = false
     let aborting: Promise<void> | undefined
     let toolCalls = 0
+    const completedActions: PiActionOutcome[] = []
     let catalogRefreshed = false
     function abort() {
       accepting = false
@@ -80,6 +90,38 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
           registry.install(
             defineExtension({
               name: 'webmcp-runtime',
+              hooks: [
+                hook(CompactionTask, {
+                  async beforeCompact(compaction, _api, taskContext) {
+                    const currentSignal = AbortSignal.any([
+                      signal,
+                      ...(taskContext.abortSignal ? [taskContext.abortSignal] : [])
+                    ])
+                    try {
+                      if (!accepting)
+                        throw new PiFailure('stale_document', 'The turn is no longer active.')
+                      const summary = await summarizePiHistory(
+                        options.resolver,
+                        compaction.entries[0]?.kind === 'pi.compaction'
+                          ? compaction.messages.slice(1)
+                          : compaction.messages,
+                        text ?? '',
+                        currentSignal,
+                        limits.maxRequestBytes,
+                        compaction.entries[0]?.kind === 'pi.compaction'
+                          ? compaction.messages[0]
+                          : undefined
+                      )
+                      currentSignal.throwIfAborted()
+                      if (summary && compaction.reason === 'overflow') failure = undefined
+                      return summary ? { summary } : { decline: true }
+                    } catch (error) {
+                      failure = piError(error)
+                      throw error
+                    }
+                  }
+                })
+              ],
               tools: [
                 defineTool({
                   name: piRefreshCatalogToolName,
@@ -130,6 +172,7 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                             'stale_document',
                             'The tool catalog changed. Send a new request.'
                           )
+                        const actionInput = structuredClone(input)
                         const result = await abortable(
                           options.host.invoke(
                             { name: tool.name, input, revision: roundCatalog.revision },
@@ -151,6 +194,11 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                             'limit_reached',
                             'The tool result exceeds the request budget. The action may have completed; check application state.'
                           )
+                        completedActions.push({
+                          toolName: tool.name,
+                          input: actionInput,
+                          status: result.status
+                        })
                         if (result.status !== 'success')
                           failure = {
                             code:
@@ -232,9 +280,13 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                 options.resolver,
                 messages,
                 current.tools,
-                await abortable(options.host.context(currentSignal), currentSignal),
+                {
+                  ...(await abortable(options.host.context(currentSignal), currentSignal)),
+                  piCompletedActions: structuredClone(completedActions)
+                },
                 currentSignal,
-                limits.maxRequestBytes
+                limits.maxRequestBytes,
+                text
               )
               const latest = await abortable(options.host.discover(currentSignal), currentSignal)
               if (latest.revision !== current.revision) return refreshCatalog(latest)
@@ -254,7 +306,7 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                 settings: {
                   toolExecution: 'sequential',
                   retry: { enabled: false },
-                  compaction: { enabled: false },
+                  compaction: piCompactionPolicy(limits.maxRequestBytes),
                   stream: { maxRetries: 0 }
                 }
               },
@@ -272,11 +324,14 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                 'Assist using current application tools and context. Re-resolve after each result. Never replay abandoned actions. Application validation and approval are authoritative.'
             }
           })
-          watch = await conversation.watch(context)
-          const previousTurn = lastTurnState(watch.value)
+          const entries = await readPiHistory(conversation, context)
+          const history = new Map(
+            entries.map(function entry(entry) {
+              return [entry.id, entry]
+            })
+          )
+          const previousTurn = lastTurnState({ entries })
           interrupted = previousTurn === 'started' || previousTurn === 'interrupted'
-          await watch.stop()
-          watch = undefined
           // Abort before enabling any resolver or page request on recovery.
           await conversation.abort(context)
           // Root creation options do not update a restored conversation's persisted model.
@@ -288,6 +343,14 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
             )
           signal.addEventListener('abort', abort, { once: true })
           watch = await conversation.watch(context)
+          function remember(view: ConversationView) {
+            for (const entry of view.entries) history.set(entry.id, entry)
+            return normalizeMessages({
+              entries: [...history.values()].sort(function chronological(left, right) {
+                return left.id < right.id ? -1 : 1
+              })
+            })
+          }
           function update(view: ConversationView) {
             publish({
               state: signal.aborted
@@ -297,7 +360,7 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                   : interrupted
                     ? 'interrupted'
                     : 'idle',
-              messages: normalizeMessages(view)
+              messages: remember(view)
             })
           }
           update(watch.value)
@@ -334,7 +397,7 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
           await watch.stop()
           watch = undefined
           const current = await conversation.watch(context)
-          const messages = normalizeMessages(current.value)
+          const messages = remember(current.value)
           await current.stop()
           const wasInterrupted = signal.aborted || (text === undefined && interrupted)
           publish({

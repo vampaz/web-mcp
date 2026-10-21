@@ -1,6 +1,43 @@
-import { expect, it } from 'vitest'
-import type { ConversationView } from '@earendil-works/pi-durable'
-import { lastTurnState, normalizeMessages } from './recovery'
+import { expect, it, vi } from 'vitest'
+import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context'
+import type { Conversation, ConversationView } from '@earendil-works/pi-durable'
+import { lastTurnState, normalizeMessages, readPiHistory } from './recovery'
+
+it('reads every page of durable history in chronological order without exposing compaction checkpoints', async function history() {
+  const entries = vi
+    .fn()
+    .mockResolvedValueOnce({
+      items: [{ id: 1, kind: 'user', model: [{ role: 'user', content: 'Original request' }] }],
+      next: { after: 1 }
+    })
+    .mockResolvedValueOnce({
+      items: [
+        {
+          id: 2,
+          kind: 'pi.compaction',
+          model: [{ role: 'user', content: '<summary>Internal checkpoint</summary>' }]
+        },
+        {
+          id: 3,
+          kind: 'assistant',
+          model: [{ role: 'assistant', content: [{ type: 'text', text: 'Saved' }] }]
+        }
+      ]
+    })
+  const history = await readPiHistory({ entries } as unknown as Conversation, BACKGROUND_CONTEXT)
+  expect(entries).toHaveBeenNthCalledWith(
+    2,
+    { order: 'ascending' },
+    100,
+    { after: 1 },
+    BACKGROUND_CONTEXT
+  )
+  expect(
+    normalizeMessages({ entries: history }).map(function text(message) {
+      return message.text
+    })
+  ).toEqual(['Original request', 'Saved'])
+})
 
 it('preserves the latest durable turn state across unrelated entries', function test() {
   const entries: ConversationView['entries'][number][] = []
