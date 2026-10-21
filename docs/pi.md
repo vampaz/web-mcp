@@ -73,7 +73,7 @@ Defaults and accepted bounds:
 
 Built-in resolvers enforce `maxRequestBytes` on the serialized HTTP body, or the Chrome prompt and response constraint. This bounds data sent by the browser; server-added context and the model's internal session history are outside this limit. Custom resolvers must enforce the same boundary for their transport.
 
-Each model request has a two-minute timeout. A turn can span multiple requests and wait for application approval without a total turn deadline. Worker health checks and Stop still interrupt a disconnected or cancelled turn.
+Each model request has a two-minute timeout. A timeout aborts the resolver request and ends the turn with a provider failure, even if the resolver ignores cancellation. A late answer cannot invoke an application action. A turn can span multiple requests and wait for application approval without a total turn deadline. Worker health checks and Stop still interrupt a disconnected or cancelled turn.
 
 Entering the browser's back/forward cache stops the active turn while preserving the controller for restoration. A new user request reconnects if necessary. Actual document disposal destroys the controller.
 

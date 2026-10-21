@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.2 — 2026-10-21
+
+- Enforce Pi's two-minute resolver deadline, including providers that ignore cancellation.
+- Release the conversation after a timeout and reject late model actions without replay or fallback.
+
 ## 0.4.1 — 2026-10-20
 
 - Refresh Pi's tool snapshot when components finish mounting between model rounds.

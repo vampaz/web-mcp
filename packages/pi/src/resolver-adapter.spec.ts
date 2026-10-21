@@ -5,7 +5,90 @@ import { createResolver, type ToolResolver } from '@vampaz/webmcp-kit'
 import { resolvePiRound } from './resolver-adapter'
 
 afterEach(function cleanup() {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
+})
+
+it('aborts a stalled model request after two minutes and ignores its late answer', async function test() {
+  vi.useFakeTimers()
+  let finish!: (value: Awaited<ReturnType<ToolResolver['resolve']>>) => void
+  let requestSignal: AbortSignal | undefined
+  const resolver: ToolResolver = {
+    name: 'Stalled provider',
+    available: true,
+    status: 'ready',
+    detail: '',
+    capabilities: { conversation: true },
+    resolve(_message, _tools, _context, options) {
+      requestSignal = options?.signal
+      return new Promise(function pending(resolve) {
+        finish = resolve
+      })
+    }
+  }
+  let outcome: unknown
+  const pending = resolvePiRound(
+    resolver,
+    [{ role: 'user', content: 'Read the invoice', timestamp: 0 }],
+    [],
+    {},
+    new AbortController().signal,
+    4096
+  ).then(
+    (value) => {
+      outcome = value
+    },
+    (error) => {
+      outcome = error
+    }
+  )
+
+  await vi.advanceTimersByTimeAsync(119999)
+  expect(outcome).toBeUndefined()
+  await vi.advanceTimersByTimeAsync(1)
+  const deadlineOutcome = outcome
+  const abortedAtDeadline = requestSignal?.aborted
+  finish({ toolName: 'pi_reply', input: { text: 'Late answer' }, confidence: 1, reason: 'Late' })
+  await pending
+
+  expect(deadlineOutcome).toMatchObject({
+    code: 'provider_failed',
+    message: expect.stringContaining('timed out')
+  })
+  expect(abortedAtDeadline).toBe(true)
+  expect(outcome).toBe(deadlineOutcome)
+  expect(vi.getTimerCount()).toBe(0)
+})
+
+it('preserves user cancellation and clears the model deadline', async function test() {
+  vi.useFakeTimers()
+  const controller = new AbortController()
+  let requestSignal: AbortSignal | undefined
+  const resolver: ToolResolver = {
+    name: 'Stalled provider',
+    available: true,
+    status: 'ready',
+    detail: '',
+    capabilities: { conversation: true },
+    resolve(_message, _tools, _context, options) {
+      requestSignal = options?.signal
+      return new Promise(function pending() {})
+    }
+  }
+  const pending = resolvePiRound(
+    resolver,
+    [{ role: 'user', content: 'Read the invoice', timestamp: 0 }],
+    [],
+    {},
+    controller.signal,
+    4096
+  )
+  const failure = expect(pending).rejects.toMatchObject({ code: 'stale_document' })
+  controller.abort()
+
+  await failure
+  expect(requestSignal?.aborted).toBe(true)
+  expect(vi.getTimerCount()).toBe(0)
 })
 
 it('preserves tool inputs and results while omitting request-only metadata', async function test() {

@@ -255,7 +255,7 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                   toolExecution: 'sequential',
                   retry: { enabled: false },
                   compaction: { enabled: false },
-                  stream: { timeoutMs: 120000, maxRetries: 0 }
+                  stream: { maxRetries: 0 }
                 }
               },
               context
