@@ -22,12 +22,14 @@ it('summarizes large history through bounded requests without offering applicati
         {
           message: {
             content: JSON.stringify({
-              toolName: 'pi_reply',
-              input: {
-                text: 'Goal: finish category C. Proposal p-1 saved; never replay it. Continue with p-2.'
-              },
-              confidence: 1,
-              reason: 'History checkpoint'
+              action: {
+                toolName: 'pi_reply',
+                input: {
+                  text: 'Goal: finish category C. Proposal p-1 saved; never replay it. Continue with p-2.'
+                },
+                confidence: 1,
+                reason: 'History checkpoint'
+              }
             })
           }
         }

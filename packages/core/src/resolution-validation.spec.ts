@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { validateToolResolution } from './resolution-validation'
+import {
+  createStructuredToolResolutionSchema,
+  validateToolResolution
+} from './resolution-validation'
+import { validateJsonValue } from './schema'
 
 describe('tool resolution validation', () => {
   const tools = [
@@ -21,6 +25,40 @@ describe('tool resolution validation', () => {
       }
     }
   ]
+
+  it('constrains generated arguments instead of allowing resolver metadata inside tool input', () => {
+    const schema = createStructuredToolResolutionSchema([
+      ...tools,
+      { name: 'open_object', inputSchema: { type: 'object' } },
+      {
+        name: 'pi_reply',
+        inputSchema: {
+          type: 'object',
+          properties: { text: { type: 'string' } },
+          required: ['text'],
+          additionalProperties: false
+        }
+      }
+    ])
+    const reply = {
+      toolName: 'pi_reply',
+      input: { text: 'All proposals were accepted.' },
+      confidence: 1,
+      reason: 'Every save succeeded.'
+    }
+    function errors(action: unknown) {
+      return validateJsonValue({ action }, schema)
+    }
+    expect(errors(reply)).toEqual([])
+    expect(
+      errors({ ...reply, input: { ...reply.input, confidence: 1, reason: reply.reason } })
+    ).not.toEqual([])
+    expect(errors({ ...reply, toolName: 'select_items', input: { ids: ['a'] } })).toEqual([])
+    expect(errors({ ...reply, toolName: 'needs_clarification', input: {} })).toEqual([])
+    expect(errors({ ...reply, input: { ids: [42] } })).not.toEqual([])
+    expect(errors({ ...reply, input: {} })).not.toEqual([])
+    expect(errors({ ...reply, input: { ids: ['a'] } })).not.toEqual([])
+  })
 
   it('validates single tool resolutions against the selected tool schema', () => {
     expect(function validateInvalidResolution() {

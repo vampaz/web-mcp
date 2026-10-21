@@ -22,7 +22,13 @@ it.each(['json_object', 'json_schema', 'server', 'hosted'] as const)(
         mode === 'server' || mode === 'hosted'
           ? reply
           : {
-              choices: [{ message: { content: JSON.stringify(reply) } }]
+              choices: [
+                {
+                  message: {
+                    content: JSON.stringify(mode === 'json_schema' ? { action: reply } : reply)
+                  }
+                }
+              ]
             }
       )
     })

@@ -133,3 +133,12 @@ Pi additionally requires `capabilities: { conversation: true }` and an available
 ## Tool sequences
 
 The command input accepts up to five ordered `steps` in a `tool_sequence`. Every step runs through core validation, current availability, approval, and guards. A failed step stops the sequence. Pi always chooses one action and resolves again using its actual result. `needs_clarification` and `no_tools_match` produce visible feedback without running a tool.
+
+### Single-step structured responses
+
+With an OpenAI-compatible provider and `responseFormat: 'json_schema'`, a single-step request uses
+an `action` envelope. Its schema pairs each tool name with that tool's input schema, preventing
+arguments for another tool from satisfying the selected branch. The resolver validates and unwraps
+this transport envelope; callers still receive `{ toolName, input, confidence, reason }`.
+The provider receives the schema through `response_format`; the prompt does not duplicate it.
+App-owned server resolvers and bounded Resolver mode retain their existing response contracts.

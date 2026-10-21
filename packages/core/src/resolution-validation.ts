@@ -67,6 +67,38 @@ export function createToolResolutionSchema(
   }
 }
 
+export function createStructuredToolResolutionSchema(
+  tools: ToolResolutionValidationTool[]
+): JsonSchema {
+  const resolution = createToolResolutionSchema(tools, true)
+  const variants = [
+    ...tools
+      .filter((tool) => tool.name)
+      .map((tool) => ({
+        ...resolution,
+        properties: {
+          ...resolution.properties,
+          toolName: { type: 'string', enum: [tool.name] },
+          input: tool.inputSchema ?? { type: 'object' }
+        }
+      })),
+    {
+      ...resolution,
+      properties: {
+        ...resolution.properties,
+        toolName: { type: 'string', enum: [...resolverOutcomeToolNames] },
+        input: { type: 'object', properties: {}, additionalProperties: false }
+      }
+    }
+  ]
+  return {
+    type: 'object',
+    properties: { action: { anyOf: variants } },
+    required: ['action'],
+    additionalProperties: false
+  }
+}
+
 export function validateToolResolution(
   resolution: unknown,
   tools: ToolResolutionValidationTool[],
