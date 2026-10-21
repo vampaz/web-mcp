@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.4 — 2026-10-21
+
+- Constrain OpenAI-compatible single-step structured output to the selected tool's argument schema, including conversation replies. Keep the public tool-resolution result unchanged.
+- Avoid repeating structured-output schemas in model prompts, leaving more of the request budget for application context and conversation history.
+
 ## 0.4.3 — 2026-10-21
 
 - Automatically compact older Pi context through the configured resolver, without offering application actions to the summarizer.

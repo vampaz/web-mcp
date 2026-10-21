@@ -10,7 +10,12 @@ import type {
 } from './interfaces/tool'
 import { getErrorMessage } from './confirmation'
 import { resolveWithHeuristics } from './heuristic-resolver'
-import { createToolResolutionSchema, validateToolResolution } from './resolution-validation'
+import {
+  createStructuredToolResolutionSchema,
+  createToolResolutionSchema,
+  validateToolResolution
+} from './resolution-validation'
+import { formatJsonValueValidationError, validateJsonValue } from './schema'
 import { ResolverRequestLimitError, serializeResolverRequest } from './resolver-request'
 
 interface LanguageModelSession {
@@ -346,20 +351,26 @@ async function resolveWithOpenAICompatible(
     headers['X-Title'] = 'WebMCP Kit'
   }
 
+  const structured = config.responseFormat === 'json_schema'
+  const wrapped = structured && options?.singleStep === true
+  const responseSchema = wrapped
+    ? createStructuredToolResolutionSchema(tools)
+    : createToolResolutionSchema(tools, options?.singleStep)
+
   const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST',
     headers,
     body: serializeResolverRequest(
       {
         model,
-        messages: createResolverMessages(message, tools, context, options?.singleStep),
+        messages: createResolverMessages(message, tools, context, options?.singleStep, structured),
         response_format:
           config.responseFormat === 'json_schema'
             ? {
                 type: 'json_schema',
                 json_schema: {
                   name: 'webmcp_resolution',
-                  schema: createToolResolutionSchema(tools, options?.singleStep)
+                  schema: responseSchema
                 }
               }
             : {
@@ -388,25 +399,38 @@ async function resolveWithOpenAICompatible(
   const content = payload.choices?.[0]?.message?.content
   if (!content) throw new Error('provider returned no message content')
 
-  return parseToolResolutionJson(content, getProviderLabel(config))
+  const parsed = parseToolResolutionJson(content, getProviderLabel(config))
+  if (!wrapped) return parsed
+  const action = (parsed as unknown as { action?: unknown } | null)?.action
+  validateToolResolution(action, tools, { singleStep: true })
+  const errors = validateJsonValue(parsed, responseSchema)
+  if (errors.length)
+    throw new Error(
+      `provider returned invalid structured resolution: ${formatJsonValueValidationError(errors)}`
+    )
+  return action as ToolResolution
 }
 
 function createResolverMessages(
   message: string,
   tools: WebMCPTool[],
   context: ResolverContext,
-  singleStep = false
+  singleStep = false,
+  structured = false
 ) {
   return [
     {
       role: 'system',
       content: singleStep
-        ? 'Choose exactly one next app tool, needs_clarification, or no_tools_match. Never return tool_sequence or steps. Return only JSON with toolName, input, confidence, and reason.'
+        ? 'Choose exactly one next app tool, needs_clarification, or no_tools_match. Never return tool_sequence or steps. ' +
+          (structured
+            ? 'Return only JSON with an action object containing toolName, input, confidence, and reason.'
+            : 'Return only JSON with toolName, input, confidence, and reason.')
         : 'Choose one app tool, a short ordered tool_sequence, needs_clarification, or no_tools_match. Return only JSON with toolName, input, confidence, reason, and optional steps.'
     },
     {
       role: 'user',
-      content: createResolverPrompt(message, tools, context, singleStep)
+      content: createResolverPrompt(message, tools, context, singleStep, structured)
     }
   ]
 }
@@ -415,20 +439,29 @@ function createResolverPrompt(
   message: string,
   tools: WebMCPTool[],
   context: ResolverContext,
-  singleStep = false
+  singleStep = false,
+  structured = false
 ): string {
   return [
     `User request: ${message}`,
     `Current app context:\n${JSON.stringify(context)}`,
     `Available tools:\n${JSON.stringify(createToolCatalog(tools))}`,
+    'Put only the selected tool arguments inside input. confidence and reason are siblings of toolName, never inside input unless the tool explicitly defines them.',
     'Choose the best tool and exact parameters from the current app context. Prefer stable IDs from context over labels.',
     singleStep
       ? 'Choose only the next unfinished action. Return one tool invocation, never a sequence or steps. Wait for the actual result before choosing another action. Never invent future tool results or placeholders.'
       : 'If the request requires multiple app actions, return a chained resolution with toolName "tool_sequence", input {}, and steps ordered by dependency. Use at most 5 steps. Each step must use one available tool and must be executable after the previous step updates app state.',
     'If the request is missing required information that is not present in context, return {"toolName":"needs_clarification","input":{},"confidence":0,"reason":"Ask for the missing information."}.',
     'If none of the available tools can satisfy the request, return {"toolName":"no_tools_match","input":{},"confidence":0,"reason":"Explain what kind of app action is available instead."}.',
-    'Return only valid JSON matching this schema:',
-    JSON.stringify(createToolResolutionSchema(tools, singleStep))
+    ...(structured
+      ? [
+          'Follow the response schema supplied by the model API.' +
+            (singleStep ? ' Wrap the single resolution in action.' : '')
+        ]
+      : [
+          'Return only valid JSON matching this schema:',
+          JSON.stringify(createToolResolutionSchema(tools, singleStep))
+        ])
   ].join('\n\n')
 }
 

@@ -40,11 +40,27 @@ describe('resolver', () => {
             {
               message: {
                 content: JSON.stringify({
-                  toolName: 'tool_sequence',
-                  input: {},
-                  confidence: 1,
-                  reason: 'Batch',
-                  steps: [{ toolName: 'read_value', input: {}, confidence: 1, reason: 'Read' }]
+                  ...(_options?.body &&
+                  JSON.parse(String(_options.body)).response_format.json_schema.schema.properties
+                    .action
+                    ? {
+                        action: {
+                          toolName: 'tool_sequence',
+                          input: {},
+                          confidence: 1,
+                          reason: 'Batch',
+                          steps: []
+                        }
+                      }
+                    : {
+                        toolName: 'tool_sequence',
+                        input: {},
+                        confidence: 1,
+                        reason: 'Batch',
+                        steps: [
+                          { toolName: 'read_value', input: {}, confidence: 1, reason: 'Read' }
+                        ]
+                      })
                 })
               }
             }
@@ -69,11 +85,14 @@ describe('resolver', () => {
       'single-step'
     )
     const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))
-    expect(body.response_format.json_schema.schema.properties.steps).toBeUndefined()
-    expect(body.response_format.json_schema.schema.properties.toolName.enum).toContain('read_value')
-    expect(body.response_format.json_schema.schema.properties.toolName.enum).not.toContain(
-      'tool_sequence'
+    const variants = body.response_format.json_schema.schema.properties.action.anyOf
+    expect(variants.every((variant: JsonSchema) => !variant.properties?.steps)).toBe(true)
+    expect(variants.flatMap((variant: JsonSchema) => variant.properties?.toolName.enum)).toContain(
+      'read_value'
     )
+    expect(
+      variants.flatMap((variant: JsonSchema) => variant.properties?.toolName.enum)
+    ).not.toContain('tool_sequence')
     expect(body.messages[0].content).toContain('exactly one')
     expect((await resolver.resolve('Read', tools)).toolName).toBe('tool_sequence')
   })
@@ -121,6 +140,49 @@ describe('resolver', () => {
       temperature: 0.2,
       reasoning_effort: 'none'
     })
+  })
+
+  it('pairs structured tool arguments and fits a large tool schema within the request budget', async function test() {
+    const action = {
+      toolName: 'read_value',
+      input: { targetId: 'one' },
+      confidence: 1,
+      reason: 'Read'
+    }
+    const fetch = vi.fn(async function respond() {
+      return Response.json({ choices: [{ message: { content: JSON.stringify({ action }) } }] })
+    })
+    vi.stubGlobal('fetch', fetch)
+    const resolver = await createResolver({
+      provider: 'openai-compatible',
+      baseUrl: '/local/v1',
+      responseFormat: 'json_schema'
+    })
+    const tools = [
+      createTool('read_value', 'Read a visible value', {
+        type: 'object',
+        properties: {
+          targetId: { type: 'string', description: 'schema-budget-detail '.repeat(250) }
+        },
+        required: ['targetId'],
+        additionalProperties: false
+      })
+    ]
+    await expect(
+      resolver.resolve('Read one', tools, {}, { singleStep: true, maxRequestBytes: 15000 })
+    ).resolves.toEqual(action)
+    const body = String(vi.mocked(globalThis.fetch).mock.calls[0]?.[1]?.body)
+    expect(new TextEncoder().encode(body).byteLength).toBeLessThanOrEqual(15000)
+    expect(body.match(/schema-budget-detail /g)).toHaveLength(500)
+    fetch.mockResolvedValueOnce(
+      Response.json({
+        choices: [{ message: { content: JSON.stringify({ action: { ...action, input: {} } }) } }]
+      })
+    )
+    await expect(resolver.resolve('Read one', tools, {}, { singleStep: true })).rejects.toThrow(
+      'invalid input for "read_value"'
+    )
+    expect(fetch).toHaveBeenCalledTimes(2)
   })
 
   it('uses a deterministic fallback resolver without Chrome built-in AI', async () => {
