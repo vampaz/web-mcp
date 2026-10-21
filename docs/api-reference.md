@@ -372,6 +372,8 @@ export interface ResolverRequest {
 export interface ResolverRunOptions {
   signal?: AbortSignal
   singleStep?: boolean
+  /** Summarize history through the offered tool, without action selection or resolver outcomes. */
+  purpose?: 'summary'
   /** Maximum UTF-8 bytes in the serialized resolver request, including prompt/schema overhead. */
   maxRequestBytes?: number
 }
@@ -576,6 +578,7 @@ export interface ToolResolutionStep {
 export interface ToolResolutionValidationOptions {
   messageStyle?: 'provider' | 'server'
   singleStep?: boolean
+  purpose?: ResolverRunOptions['purpose']
 }
 ```
 

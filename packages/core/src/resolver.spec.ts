@@ -185,6 +185,122 @@ describe('resolver', () => {
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 
+  it('keeps input schema descriptions in json_schema single-step prompts', async function test() {
+    const fetch = vi.fn(async function respond() {
+      return Response.json({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                action: {
+                  toolName: 'create_invoice',
+                  input: { amount: 25000 },
+                  confidence: 1,
+                  reason: 'Invoice'
+                }
+              })
+            }
+          }
+        ]
+      })
+    })
+    vi.stubGlobal('fetch', fetch)
+    const resolver = await createResolver({
+      provider: 'openai-compatible',
+      baseUrl: '/local/v1',
+      responseFormat: 'json_schema'
+    })
+    const inputSchema: JsonSchema = {
+      type: 'object',
+      properties: { amount: { type: 'integer', description: 'Total amount in euro cents.' } },
+      required: ['amount'],
+      additionalProperties: false
+    }
+    await resolver.resolve(
+      'Invoice 250 euros',
+      [createTool('create_invoice', 'Create an invoice.', inputSchema)],
+      {},
+      { singleStep: true }
+    )
+    // LM Studio applies response_format as an output constraint only and never shows it to the model.
+    const request = JSON.parse(String(vi.mocked(globalThis.fetch).mock.calls[0]?.[1]?.body))
+    expect(request.messages[1].content).toContain(`"inputSchema":${JSON.stringify(inputSchema)}`)
+    expect(
+      request.response_format.json_schema.schema.properties.action.anyOf[0].properties.input
+    ).toEqual(inputSchema)
+  })
+
+  it.each([
+    ['json_schema', 'needs_clarification'],
+    ['json_schema', 'no_tools_match'],
+    ['json_object', 'needs_clarification'],
+    ['json_object', 'no_tools_match']
+  ] as const)(
+    'accepts its own %s example for %s',
+    async function example(responseFormat, toolName) {
+      const fetch = vi.fn(async function respond(_url: unknown, options: RequestInit) {
+        const request = JSON.parse(String(options.body))
+        const instruction = request.messages[1].content.split('\n\n').find(function outcome(
+          line: string
+        ) {
+          return line.includes(`"toolName":"${toolName}"`)
+        })
+        const content = instruction?.match(/return (\{.*\})\.$/)?.[1]
+        expect(content).toBeDefined()
+        return Response.json({ choices: [{ message: { content } }] })
+      })
+      vi.stubGlobal('fetch', fetch)
+      const resolver = await createResolver({
+        provider: 'openai-compatible',
+        baseUrl: '/local/v1',
+        responseFormat
+      })
+      await expect(resolver.resolve('Help', [], {}, { singleStep: true })).resolves.toMatchObject({
+        toolName,
+        input: {}
+      })
+    }
+  )
+
+  it.each(['json_schema', 'json_object'] as const)(
+    'retains prompt input schemas for bounded %s resolution',
+    async function catalog(responseFormat) {
+      const fetch = vi.fn(async function respond(_url: unknown, options: RequestInit) {
+        const request = JSON.parse(String(options.body))
+        expect(request.messages[1].content).toContain('"required":["targetId"]')
+        return Response.json({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  toolName: 'read_value',
+                  input: { targetId: 'one' },
+                  confidence: 1,
+                  reason: 'Read'
+                })
+              }
+            }
+          ]
+        })
+      })
+      vi.stubGlobal('fetch', fetch)
+      const resolver = await createResolver({
+        provider: 'openai-compatible',
+        baseUrl: '/local/v1',
+        responseFormat
+      })
+      await expect(
+        resolver.resolve('Read one', [
+          createTool('read_value', 'Read', {
+            type: 'object',
+            properties: { targetId: { type: 'string' } },
+            required: ['targetId']
+          })
+        ])
+      ).resolves.toMatchObject({ input: { targetId: 'one' } })
+    }
+  )
+
   it('uses a deterministic fallback resolver without Chrome built-in AI', async () => {
     const resolver = await createBestResolver()
     const resolution = await resolver.resolve('Create an invoice for Acme for 250 euros', [

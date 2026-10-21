@@ -1,4 +1,9 @@
-import type { JsonSchema, ToolResolution, ToolResolutionStep } from './interfaces/tool'
+import type {
+  JsonSchema,
+  ResolverRunOptions,
+  ToolResolution,
+  ToolResolutionStep
+} from './interfaces/tool'
 import { formatJsonValueValidationError, validateJsonValue } from './schema'
 
 export const resolverOutcomeToolNames = ['needs_clarification', 'no_tools_match'] as const
@@ -12,6 +17,7 @@ export interface ToolResolutionValidationTool {
 export interface ToolResolutionValidationOptions {
   messageStyle?: 'provider' | 'server'
   singleStep?: boolean
+  purpose?: ResolverRunOptions['purpose']
 }
 
 export const toolResolutionSchema = {
@@ -43,9 +49,10 @@ export const toolResolutionSchema = {
 
 export function createToolResolutionSchema(
   tools: ToolResolutionValidationTool[],
-  singleStep = false
+  singleStep = false,
+  purpose?: ResolverRunOptions['purpose']
 ): JsonSchema {
-  if (!singleStep) return toolResolutionSchema
+  if (!singleStep && purpose !== 'summary') return toolResolutionSchema
   const properties: Record<string, JsonSchema> = { ...toolResolutionSchema.properties }
   delete properties.steps
   return {
@@ -60,7 +67,7 @@ export function createToolResolutionSchema(
               return tool.name
             })
             .filter(Boolean),
-          ...resolverOutcomeToolNames
+          ...(purpose === 'summary' ? [] : resolverOutcomeToolNames)
         ]
       }
     }
@@ -68,9 +75,10 @@ export function createToolResolutionSchema(
 }
 
 export function createStructuredToolResolutionSchema(
-  tools: ToolResolutionValidationTool[]
+  tools: ToolResolutionValidationTool[],
+  purpose?: ResolverRunOptions['purpose']
 ): JsonSchema {
-  const resolution = createToolResolutionSchema(tools, true)
+  const resolution = createToolResolutionSchema(tools, true, purpose)
   const variants = [
     ...tools
       .filter((tool) => tool.name)
@@ -82,14 +90,18 @@ export function createStructuredToolResolutionSchema(
           input: tool.inputSchema ?? { type: 'object' }
         }
       })),
-    {
-      ...resolution,
-      properties: {
-        ...resolution.properties,
-        toolName: { type: 'string', enum: [...resolverOutcomeToolNames] },
-        input: { type: 'object', properties: {}, additionalProperties: false }
-      }
-    }
+    ...(purpose === 'summary'
+      ? []
+      : [
+          {
+            ...resolution,
+            properties: {
+              ...resolution.properties,
+              toolName: { type: 'string', enum: [...resolverOutcomeToolNames] },
+              input: { type: 'object', properties: {}, additionalProperties: false }
+            }
+          }
+        ])
   ]
   return {
     type: 'object',
@@ -109,7 +121,7 @@ export function validateToolResolution(
   if (!resolution || typeof resolution !== 'object') throw new Error(messages.invalidResolution)
   const typedResolution = resolution as Partial<ToolResolution>
   if (
-    options.singleStep &&
+    (options.singleStep || options.purpose === 'summary') &&
     (typedResolution.steps !== undefined || typedResolution.toolName === 'tool_sequence')
   )
     throw new Error('provider returned a sequence for a single-step request')
@@ -129,6 +141,8 @@ export function validateToolResolution(
   }
   if (typeof typedResolution.reason !== 'string') throw new Error(messages.invalidReason)
   if (isResolverOutcomeToolName(typedResolution.toolName)) {
+    if (options.purpose === 'summary')
+      throw new Error(messages.unknownTool(typedResolution.toolName))
     if (typedResolution.steps !== undefined) throw new Error(messages.invalidOutcomeSteps)
     return
   }

@@ -1,4 +1,59 @@
 import { expect, test } from '@playwright/test'
+import { loadEnv } from 'vite'
+import { createResolver, type WebMCPTool } from '@vampaz/webmcp-kit'
+import { resolveDemoConfig } from '@/config'
+
+test('fills arguments whose meaning only the input schema descriptions state', async function described() {
+  const config = resolveDemoConfig({
+    ...loadEnv('development', new URL('../../', import.meta.url).pathname, ''),
+    ...process.env
+  })
+  const resolver = await createResolver({
+    provider: 'openai-compatible',
+    baseUrl: config.baseUrl,
+    model: config.modelId,
+    responseFormat: 'json_schema',
+    maxTokens: 1024,
+    temperature: 0.2,
+    reasoningEffort: 'none',
+    auth: config.token ? { mode: 'user-key', apiKey: config.token } : { mode: 'none' }
+  })
+  const tool: WebMCPTool = {
+    name: 'create_invoice',
+    description: 'Create an invoice.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        account: {
+          type: 'string',
+          description: "The customer's account number (accountNo) from context, not their id."
+        },
+        amount: { type: 'integer', description: 'Total amount in euro cents.' },
+        priority: {
+          type: 'integer',
+          enum: [1, 2, 3],
+          description: '1 is the lowest priority and 3 is the most urgent.'
+        }
+      },
+      required: ['account', 'amount', 'priority'],
+      additionalProperties: false
+    },
+    execute() {
+      throw new Error('This model check never executes tools.')
+    }
+  }
+  // LM Studio applies response_format as an output constraint only; the model reads descriptions in the prompt.
+  const resolution = await resolver.resolve(
+    'Create an urgent invoice for Acme for 250 euros.',
+    [tool],
+    { customers: [{ id: 'cus_17', accountNo: 'ACC-4410', name: 'Acme' }] },
+    { singleStep: true }
+  )
+  expect(resolution).toMatchObject({
+    toolName: 'create_invoice',
+    input: { account: 'ACC-4410', amount: 25000, priority: 3 }
+  })
+})
 
 test('answers and discovers tools through the actual model and Pi loop', async function discovery({
   page

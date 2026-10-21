@@ -11,10 +11,12 @@ import type { PiActionOutcome } from './interfaces/action-outcome'
 import { PiFailure } from './errors'
 import { installBrowserStorage } from './test-utils/browser'
 import * as modelAdapter from './model-adapter'
+import * as historyCompaction from './compaction'
 import { openPiStorage } from './storage'
 import { piSessionKey, resolvePiLimits } from './session'
 
 it('automatically compacts an active turn while retaining its objective, saved actions and full visible history', async function compaction() {
+  const summarize = vi.spyOn(historyCompaction, 'summarizePiHistory')
   const applied: string[] = []
   const checkpoints: string[] = []
   const request = 'Accept all proposals in category C; never change another category.'
@@ -58,7 +60,12 @@ it('automatically compacts an active turn while retaining its objective, saved a
           })
         ).toEqual(['pi_reply'])
         expect(context.transcript).not.toContain('older target IDs were omitted from this summary')
-        if (checkpoints.length) expect(context.previousCheckpoint).toContain('Category C only')
+        if (checkpoints.length) {
+          expect(context.previousCheckpoint).toBe(
+            'Category C only. Continue using the exact completed-action record; older target IDs were omitted from this summary.'
+          )
+          expect(context.previousCheckpoint).not.toContain('<summary>')
+        }
         checkpoints.push(context.transcript)
         return resolution('pi_reply', {
           text: 'Category C only. Continue using the exact completed-action record; older target IDs were omitted from this summary.'
@@ -77,7 +84,12 @@ it('automatically compacts an active turn while retaining its objective, saved a
   )
   runtime = await createPiRuntime({ ...config, limits: { maxRequestBytes: 32768 } })
   expect(await runtime.send(request)).toEqual({ status: 'completed' })
-  expect(checkpoints.length).toBeGreaterThan(0)
+  expect(checkpoints.length).toBeGreaterThan(1)
+  expect(
+    summarize.mock.calls.some(function reusedCheckpoint(call) {
+      return call[5] !== undefined
+    })
+  ).toBe(true)
   expect(applied).toEqual(['p-1', 'p-2', 'p-3', 'p-4'])
   const history = runtime.getSnapshot().messages
   expect(history[0]).toMatchObject({ role: 'user', text: request })
