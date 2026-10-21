@@ -113,15 +113,28 @@ export async function resolvePiRound(
       'limit_reached',
       'This conversation exceeds the resolver request limit. Start a new chat before continuing.'
     )
-  const resolution = await abortable(
-    resolver.resolve(message, tools, currentContext, {
-      signal,
-      singleStep: true,
-      maxRequestBytes: maxBytes
-    }),
-    signal
-  )
-  signal.throwIfAborted()
-  validateToolResolution(resolution, tools, { singleStep: true })
-  return resolution
+  const deadline = new AbortController()
+  const timer = setTimeout(function timeout() {
+    deadline.abort()
+  }, 120000)
+  const requestSignal = AbortSignal.any([signal, deadline.signal])
+  try {
+    const resolution = await abortable(
+      resolver.resolve(message, tools, currentContext, {
+        signal: requestSignal,
+        singleStep: true,
+        maxRequestBytes: maxBytes
+      }),
+      requestSignal
+    )
+    requestSignal.throwIfAborted()
+    validateToolResolution(resolution, tools, { singleStep: true })
+    return resolution
+  } catch (error) {
+    if (deadline.signal.aborted && !signal.aborted)
+      throw new PiFailure('provider_failed', 'The model request timed out after two minutes.')
+    throw error
+  } finally {
+    clearTimeout(timer)
+  }
 }

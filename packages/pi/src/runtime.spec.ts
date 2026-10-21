@@ -17,6 +17,7 @@ beforeEach(installBrowserStorage)
 afterEach(async function cleanup() {
   await runtime?.destroy()
   runtime = undefined
+  vi.useRealTimers()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
@@ -390,6 +391,35 @@ it('stops an uncooperative provider and settles the turn', async function test()
   expect(await turn).toEqual({ status: 'interrupted' })
   expect(runtime.getSnapshot().state).toBe('interrupted')
   expect(config.invoke).not.toHaveBeenCalled()
+})
+
+it('releases the conversation after a model timeout without replaying a late action', async function test() {
+  const config = options([resolution()])
+  let requested!: () => void
+  let lateAnswer!: (value: ToolResolution) => void
+  const started = new Promise<void>(function ready(resolve) {
+    requested = resolve
+  })
+  vi.mocked(config.resolver.resolve).mockImplementationOnce(function stalled() {
+    requested()
+    return new Promise(function pending(resolve) {
+      lateAnswer = resolve
+    })
+  })
+  runtime = await createPiRuntime(config)
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  const turn = runtime.send('Read the counter')
+  await started
+  await vi.advanceTimersByTimeAsync(120000)
+
+  expect(await turn).toMatchObject({
+    status: 'error',
+    error: { code: 'provider_failed', message: expect.stringContaining('timed out') }
+  })
+  lateAnswer(resolution('read_counter', {}))
+  await expect(runtime.send('Hello again')).resolves.toEqual({ status: 'completed' })
+  expect(config.invoke).not.toHaveBeenCalled()
+  expect(vi.getTimerCount()).toBe(0)
 })
 
 it('rejects simultaneous sends and clear during an active turn', async function test() {
