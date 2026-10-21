@@ -85,3 +85,31 @@ test('reports storage failures and request limits visibly', async function failu
   expect(result.unavailable).toMatchObject({ state: 'error', error: { code: 'storage_failed' } })
   expect(result.outcome).toMatchObject({ status: 'error', error: { code: 'limit_reached' } })
 })
+
+test('compacts growing model context while retaining the full durable conversation', async function compaction({
+  page
+}) {
+  const result = await page.evaluate(async function exercise() {
+    const fixture = window.piStorageFixture
+    await fixture.open('compaction', 'owner', 'compaction')
+    const outcomes = []
+    for (let turn = 0; turn < 10; turn++)
+      outcomes.push(
+        await fixture.send('compaction', `Evidence ${turn}: ` + 'audit evidence '.repeat(1000))
+      )
+    const history = fixture.snapshot('compaction').messages
+    await fixture.destroy('compaction')
+    const restored = await fixture.open('restored', 'owner', 'compaction')
+    const continuation = await fixture.send('restored', 'Hello again')
+    return { outcomes, history, restored, continuation, committed: await fixture.evidence() }
+  })
+  expect(result.outcomes).toEqual(Array.from({ length: 10 }, () => ({ status: 'completed' })))
+  expect(result.history.filter((message) => message.role === 'user')).toHaveLength(10)
+  expect(result.history.filter((message) => message.role === 'assistant')).toHaveLength(10)
+  expect(new TextEncoder().encode(JSON.stringify(result.history)).byteLength).toBeGreaterThan(
+    128 * 1024
+  )
+  expect(result.restored.messages).toEqual(result.history)
+  expect(result.continuation).toEqual({ status: 'completed' })
+  expect(result.committed.every(Boolean)).toBe(true)
+})

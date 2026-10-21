@@ -8,10 +8,41 @@ import type {
 } from '@earendil-works/pi-ai'
 import { createModels, createProvider } from '@earendil-works/pi-ai/models'
 import { createAssistantMessageEventStream } from '@earendil-works/pi-ai/utils/event-stream'
+import { isContextOverflow } from '@earendil-works/pi-ai/utils/overflow'
 import type { Message } from '@earendil-works/pi-ai'
 import type { ToolResolution } from '@vampaz/webmcp-kit'
+import { piError } from './errors'
 
 export const piModel = { provider: 'webmcp', modelId: 'configured-resolver' }
+export const piContextWindow = 32768
+
+export function isPiContextOverflow(error: unknown) {
+  const message = piAssistantMessage()
+  message.stopReason = 'error'
+  message.errorMessage = piError(error).message
+  return isContextOverflow(message)
+}
+
+function piAssistantMessage(): AssistantMessage {
+  return {
+    role: 'assistant',
+    content: [],
+    api: 'webmcp',
+    provider: piModel.provider,
+    model: piModel.modelId,
+    stopReason: 'stop',
+    timestamp: Date.now(),
+    // ToolResolver does not expose usage. These required fields are not displayed as measured usage.
+    usage: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 0,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 }
+    }
+  }
+}
 
 export function createPiModels(
   request: (messages: Message[], signal?: AbortSignal) => Promise<ToolResolution>
@@ -19,24 +50,7 @@ export function createPiModels(
   const models = createModels()
   function stream(_model: Model<Api>, context: TranscriptContext, options?: StreamOptions) {
     const events = createAssistantMessageEventStream()
-    const message: AssistantMessage = {
-      role: 'assistant',
-      content: [],
-      api: 'webmcp',
-      provider: piModel.provider,
-      model: piModel.modelId,
-      stopReason: 'stop',
-      timestamp: Date.now(),
-      // ToolResolver does not expose usage. These required fields are not displayed as measured usage.
-      usage: {
-        input: 0,
-        output: 0,
-        cacheRead: 0,
-        cacheWrite: 0,
-        totalTokens: 0,
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 }
-      }
-    }
+    const message = piAssistantMessage()
     events.push({ type: 'start', partial: message })
     void complete()
     return events
@@ -102,7 +116,7 @@ export function createPiModels(
           baseUrl: '',
           reasoning: false,
           input: ['text'],
-          contextWindow: 32768,
+          contextWindow: piContextWindow,
           maxTokens: 2048,
           cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
         }

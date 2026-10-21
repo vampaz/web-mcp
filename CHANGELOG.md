@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.3 — 2026-10-21
+
+- Automatically compact older Pi context through the configured resolver, without offering application actions to the summarizer.
+- Preserve the full visible history, saved outcomes, and interrupted-turn recovery across compaction and reopening.
+
 ## 0.4.2 — 2026-10-21
 
 - Enforce Pi's two-minute resolver deadline, including providers that ignore cancellation.

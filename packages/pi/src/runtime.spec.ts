@@ -7,10 +7,240 @@ import type { ToolResolution, ToolResolver } from '@vampaz/webmcp-kit'
 import { createPiRuntime } from './runtime'
 import type { PiController } from './interfaces/controller'
 import type { PiToolHost } from './interfaces/host'
+import type { PiActionOutcome } from './interfaces/action-outcome'
+import { PiFailure } from './errors'
 import { installBrowserStorage } from './test-utils/browser'
 import * as modelAdapter from './model-adapter'
 import { openPiStorage } from './storage'
 import { piSessionKey, resolvePiLimits } from './session'
+
+it('automatically compacts an active turn while retaining its objective, saved actions and full visible history', async function compaction() {
+  const applied: string[] = []
+  const checkpoints: string[] = []
+  const request = 'Accept all proposals in category C; never change another category.'
+  const config = options([], {
+    async discover() {
+      return {
+        revision: '1',
+        tools: [
+          {
+            name: 'accept_proposal',
+            description: 'Accept the specified pending proposal.',
+            inputSchema: {
+              type: 'object',
+              properties: { id: { type: 'string' } },
+              required: ['id'],
+              additionalProperties: false
+            }
+          }
+        ]
+      }
+    },
+    async invoke(call) {
+      const id = String(call.input.id)
+      expect(applied).not.toContain(id)
+      applied.push(id)
+      call.input.id = 'host-normalized-input'
+      return {
+        toolName: call.name,
+        status: 'success',
+        output: { id, saved: true, evidence: 'supporting calculation '.repeat(500) },
+        durationMs: 0
+      }
+    }
+  })
+  config.resolver.resolve = vi.fn<ToolResolver['resolve']>(
+    async function next(message, tools, context) {
+      if (typeof context?.transcript === 'string') {
+        expect(
+          tools.map(function name(tool) {
+            return tool.name
+          })
+        ).toEqual(['pi_reply'])
+        expect(context.transcript).not.toContain('older target IDs were omitted from this summary')
+        if (checkpoints.length) expect(context.previousCheckpoint).toContain('Category C only')
+        checkpoints.push(context.transcript)
+        return resolution('pi_reply', {
+          text: 'Category C only. Continue using the exact completed-action record; older target IDs were omitted from this summary.'
+        })
+      }
+      expect(message).toContain(request)
+      const completed = context?.piCompletedActions as PiActionOutcome[]
+      expect(completed.map((action) => action.input.id)).toEqual(applied)
+      expect(completed.every((action) => action.status === 'success')).toBe(true)
+      if (completed.length === 4) {
+        expect(JSON.stringify(context?.piPreviousConversation)).not.toContain('p-1')
+        return resolution('pi_reply', { text: 'Four category C proposals saved.' })
+      }
+      return resolution('accept_proposal', { id: `p-${completed.length + 1}` })
+    }
+  )
+  runtime = await createPiRuntime({ ...config, limits: { maxRequestBytes: 32768 } })
+  expect(await runtime.send(request)).toEqual({ status: 'completed' })
+  expect(checkpoints.length).toBeGreaterThan(0)
+  expect(applied).toEqual(['p-1', 'p-2', 'p-3', 'p-4'])
+  const history = runtime.getSnapshot().messages
+  expect(history[0]).toMatchObject({ role: 'user', text: request })
+  expect(
+    history.filter(function tool(message) {
+      return message.role === 'tool'
+    })
+  ).toHaveLength(4)
+  expect(
+    history.some(function internal(message) {
+      return message.text.includes('<summary>')
+    })
+  ).toBe(false)
+  const calls = vi.mocked(config.resolver.resolve).mock.calls.length
+  await runtime.destroy()
+  runtime = await createPiRuntime({ ...config, limits: { maxRequestBytes: 32768 } })
+  expect(runtime.getSnapshot().messages).toEqual(history)
+  expect(vi.mocked(config.resolver.resolve).mock.calls).toHaveLength(calls)
+  expect(applied).toHaveLength(4)
+})
+
+it('Stop interrupts compaction without placing a late checkpoint or replaying the saved action', async function cancelCompaction() {
+  let started!: () => void
+  const summarizing = new Promise<void>(function pending(resolve) {
+    started = resolve
+  })
+  let finish!: (value: ToolResolution) => void
+  const invoke = vi.fn(async function saved() {
+    return {
+      toolName: 'read_counter',
+      status: 'success' as const,
+      output: { saved: true, evidence: 'evidence '.repeat(1800) },
+      durationMs: 0
+    }
+  })
+  const config = options([], { invoke })
+  config.resolver.resolve = vi.fn<ToolResolver['resolve']>(
+    async function next(_message, _tools, context) {
+      if (typeof context?.transcript === 'string') {
+        started()
+        return new Promise<ToolResolution>(function pending(resolve) {
+          finish = resolve
+        })
+      }
+      return resolution('read_counter', {})
+    }
+  )
+  runtime = await createPiRuntime({ ...config, limits: { maxRequestBytes: 32768 } })
+  const turn = runtime.send('Save once and continue')
+  await summarizing
+  await runtime.stop()
+  finish(resolution('pi_reply', { text: 'Late checkpoint' }))
+  expect(await turn).toEqual({ status: 'interrupted' })
+  expect(invoke).toHaveBeenCalledOnce()
+  const history = runtime.getSnapshot().messages
+  expect(
+    history.some(function late(message) {
+      return message.text.includes('Late checkpoint')
+    })
+  ).toBe(false)
+  await runtime.destroy()
+  runtime = await createPiRuntime(config)
+  expect(runtime.getSnapshot().state).toBe('interrupted')
+  expect(invoke).toHaveBeenCalledOnce()
+})
+
+it('reports a failed compaction without continuing application actions or losing saved history', async function failedCompaction() {
+  const invoke = vi.fn(async function saved() {
+    return {
+      toolName: 'read_counter',
+      status: 'success' as const,
+      output: { saved: true, evidence: 'evidence '.repeat(1800) },
+      durationMs: 0
+    }
+  })
+  const config = options([], { invoke })
+  config.resolver.resolve = vi.fn<ToolResolver['resolve']>(
+    async function next(_message, _tools, context) {
+      if (typeof context?.transcript === 'string') throw new Error('Local model is unavailable')
+      return resolution('read_counter', {})
+    }
+  )
+  runtime = await createPiRuntime({ ...config, limits: { maxRequestBytes: 32768 } })
+  expect(await runtime.send('Save once and continue')).toMatchObject({
+    status: 'error',
+    error: { message: 'Local model is unavailable' }
+  })
+  expect(invoke).toHaveBeenCalledOnce()
+  expect(runtime.getSnapshot().messages).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        role: 'tool',
+        failed: false,
+        text: expect.stringContaining('"saved":true')
+      })
+    ])
+  )
+  await runtime.destroy()
+  runtime = await createPiRuntime(config)
+  expect(invoke).toHaveBeenCalledOnce()
+})
+
+it.each(['provider context', 'serialized request budget'])(
+  'recovers a %s overflow by compaction without repeating a saved action',
+  async function overflowCompaction(kind) {
+    let overflow = false
+    const checkpoints: string[] = []
+    const config = options([])
+    config.resolver.resolve = vi.fn<ToolResolver['resolve']>(
+      async function next(message, _tools, context) {
+        if (typeof context?.transcript === 'string') {
+          checkpoints.push(context.transcript)
+          return resolution('pi_reply', {
+            text: 'Earlier evidence noted. Continue the current request.'
+          })
+        }
+        if (message.startsWith('Earlier evidence')) return resolution()
+        if (!config.invoke.mock.calls.length) return resolution('read_counter', {})
+        if (!overflow) {
+          overflow = true
+          if (kind === 'provider context')
+            throw new Error('prompt is too long: provider context limit exceeded')
+          throw new PiFailure(
+            'limit_reached',
+            'This conversation exceeds the resolver request limit.'
+          )
+        }
+        return resolution('pi_reply', { text: 'The saved counter result is 7.' })
+      }
+    )
+    runtime = await createPiRuntime(config)
+    expect(await runtime.send('Earlier evidence A: ' + 'first evidence '.repeat(200))).toEqual({
+      status: 'completed'
+    })
+    expect(await runtime.send('Earlier evidence B: ' + 'second evidence '.repeat(600))).toEqual({
+      status: 'completed'
+    })
+    expect(await runtime.send('Read the counter once and report its saved result.')).toEqual({
+      status: 'completed'
+    })
+    expect(checkpoints.length).toBeGreaterThan(0)
+    expect(config.invoke).toHaveBeenCalledOnce()
+    expect(runtime.getSnapshot().state).toBe('idle')
+    const history = runtime.getSnapshot().messages
+    expect(history.filter((message) => message.failed)).toEqual([])
+    await runtime.destroy()
+    runtime = await createPiRuntime(config)
+    expect(runtime.getSnapshot().messages).toEqual(history)
+    expect(config.invoke).toHaveBeenCalledOnce()
+  }
+)
+
+it('keeps a small request budget usable without making extra summarization requests', async function smallBudget() {
+  const config = options([resolution(), resolution()])
+  runtime = await createPiRuntime({ ...config, limits: { maxRequestBytes: 4096 } })
+  expect(await runtime.send('Earlier evidence A: ' + 'a'.repeat(400))).toEqual({
+    status: 'completed'
+  })
+  expect(await runtime.send('Earlier evidence B: ' + 'b'.repeat(400))).toEqual({
+    status: 'completed'
+  })
+  expect(config.resolver.resolve).toHaveBeenCalledTimes(2)
+})
 
 let runtime: PiController | undefined
 beforeEach(installBrowserStorage)
