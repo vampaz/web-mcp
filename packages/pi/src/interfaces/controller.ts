@@ -21,10 +21,25 @@ export type PiErrorCode =
   | 'limit_reached'
   | 'conversation_busy'
 
+export type PiErrorReason =
+  | 'tool_calls'
+  | 'request_bytes'
+  | 'history_bytes'
+  | 'tool_result_bytes'
+  | 'storage_quota'
+  | 'context_overflow'
+  | 'timeout'
+
 export interface PiError {
   code: PiErrorCode
   message: string
+  /** Narrows codes such as `limit_reached` and `storage_failed` to a specific remedy. */
+  reason?: PiErrorReason
+  /** True when an application action was invoked during the failed turn and may have run. */
+  actionMayHaveRun?: boolean
 }
+
+export type PiToolStatus = 'success' | 'error' | 'blocked' | 'unavailable' | 'unknown'
 
 export interface PiMessage {
   id: string
@@ -32,12 +47,32 @@ export interface PiMessage {
   text: string
   toolName?: string
   failed?: boolean
+  /** Tool messages: the validated input the model chose. */
+  input?: Record<string, unknown>
+  /** Tool messages: `unknown` when an interruption hid whether the action ran. */
+  status?: PiToolStatus
+  /** Tool messages: successful output, as returned by the application. */
+  output?: unknown
+}
+
+export type PiActivity =
+  | { kind: 'resolving' }
+  | { kind: 'compacting' }
+  | { kind: 'tool'; toolName: string; phase: 'approval' | 'running' }
+
+export interface PiHistoryUsage {
+  historyBytes: number
+  maxHistoryBytes: number
 }
 
 export interface PiSnapshot {
   state: PiState
   messages: readonly PiMessage[]
   error?: PiError
+  /** What a running turn is doing now; absent outside `running` and `stopping`. */
+  activity?: PiActivity
+  /** Durable log size, so a UI can warn before the history limit. */
+  usage?: PiHistoryUsage
 }
 
 export interface PiTurnOutcome {
@@ -51,6 +86,8 @@ export interface PiController {
   send(text: string): Promise<PiTurnOutcome>
   stop(): Promise<void>
   clear(): Promise<void>
+  /** Reloads saved history, for example after another tab finished a turn. */
+  refresh(): Promise<void>
   destroy(): Promise<void>
 }
 

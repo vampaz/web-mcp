@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context'
 import { createModels } from '@earendil-works/pi-ai/models'
 import { createRegistry, Harness } from '@earendil-works/pi-durable'
-import type { ToolResolution, ToolResolver } from '@vampaz/webmcp-kit'
+import { createResolver, type ToolResolution, type ToolResolver } from '@vampaz/webmcp-kit'
 import { createPiRuntime } from './runtime'
 import type { PiController } from './interfaces/controller'
 import type { PiToolHost } from './interfaces/host'
@@ -14,6 +14,7 @@ import * as modelAdapter from './model-adapter'
 import * as historyCompaction from './compaction'
 import { openPiStorage } from './storage'
 import { piSessionKey, resolvePiLimits } from './session'
+import { deletePiConversations, listPiConversations } from './conversations'
 
 it('automatically compacts an active turn while retaining its objective, saved actions and full visible history', async function compaction() {
   const summarize = vi.spyOn(historyCompaction, 'summarizePiHistory')
@@ -76,7 +77,8 @@ it('automatically compacts an active turn while retaining its objective, saved a
       expect(completed.map((action) => action.input.id)).toEqual(applied)
       expect(completed.every((action) => action.status === 'success')).toBe(true)
       if (completed.length === 4) {
-        expect(JSON.stringify(context?.piPreviousConversation)).not.toContain('p-1')
+        const history = message.split('\n\nCurrent user request:')[0]!
+        expect(history).not.toContain('p-1')
         return resolution('pi_reply', { text: 'Four category C proposals saved.' })
       }
       return resolution('accept_proposal', { id: `p-${completed.length + 1}` })
@@ -206,7 +208,8 @@ it.each(['provider context', 'serialized request budget'])(
             text: 'Earlier evidence noted. Continue the current request.'
           })
         }
-        if (message.startsWith('Earlier evidence')) return resolution()
+        if (message.split('\n\nCurrent user request: ').at(-1)!.startsWith('Earlier evidence'))
+          return resolution()
         if (!config.invoke.mock.calls.length) return resolution('read_counter', {})
         if (!overflow) {
           overflow = true
@@ -354,8 +357,8 @@ it.each([false, true])(
       {
         registry: createRegistry(),
         models: modelAdapter.createPiModels(async function unused() {
-          return resolution()
-        })
+          return { resolution: resolution() }
+        }, 32_768)
       },
       BACKGROUND_CONTEXT
     )
@@ -596,14 +599,23 @@ it('preserves a completed action result when refreshing tools fails', async func
   expect(config.resolver.resolve).toHaveBeenCalledTimes(1)
 })
 
-it('rejects invalid model output without a fallback or tool call', async function test() {
-  const config = options([resolution('invented_tool', {})])
+it('rejects repeated invalid model output without a fallback or tool call', async function test() {
+  const config = options([resolution('invented_tool', {}), resolution('invented_tool', {})])
   runtime = await createPiRuntime(config)
   expect(await runtime.send('Read')).toMatchObject({
     status: 'error',
     error: { code: 'provider_failed' }
   })
   expect(config.invoke).not.toHaveBeenCalled()
+  expect(config.resolver.resolve).toHaveBeenCalledTimes(2)
+})
+
+it('gives the model one correction round with the validation error', async function test() {
+  const config = options([resolution('invented_tool', {}), resolution()])
+  runtime = await createPiRuntime(config)
+  expect(await runtime.send('Read')).toEqual({ status: 'completed' })
+  const retry = vi.mocked(config.resolver.resolve).mock.calls[1]?.[2]
+  expect(String(retry?.piCorrection)).toContain('invented_tool')
 })
 
 it('enforces the configured tool call limit', async function test() {
@@ -793,6 +805,10 @@ it('keeps an already executed effect when its acknowledgement is interrupted and
   await runtime.stop()
   expect(await turn).toEqual({ status: 'interrupted' })
   expect(effects).toBe(1)
+  expect(runtime.getSnapshot().messages.find((message) => message.role === 'tool')).toMatchObject({
+    toolName: 'read_counter',
+    status: 'unknown'
+  })
   await runtime.destroy()
   runtime = await createPiRuntime(config)
   expect(runtime.getSnapshot().state).toBe('interrupted')
@@ -807,4 +823,361 @@ it('keeps an already executed effect when its acknowledgement is interrupted and
   await runtime.destroy()
   runtime = await createPiRuntime(config)
   expect(runtime.getSnapshot().state).toBe('idle')
+})
+
+it('shows what a running turn is doing, including approval waits', async function test() {
+  let approve!: () => void
+  let waiting!: () => void
+  const asked = new Promise<void>(function ready(resolve) {
+    waiting = resolve
+  })
+  const config = options([resolution('read_counter', {}), resolution()], {
+    async invoke(call, _signal, progress) {
+      progress?.('approval')
+      waiting()
+      await new Promise<void>(function decide(resolve) {
+        approve = resolve
+      })
+      progress?.('running')
+      return { toolName: call.name, status: 'success', output: { value: 7 }, durationMs: 0 }
+    }
+  })
+  runtime = await createPiRuntime(config)
+  const turn = runtime.send('Read')
+  await asked
+  expect(runtime.getSnapshot().activity).toEqual({
+    kind: 'tool',
+    toolName: 'read_counter',
+    phase: 'approval'
+  })
+  approve()
+  expect(await turn).toEqual({ status: 'completed' })
+  const snapshot = runtime.getSnapshot()
+  expect(snapshot.activity).toBeUndefined()
+  expect(snapshot.usage?.historyBytes).toBeGreaterThan(0)
+  expect(Object.isFrozen(snapshot.messages)).toBe(true)
+  expect(snapshot.messages.find((message) => message.role === 'tool')).toMatchObject({
+    toolName: 'read_counter',
+    status: 'success',
+    output: { value: 7 }
+  })
+})
+
+it('reports the storage limit hidden inside wrapped failures and flags the unsaved action', async function test() {
+  let invoked = 0
+  const config = options(
+    [resolution(), resolution(), resolution('read_counter', {}), resolution()],
+    {
+      async invoke(call) {
+        invoked++
+        return {
+          toolName: call.name,
+          status: 'success',
+          output: { report: 'x'.repeat(30_000) },
+          durationMs: 0
+        }
+      }
+    }
+  )
+  runtime = await createPiRuntime({
+    ...config,
+    limits: { maxHistoryBytes: 65536, maxRequestBytes: 262144 }
+  })
+  expect(await runtime.send('a'.repeat(16_000))).toEqual({ status: 'completed' })
+  expect(await runtime.send('b'.repeat(16_000))).toEqual({ status: 'completed' })
+  const outcome = await runtime.send('Read the report')
+  expect(invoked).toBe(1)
+  expect(outcome).toMatchObject({
+    status: 'error',
+    error: { code: 'limit_reached', reason: 'history_bytes', actionMayHaveRun: true }
+  })
+})
+
+it('enforces the configured message length', async function test() {
+  runtime = await createPiRuntime({ ...options([]), limits: { maxMessageChars: 5 } })
+  expect(await runtime.send('123456')).toMatchObject({
+    status: 'error',
+    error: { code: 'configuration', message: 'Enter a message of 1–5 characters.' }
+  })
+})
+
+it('reloads history after another controller releases a busy conversation', async function test() {
+  let release!: () => void
+  let started!: () => void
+  const running = new Promise<void>(function ready(resolve) {
+    started = resolve
+  })
+  const writer = options([resolution('read_counter', {}), resolution()], {
+    async invoke(call) {
+      started()
+      await new Promise<void>(function hold(resolve) {
+        release = resolve
+      })
+      return { toolName: call.name, status: 'success', output: { value: 7 }, durationMs: 0 }
+    }
+  })
+  runtime = await createPiRuntime(writer)
+  const turn = runtime.send('Read')
+  await running
+  const reader = await createPiRuntime(options([]))
+  try {
+    expect(reader.getSnapshot()).toMatchObject({
+      state: 'error',
+      error: { code: 'conversation_busy' }
+    })
+    release()
+    await turn
+    await reader.refresh()
+    expect(reader.getSnapshot().state).toBe('idle')
+    expect(reader.getSnapshot().messages.map((message) => message.role)).toEqual([
+      'user',
+      'tool',
+      'assistant'
+    ])
+  } finally {
+    await reader.destroy()
+  }
+})
+
+it('deletes stored conversations for one account and clears by deleting the database', async function test() {
+  const owner = { namespace: 'tests', ownerId: 'leaving' }
+  for (const conversationId of ['one', 'two']) {
+    const controller = await createPiRuntime({
+      ...options([resolution()]),
+      session: { ...owner, conversationId }
+    })
+    await controller.send('Hello')
+    await controller.destroy()
+  }
+  const other = { namespace: 'tests', ownerId: 'staying', conversationId: 'three' }
+  runtime = await createPiRuntime({ ...options([resolution()]), session: other })
+  await runtime.send('Hello')
+  expect((await listPiConversations(owner)).sort()).toEqual(['one', 'two'])
+
+  await deletePiConversations(owner)
+
+  expect(await listPiConversations(owner)).toEqual([])
+  expect(await listPiConversations(other)).toEqual(['three'])
+  await runtime.clear()
+  expect(await listPiConversations(other)).toEqual([])
+})
+
+it('waits for a history reload instead of rejecting a send', async function test() {
+  runtime = await createPiRuntime(options([resolution()]))
+  const reload = runtime.refresh()
+  const outcome = runtime.send('Hello')
+  await reload
+  expect(await outcome).toEqual({ status: 'completed' })
+})
+
+it('reloads every idle reader after a turn finishes in another controller', async function test() {
+  runtime = await createPiRuntime(options([resolution()]))
+  const readers = [await createPiRuntime(options([])), await createPiRuntime(options([]))]
+  try {
+    expect(await runtime.send('Hello')).toEqual({ status: 'completed' })
+    for (const reader of readers) {
+      await vi.waitFor(function reloaded() {
+        expect(reader.getSnapshot().messages.map((message) => message.role)).toEqual([
+          'user',
+          'assistant'
+        ])
+      })
+      expect(reader.getSnapshot().state).toBe('idle')
+    }
+  } finally {
+    for (const reader of readers) await reader.destroy()
+  }
+})
+
+it('reloads all readers even when one reload outlasts the old retry window', async function test() {
+  let hold = false
+  let held = false
+  let started!: () => void
+  let release!: () => void
+  const entered = new Promise<void>(function ready(resolve) {
+    started = resolve
+  })
+  const pending = new Promise<void>(function wait(resolve) {
+    release = resolve
+  })
+  const host = options([]).host
+  async function discover(signal: AbortSignal) {
+    if (hold && !held) {
+      held = true
+      started()
+      await pending
+    }
+    return host.discover(signal)
+  }
+  runtime = await createPiRuntime(options([resolution()]))
+  const readers = [
+    await createPiRuntime(options([], { discover })),
+    await createPiRuntime(options([], { discover }))
+  ]
+  try {
+    hold = true
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    expect(await runtime.send('Hello')).toEqual({ status: 'completed' })
+    await entered
+    await vi.advanceTimersByTimeAsync(5000)
+    release()
+    vi.useRealTimers()
+    for (const reader of readers)
+      await vi.waitFor(function reloaded() {
+        expect(reader.getSnapshot()).toMatchObject({ state: 'idle', messages: expect.any(Array) })
+        expect(reader.getSnapshot().messages).toHaveLength(2)
+      })
+  } finally {
+    release()
+    vi.useRealTimers()
+    for (const reader of readers) await reader.destroy()
+  }
+})
+
+it.each(['stop', 'destroy'] as const)(
+  'cancels discovery during a reload on %s and releases the conversation',
+  async function test(action) {
+    let hold = false
+    let started!: () => void
+    let release!: () => void
+    let signal: AbortSignal | undefined
+    const entered = new Promise<void>(function ready(resolve) {
+      started = resolve
+    })
+    const pending = new Promise<void>(function wait(resolve) {
+      release = resolve
+    })
+    const host = options([]).host
+    runtime = await createPiRuntime(
+      options([], {
+        async discover(currentSignal) {
+          if (hold) {
+            signal = currentSignal
+            started()
+            await pending
+          }
+          return host.discover(currentSignal)
+        }
+      })
+    )
+    hold = true
+    const reload = runtime.refresh()
+    await entered
+    const stopping = runtime[action]()
+    try {
+      await vi.waitFor(function cancelled() {
+        expect(signal?.aborted).toBe(true)
+      })
+      await stopping
+      expect(runtime.getSnapshot().state).toBe(action === 'destroy' ? 'closed' : 'interrupted')
+      const replacement = await createPiRuntime(options([]))
+      try {
+        expect(replacement.getSnapshot().state).toBe('idle')
+      } finally {
+        await replacement.destroy()
+      }
+    } finally {
+      release()
+      await Promise.all([reload, stopping])
+    }
+  }
+)
+
+it('cancels a queued background reload without waiting for the other controller', async function test() {
+  const config = options([])
+  runtime = await createPiRuntime(config)
+  const discover = vi.spyOn(config.host, 'discover')
+  let release!: () => void
+  let started!: () => void
+  const entered = new Promise<void>(function ready(resolve) {
+    started = resolve
+  })
+  const key = piSessionKey(config.session)
+  const owner = navigator.locks.request(key, async function hold() {
+    started()
+    await new Promise<void>(function wait(resolve) {
+      release = resolve
+    })
+  })
+  const channel = new BroadcastChannel(key)
+  try {
+    await entered
+    channel.postMessage('changed')
+    await vi.waitFor(async function queued() {
+      expect((await navigator.locks.query()).pending).toHaveLength(1)
+    })
+    await runtime.destroy()
+    expect((await navigator.locks.query()).held).toHaveLength(1)
+    expect(runtime.getSnapshot().state).toBe('closed')
+    expect(discover).not.toHaveBeenCalled()
+  } finally {
+    release()
+    await owner
+    channel.close()
+  }
+})
+
+it('empties other controllers on clear without recreating the deleted database', async function test() {
+  const config = options([resolution()])
+  runtime = await createPiRuntime(config)
+  const reader = await createPiRuntime(options([]))
+  try {
+    expect(await runtime.send('Hello')).toEqual({ status: 'completed' })
+    await vi.waitFor(function reloaded() {
+      expect(reader.getSnapshot().messages).toHaveLength(2)
+    })
+    await runtime.clear()
+    await vi.waitFor(function emptied() {
+      expect(reader.getSnapshot().messages).toEqual([])
+    })
+    await new Promise(function settle(resolve) {
+      setTimeout(resolve, 100)
+    })
+    expect(await listPiConversations(config.session)).toEqual([])
+  } finally {
+    await reader.destroy()
+  }
+})
+
+it('gives malformed model JSON from a built-in resolver one correction round', async function test() {
+  const replies = [
+    'I would read the counter now.',
+    JSON.stringify({
+      toolName: 'pi_reply',
+      input: { text: 'Done.' },
+      confidence: 1,
+      reason: 'Reply'
+    })
+  ]
+  const fetch = vi.fn(async function respond() {
+    return Response.json({ choices: [{ message: { content: replies.shift() } }] })
+  })
+  vi.stubGlobal('fetch', fetch)
+  const resolver = await createResolver({
+    provider: 'openai-compatible',
+    baseUrl: 'https://models.example.test/v1',
+    auth: { mode: 'none' }
+  })
+  runtime = await createPiRuntime({ ...options([]), resolver })
+
+  expect(await runtime.send('Hello')).toEqual({ status: 'completed' })
+  expect(fetch).toHaveBeenCalledTimes(2)
+  const [, init] = fetch.mock.calls[1] as unknown as [string, RequestInit]
+  const retry = JSON.parse(String(init.body)) as { messages: { content: string }[] }
+  expect(retry.messages.at(-1)?.content).toContain('piCorrection')
+})
+
+it('does not recreate a cleared database when a controller reloads afterwards', async function test() {
+  const config = options([resolution()])
+  runtime = await createPiRuntime(config)
+  expect(await runtime.send('Hello')).toEqual({ status: 'completed' })
+  const reader = await createPiRuntime(options([]))
+  try {
+    await runtime.clear()
+    await reader.refresh()
+    expect(reader.getSnapshot()).toMatchObject({ state: 'idle', messages: [] })
+    expect(await listPiConversations(config.session)).toEqual([])
+  } finally {
+    await reader.destroy()
+  }
 })

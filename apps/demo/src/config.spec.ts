@@ -20,5 +20,5 @@ it.each([
 ])('rejects an unsafe target %s', function test(target) {
   expect(function invalid() {
     resolveDemoConfig({ LM_STUDIO_BASE_URL: target })
-  }).toThrow()
+  }).toThrow('LM_STUDIO_BASE_URL must be a loopback HTTP(S) URL ending in /v1.')
 })

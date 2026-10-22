@@ -86,6 +86,7 @@ describe('integration diagnostics', () => {
           required: ['invoiceId'],
           additionalProperties: false
         },
+        confirmation: { reason: 'Creates a draft invoice.' },
         execute() {
           return { created: true }
         }

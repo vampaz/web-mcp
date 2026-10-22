@@ -44,7 +44,7 @@ Use the shared [Pi controller](./pi.md) and [chat custom element](./chat.md) for
         }
         this.harness = harness
         const chat = document.createElement('webmcp-chat') as WebMCPChatElement
-        chat.configure({ harness })
+        chat.configure({ controller: harness })
         this.append(chat)
       }).catch((error) => {
         if (this.isConnected && generation === this.generation) this.textContent = String(error)

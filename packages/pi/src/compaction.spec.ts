@@ -7,7 +7,7 @@ afterEach(function cleanup() {
   vi.unstubAllGlobals()
 })
 
-it.each(['json_schema', 'json_object'] as const)(
+it.each(['json_schema', 'json_object', 'text'] as const)(
   'summarizes large history through bounded %s requests without offering application actions',
   async function test(responseFormat) {
     const bodies: string[] = []
@@ -71,7 +71,9 @@ it.each(['json_schema', 'json_object'] as const)(
       ],
       'Accept category C',
       new AbortController().signal,
-      8192
+      8192,
+      undefined,
+      { contextTokens: 32_768, timeoutMs: 120_000 }
     )
 
     expect(bodies.length).toBeGreaterThan(1)
@@ -102,7 +104,9 @@ it('does not summarize system-only entries or expose their tool catalog', async 
       [{ role: 'system', content: 'Tool catalog', timestamp: 0 }],
       'Continue',
       new AbortController().signal,
-      8192
+      8192,
+      undefined,
+      { contextTokens: 32_768, timeoutMs: 120_000 }
     )
   ).toBeUndefined()
   expect(resolve).not.toHaveBeenCalled()
@@ -169,7 +173,8 @@ it('keeps an earlier checkpoint separate from user history and omits action-sele
       content:
         'The conversation history before this point was compacted into the following summary:\n\n<summary>\nConfirmed: accept_proposal p-1 succeeded.\n</summary>',
       timestamp: 0
-    }
+    },
+    { contextTokens: 32_768, timeoutMs: 120_000 }
   )
   expect(resolve).toHaveBeenCalledOnce()
 })
@@ -201,7 +206,9 @@ it('condenses an oversized checkpoint once before accepting it', async function 
     [{ role: 'user', content: 'Keep the saved proposal outcome', timestamp: 0 }],
     'Continue category C',
     new AbortController().signal,
-    8192
+    8192,
+    undefined,
+    { contextTokens: 32_768, timeoutMs: 120_000 }
   )
   expect(result).toContain('p-1 saved')
   expect(resolve).toHaveBeenCalledTimes(2)
@@ -242,7 +249,9 @@ it('shrinks transcript chunks when the provider context is smaller than the byte
       [{ role: 'user', content: 'Audit evidence '.repeat(400), timestamp: 0 }],
       'Continue category C',
       new AbortController().signal,
-      32768
+      32768,
+      undefined,
+      { contextTokens: 32_768, timeoutMs: 120_000 }
     )
   ).toContain('p-1 saved')
   expect(attempted[0]).toBeGreaterThan(1024)
@@ -266,7 +275,9 @@ it('does not mistake a provider rate limit for context overflow', async function
       [{ role: 'user', content: 'Audit evidence', timestamp: 0 }],
       'Continue category C',
       new AbortController().signal,
-      8192
+      8192,
+      undefined,
+      { contextTokens: 32_768, timeoutMs: 120_000 }
     )
   ).rejects.toThrow('Rate limit')
   expect(resolve).toHaveBeenCalledOnce()
@@ -301,7 +312,9 @@ it.each(['needs_clarification', 'no_tools_match', 'accept_proposal', 'oversized'
         [{ role: 'user', content: 'Remember the saved proposal', timestamp: 0 }],
         'Continue',
         new AbortController().signal,
-        8192
+        8192,
+        undefined,
+        { contextTokens: 32_768, timeoutMs: 120_000 }
       )
     ).rejects.toThrow()
   }

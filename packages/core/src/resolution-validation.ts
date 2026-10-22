@@ -111,6 +111,14 @@ export function createStructuredToolResolutionSchema(
   }
 }
 
+/** A resolver returned a resolution that does not match the offered tools or the resolution contract. */
+export class ToolResolutionValidationError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ToolResolutionValidationError'
+  }
+}
+
 export function validateToolResolution(
   resolution: unknown,
   tools: ToolResolutionValidationTool[],
@@ -118,32 +126,38 @@ export function validateToolResolution(
 ): void {
   const messages = getValidationMessages(options.messageStyle ?? 'provider')
 
-  if (!resolution || typeof resolution !== 'object') throw new Error(messages.invalidResolution)
+  if (!resolution || typeof resolution !== 'object')
+    throw new ToolResolutionValidationError(messages.invalidResolution)
   const typedResolution = resolution as Partial<ToolResolution>
   if (
     (options.singleStep || options.purpose === 'summary') &&
     (typedResolution.steps !== undefined || typedResolution.toolName === 'tool_sequence')
   )
-    throw new Error('provider returned a sequence for a single-step request')
-  if (typeof typedResolution.toolName !== 'string') throw new Error(messages.invalidToolName)
+    throw new ToolResolutionValidationError(
+      'provider returned a sequence for a single-step request'
+    )
+  if (typeof typedResolution.toolName !== 'string')
+    throw new ToolResolutionValidationError(messages.invalidToolName)
   if (
     !typedResolution.input ||
     typeof typedResolution.input !== 'object' ||
     Array.isArray(typedResolution.input)
   ) {
-    throw new Error(messages.invalidInput)
+    throw new ToolResolutionValidationError(messages.invalidInput)
   }
   if (
     typeof typedResolution.confidence !== 'number' ||
     !Number.isFinite(typedResolution.confidence)
   ) {
-    throw new Error(messages.invalidConfidence)
+    throw new ToolResolutionValidationError(messages.invalidConfidence)
   }
-  if (typeof typedResolution.reason !== 'string') throw new Error(messages.invalidReason)
+  if (typeof typedResolution.reason !== 'string')
+    throw new ToolResolutionValidationError(messages.invalidReason)
   if (isResolverOutcomeToolName(typedResolution.toolName)) {
     if (options.purpose === 'summary')
-      throw new Error(messages.unknownTool(typedResolution.toolName))
-    if (typedResolution.steps !== undefined) throw new Error(messages.invalidOutcomeSteps)
+      throw new ToolResolutionValidationError(messages.unknownTool(typedResolution.toolName))
+    if (typedResolution.steps !== undefined)
+      throw new ToolResolutionValidationError(messages.invalidOutcomeSteps)
     return
   }
   if (typedResolution.steps !== undefined) {
@@ -163,11 +177,12 @@ function validateToolResolutionSequence(
   tools: ToolResolutionValidationTool[],
   messages: ToolResolutionValidationMessages
 ): void {
-  if (resolution.toolName !== 'tool_sequence') throw new Error(messages.invalidSequence)
+  if (resolution.toolName !== 'tool_sequence')
+    throw new ToolResolutionValidationError(messages.invalidSequence)
   if (!Array.isArray(resolution.steps) || resolution.steps.length === 0) {
-    throw new Error(messages.invalidSequenceSteps)
+    throw new ToolResolutionValidationError(messages.invalidSequenceSteps)
   }
-  if (resolution.steps.length > 5) throw new Error(messages.sequenceTooLong)
+  if (resolution.steps.length > 5) throw new ToolResolutionValidationError(messages.sequenceTooLong)
 
   resolution.steps.forEach(function validateSequenceStep(step) {
     validateToolResolutionStep(step, tools, messages)
@@ -179,25 +194,29 @@ function validateToolResolutionStep(
   tools: ToolResolutionValidationTool[],
   messages: ToolResolutionValidationMessages
 ): void {
-  if (!step || typeof step !== 'object') throw new Error(messages.invalidStep)
-  if (typeof step.toolName !== 'string') throw new Error(messages.invalidStepToolName)
+  if (!step || typeof step !== 'object')
+    throw new ToolResolutionValidationError(messages.invalidStep)
+  if (typeof step.toolName !== 'string')
+    throw new ToolResolutionValidationError(messages.invalidStepToolName)
   if (!step.input || typeof step.input !== 'object' || Array.isArray(step.input)) {
-    throw new Error(messages.invalidStepInput)
+    throw new ToolResolutionValidationError(messages.invalidStepInput)
   }
   if (typeof step.confidence !== 'number' || !Number.isFinite(step.confidence)) {
-    throw new Error(messages.invalidStepConfidence)
+    throw new ToolResolutionValidationError(messages.invalidStepConfidence)
   }
-  if (typeof step.reason !== 'string') throw new Error(messages.invalidStepReason)
+  if (typeof step.reason !== 'string')
+    throw new ToolResolutionValidationError(messages.invalidStepReason)
 
   const selectedTool = tools.find(function findSelectedTool(tool) {
     return tool.name === step.toolName
   })
-  if (!selectedTool) throw new Error(messages.unknownTool(step.toolName))
-  if (!selectedTool.inputSchema) throw new Error(messages.missingInputSchema)
+  if (!selectedTool) throw new ToolResolutionValidationError(messages.unknownTool(step.toolName))
+  if (!selectedTool.inputSchema)
+    throw new ToolResolutionValidationError(messages.missingInputSchema)
 
   const inputValidationErrors = validateJsonValue(step.input, selectedTool.inputSchema)
   if (inputValidationErrors.length > 0) {
-    throw new Error(
+    throw new ToolResolutionValidationError(
       messages.invalidToolInput(
         step.toolName,
         formatJsonValueValidationError(inputValidationErrors)

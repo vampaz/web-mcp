@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["unicorn", "typescript", "oxc", "vitest"],
+  "rules": {
+    "func-style": ["error", "declaration"],
+    "vitest/require-mock-type-parameters": "off",
+    "vitest/valid-expect": "off",
+    "vitest/expect-expect": "off",
+    "vitest/require-to-throw-message": "off",
+    "vitest/prefer-snapshot-hint": "off"
+  }
+}

@@ -8,3 +8,8 @@ export interface UseWebMCPToolResult<TInput = Record<string, unknown>, TOutput =
   unregister: () => void
   getRegistration: () => RegisteredTool<TInput, TOutput> | undefined
 }
+
+export interface UseWebMCPToolsResult {
+  unregister: () => void
+  getRegistrations: () => RegisteredTool[]
+}

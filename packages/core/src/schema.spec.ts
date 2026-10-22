@@ -340,4 +340,89 @@ describe('schema validation', () => {
       validateJsonValue('2026-02-30T25:90:00Z', { type: 'string', format: 'date-time' })
     ).toEqual(['/ expected date-time format, got "2026-02-30T25:90:00Z".'])
   })
+  it('validates keywords that Zod emits for numbers, records, tuples, and intersections', () => {
+    expect(validateJsonValue(0, { type: 'integer', exclusiveMinimum: 0 })).toEqual([
+      '/ expected number > 0, got 0.'
+    ])
+    expect(validateJsonValue(10, { type: 'number', exclusiveMaximum: 10 })).toEqual([
+      '/ expected number < 10, got 10.'
+    ])
+    expect(validateJsonValue(0.3, { type: 'number', multipleOf: 0.1 })).toEqual([])
+    expect(validateJsonValue(7, { type: 'number', multipleOf: 2 })).toEqual([
+      '/ expected a multiple of 2, got 7.'
+    ])
+    expect(validateJsonValue([1, 2, 1], { type: 'array', uniqueItems: true })).toEqual([
+      '/2 is a duplicate item.'
+    ])
+    expect(
+      validateJsonValue(['a', 'b'], {
+        type: 'array',
+        prefixItems: [{ type: 'string' }, { type: 'number' }]
+      })
+    ).toEqual(['/1 expected number, got string.'])
+    expect(
+      validateJsonValue(
+        { 'Bad key': 1 },
+        { type: 'object', propertyNames: { pattern: '^[a-z]+$' } }
+      )
+    ).toEqual(['/Bad key has a disallowed property name.'])
+    expect(validateJsonValue({}, { type: 'object', minProperties: 1 })).toEqual([
+      '/ expected at least 1 properties, got 0.'
+    ])
+    expect(
+      validateJsonValue(
+        { a: 'x' },
+        { allOf: [{ required: ['a'] }, { required: ['b'], properties: { b: { type: 'string' } } }] }
+      )
+    ).toEqual(['/b is required.'])
+    expect(validateJsonValue('admin', { type: 'string', not: { const: 'admin' } })).toEqual([
+      '/ matched a disallowed schema.'
+    ])
+  })
+
+  it('checks common string formats and leaves unknown formats as annotations', () => {
+    expect(validateJsonValue('not-a-uuid', { type: 'string', format: 'uuid' })).toHaveLength(1)
+    expect(
+      validateJsonValue('123e4567-e89b-12d3-a456-426614174000', { type: 'string', format: 'uuid' })
+    ).toEqual([])
+    expect(validateJsonValue('256.1.1.1', { type: 'string', format: 'ipv4' })).toHaveLength(1)
+    expect(validateJsonValue('10.0.0.1', { type: 'string', format: 'ipv4' })).toEqual([])
+    expect(validateJsonValue('2001:db8::1', { type: 'string', format: 'ipv6' })).toEqual([])
+    expect(validateJsonValue('2001:db8:::1', { type: 'string', format: 'ipv6' })).toHaveLength(1)
+    expect(validateJsonValue('-bad.example', { type: 'string', format: 'hostname' })).toHaveLength(
+      1
+    )
+    expect(validateJsonValue('anything', { type: 'string', format: 'jwt' })).toEqual([])
+  })
+
+  it('rejects value keywords it cannot enforce when a tool is defined', () => {
+    expect(
+      validateJsonSchema({
+        type: 'object',
+        properties: { node: { $ref: '#/$defs/node' } },
+        $defs: { node: { type: 'object' } }
+      })
+    ).toEqual([
+      'schema.$defs is not supported; inline the schema or remove the keyword.',
+      'schema.properties.node.$ref is not supported; inline the schema or remove the keyword.'
+    ])
+    expect(validateJsonSchema({ type: 'object', patternProperties: {} })).toEqual([
+      'schema.patternProperties is not supported; inline the schema or remove the keyword.'
+    ])
+  })
+
+  it('skips pattern checks after a failed length bound and bounds error values', () => {
+    const started = performance.now()
+    const errors = validateJsonValue(`${'a'.repeat(40)}!`, {
+      type: 'string',
+      maxLength: 5,
+      pattern: '^(a+)+$'
+    })
+    expect(performance.now() - started).toBeLessThan(100)
+    expect(errors).toEqual(['/ expected string length <= 5, got 41.'])
+
+    const [error] = validateJsonValue('x'.repeat(10_000), { enum: ['short'] })
+    expect(error!.length).toBeLessThan(200)
+    expect(error).toContain('…')
+  })
 })

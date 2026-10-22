@@ -2,7 +2,8 @@ import { afterEach, expect, it, vi } from 'vitest'
 
 import { setConfirmationHandler } from './confirmation'
 import { defineTool } from './define-tool'
-import type { ConfirmationHandler } from './interfaces/tool'
+import { subscribeWebMCPKitEvents } from './events'
+import type { ConfirmationHandler, WebMCPKitEvent } from './interfaces/tool'
 import { clearToolsForTest, invokeTool, registerTool, unregisterTool } from './registry'
 
 afterEach(function cleanup() {
@@ -130,4 +131,109 @@ it('checks scope and cancellation after an asynchronous guard', async function t
   fixture.approve(true)
   expect((await pending).code).toBe('scope_unavailable')
   expect(fixture.execute).not.toHaveBeenCalled()
+})
+
+it('emits correlated confirmation events around approval', async () => {
+  const fixture = setup()
+  const events: WebMCPKitEvent[] = []
+  const unsubscribe = subscribeWebMCPKitEvents(function record(event) {
+    events.push(event)
+  })
+  const pending = invokeTool({ id: 'call_1', toolName: 'set_counter', input: {}, source: 'pi' })
+  await Promise.resolve()
+  expect(events.map((event) => event.type)).toEqual(['invoked', 'confirmation-requested'])
+  fixture.approve(true)
+  await pending
+  unsubscribe()
+
+  expect(events.map((event) => event.type)).toEqual([
+    'invoked',
+    'confirmation-requested',
+    'confirmation-settled',
+    'succeeded'
+  ])
+  expect(events[2]?.detail).toEqual({
+    id: 'call_1',
+    toolName: 'set_counter',
+    source: 'pi',
+    approved: true
+  })
+})
+
+it('gives event subscribers their own copies of input and result', async () => {
+  registerTool(
+    defineTool({
+      name: 'echo_note',
+      description: 'Echo a short note back to the caller for display.',
+      inputSchema: {
+        type: 'object',
+        properties: { note: { type: 'string' } },
+        required: ['note'],
+        additionalProperties: false
+      },
+      execute(input) {
+        return input
+      }
+    })
+  )
+  const unsubscribe = subscribeWebMCPKitEvents(function redact(event) {
+    const detail = event.detail as Record<string, unknown>
+    if (event.type === 'invoked') (detail.input as Record<string, unknown>).note = 'changed'
+    if (event.type === 'succeeded') detail.output = '[redacted]'
+  })
+  const result = await invokeTool({ toolName: 'echo_note', input: { note: 'original' } })
+  unsubscribe()
+
+  expect(result.output).toEqual({ note: 'original' })
+})
+
+it('keeps validated nested output out of listeners reach', async () => {
+  registerTool(
+    defineTool({
+      name: 'read_counter',
+      description: 'Read the current application counter for display.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      outputSchema: {
+        type: 'object',
+        properties: { counter: { type: 'object', properties: { value: { type: 'integer' } } } },
+        required: ['counter']
+      },
+      execute() {
+        return { counter: { value: 7 } }
+      }
+    })
+  )
+  const unsubscribe = subscribeWebMCPKitEvents(function tamper(event) {
+    if (event.type !== 'succeeded') return
+    const output = (event.detail as { output: { counter: { value: unknown } } }).output
+    output.counter.value = 'seven'
+  })
+  const result = await invokeTool({ toolName: 'read_counter', input: {} })
+  unsubscribe()
+
+  expect(result).toMatchObject({ status: 'success', output: { counter: { value: 7 } } })
+})
+
+it('leaves output that cannot be cloned out of event details', async () => {
+  const handle = { close() {} }
+  registerTool(
+    defineTool({
+      name: 'open_editor',
+      description: 'Open the inline editor and return its handle to the caller.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      execute() {
+        return handle
+      }
+    })
+  )
+  const details: unknown[] = []
+  const unsubscribe = subscribeWebMCPKitEvents(function record(event) {
+    if (event.type === 'succeeded') details.push(event.detail)
+  })
+  const result = await invokeTool({ toolName: 'open_editor', input: {} })
+  unsubscribe()
+
+  expect(result.output).toBe(handle)
+  expect(details[0]).toMatchObject({ status: 'success' })
+  expect(details[0]).not.toHaveProperty('output')
 })

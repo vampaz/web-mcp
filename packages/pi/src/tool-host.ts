@@ -1,6 +1,6 @@
-import { invokeTool } from '@vampaz/webmcp-kit'
+import { invokeTool, subscribeWebMCPKitEvents } from '@vampaz/webmcp-kit'
 import { listAvailableTools } from '../../core/src/registry'
-import type { ResolverContext } from '@vampaz/webmcp-kit'
+import type { ConfirmationEventDetail, ResolverContext } from '@vampaz/webmcp-kit'
 import type { PiToolHost } from './interfaces/host'
 import { PiFailure } from './errors'
 
@@ -41,11 +41,29 @@ export function createRegistryToolHost(
       signal.throwIfAborted()
       return context()
     },
-    async invoke(call, signal) {
+    async invoke(call, signal, progress) {
       const current = await discover(signal)
       if (current.revision !== call.revision)
         throw new PiFailure('stale_document', 'The tool catalog changed. Send a new request.')
-      return invokeTool({ toolName: call.name, input: call.input, source: 'resolver', signal })
+      const id = `pi_${crypto.randomUUID()}`
+      // Approval events carry the invocation ID, so the activity shows when the app asks the user.
+      const unsubscribe = subscribeWebMCPKitEvents(function phase(event) {
+        const detail = event.detail as ConfirmationEventDetail | undefined
+        if (detail?.id !== id) return
+        if (event.type === 'confirmation-requested') progress?.('approval')
+        else if (event.type === 'confirmation-settled') progress?.('running')
+      })
+      try {
+        return await invokeTool({
+          id,
+          toolName: call.name,
+          input: call.input,
+          source: 'pi',
+          signal
+        })
+      } finally {
+        unsubscribe()
+      }
     }
   }
 }

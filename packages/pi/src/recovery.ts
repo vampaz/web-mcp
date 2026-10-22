@@ -1,6 +1,7 @@
 import type { Context } from '@earendil-works/chord'
 import type { Conversation, ConversationView, Cursor } from '@earendil-works/pi-durable'
 import { CompactionEntry } from '@earendil-works/pi-durable'
+import type { ToolInvocationResult } from '@vampaz/webmcp-kit'
 import type { PiMessage } from './interfaces/controller'
 import { piRefreshCatalogToolName } from './resolver-adapter'
 
@@ -22,9 +23,22 @@ export function lastTurnState(
   }
 }
 
+export const piActionInvokingKind = 'webmcp.action.invoking'
+
 export function normalizeMessages(view: Pick<ConversationView, 'entries'>): PiMessage[] {
   const recovered = new Set<ConversationView['entries'][number]['id']>()
-  view.entries.forEach(function overflow(entry, index) {
+  const invoking = new Set<string>()
+  const calls = new Map<string, Record<string, unknown>>()
+  view.entries.forEach(function scan(entry, index) {
+    if (entry.kind === piActionInvokingKind) {
+      const callId = (entry.data as { callId?: unknown } | undefined)?.callId
+      if (typeof callId === 'string') invoking.add(callId)
+    }
+    for (const message of entry.model ?? [])
+      if (message.role === 'assistant')
+        for (const content of message.content)
+          if (content.type === 'toolCall' && typeof content.id === 'string')
+            calls.set(content.id, content.arguments)
     if (CompactionEntry.is(entry) && entry.data?.reason === 'overflow') {
       const previous = view.entries[index - 1]
       if (
@@ -48,6 +62,16 @@ export function normalizeMessages(view: Pick<ConversationView, 'entries'>): PiMe
                 return block.type === 'text' ? [block.text] : []
               })
               .join('\n')
+      if (message.role === 'toolResult')
+        return [
+          {
+            id: `${entry.id}:${index}`,
+            role: 'tool',
+            toolName: message.toolName,
+            ...(calls.has(message.toolCallId) ? { input: calls.get(message.toolCallId) } : {}),
+            ...toolOutcome(text, message.isError, invoking.has(message.toolCallId))
+          }
+        ]
       if (
         !text &&
         message.role === 'assistant' &&
@@ -58,11 +82,8 @@ export function normalizeMessages(view: Pick<ConversationView, 'entries'>): PiMe
       return [
         {
           id: `${entry.id}:${index}`,
-          role: message.role === 'toolResult' ? 'tool' : message.role,
+          role: message.role,
           text: text || (message.role === 'assistant' ? (message.errorMessage ?? '') : ''),
-          ...(message.role === 'toolResult'
-            ? { toolName: message.toolName, failed: message.isError }
-            : {}),
           ...(message.role === 'assistant' && message.stopReason === 'error'
             ? { failed: true }
             : {})
@@ -70,6 +91,47 @@ export function normalizeMessages(view: Pick<ConversationView, 'entries'>): PiMe
       ]
     })
   })
+}
+
+function toolOutcome(
+  text: string,
+  isError: boolean,
+  invoked: boolean
+): Pick<PiMessage, 'text' | 'status' | 'output' | 'failed'> {
+  try {
+    const result = JSON.parse(text) as Partial<ToolInvocationResult>
+    if (result && typeof result === 'object' && typeof result.status === 'string') {
+      const success = result.status === 'success'
+      return {
+        text: success
+          ? (JSON.stringify(result.output) ?? '')
+          : (result.error ?? 'The action did not succeed.'),
+        status: result.status,
+        ...(success && result.output !== undefined ? { output: result.output } : {}),
+        failed: !success
+      }
+    }
+  } catch {
+    /* Pi wrote a text outcome, such as an interruption or a runtime failure. */
+  }
+  const plain = text
+    .replace(/^<harness>\s*/, '')
+    .replace(/\s*<\/harness>$/, '')
+    .replace(/^\[error\]\s*/, '')
+  if (isError && /\bwas (?:aborted|interrupted|not started)\b/.test(plain))
+    // Pi reports any stopped call as aborted; the durable marker says whether the app received it.
+    return invoked
+      ? {
+          text: 'Outcome unknown: the turn stopped after this action started. Check application state before retrying.',
+          status: 'unknown',
+          failed: true
+        }
+      : {
+          text: 'Not run: the turn stopped before this action started.',
+          status: 'error',
+          failed: true
+        }
+  return { text: plain, status: isError ? 'error' : 'success', failed: isError }
 }
 
 export async function readPiHistory(conversation: Conversation, context: Context) {

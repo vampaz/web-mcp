@@ -2,17 +2,25 @@ import { defineConfig, devices } from '@playwright/test'
 import { demoTestOrigin } from './apps/demo/local-tls'
 import './scripts/playwright-trust'
 import { join } from 'node:path'
+import { mkdirSync } from 'node:fs'
+
+// shortcut: isolate macOS app data until Playwright includes the Firefox 158 fix.
+const firefoxHome =
+  process.platform === 'darwin' ? join(import.meta.dirname, 'test-results/firefox-home') : undefined
+if (firefoxHome) mkdirSync(firefoxHome, { recursive: true })
 
 const firefoxPolicy =
   process.platform === 'linux' && process.env.CI === 'true' && process.env.RUNNER_TEMP
     ? join(process.env.RUNNER_TEMP, 'webmcp-firefox-policies.json')
     : undefined
+// Browser projects run every spec except these, so a new spec cannot fall outside all projects.
+const separateSuites = ['**/lmstudio.spec.ts', '**/webmcp-native.spec.ts']
+const chromiumOnly = ['**/pi-assistant.spec.ts']
 
 export default defineConfig({
   testDir: './apps/demo/tests/e2e',
   outputDir: 'test-results/browser',
   reporter: [['list'], ['json', { outputFile: 'test-results/browser-results.json' }]],
-  testIgnore: '**/lmstudio.spec.ts',
   fullyParallel: false,
   workers: 2,
   retries: 0,
@@ -28,7 +36,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      testMatch: /(?:core|pi-assistant|pi-storage|webmcp-chat)\.spec\.ts/,
+      testIgnore: separateSuites,
       use: {
         ...devices['Desktop Chrome'],
         launchOptions: { args: ['--disable-blink-features=WebMCP'] }
@@ -36,12 +44,13 @@ export default defineConfig({
     },
     {
       name: 'firefox',
-      testMatch: /(?:core|pi-storage|webmcp-chat)\.spec\.ts/,
+      testIgnore: [...separateSuites, ...chromiumOnly],
       use: {
         ...devices['Desktop Firefox'],
         launchOptions: {
           env: {
             ...process.env,
+            ...(firefoxHome ? { CFFIXED_USER_HOME: firefoxHome } : {}),
             ...(firefoxPolicy ? { PLAYWRIGHT_FIREFOX_POLICIES_JSON: firefoxPolicy } : {})
           }
         }
@@ -49,7 +58,7 @@ export default defineConfig({
     },
     {
       name: 'webkit',
-      testMatch: /(?:core|pi-storage|webmcp-chat)\.spec\.ts/,
+      testIgnore: [...separateSuites, ...chromiumOnly],
       use: { ...devices['Desktop Safari'] }
     },
     {

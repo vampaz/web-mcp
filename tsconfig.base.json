@@ -9,14 +9,11 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "ignoreDeprecations": "6.0",
     "noEmit": true,
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["apps/demo/src/*"],
-      "@vampaz/webmcp-kit": ["packages/core/src/index.ts"],
-      "@vampaz/webmcp-kit/testing/playwright": ["packages/testing/src/playwright.ts"],
-      "@vampaz/webmcp-kit/*": ["packages/*/src/index.ts"]
+      "@vampaz/webmcp-kit": ["./packages/core/src/index.ts"],
+      "@vampaz/webmcp-kit/testing/playwright": ["./packages/testing/src/playwright.ts"],
+      "@vampaz/webmcp-kit/*": ["./packages/*/src/index.ts"]
     }
   }
 }

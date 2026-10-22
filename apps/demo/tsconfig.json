@@ -1,5 +1,14 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "types": ["vite/client", "node"] },
-  "include": ["src/**/*.ts", "src/**/*.vue", "vite.config.ts"]
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "types": ["vite/client", "node"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@vampaz/webmcp-kit": ["../../packages/core/src/index.ts"],
+      "@vampaz/webmcp-kit/testing/playwright": ["../../packages/testing/src/playwright.ts"],
+      "@vampaz/webmcp-kit/*": ["../../packages/*/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.vue", "tests/**/*.ts", "vite.config.ts"]
 }

@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { setConfirmationHandler } from './confirmation'
 import { defineTool } from './define-tool'
+import { subscribeWebMCPKitEvents } from './events'
+import type { ToolInvocation, WebMCPKitEvent } from './interfaces/tool'
 import { clearToolsForTest, registerTool } from './registry'
 import { installWebMCPKitTestBridge } from './test-bridge'
 
@@ -114,15 +116,24 @@ describe('test bridge', () => {
 
     installWebMCPKitTestBridge()
 
+    const events: WebMCPKitEvent[] = []
+    const unsubscribe = subscribeWebMCPKitEvents(function record(event) {
+      events.push(event)
+    })
     const result = await window.__webMCPKit?.invokeTool({
       toolName: 'checkout_cart',
       input: {},
-      confirmed: true
-    })
+      confirmed: true,
+      source: 'native'
+    } as ToolInvocation)
+    unsubscribe()
 
     expect(result).toMatchObject({
       status: 'blocked',
       error: 'Checkout requires approval.'
+    })
+    expect(events.find((event) => event.type === 'invoked')?.detail).toMatchObject({
+      source: 'fallback'
     })
   })
 })

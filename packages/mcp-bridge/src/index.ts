@@ -1,15 +1,19 @@
 import {
+  getTool,
   invokeTool,
-  listTools,
   type JsonSchema,
   type RegisteredTool,
+  type ToolAnnotations,
   type ToolInvocationResult
 } from '@vampaz/webmcp-kit'
+import { listAvailableTools } from '../../core/src/registry'
 
 export interface MCPBridgeTool {
   name: string
   description: string
   inputSchema: JsonSchema
+  outputSchema?: JsonSchema
+  annotations?: ToolAnnotations
 }
 
 export interface MCPBridgeRequest {
@@ -44,7 +48,7 @@ export function createLocalMCPBridge(): MCPBridge {
 }
 
 function listToolsForBridge(): MCPBridgeTool[] {
-  return listTools().map(toBridgeTool)
+  return listAvailableTools().map(toBridgeTool)
 }
 
 async function callTool(
@@ -54,7 +58,7 @@ async function callTool(
   return invokeTool({
     toolName: name,
     input,
-    source: 'fallback'
+    source: 'mcp-bridge'
   })
 }
 
@@ -77,7 +81,11 @@ async function handleRequest(request: MCPBridgeRequest): Promise<MCPBridgeRespon
       return createErrorResponse(request, -32602, 'Expected params.name and params.arguments.')
     }
 
+    // Read the schema before the call: a tool can unregister itself while it runs.
+    const declaresOutput = Boolean(getTool(name)?.tool.outputSchema)
     const result = await callTool(name, input)
+    // MCP requires structured content, which may be any JSON value, when an output schema is declared.
+    const structured = declaresOutput && result.status === 'success' && result.output !== undefined
 
     return {
       jsonrpc: '2.0',
@@ -89,6 +97,7 @@ async function handleRequest(request: MCPBridgeRequest): Promise<MCPBridgeRespon
             text: JSON.stringify(result.output ?? result.error ?? null)
           }
         ],
+        ...(structured ? { structuredContent: result.output } : {}),
         isError: result.status !== 'success'
       }
     }
@@ -98,10 +107,13 @@ async function handleRequest(request: MCPBridgeRequest): Promise<MCPBridgeRespon
 }
 
 function toBridgeTool(registration: RegisteredTool): MCPBridgeTool {
+  const { outputSchema, annotations } = registration.tool
   return {
     name: registration.tool.name,
     description: registration.tool.description,
-    inputSchema: registration.tool.inputSchema
+    inputSchema: registration.tool.inputSchema,
+    ...(outputSchema ? { outputSchema } : {}),
+    ...(annotations ? { annotations } : {})
   }
 }
 

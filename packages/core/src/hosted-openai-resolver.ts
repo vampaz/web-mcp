@@ -9,8 +9,8 @@ import type {
   WebMCPCommandInputResolverModelOption,
   WebMCPCommandInputResolverOption
 } from './interfaces/command-input'
-import { getErrorMessage } from './confirmation'
 import { createToolResolutionSchema, validateToolResolution } from './resolution-validation'
+import { createResponseError } from './resolver-error'
 import { serializeResolverRequest } from './resolver-request'
 
 export interface HostedOpenAIResolverOptions {
@@ -68,6 +68,8 @@ interface TurnstileRenderOptions {
 const hostedOpenAIResolverServiceId = 'hosted-openai-resolver'
 const turnstileScriptSrc = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
 const sessionRefreshSkewMs = 30 * 1000
+const sessionRequestTimeoutMs = 60 * 1000
+const challengeScriptTimeoutMs = 15 * 1000
 const defaultResolverEndpointPath = '/api/webmcp/resolve'
 const defaultSessionEndpointPath = '/api/webmcp/session'
 let turnstileScriptPromise: Promise<void> | undefined
@@ -88,6 +90,44 @@ export function createHostedOpenAIResolver(rawOptions: HostedOpenAIResolverOptio
   }
 
   let paidAccessSession: PaidAccessSession | null = null
+  let pendingSession:
+    | { promise: Promise<PaidAccessSession>; controller: AbortController; waiters: number }
+    | undefined
+
+  // Concurrent resolves share one challenge and session request. It is cancelled only when every
+  // waiting caller has cancelled, and it times out on its own.
+  async function getSession(signal?: AbortSignal): Promise<PaidAccessSession> {
+    signal?.throwIfAborted()
+    if (paidAccessSession && isPaidAccessSessionFresh(paidAccessSession)) return paidAccessSession
+    if (!pendingSession) {
+      const controller = new AbortController()
+      const request = {
+        controller,
+        waiters: 0,
+        promise: requestPaidAccessSession(
+          options,
+          AbortSignal.any([controller.signal, AbortSignal.timeout(sessionRequestTimeoutMs)])
+        )
+          .then(function store(session) {
+            paidAccessSession = session
+            return session
+          })
+          .finally(function settle() {
+            if (pendingSession === request) pendingSession = undefined
+          })
+      }
+      request.promise.catch(function observed() {})
+      pendingSession = request
+    }
+    const request = pendingSession
+    request.waiters++
+    try {
+      return await waitForChallenge(request.promise, signal)
+    } finally {
+      request.waiters--
+      if (request.waiters === 0 && signal?.aborted) request.controller.abort(signal.reason)
+    }
+  }
 
   return {
     capabilities: { conversation: true },
@@ -121,20 +161,21 @@ export function createHostedOpenAIResolver(rawOptions: HostedOpenAIResolverOptio
         },
         runOptions?.maxRequestBytes
       )
-      paidAccessSession = await getPaidAccessSession(options, paidAccessSession, runOptions?.signal)
+      const session = await getSession(runOptions?.signal)
       const response = await requestHostedResolution({
         body,
         options,
         signal: runOptions?.signal,
-        token: paidAccessSession.token
+        token: session.token
       })
 
-      if (response.status === 401 || response.status === 403) {
+      // Only invalidate the session this request used; another request may already hold a newer one.
+      if ((response.status === 401 || response.status === 403) && paidAccessSession === session) {
         paidAccessSession = null
       }
 
       if (!response.ok) {
-        throw new Error(await getHostedResolverError(response))
+        throw await createResponseError('Hosted OpenAI', response)
       }
 
       const resolution = (await response.json()) as ToolResolution
@@ -226,14 +267,10 @@ async function requestHostedResolution(input: {
   })
 }
 
-async function getPaidAccessSession(
+async function requestPaidAccessSession(
   options: ResolvedHostedOpenAIResolverOptions,
-  currentSession: PaidAccessSession | null,
-  signal?: AbortSignal
+  signal: AbortSignal
 ): Promise<PaidAccessSession> {
-  signal?.throwIfAborted()
-  if (currentSession && isPaidAccessSessionFresh(currentSession)) return currentSession
-
   const turnstileToken = await getBrowserChallengeToken(options, signal)
   const response = await fetch(options.sessionEndpoint, {
     body: JSON.stringify({
@@ -250,10 +287,22 @@ async function getPaidAccessSession(
   })
 
   if (!response.ok) {
-    throw new Error(await getHostedResolverError(response))
+    throw await createResponseError('Hosted OpenAI session', response)
   }
 
-  return (await response.json()) as PaidAccessSession
+  return parsePaidAccessSession(await response.json())
+}
+
+function parsePaidAccessSession(value: unknown): PaidAccessSession {
+  const session = value as Partial<PaidAccessSession> | null
+  if (!session || typeof session.token !== 'string' || !session.token)
+    throw new Error('Hosted OpenAI session response did not include a token.')
+  // An unreadable expiry is treated like a missing one: reuse until the endpoint rejects the token.
+  const expiresAt =
+    typeof session.expiresAt === 'string' && !Number.isNaN(Date.parse(session.expiresAt))
+      ? session.expiresAt
+      : undefined
+  return { token: session.token, tokenType: 'Bearer', ...(expiresAt ? { expiresAt } : {}) }
 }
 
 async function getBrowserChallengeToken(
@@ -293,7 +342,12 @@ async function createTurnstileToken(siteKey: string, signal?: AbortSignal): Prom
     document.body.append(container)
 
     let widgetId = ''
+    const timeout = setTimeout(function expire() {
+      cleanup()
+      reject(new Error('Browser challenge timed out.'))
+    }, sessionRequestTimeoutMs)
     function cleanup() {
+      clearTimeout(timeout)
       signal?.removeEventListener('abort', abort)
       if (widgetId) window.turnstile?.remove?.(widgetId)
       container.remove()
@@ -357,17 +411,32 @@ function loadTurnstileScript(): Promise<void> {
   if (turnstileScriptPromise) return turnstileScriptPromise
 
   turnstileScriptPromise = new Promise(function loadScript(resolve, reject) {
+    // A tag added earlier may have failed before these listeners existed, so loading is bounded.
+    const timeout = setTimeout(function expire() {
+      turnstileScriptPromise = undefined
+      reject(new Error('Browser challenge script did not load.'))
+    }, challengeScriptTimeoutMs)
+    const settle = {
+      resolve() {
+        clearTimeout(timeout)
+        resolve()
+      },
+      reject(error: Error) {
+        clearTimeout(timeout)
+        reject(error)
+      }
+    }
     const existingScript = document.querySelector<HTMLScriptElement>(
       `script[src="${turnstileScriptSrc}"]`
     )
     if (existingScript) {
       existingScript.addEventListener('load', function handleLoad() {
-        resolve()
+        settle.resolve()
       })
       existingScript.addEventListener('error', function handleError() {
         existingScript.remove()
         turnstileScriptPromise = undefined
-        reject(new Error('Browser challenge script failed to load.'))
+        settle.reject(new Error('Browser challenge script failed to load.'))
       })
       return
     }
@@ -377,12 +446,12 @@ function loadTurnstileScript(): Promise<void> {
     script.defer = true
     script.src = turnstileScriptSrc
     script.addEventListener('load', function handleLoad() {
-      resolve()
+      settle.resolve()
     })
     script.addEventListener('error', function handleError() {
       script.remove()
       turnstileScriptPromise = undefined
-      reject(new Error('Browser challenge script failed to load.'))
+      settle.reject(new Error('Browser challenge script failed to load.'))
     })
     document.head.append(script)
   })
@@ -406,15 +475,4 @@ function createHostedToolCatalog(tools: WebMCPTool[]) {
       name: tool.name
     }
   })
-}
-
-async function getHostedResolverError(response: Response): Promise<string> {
-  try {
-    const payload = (await response.json()) as { error?: string }
-    if (payload.error) return `Hosted OpenAI returned ${response.status}: ${payload.error}`
-  } catch (error) {
-    return `Hosted OpenAI returned ${response.status}: ${getErrorMessage(error)}`
-  }
-
-  return `Hosted OpenAI returned ${response.status}`
 }

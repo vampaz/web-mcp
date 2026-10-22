@@ -16,4 +16,5 @@ export interface PopupResize {
   y: number
   width: number
   height: number
+  right: number
 }

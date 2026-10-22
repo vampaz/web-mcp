@@ -28,7 +28,10 @@ describe('server tools', () => {
           additionalProperties: false
         },
         confirmation: {
-          reason: 'Sending an invoice emails a customer.'
+          reason: 'Sending an invoice emails a customer.',
+          handler() {
+            return true
+          }
         }
       })
     )
@@ -36,7 +39,6 @@ describe('server tools', () => {
     const result = await invokeTool({
       toolName: 'send_invoice',
       input: { invoiceId: 'inv_1' },
-      confirmed: true,
       source: 'resolver'
     })
 
@@ -126,5 +128,44 @@ describe('server tools', () => {
         signal: controller.signal
       })
     )
+  })
+
+  it('runs parseInput before approval and infers input types from the schema', async () => {
+    const fetchTool = vi.fn(async function fetchTool() {
+      return Response.json({ ok: true })
+    })
+    const tool = defineServerTool({
+      name: 'rename_note',
+      description: 'Rename the selected note on the server after trimming the title.',
+      endpoint: '/api/tools/rename-note',
+      fetch: fetchTool,
+      inputSchema: {
+        type: 'object',
+        properties: { title: { type: 'string' } },
+        required: ['title'],
+        additionalProperties: false
+      },
+      parseInput(input) {
+        const { title } = input as { title: string }
+        if (!title.trim()) throw new Error('Title must not be blank.')
+        return { title: title.trim() }
+      },
+      guard(input) {
+        const title: string = input.title
+        return title.length <= 80
+      }
+    })
+    registerTool(tool)
+
+    await expect(
+      invokeTool({ toolName: 'rename_note', input: { title: '   ' } })
+    ).resolves.toMatchObject({ status: 'error', code: 'invalid_input' })
+    expect(fetchTool).not.toHaveBeenCalled()
+
+    await invokeTool({ toolName: 'rename_note', input: { title: '  Plan  ' } })
+    const [, init] = fetchTool.mock.calls[0] as unknown as [string, RequestInit]
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      input: { title: 'Plan' }
+    })
   })
 })

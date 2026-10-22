@@ -67,7 +67,7 @@ export function mountCounterAssistant(options: {
       defineWebMCPChat()
       element = document.createElement('webmcp-chat') as WebMCPChatElement
       element.configure({
-        harness,
+        controller: harness,
         mode: 'popup',
         title: 'Counter assistant',
         suggestedPrompts: ['Read the counter', 'Set the counter to 7']

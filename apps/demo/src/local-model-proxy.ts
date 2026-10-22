@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { DemoConfig } from './interfaces/config'
+import type { DemoConfig } from './interfaces/config.ts'
 
 export function proxyRequestAllowed(
   path: string,

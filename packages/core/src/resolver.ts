@@ -8,15 +8,18 @@ import type {
   ToolResolver,
   WebMCPTool
 } from './interfaces/tool'
+import { raceAbort } from './abort'
 import { getErrorMessage } from './confirmation'
 import { resolveWithHeuristics } from './heuristic-resolver'
 import {
   createStructuredToolResolutionSchema,
   createToolResolutionSchema,
+  ToolResolutionValidationError,
   validateToolResolution
 } from './resolution-validation'
 import { formatJsonValueValidationError, validateJsonValue } from './schema'
 import { ResolverRequestLimitError, serializeResolverRequest } from './resolver-request'
+import { createResponseError, isContextOverflowText, ResolverError } from './resolver-error'
 
 interface LanguageModelSession {
   clone: (options?: { signal?: AbortSignal }) => Promise<LanguageModelSession>
@@ -37,7 +40,13 @@ interface WindowWithLanguageModel extends Window {
 type ChromeAIAvailability = 'available' | 'downloadable' | 'downloading' | 'unavailable'
 type ChromeAIOutputLanguage = 'en'
 
+interface ChromeAIMonitor {
+  addEventListener(type: 'downloadprogress', listener: (event: { loaded: number }) => void): void
+}
+
 interface ChromeAIOptions {
+  monitor?: (monitor: ChromeAIMonitor) => void
+  signal?: AbortSignal
   expectedInputs?: Array<{
     type: 'text'
     languages: ChromeAIOutputLanguage[]
@@ -235,9 +244,7 @@ export function createRemoteResolver(config: RemoteResolverConfig): ToolResolver
       } catch (error) {
         throwIfAborted(options?.signal)
         if (error instanceof ResolverRequestLimitError) throw error
-        throw new Error(
-          `${providerLabel} could not resolve this command (${getErrorMessage(error)})`
-        )
+        throw wrapResolverError(`${providerLabel} could not resolve this command`, error)
       }
     }
   }
@@ -251,13 +258,15 @@ async function resolveWithChromeAI(
   options?: ResolverRunOptions
 ): Promise<ToolResolution> {
   throwIfAborted(options?.signal)
+  // Chrome passes the response constraint to the model, so the prompt need not repeat it.
   const prompt = createResolverPrompt(
     message,
     tools,
     context,
     options?.singleStep,
     false,
-    options?.purpose
+    options?.purpose,
+    true
   )
   const responseConstraint = createToolResolutionSchema(
     tools,
@@ -265,17 +274,36 @@ async function resolveWithChromeAI(
     options?.purpose
   )
   serializeResolverRequest({ prompt, responseConstraint }, options?.maxRequestBytes)
-  const response = await session.prompt(prompt, {
-    responseConstraint,
-    ...(options?.signal ? { signal: options.signal } : {})
-  })
+  let response: string
+  try {
+    response = await session.prompt(prompt, {
+      responseConstraint,
+      ...(options?.signal ? { signal: options.signal } : {})
+    })
+  } catch (error) {
+    const text = `${(error as { name?: unknown })?.name ?? ''} ${getErrorMessage(error)}`
+    if (isContextOverflowText(text))
+      throw new ResolverError(
+        `Chrome built-in AI input exceeded its context window (${getErrorMessage(error)})`,
+        'context_overflow'
+      )
+    throw error
+  }
 
   return parseToolResolutionJson(response, 'Chrome built-in AI')
 }
 
-function createChromeAISession(languageModel: LanguageModelApi): Promise<LanguageModelSession> {
+function createChromeAISession(
+  languageModel: LanguageModelApi,
+  onProgress: (loaded: number) => void
+): Promise<LanguageModelSession> {
   return languageModel.create({
     ...chromeAITextOptions,
+    monitor(monitor) {
+      monitor.addEventListener('downloadprogress', function progress(event) {
+        onProgress(event.loaded)
+      })
+    },
     initialPrompts: [
       {
         role: 'system',
@@ -333,7 +361,7 @@ async function resolveWithServerEndpoint(
   })
 
   if (!response.ok) {
-    throw new Error(await getServerResolverError(response))
+    throw await createResponseError('server resolver', response)
   }
 
   return (await response.json()) as ToolResolution
@@ -393,9 +421,10 @@ async function resolveWithOpenAICompatible(
                 }
               }
             : {
-                type: 'json_object'
+                type: config.responseFormat ?? 'json_object'
               },
-        temperature: config.temperature ?? 0,
+        // Some reasoning models reject temperature; send it only when the app configures it.
+        ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
         ...(config.maxTokens !== undefined ? { max_tokens: config.maxTokens } : {}),
         ...(config.reasoningEffort !== undefined
           ? { reasoning_effort: config.reasoningEffort }
@@ -407,7 +436,7 @@ async function resolveWithOpenAICompatible(
   })
 
   if (!response.ok) {
-    throw new Error(`${getProviderLabel(config)} returned ${response.status}`)
+    throw await createResponseError(getProviderLabel(config), response)
   }
 
   const payload = (await response.json()) as {
@@ -416,7 +445,7 @@ async function resolveWithOpenAICompatible(
   if (payload.choices?.[0]?.finish_reason === 'length')
     throw new Error('provider reached the output token limit')
   const content = payload.choices?.[0]?.message?.content
-  if (!content) throw new Error('provider returned no message content')
+  if (!content) throw new ToolResolutionValidationError('provider returned no message content')
 
   const parsed = parseToolResolutionJson(content, getProviderLabel(config))
   if (!wrapped) return parsed
@@ -424,7 +453,7 @@ async function resolveWithOpenAICompatible(
   validateToolResolution(action, tools, { singleStep: true, purpose: options?.purpose })
   const errors = validateJsonValue(parsed, responseSchema)
   if (errors.length)
-    throw new Error(
+    throw new ToolResolutionValidationError(
       `provider returned invalid structured resolution: ${formatJsonValueValidationError(errors)}`
     )
   return action as ToolResolution
@@ -467,7 +496,8 @@ function createResolverPrompt(
   context: ResolverContext,
   singleStep = false,
   structured = false,
-  purpose?: ResolverRunOptions['purpose']
+  purpose?: ResolverRunOptions['purpose'],
+  schemaSupplied = structured
 ): string {
   singleStep ||= purpose === 'summary'
   function outcomeExample(toolName: string, reason: string) {
@@ -489,10 +519,10 @@ function createResolverPrompt(
           `If the request is missing required information that is not present in context, return ${outcomeExample('needs_clarification', 'Ask for the missing information.')}.`,
           `If none of the available tools can satisfy the request, return ${outcomeExample('no_tools_match', 'Explain what kind of app action is available instead.')}.`
         ]),
-    ...(structured
+    ...(schemaSupplied
       ? [
           'Follow the response schema supplied by the model API.' +
-            (singleStep ? ' Wrap the single resolution in action.' : '')
+            (structured && singleStep ? ' Wrap the single resolution in action.' : '')
         ]
       : [
           'Return only valid JSON matching this schema:',
@@ -525,7 +555,15 @@ function createActiveChromeResolver(
   let disposed = false
   const activeSessions = new Set<LanguageModelSession>()
 
-  return {
+  function reportProgress(loaded: number) {
+    resolver.status = loaded >= 1 ? 'ready' : 'downloading'
+    resolver.detail =
+      loaded >= 1
+        ? 'Chrome built-in AI is ready.'
+        : `Chrome is downloading the built-in AI model (${Math.round(loaded * 100)}%).`
+  }
+
+  const resolver: ToolResolver = {
     capabilities: { conversation: strict },
     name: 'Chrome built-in AI',
     available: true,
@@ -540,20 +578,26 @@ function createActiveChromeResolver(
       try {
         throwIfAborted(options?.signal)
         if (disposed) throw new Error('The resolver was disposed.')
-        pendingSession ??= createChromeAISession(languageModel)
+        pendingSession ??= createChromeAISession(languageModel, reportProgress)
           .then(function created(value) {
             if (disposed) {
               disposeChromeAISession(value)
               throw new Error('The resolver was disposed.')
             }
             session = value
+            reportProgress(1)
             return value
           })
           .catch(function failed(error) {
             pendingSession = undefined
             throw error
           })
-        const base = await pendingSession
+        // A caller can stop waiting for a model download; the shared session keeps loading for others.
+        const base = await raceAbort(
+          pendingSession,
+          options?.signal,
+          'Resolver request was cancelled.'
+        )
         throwIfAborted(options?.signal)
         const current = await base.clone({ signal: options?.signal })
         try {
@@ -572,9 +616,7 @@ function createActiveChromeResolver(
         if (disposed) throw new Error('The resolver was disposed.')
         if (error instanceof ResolverRequestLimitError) throw error
         if (strict)
-          throw new Error(
-            `Chrome built-in AI could not resolve this command (${getErrorMessage(error)})`
-          )
+          throw wrapResolverError('Chrome built-in AI could not resolve this command', error)
 
         return {
           ...resolveWithHeuristics(message, tools, context),
@@ -590,6 +632,16 @@ function createActiveChromeResolver(
       activeSessions.clear()
     }
   }
+  return resolver
+}
+
+/** Adds context to a provider failure while keeping its stable code. */
+function wrapResolverError(prefix: string, error: unknown): Error {
+  const message = `${prefix} (${getErrorMessage(error)})`
+  if (error instanceof ResolverError) return new ResolverError(message, error.code, error.status)
+  if (error instanceof ToolResolutionValidationError)
+    return new ToolResolutionValidationError(message)
+  return new Error(message)
 }
 
 function disposeChromeAISession(session: LanguageModelSession | undefined): void {
@@ -601,17 +653,18 @@ function disposeChromeAISession(session: LanguageModelSession | undefined): void
   session?.dispose?.()
 }
 
+// Unusable model text is an invalid resolution, so callers such as Pi can ask the model again.
 function parseToolResolutionJson(value: string, source: string): ToolResolution {
   try {
     return JSON.parse(normalizeJsonText(value, source)) as ToolResolution
   } catch {
-    throw new Error(`${source} returned unparseable JSON`)
+    throw new ToolResolutionValidationError(`${source} returned unparseable JSON`)
   }
 }
 
 export function normalizeJsonText(value: string, source = 'AI'): string {
   const trimmedValue = value.trim()
-  if (!trimmedValue) throw new Error(`${source} returned empty text`)
+  if (!trimmedValue) throw new ToolResolutionValidationError(`${source} returned empty text`)
 
   const fencedMatch = trimmedValue.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
   if (fencedMatch?.[1]) return fencedMatch[1].trim()
@@ -622,7 +675,9 @@ export function normalizeJsonText(value: string, source = 'AI'): string {
     return trimmedValue.slice(firstBraceIndex, lastBraceIndex + 1)
   }
 
-  throw new Error(`${source} returned non-JSON text: ${trimmedValue.slice(0, 120)}`)
+  throw new ToolResolutionValidationError(
+    `${source} returned non-JSON text: ${trimmedValue.slice(0, 120)}`
+  )
 }
 
 function createUnavailableChromeResolver(detail: string, strict = false): ToolResolver {
@@ -720,17 +775,6 @@ function getProviderLabel(config: RemoteResolverConfig): string {
 
 function getDefaultStorageKey(provider: ResolverProviderConfig['provider']): string {
   return `@vampaz/webmcp-kit:${provider}:api-key`
-}
-
-async function getServerResolverError(response: Response): Promise<string> {
-  try {
-    const payload = (await response.json()) as { error?: string }
-    if (payload.error) return `server resolver returned ${response.status}: ${payload.error}`
-  } catch {
-    return `server resolver returned ${response.status}`
-  }
-
-  return `server resolver returned ${response.status}`
 }
 
 function throwIfAborted(signal: AbortSignal | undefined): void {

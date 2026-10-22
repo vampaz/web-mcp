@@ -4,6 +4,7 @@ export type {
   WebMCPCommandErrorEventDetail,
   WebMCPCommandInputConfigureOptions,
   WebMCPCommandInputElement,
+  WebMCPCommandInputLabels,
   WebMCPCommandInputResolverCreateOptions,
   WebMCPCommandInputResolverModelOption,
   WebMCPCommandInputResolverOption,

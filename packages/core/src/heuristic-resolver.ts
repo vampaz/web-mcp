@@ -29,24 +29,43 @@ const ignoredTerms = new Set([
   'all',
   'an',
   'and',
+  'are',
   'as',
   'by',
+  'can',
+  'could',
+  'do',
+  'does',
   'for',
   'from',
+  'have',
+  'how',
+  'i',
   'in',
   'into',
+  'is',
+  'it',
   'item',
   'items',
   'me',
+  'my',
   'of',
   'on',
+  'or',
   'please',
   'show',
   'the',
   'that',
+  'this',
   'to',
-  'with'
+  'what',
+  'with',
+  'you',
+  'your'
 ])
+
+// One tool-name term, or two description/property terms, before a tool may run.
+const minimumToolScore = 2
 
 export function resolveWithHeuristics(
   message: string,
@@ -98,14 +117,15 @@ function selectTool(message: string, tools: WebMCPTool[]): WebMCPTool | undefine
   const selectedTool = [...tools].sort(function sortByScore(left, right) {
     return selectedToolScore(message, right) - selectedToolScore(message, left)
   })[0]
-  if (selectedToolScore(message, selectedTool) <= 0) return undefined
+  if (selectedToolScore(message, selectedTool) < minimumToolScore) return undefined
 
   return selectedTool
 }
 
 function selectedToolScore(message: string, tool: WebMCPTool): number {
   const messageTerms = tokenize(message)
-  const toolText = `${tool.name} ${tool.description} ${JSON.stringify(tool.inputSchema)}`
+  // Score words authors wrote, never JSON Schema keywords such as "type", "object", or "false".
+  const toolText = `${tool.name} ${tool.description} ${getSchemaText(tool.inputSchema)}`
   const toolTerms = new Set(tokenize(toolText))
 
   const tokenScore = messageTerms.reduce(function addMatchingTerm(total, term) {
@@ -118,6 +138,20 @@ function selectedToolScore(message: string, tool: WebMCPTool): number {
   return (
     tokenScore + getSchemaEnumScore(message, tool.inputSchema) + getSearchIntentScore(message, tool)
   )
+}
+
+function getSchemaText(schema: JsonSchema): string {
+  return Object.entries(schema.properties ?? {})
+    .flatMap(function describeProperty([name, property]) {
+      return [
+        name,
+        property.title ?? '',
+        property.description ?? '',
+        ...(property.enum ?? []).filter((value) => typeof value === 'string'),
+        getSchemaText(property)
+      ]
+    })
+    .join(' ')
 }
 
 function getSchemaEnumScore(message: string, schema: JsonSchema): number {
@@ -211,18 +245,21 @@ function createInputValue(
   }
 
   if (schema.type === 'string' || schema.type === undefined) {
-    const contextValue = findContextValueForKey(key, message, context)
-    if (isIdKey(key)) return contextValue
-    if (contextValue !== undefined) return contextValue
-    if (isQueryKey(key)) return cleanQuery(message)
-    if (isStatusKey(key)) return getStatusFromMessage(message)
+    if (isIdKey(key)) return findContextValueForKey(key, message, context)
+    // Optional text is filled only when the request is explicitly a search; otherwise leave it out.
+    if (isQueryKey(key) && (required || hasSearchIntent(message))) return cleanQuery(message)
+    if (!required) return undefined
     if (isCustomerKey(key)) return extractCustomerName(message)
     if (isBodyKey(key)) return message
     if (isSubjectKey(key)) return getSubject(message)
-    if (required) return cleanQuery(message)
+    return cleanQuery(message)
   }
 
   return undefined
+}
+
+function hasSearchIntent(message: string): boolean {
+  return /\b(find|search|show|look up|list)\b/i.test(message)
 }
 
 function getEnumValue(values: readonly unknown[], message: string, key: string): unknown {
@@ -378,16 +415,6 @@ function getSubject(message: string): string {
   return cleanQuery(message).slice(0, 80) || 'Request'
 }
 
-function getStatusFromMessage(message: string): string {
-  const normalizedMessage = message.toLowerCase()
-  if (normalizedMessage.includes('paid')) return 'paid'
-  if (normalizedMessage.includes('overdue')) return 'overdue'
-  if (normalizedMessage.includes('sent')) return 'sent'
-  if (normalizedMessage.includes('void')) return 'void'
-  if (normalizedMessage.includes('draft')) return 'draft'
-  return 'all'
-}
-
 function isAmountKey(key: string): boolean {
   return key.toLowerCase().includes('amount') || key.toLowerCase().includes('price')
 }
@@ -418,10 +445,6 @@ function isQuantityKey(key: string): boolean {
 
 function isQueryKey(key: string): boolean {
   return key.toLowerCase().includes('query') || key.toLowerCase().includes('search')
-}
-
-function isStatusKey(key: string): boolean {
-  return key.toLowerCase().includes('status')
 }
 
 function isSubjectKey(key: string): boolean {

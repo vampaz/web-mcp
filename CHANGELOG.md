@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.0 — 2026-10-21
+
+Breaking release; see the [migration guide](./docs/migration-0.5.md).
+
+- **Node:** require Node 24 or newer (`engines: >=24`), matching the development baseline.
+- **Approval and invocation:** remove the `confirmed` bypass from `invokeTool()`; approve only on an explicit `true`; accept only plain JSON input and return `invalid_input` instead of rejecting; give event listeners copies; emit `confirmation-requested` and `confirmation-settled` events; report unvalidatable output as `invalid_output`; add `'pi'` and `'mcp-bridge'` sources; add atomic `registerTools()`.
+- **Schemas:** enforce exclusive bounds, `multipleOf`, `uniqueItems`, property counts, `propertyNames`, `prefixItems`, `allOf`, `not`, and the `uuid`, `ipv4`, `ipv6`, and `hostname` formats; reject unsupported keywords such as `$ref` at definition; skip pattern checks after a failed length bound; cache patterns; shorten values in errors; warn about unchecked formats and inflected mutation verbs.
+- **Resolvers:** stop the heuristic resolver from matching schema keywords or inventing optional inputs; add `ResolverError` with context-overflow detection and provider messages; add `ToolResolutionValidationError`; omit default `temperature`; report Chrome download progress and let callers cancel the wait; share hosted sessions and add challenge timeouts; forward `parseInput` and infer types in `defineServerTool()`.
+- **Pi:** send earlier turns' actions and the checkpoint as untrusted data; mark interrupted invoked actions as outcome unknown; expose `activity`, `usage`, structured tool messages, `refresh()`, cross-tab reloads, `deletePiConversations()`, and `listPiConversations()`; keep wrapped storage error codes; add `reason` and `actionMayHaveRun`; add one correction round for invalid model output; make request timeout, context size, and message length configurable; compact from measured request size; share frozen snapshots; delete the database on clear.
+- **Chat:** rename `harness` to `controller`; confirm New chat; show activity, error tones, Edit last message, and structured tool details; add labels and locale, themes, parts, slots, `renderMessage`, an imperative API and events, mobile, RTL, forced-colors, and container-filling fixes.
+- **Command input and devtools:** add Stop and Escape cancellation, focus restoration, labels, a launcher, parts, documented tokens, property upgrades, and stable shadow DOM; keep resolver sessions and running commands across equal reconfiguration; render devtools in a shadow root with keyed updates, longer history, filtering, schema hints, inline JSON errors, and copyable snippets.
+- **Helpers and tooling:** add `useWebMCPTools()` for Vue, React, and Svelte; type Zod `examples` as raw input; return MCP `structuredContent`; split the release workflow by permission and pin actions; add coverage, link checks, bundle budgets, an all-entries package fixture, a lint configuration, and a fixtures lab mode.
+
 ## 0.4.5 — 2026-10-21
 
 - Align structured single-step JSON examples with the action envelope.

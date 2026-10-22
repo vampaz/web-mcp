@@ -8,6 +8,7 @@ import type {
   WebMCPCommandErrorEventDetail,
   WebMCPCommandInputConfigureOptions,
   WebMCPCommandInputElement,
+  WebMCPCommandInputLabels,
   WebMCPCommandInputResolverOption,
   WebMCPCommandInputPhase,
   WebMCPCommandPanelToggleEventDetail,
@@ -18,17 +19,25 @@ import type {
   WebMCPCommandInputRunOptions
 } from './interfaces/command-input'
 import {
-  getShadowMarkup,
-  getStructureSignature,
+  applyCommandInputView,
+  createCommandInputDom,
+  type CommandInputDom,
+  type CommandInputTone,
   type CommandInputViewState
 } from './command-input-render'
-import { invokeResolvedSteps, throwIfAborted } from './command-input-runner'
+import {
+  commandCancelledMessage,
+  invokeResolvedSteps,
+  throwIfAborted,
+  waitUnlessAborted
+} from './command-input-runner'
 import { getErrorMessage } from './confirmation'
 import {
   getDefaultModelForResolverOption,
-  getResolverOptionModelControlMarkup,
+  getModelSelectState,
+  getProviderSelectState,
   getResolverOptionStatusText,
-  getProviderControlMarkup
+  sameResolverOptions
 } from './command-input-options'
 import { createResolver } from './resolver'
 import { listAvailableTools } from './registry'
@@ -39,27 +48,67 @@ type CommandInputConstructor = CustomElementConstructor & {
 }
 
 type CommandInputRuntimeState = {
-  buttonLabel: string
+  buttonLabel?: string
   disabled: boolean
   floating: boolean
   floatingExpanded: boolean
   hasDiagnostics: boolean
   diagnosticsOpen: boolean
+  label?: string
+  labels: Partial<WebMCPCommandInputLabels>
+  launcher: boolean
   model: string
   phase: WebMCPCommandInputPhase
   resolverOptionId?: string
   placeholder: string
   prompt: string
-  resolverDetail: string
+  resolverDetail?: string
   resolverName: string
   settingsOpen: boolean
+  tone: CommandInputTone
 }
 
 const defaultPlaceholder = 'Tell this app what to do'
-const defaultButtonLabel = 'Run'
+const defaultLabel = 'Command'
+const defaultLabels: WebMCPCommandInputLabels = {
+  form: 'WebMCP command input',
+  run: 'Run',
+  stop: 'Stop',
+  launcher: 'Commands',
+  options: 'Options',
+  provider: 'Provider',
+  model: 'Model',
+  diagnostics: 'Developer diagnostics',
+  idle: 'Resolver is waiting for a command.',
+  preparing: 'Preparing...',
+  resolving: 'Resolving...',
+  executing: 'Running {tool}.',
+  cancelled: commandCancelledMessage
+}
 const supersededResolverRefreshMessage = 'Resolver refresh was superseded.'
 const webMCPCommandInputTagName = 'webmcp-command-input'
-const observedAttributes = ['button-label', 'disabled', 'floating', 'placeholder']
+const observedAttributes = [
+  'button-label',
+  'disabled',
+  'floating',
+  'label',
+  'launcher',
+  'placeholder'
+]
+// Properties a page may set before the element is defined; they are replayed through setters.
+const upgradableProperties = [
+  'resolverOptions',
+  'resolver',
+  'context',
+  'buttonLabel',
+  'disabled',
+  'floating',
+  'label',
+  'labels',
+  'launcher',
+  'placeholder',
+  'panelOpen'
+]
 
 export function defineWebMCPCommandInput(
   tagName = webMCPCommandInputTagName
@@ -72,42 +121,55 @@ export function defineWebMCPCommandInput(
   class WebMCPCommandInput extends HTMLElement implements WebMCPCommandInputElement {
     static observedAttributes = observedAttributes
 
-    context?: ResolverContext | (() => ResolverContext)
+    private providedContext?: ResolverContext | (() => ResolverContext)
     private providedResolverOptions?: WebMCPCommandInputResolverOption[]
     private pendingResolver?: Promise<ToolResolver>
     private currentResolver?: ToolResolver
     private isConnectedToDom = false
     private lightDomObserver?: MutationObserver
+    private panelOpener?: HTMLElement
     private resolverRevision = 0
     private providedResolver?: ToolResolver
-    private renderedStructureSignature = ''
     private running = false
     private activeCommand?: AbortController
     private userSelectedResolver = false
+    private readonly dom: CommandInputDom
     private readonly state: CommandInputRuntimeState = {
-      buttonLabel: defaultButtonLabel,
       disabled: false,
       diagnosticsOpen: false,
       floating: false,
       floatingExpanded: false,
       hasDiagnostics: false,
+      labels: {},
+      launcher: false,
       model: '',
       phase: 'idle',
       placeholder: defaultPlaceholder,
       prompt: '',
-      resolverDetail: 'Resolver is waiting for a command.',
       resolverName: 'Resolver',
-      settingsOpen: false
+      settingsOpen: false,
+      tone: 'info'
     }
 
     constructor() {
       super()
-      this.attachShadow({ mode: 'open' })
+      const root = this.attachShadow({ mode: 'open' })
+      this.dom = createCommandInputDom(root)
+      root.addEventListener('keydown', this.handleKeyDown.bind(this))
+      this.dom.form.addEventListener('submit', this.handleSubmit.bind(this))
+      this.dom.input.addEventListener('input', this.handlePromptChanged.bind(this))
+      this.dom.run.addEventListener('click', this.handleRunClick.bind(this))
+      this.dom.launcher.addEventListener('click', this.handleLauncherClick.bind(this))
+      this.dom.settings.addEventListener('toggle', this.handleSettingsToggled.bind(this))
+      this.dom.diagnostics.addEventListener('toggle', this.handleDiagnosticsToggled.bind(this))
+      this.dom.provider.addEventListener('change', this.handleProviderChanged.bind(this))
+      this.dom.model.addEventListener('change', this.handleModelChanged.bind(this))
     }
 
     connectedCallback() {
-      this.isConnectedToDom = true
       this.syncAttributes()
+      this.upgradeProperties()
+      this.isConnectedToDom = true
       this.syncDiagnosticsContent()
       this.observeLightDom()
       this.render()
@@ -119,7 +181,8 @@ export function defineWebMCPCommandInput(
       this.isConnectedToDom = false
       this.lightDomObserver?.disconnect()
       this.lightDomObserver = undefined
-      this.invalidateResolver()
+      // A DOM move disconnects and reconnects synchronously; only a real removal cancels work.
+      queueMicrotask(this.invalidateIfDisconnected.bind(this))
     }
 
     attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null) {
@@ -130,12 +193,20 @@ export function defineWebMCPCommandInput(
     }
 
     get buttonLabel(): string {
-      return this.state.buttonLabel
+      return this.state.buttonLabel || this.labels.run
     }
 
     set buttonLabel(value: string | undefined) {
-      this.applyButtonLabelState(value)
+      this.state.buttonLabel = value || undefined
       this.renderIfConnected()
+    }
+
+    get context(): ResolverContext | (() => ResolverContext) | undefined {
+      return this.providedContext
+    }
+
+    set context(value: ResolverContext | (() => ResolverContext) | undefined) {
+      this.providedContext = value
     }
 
     get disabled(): boolean {
@@ -143,8 +214,7 @@ export function defineWebMCPCommandInput(
     }
 
     set disabled(value: boolean) {
-      this.state.disabled = value
-      this.renderIfConnected()
+      this.toggleAttribute('disabled', Boolean(value))
     }
 
     get floating(): boolean {
@@ -152,8 +222,33 @@ export function defineWebMCPCommandInput(
     }
 
     set floating(value: boolean) {
-      this.applyFloatingState(value)
+      this.toggleAttribute('floating', Boolean(value))
+    }
+
+    get label(): string {
+      return this.state.label || defaultLabel
+    }
+
+    set label(value: string | undefined) {
+      this.state.label = value || undefined
       this.renderIfConnected()
+    }
+
+    get labels(): WebMCPCommandInputLabels {
+      return { ...defaultLabels, ...this.state.labels }
+    }
+
+    set labels(value: Partial<WebMCPCommandInputLabels> | undefined) {
+      this.state.labels = { ...value }
+      this.renderIfConnected()
+    }
+
+    get launcher(): boolean {
+      return this.state.launcher
+    }
+
+    set launcher(value: boolean) {
+      this.toggleAttribute('launcher', Boolean(value))
     }
 
     get panelOpen(): boolean {
@@ -237,14 +332,18 @@ export function defineWebMCPCommandInput(
         if (model) this.state.model = model.model
       }
       if ('context' in options) this.context = options.context
-      if (options.floating !== undefined) this.applyFloatingState(options.floating)
+      if (options.floating !== undefined) this.toggleAttribute('floating', options.floating)
+      if (options.launcher !== undefined) this.toggleAttribute('launcher', options.launcher)
       if (options.settingsOpen !== undefined) this.state.settingsOpen = options.settingsOpen
-      if (options.buttonLabel !== undefined) this.applyButtonLabelState(options.buttonLabel)
-      if (options.disabled !== undefined) this.state.disabled = options.disabled
+      if (options.buttonLabel !== undefined)
+        this.state.buttonLabel = options.buttonLabel || undefined
+      if (options.disabled !== undefined) this.toggleAttribute('disabled', options.disabled)
+      if (options.label !== undefined) this.state.label = options.label || undefined
+      if (options.labels !== undefined) this.state.labels = { ...options.labels }
       if (options.placeholder !== undefined) this.applyPlaceholderState(options.placeholder)
       const changed =
         previousResolver !== this.providedResolver ||
-        previousOptions !== this.providedResolverOptions ||
+        !sameResolverOptions(previousOptions, this.providedResolverOptions) ||
         previousId !== this.state.resolverOptionId ||
         previousModel !== this.state.model
       if (changed) this.invalidateResolver()
@@ -272,31 +371,32 @@ export function defineWebMCPCommandInput(
         this.openPanel()
       }
 
-      const input = this.getPromptInput()
-      const command = (message ?? input?.value ?? this.state.prompt).trim()
+      const command = (message ?? this.dom.input.value).trim()
       if (this.running || this.disabled || !command) return undefined
 
       this.state.prompt = command
       this.running = true
-      this.setPhase('preparing')
+      this.setPhase('preparing', this.labels.preparing)
+      let signal: AbortSignal | undefined
 
       try {
         this.invalidateAutoResolverBeforeRun()
         const controller = new AbortController()
         this.activeCommand = controller
-        const signal = options.signal
+        signal = options.signal
           ? AbortSignal.any([controller.signal, options.signal])
           : controller.signal
-        const resolver = await this.getCurrentResolver()
+        const resolver = await waitUnlessAborted(this.getCurrentResolver(), signal)
         const tools = listAvailableTools().map(function mapRegistration(registration) {
           return registration.tool
         })
 
-        this.setPhase('resolving')
+        this.setPhase('resolving', this.labels.resolving)
         throwIfAborted(signal)
-        const resolution = await resolver.resolve(command, tools, this.getResolverContext(), {
+        const resolution = await waitUnlessAborted(
+          resolver.resolve(command, tools, this.getResolverContext(), { signal }),
           signal
-        })
+        )
         throwIfAborted(signal)
         validateToolResolution(resolution, tools)
         this.dispatchResolutionEvent(command, resolution, resolver)
@@ -308,18 +408,27 @@ export function defineWebMCPCommandInput(
           (detail) => this.dispatchStepEvent(command, detail),
           signal
         )
-        this.state.resolverDetail = result.error ?? resolution.reason
-        this.setPhase(result.status === 'success' ? 'completed' : 'failed')
+        const cancelled = result.code === 'cancelled'
+        this.setPhase(
+          result.status === 'success' ? 'completed' : 'failed',
+          cancelled ? this.labels.cancelled : (result.error ?? resolution.reason),
+          getResultTone(result)
+        )
         this.dispatchResultEvent(command, resolution, result)
         return result
       } catch (error) {
-        const errorMessage = getErrorMessage(error)
-        this.state.resolverDetail = errorMessage
-        this.setPhase('failed')
+        const cancelled = signal?.aborted === true
+        const errorMessage = cancelled ? commandCancelledMessage : getErrorMessage(error)
+        this.setPhase(
+          'failed',
+          cancelled ? this.labels.cancelled : errorMessage,
+          cancelled ? 'info' : 'error'
+        )
         this.dispatchErrorEvent(command, errorMessage)
         return {
           toolName: this.state.resolverName,
           status: 'error',
+          code: cancelled ? 'cancelled' : 'resolver_failed',
           error: errorMessage,
           durationMs: 0
         }
@@ -336,6 +445,19 @@ export function defineWebMCPCommandInput(
           this.applyAttribute(attributeName, this.getAttribute(attributeName))
         }
       }
+    }
+
+    private upgradeProperties() {
+      for (const name of upgradableProperties) {
+        if (!Object.prototype.hasOwnProperty.call(this, name)) continue
+        const value: unknown = Reflect.get(this, name)
+        Reflect.deleteProperty(this, name)
+        Reflect.set(this, name, value)
+      }
+    }
+
+    private invalidateIfDisconnected() {
+      if (!this.isConnected) this.invalidateResolver()
     }
 
     private observeLightDom() {
@@ -365,14 +487,12 @@ export function defineWebMCPCommandInput(
     }
 
     private applyAttribute(name: string, value: string | null) {
-      if (name === 'button-label') this.applyButtonLabelState(value ?? undefined)
+      if (name === 'button-label') this.state.buttonLabel = value || undefined
       if (name === 'disabled') this.state.disabled = value !== null
       if (name === 'floating') this.applyFloatingState(value !== null)
+      if (name === 'label') this.state.label = value || undefined
+      if (name === 'launcher') this.state.launcher = value !== null
       if (name === 'placeholder') this.applyPlaceholderState(value ?? undefined)
-    }
-
-    private applyButtonLabelState(value: string | undefined) {
-      this.state.buttonLabel = value || defaultButtonLabel
     }
 
     private applyPlaceholderState(value: string | undefined) {
@@ -431,12 +551,13 @@ export function defineWebMCPCommandInput(
       try {
         const resolver = await this.getCurrentResolver()
         this.state.resolverName = `${resolver.name} (${resolver.status})`
-        this.state.resolverDetail = resolver.detail
+        // A running command owns the status region until it settles.
+        if (!this.running) this.setDetail(resolver.detail, 'info')
         this.dispatchResolverEvent(resolver)
       } catch (error) {
         if (getErrorMessage(error) === supersededResolverRefreshMessage) return
         this.state.resolverName = 'Resolver'
-        this.state.resolverDetail = getErrorMessage(error)
+        if (!this.running) this.setDetail(getErrorMessage(error), 'error')
       }
 
       this.renderIfConnected()
@@ -451,16 +572,27 @@ export function defineWebMCPCommandInput(
     }
 
     private invalidateAutoResolverBeforeRun() {
-      if (!this.providedResolver && !this.getSelectedResolverOption()) this.invalidateResolver()
+      if (this.providedResolver || this.getSelectedResolverOption()) return
+      // Keep a ready automatic resolver (and its Chrome AI session); retry anything else.
+      if (this.currentResolver?.status === 'ready') return
+      // A creation already in flight is fresh, so reuse it instead of starting another one.
+      if (!this.currentResolver && this.pendingResolver) return
+      this.invalidateResolver()
     }
 
-    private setPhase(phase: WebMCPCommandInputPhase) {
+    private setPhase(phase: WebMCPCommandInputPhase, detail?: string, tone?: CommandInputTone) {
       this.state.phase = phase
+      if (detail !== undefined) this.setDetail(detail, tone ?? 'info')
       this.renderIfConnected()
     }
 
+    private setDetail(detail: string, tone: CommandInputTone) {
+      this.state.resolverDetail = detail
+      this.state.tone = tone
+    }
+
     private setActiveToolName(toolName: string) {
-      this.state.resolverDetail = `Running ${toolName}.`
+      this.setDetail(this.labels.executing.replaceAll('{tool}', toolName), 'info')
       this.renderIfConnected()
     }
 
@@ -541,13 +673,19 @@ export function defineWebMCPCommandInput(
       )
     }
 
-    private getPromptInput(): HTMLInputElement | null {
-      return this.shadowRoot?.querySelector<HTMLInputElement>('[data-command-input]') ?? null
-    }
-
     private handleSubmit(event: SubmitEvent) {
       event.preventDefault()
       void this.run()
+    }
+
+    private handleRunClick(event: MouseEvent) {
+      if (!this.activeCommand) return
+      event.preventDefault()
+      this.activeCommand.abort()
+    }
+
+    private handleLauncherClick() {
+      this.setPanelOpen(!this.state.floatingExpanded, this.dom.launcher)
     }
 
     private handleProviderChanged(event: Event) {
@@ -586,25 +724,49 @@ export function defineWebMCPCommandInput(
       this.state.diagnosticsOpen = target.open
     }
 
-    private handlePanelKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'Escape' || !this.state.floatingExpanded) return
+    private handleKeyDown(event: Event) {
+      if (!(event instanceof KeyboardEvent) || event.key !== 'Escape' || event.isComposing) return
+      // The first Escape stops a running command; the next one closes the floating panel.
+      if (this.activeCommand && !this.activeCommand.signal.aborted) {
+        event.preventDefault()
+        this.activeCommand.abort()
+        return
+      }
+      if (!this.state.floating || !this.state.floatingExpanded) return
       event.preventDefault()
       this.closePanel()
     }
 
-    private setPanelOpen(value: boolean) {
+    private setPanelOpen(value: boolean, opener?: HTMLElement) {
       if (this.state.floatingExpanded === value) {
         if (value) this.focusPromptInput()
         return
       }
+      const restoreFocus = !value && this.containsFocus()
+      if (value) this.panelOpener = opener ?? getDeepActiveElement()
       this.state.floatingExpanded = value
       this.renderIfConnected()
       this.dispatchPanelToggleEvent(value)
-      if (value) this.focusPromptInput()
+      if (value) {
+        this.focusPromptInput()
+        return
+      }
+      const panelOpener = this.panelOpener
+      this.panelOpener = undefined
+      if (!restoreFocus) return
+      if (panelOpener?.isConnected) panelOpener.focus()
+      else if (this.dom.launcher.isConnected) this.dom.launcher.focus()
+    }
+
+    private containsFocus(): boolean {
+      const root = this.getRootNode()
+      if (!(root instanceof Document) && !(root instanceof ShadowRoot)) return false
+      const active = root.activeElement
+      return active !== null && this.contains(active)
     }
 
     private focusPromptInput() {
-      this.getPromptInput()?.focus()
+      this.dom.input.focus()
     }
 
     private dispatchPanelToggleEvent(open: boolean) {
@@ -630,133 +792,47 @@ export function defineWebMCPCommandInput(
     }
 
     private render() {
-      if (!this.shadowRoot) return
-      const view = this.getViewState()
-      const structureSignature = getStructureSignature(view)
-      if (this.renderedStructureSignature !== structureSignature) {
-        this.renderStructure(view)
-        this.renderedStructureSignature = structureSignature
-      }
-      this.applyViewState(view)
+      applyCommandInputView(this.dom, this.getViewState())
+      this.syncFloatingHost()
     }
 
     private getViewState(): CommandInputViewState {
+      const labels = this.labels
       const resolverOption = this.getSelectedResolverOption()
       const model = this.state.model
       const showProviderControl =
         !this.providedResolver && (this.providedResolverOptions?.length ?? 0) > 1
       const showModelControl =
         !this.providedResolver && (resolverOption?.modelOptions?.length ?? 0) > 1
-      const optionsStatus = resolverOption
-        ? getResolverOptionStatusText(resolverOption, model)
-        : this.state.resolverName
 
       return {
-        buttonLabel: this.running ? getStatusLabel(this.state.phase) : this.state.buttonLabel,
+        buttonLabel: this.buttonLabel,
+        detail: this.state.resolverDetail ?? labels.idle,
         diagnosticsOpen: this.state.diagnosticsOpen,
         disabled: this.state.disabled,
         floating: this.state.floating,
         floatingExpanded: this.state.floatingExpanded,
-        modelControlMarkup:
+        label: this.label,
+        labels,
+        launcher: this.state.launcher,
+        model:
           showModelControl && resolverOption
-            ? getResolverOptionModelControlMarkup(resolverOption, model)
-            : '',
-        detail: this.state.resolverDetail,
-        optionsStatus,
+            ? getModelSelectState(resolverOption, model)
+            : undefined,
+        optionsStatus: resolverOption
+          ? getResolverOptionStatusText(resolverOption, model)
+          : this.state.resolverName,
         phase: this.state.phase,
         placeholder: this.state.placeholder,
         prompt: this.state.prompt,
-        providerControlMarkup: showProviderControl
-          ? getProviderControlMarkup(resolverOption?.id ?? '', this.providedResolverOptions ?? [])
-          : '',
+        provider: showProviderControl
+          ? getProviderSelectState(resolverOption?.id ?? '', this.providedResolverOptions ?? [])
+          : undefined,
         running: this.running,
         settingsOpen: this.state.settingsOpen,
         showDiagnostics: this.state.hasDiagnostics,
-        showSettings: showProviderControl || showModelControl
+        tone: this.state.tone
       }
-    }
-
-    private renderStructure(view: CommandInputViewState) {
-      if (!this.shadowRoot) return
-      const previousInput = this.getPromptInput()
-      const active = this.shadowRoot.activeElement
-      const shouldRestorePromptFocus = active === previousInput
-      const selectedControl = ['[data-provider]', '[data-model]'].find(function focused(selector) {
-        return active?.matches(selector)
-      })
-      const selectionStart = previousInput?.selectionStart
-      const selectionEnd = previousInput?.selectionEnd
-
-      this.shadowRoot.innerHTML = getShadowMarkup(view)
-
-      const form = this.shadowRoot.querySelector<HTMLFormElement>('form')
-      const input = this.shadowRoot.querySelector<HTMLInputElement>('[data-command-input]')
-      const floatingPanel = this.shadowRoot.querySelector<HTMLElement>('.webmcp-floating-panel')
-      const settingsControl = this.shadowRoot.querySelector<HTMLDetailsElement>('.webmcp-settings')
-      const diagnosticsControl =
-        this.shadowRoot.querySelector<HTMLDetailsElement>('.webmcp-diagnostics')
-      const providerControl = this.shadowRoot.querySelector<HTMLSelectElement>('[data-provider]')
-      const modelControl = this.shadowRoot.querySelector<HTMLInputElement | HTMLSelectElement>(
-        '[data-model]'
-      )
-
-      form?.addEventListener('submit', this.handleSubmit.bind(this))
-      input?.addEventListener('input', this.handlePromptChanged.bind(this))
-      floatingPanel?.addEventListener('keydown', this.handlePanelKeyDown.bind(this))
-      settingsControl?.addEventListener('toggle', this.handleSettingsToggled.bind(this))
-      diagnosticsControl?.addEventListener('toggle', this.handleDiagnosticsToggled.bind(this))
-      providerControl?.addEventListener('change', this.handleProviderChanged.bind(this))
-      modelControl?.addEventListener('change', this.handleModelChanged.bind(this))
-      if (selectedControl)
-        this.shadowRoot.querySelector<HTMLElement>(selectedControl)?.focus({ preventScroll: true })
-      if (shouldRestorePromptFocus) {
-        input?.focus({ preventScroll: true })
-        if (selectionStart !== null && selectionEnd !== null) {
-          input?.setSelectionRange(selectionStart ?? 0, selectionEnd ?? selectionStart ?? 0)
-        }
-      }
-    }
-
-    private applyViewState(view: CommandInputViewState) {
-      const root = this.shadowRoot
-      if (!root) return
-
-      const feedback = root.querySelector<HTMLElement>('[data-feedback]')
-      if (feedback) feedback.textContent = view.detail ?? ''
-      const input = this.getPromptInput()
-      if (input) {
-        input.placeholder = view.placeholder
-        if (input.value !== view.prompt) input.value = view.prompt
-        if (input.getAttribute('value') !== view.prompt) input.setAttribute('value', view.prompt)
-        input.toggleAttribute('disabled', view.disabled)
-      }
-
-      const button = root.querySelector<HTMLButtonElement>('.webmcp-run-button')
-      if (button) {
-        button.dataset.phase = view.phase
-        button.toggleAttribute('disabled', view.running || view.disabled)
-        button.setAttribute('aria-busy', String(view.running))
-        if (button.textContent.trim() !== view.buttonLabel) button.textContent = view.buttonLabel
-      }
-
-      const settingsControl = root.querySelector<HTMLDetailsElement>('.webmcp-settings')
-      if (settingsControl && settingsControl.open !== view.settingsOpen) {
-        settingsControl.open = view.settingsOpen
-      }
-      const status = root.querySelector<HTMLElement>('.webmcp-settings-summary .webmcp-status')
-      if (status && status.textContent.trim() !== view.optionsStatus) {
-        status.textContent = view.optionsStatus
-      }
-
-      const diagnosticsControl = root.querySelector<HTMLDetailsElement>('.webmcp-diagnostics')
-      if (diagnosticsControl && diagnosticsControl.open !== view.diagnosticsOpen) {
-        diagnosticsControl.open = view.diagnosticsOpen
-      }
-
-      const floatingPanel = root.querySelector<HTMLElement>('.webmcp-floating-panel')
-      if (floatingPanel) floatingPanel.hidden = !view.floatingExpanded
-
-      this.syncFloatingHost()
     }
 
     private getSelectedResolverOption(): WebMCPCommandInputResolverOption | undefined {
@@ -780,6 +856,7 @@ export function defineWebMCPCommandInput(
         'data-floating-expanded',
         this.state.floating && this.state.floatingExpanded
       )
+      this.toggleAttribute('data-launcher', this.state.floating && this.state.launcher)
       if (!this.state.floating) {
         this.style.removeProperty('left')
         this.style.removeProperty('top')
@@ -793,11 +870,16 @@ export function defineWebMCPCommandInput(
   return WebMCPCommandInput
 }
 
-function getStatusLabel(phase: WebMCPCommandInputPhase): string {
-  if (phase === 'preparing') return 'Preparing...'
-  if (phase === 'resolving') return 'Resolving...'
-  if (phase === 'executing') return 'Running...'
-  return defaultButtonLabel
+function getResultTone(result: ToolInvocationResult): CommandInputTone {
+  if (result.status === 'success') return 'success'
+  if (result.status === 'error' && result.code !== 'cancelled') return 'error'
+  return 'info'
+}
+
+function getDeepActiveElement(): HTMLElement | undefined {
+  let active = document.activeElement
+  while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement
+  return active instanceof HTMLElement && active !== document.body ? active : undefined
 }
 
 function assertCustomElementsAvailable() {

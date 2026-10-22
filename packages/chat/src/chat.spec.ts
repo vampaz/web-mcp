@@ -4,7 +4,9 @@ import { defineWebMCPChat } from './chat'
 import type { WebMCPChatElement } from './interfaces/chat'
 
 defineWebMCPChat()
+let coarsePointer = false
 beforeEach(function layout() {
+  coarsePointer = false
   vi.stubGlobal(
     'ResizeObserver',
     class ResizeObserverStub {
@@ -12,6 +14,13 @@ beforeEach(function layout() {
       disconnect() {}
     }
   )
+  vi.stubGlobal('matchMedia', function matchMedia(query: string) {
+    return {
+      get matches() {
+        return query === '(pointer: coarse)' && coarsePointer
+      }
+    }
+  })
 })
 afterEach(function cleanup() {
   document.body.replaceChildren()
@@ -37,6 +46,7 @@ function controller() {
     }),
     stop: vi.fn(async function stop() {}),
     clear: vi.fn(async function clear() {}),
+    refresh: vi.fn(async function refresh() {}),
     destroy: vi.fn(async function destroy() {})
   }
   return {
@@ -51,7 +61,7 @@ function controller() {
 function mount(api: PiController) {
   const element = document.createElement('webmcp-chat') as WebMCPChatElement
   element.configure({
-    harness: api,
+    controller: api,
     title: 'Test assistant',
     suggestedPrompts: ['Read the counter']
   })
@@ -72,7 +82,7 @@ it('switches presentation without replacing the controller, transcript, or draft
   const input = element.shadowRoot!.querySelector('textarea')!
   input.value = 'Unsent question'
   const message = element.shadowRoot!.querySelector('li')!
-  element.configure({ harness: fixture.api, mode: 'popup', title: 'Ask this page' })
+  element.configure({ controller: fixture.api, mode: 'popup', title: 'Ask this page' })
   const launcher = element.shadowRoot!.querySelector<HTMLButtonElement>('.launcher')!
   const panel = element.shadowRoot!.querySelector('section')!
   expect(panel.getAttribute('role')).toBe('dialog')
@@ -91,7 +101,7 @@ it('switches presentation without replacing the controller, transcript, or draft
   expect(panel.hidden).toBe(true)
   expect(element.shadowRoot!.activeElement).toBe(launcher)
   launcher.click()
-  element.configure({ harness: fixture.api, mode: 'inline' })
+  element.configure({ controller: fixture.api, mode: 'inline' })
   expect(panel.hidden).toBe(false)
   expect(panel.hasAttribute('role')).toBe(false)
   expect(launcher.hidden).toBe(true)
@@ -102,14 +112,16 @@ it('switches presentation without replacing the controller, transcript, or draft
   expect(fixture.api.destroy).not.toHaveBeenCalled()
 })
 
-it('removes popup observers and listeners on disconnect and reconnects closed', function lifecycle() {
+it('removes popup observers and listeners on disconnect and reconnects closed', async function lifecycle() {
   const fixture = controller()
   const element = mount(fixture.api)
   const presentation = element.shadowRoot!.querySelector<HTMLElement>('.presentation')!
   const remove = vi.spyOn(window, 'removeEventListener')
-  element.configure({ harness: fixture.api, mode: 'popup' })
+  element.configure({ controller: fixture.api, mode: 'popup' })
   element.shadowRoot!.querySelector<HTMLButtonElement>('.launcher')!.click()
   element.remove()
+  expect(presentation.hidePopover).not.toHaveBeenCalled()
+  await Promise.resolve()
   expect(presentation.hidePopover).toHaveBeenCalledOnce()
   expect(remove).toHaveBeenCalledWith('resize', expect.any(Function))
   expect(fixture.listeners.size).toBe(0)
@@ -168,7 +180,7 @@ it('disconnects subscriptions and replaces controllers without destroying either
   })
   element.shadowRoot!.querySelector('textarea')!.value = 'Previous account draft'
   expect(first.listeners.size).toBe(1)
-  element.configure({ harness: second.api, title: 'Replacement', disabled: true })
+  element.configure({ controller: second.api, title: 'Replacement', disabled: true })
   expect(first.listeners.size).toBe(0)
   expect(element.shadowRoot!.querySelector('textarea')!.value).toBe('')
   expect(element.shadowRoot!.querySelector('details')!.open).toBe(false)
@@ -246,7 +258,7 @@ it.each(['new draft', 'new controller'])(
     input.value = 'Old draft'
     input.dispatchEvent(new Event('input'))
     element.shadowRoot!.querySelector<HTMLButtonElement>('[type=submit]')!.click()
-    if (change === 'new controller') element.configure({ harness: controller().api })
+    if (change === 'new controller') element.configure({ controller: controller().api })
     input.value = 'New draft'
     reject(new Error('Old request failed'))
     await Promise.resolve()
@@ -303,6 +315,7 @@ it('does not steal focus when a pending clear finishes', async function test() {
   const clear = element.shadowRoot!.querySelector<HTMLButtonElement>('[data-clear]')!
   clear.focus()
   clear.click()
+  element.shadowRoot!.querySelector<HTMLButtonElement>('[data-confirm-clear]')!.click()
   outside.focus()
   complete()
   await Promise.resolve()
@@ -428,7 +441,7 @@ it('keeps the composer usable without submitting a second turn while waiting', a
   expect(element.shadowRoot!.activeElement).toBe(input)
   expect(element.shadowRoot!.querySelector('[role=status]')!.textContent).toBe('')
   expect(element.shadowRoot!.querySelector<HTMLElement>('.working')!.hidden).toBe(false)
-  element.configure({ harness: fixture.api, title: 'Updated title' })
+  element.configure({ controller: fixture.api, title: 'Updated title' })
   input.value = 'Follow-up draft'
   input.dispatchEvent(new Event('input'))
   input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }))
@@ -470,7 +483,8 @@ it('shows the working indicator in the transcript instead of the status region',
   complete({ status: 'completed' })
   await Promise.resolve()
   expect(working.hidden).toBe(true)
-  expect(status.textContent).toBe('Ready')
+  expect(status.textContent).toBe('')
+  expect(status.hasAttribute('data-tone')).toBe(false)
 })
 
 it('hides the working indicator when a turn ends before send settles', async function test() {
@@ -505,8 +519,9 @@ it('does not change a new controller when a previous chat reset finishes', async
   first.publish({ state: 'idle', messages: [{ id: 'a', role: 'user', text: 'Keep me' }] })
   const element = mount(first.api)
   element.shadowRoot!.querySelector<HTMLButtonElement>('[data-clear]')!.click()
+  element.shadowRoot!.querySelector<HTMLButtonElement>('[data-confirm-clear]')!.click()
   const second = controller()
-  element.configure({ harness: second.api })
+  element.configure({ controller: second.api })
   const input = element.shadowRoot!.querySelector('textarea')!
   input.value = 'Draft in the new controller'
   complete()
@@ -516,7 +531,7 @@ it('does not change a new controller when a previous chat reset finishes', async
   expect(second.api.clear).not.toHaveBeenCalled()
 })
 
-it('starts a new chat immediately and resets its draft only after persistence succeeds', async function newChat() {
+it('starts an empty new chat without confirmation and resets its draft only after persistence succeeds', async function newChat() {
   const fixture = controller()
   const element = mount(fixture.api)
   const input = element.shadowRoot!.querySelector('textarea')!
@@ -553,11 +568,394 @@ it('keeps history and the draft when starting a new chat fails', async function 
   const input = element.shadowRoot!.querySelector('textarea')!
   input.value = 'Keep this draft'
   element.shadowRoot!.querySelector<HTMLButtonElement>('[data-clear]')!.click()
+  element.shadowRoot!.querySelector<HTMLButtonElement>('[data-confirm-clear]')!.click()
   await Promise.resolve()
   expect(input.value).toBe('Keep this draft')
   expect(input.disabled).toBe(false)
   expect(element.shadowRoot!.querySelector('ol')!.textContent).toContain('Saved message')
-  expect(element.shadowRoot!.querySelector('[role=status]')!.textContent).toBe(
-    'Storage is unavailable'
+  const status = element.shadowRoot!.querySelector<HTMLElement>('[role=status]')!
+  expect(status.textContent).toBe('Storage is unavailable')
+  expect(status.dataset.tone).toBe('error')
+  input.value = 'Keep this draft, edited'
+  input.dispatchEvent(new Event('input'))
+  expect(status.textContent).toBe('Storage is unavailable')
+})
+
+it('asks before deleting a conversation and restores focus when cancelled', async function confirmClear() {
+  const fixture = controller()
+  fixture.publish({ state: 'idle', messages: [{ id: 'a', role: 'user', text: 'Saved message' }] })
+  const element = mount(fixture.api)
+  const root = element.shadowRoot!
+  const clear = root.querySelector<HTMLButtonElement>('[data-clear]')!
+  const confirm = root.querySelector<HTMLElement>('.confirm-clear')!
+  const cancel = root.querySelector<HTMLButtonElement>('[data-cancel-clear]')!
+  expect(confirm.hidden).toBe(true)
+  clear.click()
+  expect(fixture.api.clear).not.toHaveBeenCalled()
+  expect(confirm.hidden).toBe(false)
+  expect(confirm.textContent).toContain('Delete this conversation? It cannot be undone.')
+  expect(root.activeElement).toBe(cancel)
+  cancel.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
   )
+  expect(confirm.hidden).toBe(true)
+  expect(root.activeElement).toBe(clear)
+  clear.click()
+  cancel.click()
+  expect(confirm.hidden).toBe(true)
+  expect(root.activeElement).toBe(clear)
+  expect(fixture.api.clear).not.toHaveBeenCalled()
+  clear.click()
+  root.querySelector<HTMLButtonElement>('[data-confirm-clear]')!.click()
+  expect(confirm.hidden).toBe(true)
+  expect(fixture.api.clear).toHaveBeenCalledOnce()
+  await Promise.resolve()
+  expect(root.querySelector('[role=status]')!.textContent).toBe('New chat started.')
+  expect(root.activeElement).toBe(root.querySelector('textarea'))
+  fixture.publish({ state: 'idle', messages: [{ id: 'b', role: 'user', text: 'Another tab' }] })
+  expect(root.querySelector('[role=status]')!.textContent).toBe('')
+})
+
+it('keeps a popup open when Escape cancels the delete confirmation', function popupConfirm() {
+  const fixture = controller()
+  fixture.publish({ state: 'idle', messages: [{ id: 'a', role: 'user', text: 'Saved message' }] })
+  const element = mount(fixture.api)
+  element.configure({ controller: fixture.api, mode: 'popup' })
+  element.open()
+  const panel = element.shadowRoot!.querySelector('section')!
+  element.shadowRoot!.querySelector<HTMLButtonElement>('[data-clear]')!.click()
+  element
+    .shadowRoot!.querySelector('[data-cancel-clear]')!
+    .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+  expect(panel.hidden).toBe(false)
+  expect(element.shadowRoot!.querySelector<HTMLElement>('.confirm-clear')!.hidden).toBe(true)
+})
+
+it('shows errors with an error tone and stays quiet after a successful turn', function tone() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  const status = element.shadowRoot!.querySelector<HTMLElement>('[role=status]')!
+  expect(status.textContent).toBe('')
+  fixture.publish({
+    state: 'error',
+    messages: [],
+    error: { code: 'provider_failed', message: 'Provider failed' }
+  })
+  expect(status.textContent).toBe('Provider failed')
+  expect(status.dataset.tone).toBe('error')
+  fixture.publish({ state: 'interrupted', messages: [] })
+  expect(status.textContent).toContain('interrupted')
+  expect(status.hasAttribute('data-tone')).toBe(false)
+  fixture.publish({ state: 'idle', messages: [{ id: 'a', role: 'assistant', text: 'Done' }] })
+  expect(status.textContent).toBe('')
+  expect(status.hasAttribute('data-tone')).toBe(false)
+})
+
+it.each([{ state: 'interrupted' as const }, { state: 'idle' as const, failed: true }])(
+  'offers to edit the last message after a $state turn without resending',
+  function edit(case_) {
+    const fixture = controller()
+    const element = mount(fixture.api)
+    const root = element.shadowRoot!
+    const input = root.querySelector('textarea')!
+    const edit = root.querySelector<HTMLButtonElement>('[data-edit-last]')!
+    fixture.publish({
+      state: 'idle',
+      messages: [
+        { id: 'q', role: 'user', text: 'Set the counter to 7' },
+        { id: 'a', role: 'assistant', text: 'Done' }
+      ]
+    })
+    expect(edit.hidden).toBe(true)
+    fixture.publish({
+      state: case_.state,
+      messages: [
+        { id: 'q', role: 'user', text: 'Set the counter to 7' },
+        { id: 'a', role: 'assistant', text: 'Done' },
+        { id: 'q2', role: 'user', text: 'Now set it to 9' },
+        { id: 'a2', role: 'assistant', text: 'HTTP 503', failed: case_.failed }
+      ]
+    })
+    expect(edit.hidden).toBe(false)
+    expect(edit.textContent).toBe('Edit last message')
+    edit.click()
+    expect(input.value).toBe('Now set it to 9')
+    expect(root.activeElement).toBe(input)
+    expect(edit.hidden).toBe(true)
+    expect(fixture.api.send).not.toHaveBeenCalled()
+  }
+)
+
+it('renders and announces activity changes once', function activity() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  const root = element.shadowRoot!
+  const working = root.querySelector<HTMLElement>('.working')!
+  const announcer = root.querySelector<HTMLElement>('[data-activity]')!
+  const messages = [{ id: 'q', role: 'user' as const, text: 'Set the counter' }]
+  const announcements: string[] = []
+  const observer = new MutationObserver(function changed() {})
+  observer.observe(announcer, { childList: true, characterData: true, subtree: true })
+  function publish(snapshot: PiSnapshot) {
+    fixture.publish(snapshot)
+    if (observer.takeRecords().length) announcements.push(announcer.textContent!)
+  }
+  publish({ state: 'running', messages, activity: { kind: 'resolving' } })
+  expect(working.textContent).toBe('Thinking…')
+  expect(working.getAttribute('aria-hidden')).toBe('true')
+  publish({ state: 'running', messages, activity: { kind: 'resolving' } })
+  publish({
+    state: 'running',
+    messages,
+    activity: { kind: 'tool', toolName: 'set_counter', phase: 'approval' }
+  })
+  publish({
+    state: 'running',
+    messages,
+    activity: { kind: 'tool', toolName: 'set_counter', phase: 'running' }
+  })
+  publish({ state: 'running', messages, activity: { kind: 'compacting' } })
+  publish({ state: 'idle', messages })
+  observer.disconnect()
+  expect(announcements).toEqual([
+    'Thinking…',
+    'Waiting for your approval: set_counter',
+    'Running set_counter…',
+    'Summarizing earlier conversation…',
+    ''
+  ])
+  expect(working.hidden).toBe(true)
+})
+
+it('uses subscribed snapshots without rereading the controller', function snapshots() {
+  const fixture = controller()
+  mount(fixture.api)
+  const read = vi.spyOn(fixture.api, 'getSnapshot')
+  fixture.publish({ state: 'running', messages: [{ id: 'q', role: 'user', text: 'Hi' }] })
+  fixture.publish({
+    state: 'idle',
+    messages: [
+      { id: 'q', role: 'user', text: 'Hi' },
+      { id: 'a', role: 'assistant', text: 'Hello' }
+    ]
+  })
+  expect(read).not.toHaveBeenCalled()
+  read.mockRestore()
+})
+
+it('exposes popup controls, draft helpers, and events', async function api() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  const root = element.shadowRoot!
+  const input = root.querySelector('textarea')!
+  const toggles: boolean[] = []
+  const sent: string[] = []
+  document.addEventListener('webmcp-chat-toggle', function toggled(event) {
+    toggles.push((event as CustomEvent<{ open: boolean }>).detail.open)
+  })
+  document.addEventListener('webmcp-chat-send', function sentText(event) {
+    sent.push((event as CustomEvent<{ text: string }>).detail.text)
+  })
+  element.open()
+  expect(toggles).toEqual([])
+  element.configure({ controller: fixture.api, mode: 'popup' })
+  const panel = root.querySelector('section')!
+  element.open()
+  expect(panel.hidden).toBe(false)
+  expect(root.activeElement).toBe(input)
+  element.open()
+  element.toggle()
+  expect(panel.hidden).toBe(true)
+  element.focusComposer()
+  expect(panel.hidden).toBe(false)
+  expect(root.activeElement).toBe(input)
+  element.close()
+  expect(toggles).toEqual([true, false, true, false])
+  element.setDraft('Drafted by the page')
+  expect(input.value).toBe('Drafted by the page')
+  expect(root.querySelector<HTMLButtonElement>('[type=submit]')!.disabled).toBe(false)
+  root.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }))
+  expect(sent).toEqual(['Drafted by the page'])
+  expect(fixture.api.send).toHaveBeenCalledWith('Drafted by the page')
+  await Promise.resolve()
+  const next = controller()
+  element.controller = next.api
+  expect(element.controller).toBe(next.api)
+  expect(fixture.listeners.size).toBe(0)
+  expect(next.listeners.size).toBe(1)
+  expect(panel.getAttribute('role')).toBe('dialog')
+})
+
+it('keeps an open popup open when the element moves in the document', async function move() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  const presentation = element.shadowRoot!.querySelector<HTMLElement>('.presentation')!
+  element.configure({ controller: fixture.api, mode: 'popup' })
+  element.open()
+  const target = document.createElement('div')
+  document.body.append(target)
+  target.append(element)
+  await Promise.resolve()
+  expect(presentation.hidePopover).not.toHaveBeenCalled()
+  expect(presentation.showPopover).toHaveBeenCalledTimes(2)
+  expect(element.shadowRoot!.querySelector('section')!.hidden).toBe(false)
+  expect(element.shadowRoot!.querySelector('.launcher')!.getAttribute('aria-expanded')).toBe('true')
+  expect(fixture.listeners.size).toBe(1)
+})
+
+it('inserts new lines with Enter on touch pointers and describes only visible help', function touch() {
+  coarsePointer = true
+  const fixture = controller()
+  const element = mount(fixture.api)
+  const input = element.shadowRoot!.querySelector('textarea')!
+  input.value = 'Hello'
+  input.dispatchEvent(new Event('input'))
+  const enter = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true })
+  input.dispatchEvent(enter)
+  expect(enter.defaultPrevented).toBe(false)
+  expect(fixture.api.send).not.toHaveBeenCalled()
+  expect(input.getAttribute('enterkeyhint')).toBe('enter')
+  expect(input.hasAttribute('aria-describedby')).toBe(false)
+  coarsePointer = false
+  input.value = 'x'.repeat(15000)
+  input.dispatchEvent(new Event('input'))
+  const hint = element.shadowRoot!.querySelector('.hint')!.id
+  const limit = element.shadowRoot!.querySelector('.limit')!
+  expect(input.getAttribute('enterkeyhint')).toBe('send')
+  expect(input.getAttribute('aria-describedby')).toBe(`${hint} ${limit.id}`)
+  input.value = 'short'
+  input.dispatchEvent(new Event('input'))
+  expect(input.getAttribute('aria-describedby')).toBe(hint)
+})
+
+it('applies labels, locale formatting, message limits, theme, and parts', function labels() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.configure({
+    controller: fixture.api,
+    labels: {
+      newChat: 'Nova conversa',
+      send: 'Enviar',
+      characterCount(count, max) {
+        return `${count}/${max}`
+      }
+    },
+    locale: 'de-DE',
+    maxMessageLength: 20,
+    theme: 'dark'
+  })
+  const root = element.shadowRoot!
+  const input = root.querySelector('textarea')!
+  expect(root.querySelector('[data-clear]')!.getAttribute('aria-label')).toBe('Nova conversa')
+  expect(root.querySelector('[type=submit]')!.getAttribute('aria-label')).toBe('Enviar')
+  input.value = 'x'.repeat(19)
+  input.dispatchEvent(new Event('input'))
+  expect(root.querySelector('.limit')!.textContent).toBe('19/20')
+  input.value = 'x'.repeat(21)
+  input.dispatchEvent(new Event('input'))
+  expect(root.querySelector('.limit')!.textContent).toContain('21 / 20 characters')
+  expect(root.querySelector<HTMLButtonElement>('[type=submit]')!.disabled).toBe(true)
+  element.configure({ controller: fixture.api, locale: 'de-DE', suggestedPrompts: ['Read'] })
+  input.value = 'x'.repeat(15000)
+  input.dispatchEvent(new Event('input'))
+  expect(root.querySelector('.limit')!.textContent).toBe('15.000 / 16.000 characters')
+  expect(element.dataset.theme).toBe('light')
+  const parts = [
+    'panel',
+    'header',
+    'title',
+    'launcher',
+    'transcript',
+    'composer',
+    'textarea',
+    'send',
+    'stop',
+    'new-chat',
+    'suggestion',
+    'status',
+    'jump-latest'
+  ]
+  expect(
+    parts.filter(function missing(part) {
+      return !root.querySelector(`[part~="${part}"]`)
+    })
+  ).toEqual([])
+  expect(
+    ['header-actions', 'footer', 'empty'].filter(function missing(slot) {
+      return !root.querySelector(`slot[name="${slot}"]`)
+    })
+  ).toEqual([])
+})
+
+it('lets a custom renderer own message bodies', function customRenderer() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.configure({
+    controller: fixture.api,
+    renderMessage(message, target) {
+      const emphasis = document.createElement('em')
+      emphasis.textContent = message.text.toUpperCase()
+      target.replaceChildren(emphasis)
+      return true
+    }
+  })
+  fixture.publish({ state: 'idle', messages: [{ id: 'a', role: 'assistant', text: 'hello' }] })
+  expect(element.shadowRoot!.querySelector('li em')!.textContent).toBe('HELLO')
+})
+
+it.each([
+  { direction: 'ltr', grow: 'ArrowRight', shrink: 'ArrowLeft' },
+  { direction: 'rtl', grow: 'ArrowLeft', shrink: 'ArrowRight' }
+])('resizes the popup toward the inline end in $direction', function rtl(case_) {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.style.direction = case_.direction
+  element.configure({ controller: fixture.api, mode: 'popup' })
+  element.open()
+  const panel = element.shadowRoot!.querySelector('section')!
+  const resize = element.shadowRoot!.querySelector<HTMLButtonElement>('[data-resize]')!
+  resize.dispatchEvent(new KeyboardEvent('keydown', { key: case_.grow, cancelable: true }))
+  expect(panel.style.width).toBe('10px')
+  resize.dispatchEvent(new KeyboardEvent('keydown', { key: case_.shrink, cancelable: true }))
+  expect(panel.style.width).toBe('0px')
+})
+
+it('describes only the move and resize controls with popup instructions', function instructions() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.configure({ controller: fixture.api, mode: 'popup', title: 'Helper' })
+  const root = element.shadowRoot!
+  const launcher = root.querySelector('.launcher')!
+  expect(launcher.getAttribute('aria-label')).toBe('Open Helper')
+  expect(launcher.hasAttribute('aria-describedby')).toBe(false)
+  element.open()
+  expect(launcher.getAttribute('aria-label')).toBe('Open Helper')
+  expect(launcher.getAttribute('aria-expanded')).toBe('true')
+  for (const name of ['Move chat', 'Resize chat']) {
+    const control = root.querySelector(`[aria-label="${name}"]`)!
+    const help = root.getElementById(control.getAttribute('aria-describedby')!)!
+    expect(help.textContent).toMatch(/arrow keys/i)
+  }
+})
+
+it('returns focus to the launcher when the user closes even if the click did not focus', function closeFocus() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.configure({ controller: fixture.api, mode: 'popup' })
+  const launcher = element.shadowRoot!.querySelector<HTMLButtonElement>('.launcher')!
+  const close = element.shadowRoot!.querySelector<HTMLButtonElement>('[aria-label="Close chat"]')!
+  launcher.click()
+  // WebKit does not focus a clicked button, so focus is outside the chat when Close runs.
+  ;(element.shadowRoot!.activeElement as HTMLElement | null)?.blur()
+  close.click()
+  expect(element.shadowRoot!.activeElement).toBe(launcher)
+
+  launcher.click()
+  ;(element.shadowRoot!.activeElement as HTMLElement | null)?.blur()
+  const outside = document.createElement('button')
+  document.body.append(outside)
+  outside.focus()
+  element.close()
+  expect(document.activeElement).toBe(outside)
+  outside.remove()
 })

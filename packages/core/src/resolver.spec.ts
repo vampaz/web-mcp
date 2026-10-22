@@ -7,6 +7,7 @@ import {
   createHeuristicResolver
 } from './resolver'
 import type { JsonSchema, WebMCPTool } from './interfaces/tool'
+import { ResolverError } from './resolver-error'
 
 interface WindowWithLanguageModel extends Window {
   LanguageModel?: {
@@ -39,10 +40,10 @@ describe('resolver', () => {
           choices: [
             {
               message: {
-                content: JSON.stringify({
-                  ...(_options?.body &&
-                  JSON.parse(String(_options.body)).response_format.json_schema.schema.properties
-                    .action
+                content: JSON.stringify(
+                  _options?.body &&
+                    JSON.parse(String(_options.body)).response_format.json_schema.schema.properties
+                      .action
                     ? {
                         action: {
                           toolName: 'tool_sequence',
@@ -60,8 +61,8 @@ describe('resolver', () => {
                         steps: [
                           { toolName: 'read_value', input: {}, confidence: 1, reason: 'Read' }
                         ]
-                      })
-                })
+                      }
+                )
               }
             }
           ]
@@ -97,7 +98,7 @@ describe('resolver', () => {
     expect((await resolver.resolve('Read', tools)).toolName).toBe('tool_sequence')
   })
 
-  it('sends the explicit JSON schema format required by LM Studio', async function test() {
+  it('sends the explicitly configured JSON schema format and generation limits', async function test() {
     const fetch = vi.fn(async function respond(
       _url: string | URL | Request,
       _options?: RequestInit
@@ -140,6 +141,43 @@ describe('resolver', () => {
       temperature: 0.2,
       reasoning_effort: 'none'
     })
+  })
+
+  it('supports text output while retaining full tool input validation', async function textOutput() {
+    const action = {
+      toolName: 'select_items',
+      input: { ids: ['one'] },
+      confidence: 1,
+      reason: 'Select the requested item.'
+    }
+    const fetch = vi.fn(async function respond(_url: unknown, _options: RequestInit) {
+      return Response.json({ choices: [{ message: { content: JSON.stringify(action) } }] })
+    })
+    vi.stubGlobal('fetch', fetch)
+    const resolver = await createResolver({
+      provider: 'openai-compatible',
+      baseUrl: '/local/v1',
+      responseFormat: 'text'
+    })
+    const tools = [
+      createTool('select_items', 'Select items.', {
+        type: 'object',
+        properties: { ids: { type: 'array', items: { type: 'string' }, uniqueItems: true } },
+        required: ['ids'],
+        additionalProperties: false
+      })
+    ]
+    await expect(resolver.resolve('Select one', tools, {}, { singleStep: true })).resolves.toEqual(
+      action
+    )
+    const request = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))
+    expect(request.response_format).toEqual({ type: 'text' })
+    expect(request.messages[1].content).toContain('"uniqueItems":true')
+    action.input.ids = ['one', 'one']
+    await expect(resolver.resolve('Select one', tools, {}, { singleStep: true })).rejects.toThrow(
+      'invalid input for "select_items"'
+    )
+    expect(fetch).toHaveBeenCalledTimes(2)
   })
 
   it('pairs structured tool arguments and fits a large tool schema within the request budget', async function test() {
@@ -234,7 +272,9 @@ describe('resolver', () => {
     ['json_schema', 'needs_clarification'],
     ['json_schema', 'no_tools_match'],
     ['json_object', 'needs_clarification'],
-    ['json_object', 'no_tools_match']
+    ['json_object', 'no_tools_match'],
+    ['text', 'needs_clarification'],
+    ['text', 'no_tools_match']
   ] as const)(
     'accepts its own %s example for %s',
     async function example(responseFormat, toolName) {
@@ -262,7 +302,7 @@ describe('resolver', () => {
     }
   )
 
-  it.each(['json_schema', 'json_object'] as const)(
+  it.each(['json_schema', 'json_object', 'text'] as const)(
     'retains prompt input schemas for bounded %s resolution',
     async function catalog(responseFormat) {
       const fetch = vi.fn(async function respond(_url: unknown, options: RequestInit) {
@@ -339,6 +379,7 @@ describe('resolver', () => {
     }
 
     const resolver = await createBestResolver()
+    expect(resolver.status).toBe('downloadable')
     const resolution = await resolver.resolve('Select all the foods that are French', [
       {
         name: 'select_items',
@@ -353,7 +394,7 @@ describe('resolver', () => {
     ])
 
     expect(resolver.available).toBe(true)
-    expect(resolver.status).toBe('downloadable')
+    expect(resolver.status).toBe('ready')
     expect(resolution.toolName).toBe('select_items')
     expect(resolution.input).toEqual({
       ids: ['item_4', 'item_7']
@@ -452,6 +493,62 @@ describe('resolver', () => {
     await expect(pending).rejects.toThrow('cancelled')
     expect(prompt).not.toHaveBeenCalled()
     resolver.dispose?.()
+  })
+
+  it('reports Chrome download progress and lets a caller stop waiting for the download', async function test() {
+    let activate!: (session: { prompt: () => Promise<string> }) => void
+    let progress!: (event: { loaded: number }) => void
+    ;(window as WindowWithLanguageModel).LanguageModel = {
+      async availability() {
+        return 'downloadable'
+      },
+      create(options?: unknown) {
+        ;(options as { monitor: (monitor: unknown) => void }).monitor({
+          addEventListener(_type: string, listener: (event: { loaded: number }) => void) {
+            progress = listener
+          }
+        })
+        return new Promise(function pending(resolve) {
+          activate = resolve
+        })
+      }
+    }
+    const resolver = await createChromeAIResolver(true)
+    const controller = new AbortController()
+    const pending = resolver.resolve('Read', [], {}, { signal: controller.signal })
+    progress({ loaded: 0.42 })
+    expect(resolver.status).toBe('downloading')
+    expect(resolver.detail).toContain('42%')
+    controller.abort()
+    await expect(pending).rejects.toThrow('cancelled')
+    activate({ prompt: vi.fn() })
+    resolver.dispose?.()
+  })
+
+  it('reports provider messages and context overflow as typed resolver errors', async function test() {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async function overflow() {
+        return Response.json(
+          { error: { message: "This model's maximum context length is 8192 tokens." } },
+          { status: 400 }
+        )
+      })
+    )
+    const resolver = await createResolver({
+      provider: 'openai-compatible',
+      baseUrl: 'https://models.example.test/v1',
+      auth: { mode: 'none' }
+    })
+
+    const failure = await resolver
+      .resolve('Read', [], {}, { singleStep: true })
+      .catch((error: unknown) => error)
+    expect(failure).toBeInstanceOf(ResolverError)
+    expect(failure).toMatchObject({ code: 'context_overflow', status: 400 })
+    expect((failure as Error).message).toContain('maximum context length')
+    const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body))
+    expect(body).not.toHaveProperty('temperature')
   })
 
   it('shares pending Chrome sessions and destroys sessions that finish after disposal', async function test() {
@@ -691,6 +788,45 @@ describe('resolver', () => {
       input: {},
       confidence: 0,
       reason: 'No registered WebMCP tool matched this request closely enough to run.'
+    })
+  })
+
+  it('does not match JSON Schema keywords or invent optional inputs', async () => {
+    const resolver = createHeuristicResolver()
+    const tools = [
+      createTool('clear_cart', 'Remove every product from the shopping cart.', {
+        type: 'object',
+        properties: { confirmEmpty: { type: 'boolean' } },
+        additionalProperties: false
+      }),
+      createTool('create_task', 'Create a task in the current project.', {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          description: { type: 'string' },
+          status: { type: 'string' },
+          priority: { enum: ['low', 'high'] }
+        },
+        required: ['title'],
+        additionalProperties: false
+      })
+    ]
+
+    await expect(resolver.resolve('What type of account do I have?', tools)).resolves.toMatchObject(
+      {
+        toolName: 'no_tools_match'
+      }
+    )
+    await expect(resolver.resolve('is that true or false', tools)).resolves.toMatchObject({
+      toolName: 'no_tools_match'
+    })
+    const plain = await resolver.resolve('create task buy milk', tools)
+    expect(plain.toolName).toBe('create_task')
+    expect({ ...plain.input }).toEqual({ title: 'create task buy milk' })
+    const prioritized = await resolver.resolve('create task buy milk with high priority', tools)
+    expect({ ...prioritized.input }).toEqual({
+      title: 'create task buy milk with high priority',
+      priority: 'high'
     })
   })
 

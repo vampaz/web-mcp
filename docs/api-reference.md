@@ -44,6 +44,22 @@ export interface ArrayParamOptions {
 }
 ```
 
+### ConfirmationEventDetail
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
+
+Detail of `confirmation-requested` and `confirmation-settled` events.
+
+```ts
+export interface ConfirmationEventDetail {
+  id: string
+  toolName: string
+  source: ToolContext['source']
+  /** Set on `confirmation-settled`. */
+  approved?: boolean
+}
+```
+
 ### ConfirmationHandler
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
@@ -83,14 +99,8 @@ export interface ConfirmationTool {
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/server-tool.ts).
 
 ```ts
-export interface DefineServerToolOptions<
-  TInput = Record<string, unknown>,
-  TOutput = unknown
-> extends Omit<WebMCPTool<TInput, TOutput>, 'execute'> {
-  endpoint: string | URL
-  fetch?: ServerToolFetch
-  headers?: Record<string, string>
-}
+export interface DefineServerToolOptions<TInput = Record<string, unknown>, TOutput = unknown>
+  extends Omit<WebMCPTool<TInput, TOutput>, 'execute'>, ServerToolEndpointOptions {}
 ```
 
 ### FormInput
@@ -169,15 +179,25 @@ export interface JsonSchema {
   properties?: Record<string, JsonSchema>
   required?: readonly string[]
   items?: JsonSchema
+  prefixItems?: readonly JsonSchema[]
   anyOf?: readonly JsonSchema[]
   oneOf?: readonly JsonSchema[]
+  allOf?: readonly JsonSchema[]
+  not?: JsonSchema
   enum?: readonly unknown[]
   const?: unknown
   title?: string
   minimum?: number
   maximum?: number
+  exclusiveMinimum?: number
+  exclusiveMaximum?: number
+  multipleOf?: number
   minItems?: number
   maxItems?: number
+  uniqueItems?: boolean
+  minProperties?: number
+  maxProperties?: number
+  propertyNames?: JsonSchema
   minLength?: number
   maxLength?: number
   pattern?: string
@@ -266,6 +286,17 @@ export interface RegisteredTool<TInput = Record<string, unknown>, TOutput = unkn
 }
 ```
 
+### RegisteredTools
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
+
+```ts
+export interface RegisteredTools {
+  registrations: RegisteredTool[]
+  unregister: () => void
+}
+```
+
 ### RegistrySnapshot
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
@@ -289,7 +320,7 @@ export interface RemoteResolverConfig {
   model?: string
   baseUrl?: string
   auth?: ResolverAuth
-  responseFormat?: 'json_object' | 'json_schema'
+  responseFormat?: 'json_object' | 'json_schema' | 'text'
   maxTokens?: number
   temperature?: number
   reasoningEffort?: 'none' | 'low' | 'medium' | 'high'
@@ -315,6 +346,28 @@ export type ResolverAuth =
 export interface ResolverContext {
   [key: string]: unknown
 }
+```
+
+### ResolverError
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/resolver-error.ts).
+
+A provider failure with a stable code, so callers need not parse provider prose.
+
+```ts
+declare class ResolverError extends Error {
+  readonly code: ResolverErrorCode
+  readonly status?: number
+  constructor(message: string, code: ResolverErrorCode, status?: number)
+}
+```
+
+### ResolverErrorCode
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/resolver-error.ts).
+
+```ts
+export type ResolverErrorCode = 'context_overflow' | 'provider_failed'
 ```
 
 ### ResolverOutcomeToolName
@@ -379,6 +432,18 @@ export interface ResolverRunOptions {
 }
 ```
 
+### SchemaTypedServerToolOptions
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/server-tool.ts).
+
+```ts
+export type SchemaTypedServerToolOptions<TSchema extends JsonSchema, TOutput = unknown> = Omit<
+  SchemaTypedWebMCPTool<TSchema, TOutput>,
+  'execute'
+> &
+  ServerToolEndpointOptions
+```
+
 ### SchemaTypedWebMCPTool
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/define-tool.ts).
@@ -394,6 +459,18 @@ export type SchemaTypedWebMCPTool<TSchema extends JsonSchema, TOutput = unknown>
     context: import('./interfaces/tool').ToolContext
   ) => TOutput | Promise<TOutput>
   guard?: (input: NoInfer<InferToolInput<TSchema>>) => boolean | string | Promise<boolean | string>
+}
+```
+
+### ServerToolEndpointOptions
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/server-tool.ts).
+
+```ts
+export interface ServerToolEndpointOptions {
+  endpoint: string | URL
+  fetch?: ServerToolFetch
+  headers?: Record<string, string>
 }
 ```
 
@@ -487,7 +564,7 @@ export interface ToolConfirmation {
 
 ```ts
 export interface ToolContext {
-  source: 'native' | 'fallback' | 'devtools' | 'resolver'
+  source: 'native' | 'fallback' | 'devtools' | 'resolver' | 'pi' | 'mcp-bridge'
   signal?: AbortSignal
 }
 ```
@@ -501,7 +578,6 @@ export interface ToolInvocation<TInput = Record<string, unknown>> {
   id?: string
   toolName: string
   input: TInput
-  confirmed?: boolean
   source?: ToolContext['source']
   signal?: AbortSignal
 }
@@ -523,6 +599,7 @@ export type ToolInvocationErrorCode =
   | 'invalid_input'
   | 'invalid_output'
   | 'not_registered'
+  | 'resolver_failed'
   | 'scope_failed'
   | 'scope_unavailable'
 ```
@@ -567,6 +644,18 @@ export interface ToolResolutionStep {
   input: Record<string, unknown>
   confidence: number
   reason: string
+}
+```
+
+### ToolResolutionValidationError
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/resolution-validation.ts).
+
+A resolver returned a resolution that does not match the offered tools or the resolution contract.
+
+```ts
+declare class ToolResolutionValidationError extends Error {
+  constructor(message: string)
 }
 ```
 
@@ -631,7 +720,15 @@ export interface ToolScopeResult {
 
 ```ts
 export interface WebMCPKitEvent {
-  type: 'registered' | 'unregistered' | 'invoked' | 'succeeded' | 'failed' | 'blocked'
+  type:
+    | 'registered'
+    | 'unregistered'
+    | 'invoked'
+    | 'confirmation-requested'
+    | 'confirmation-settled'
+    | 'succeeded'
+    | 'failed'
+    | 'blocked'
   toolName: string
   timestamp: number
   detail?: unknown
@@ -714,6 +811,9 @@ declare function createToolCatalog(
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/server-tool.ts).
 
 ```ts
+declare function defineServerTool<const TSchema extends JsonSchema, TOutput = unknown>(
+  options: SchemaTypedServerToolOptions<TSchema, TOutput>
+): WebMCPTool<InferToolInput<TSchema>, TOutput>
 declare function defineServerTool<TInput = Record<string, unknown>, TOutput = unknown>(
   options: DefineServerToolOptions<TInput, TOutput>
 ): WebMCPTool<TInput, TOutput>
@@ -861,6 +961,14 @@ declare function invokeTool<TOutput = unknown>(
 ): Promise<ToolInvocationResult<TOutput>>
 ```
 
+### isResolverError
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/resolver-error.ts).
+
+```ts
+declare function isResolverError(value: unknown): value is ResolverError
+```
+
 ### isResolverOutcomeToolName
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/resolution-validation.ts).
@@ -952,6 +1060,16 @@ declare function registerFormTool<TOutput = FormData>(
 declare function registerTool<TInput = Record<string, unknown>, TOutput = unknown>(
   tool: WebMCPTool<TInput, TOutput>
 ): RegisteredTool<TInput, TOutput>
+```
+
+### registerTools
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/registry.ts).
+
+Registers every tool or none; one disposer unregisters the whole set.
+
+```ts
+declare function registerTools(tools: readonly WebMCPTool[]): RegisteredTools
 ```
 
 ### resolverOutcomeToolNames
@@ -1078,11 +1196,16 @@ export interface DevtoolsOverlay {
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/devtools/src/devtools.ts).
 
+The overlay renders in its own shadow root. Set `--wmk-devtools-accent` on any ancestor
+(for example `:root`) to change its accent colour.
+
 ```ts
 export interface MountDevtoolsOptions {
   container?: HTMLElement
   initiallyOpen?: boolean
   placement?: 'fixed' | 'inline'
+  /** Corner for fixed placement, in logical (writing-direction aware) terms. Default `bottom-end`. */
+  position?: 'bottom-end' | 'bottom-start' | 'top-end' | 'top-start'
 }
 ```
 
@@ -1146,6 +1269,8 @@ export interface MCPBridgeTool {
   name: string
   description: string
   inputSchema: JsonSchema
+  outputSchema?: JsonSchema
+  annotations?: ToolAnnotations
 }
 ```
 
@@ -1180,6 +1305,17 @@ export interface UseWebMCPToolResult<TInput = Record<string, unknown>, TOutput =
 }
 ```
 
+### UseWebMCPToolsResult
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/react/src/interfaces/webmcp-tool.ts).
+
+```ts
+export interface UseWebMCPToolsResult {
+  unregister: () => void
+  getRegistrations: () => RegisteredTool[]
+}
+```
+
 ### useWebMCPTool
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/react/src/index.ts).
@@ -1189,6 +1325,19 @@ declare function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unkno
   tool: WebMCPTool<TInput, TOutput>,
   options?: UseWebMCPToolOptions
 ): UseWebMCPToolResult<TInput, TOutput>
+```
+
+### useWebMCPTools
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/react/src/index.ts).
+
+Registers the tools as one atomic set with the same stability rules as `useWebMCPTool`.
+
+```ts
+declare function useWebMCPTools(
+  tools: readonly WebMCPTool[],
+  options?: UseWebMCPToolOptions
+): UseWebMCPToolsResult
 ```
 
 ## @vampaz/webmcp-kit/svelte
@@ -1214,6 +1363,17 @@ export interface UseWebMCPToolResult<TInput = Record<string, unknown>, TOutput =
 }
 ```
 
+### UseWebMCPToolsResult
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/svelte/src/interfaces/webmcp-tool.ts).
+
+```ts
+export interface UseWebMCPToolsResult {
+  unregister: () => void
+  getRegistrations: () => RegisteredTool[]
+}
+```
+
 ### useWebMCPTool
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/svelte/src/index.ts).
@@ -1223,6 +1383,19 @@ declare function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unkno
   tool: WebMCPTool<TInput, TOutput>,
   options?: UseWebMCPToolOptions
 ): UseWebMCPToolResult<TInput, TOutput>
+```
+
+### useWebMCPTools
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/svelte/src/index.ts).
+
+Registers the tools as one atomic set while the component is mounted.
+
+```ts
+declare function useWebMCPTools(
+  tools: readonly WebMCPTool[],
+  options?: UseWebMCPToolOptions
+): UseWebMCPToolsResult
 ```
 
 ## @vampaz/webmcp-kit/testing
@@ -1551,6 +1724,17 @@ export interface UseWebMCPToolResult<TInput = Record<string, unknown>, TOutput =
 }
 ```
 
+### UseWebMCPToolsResult
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/vue/src/interfaces/webmcp-tool.ts).
+
+```ts
+export interface UseWebMCPToolsResult {
+  unregister: () => void
+  getRegistrations: () => RegisteredTool[]
+}
+```
+
 ### useWebMCPTool
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/vue/src/index.ts).
@@ -1560,6 +1744,19 @@ declare function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unkno
   tool: WebMCPTool<TInput, TOutput>,
   options?: UseWebMCPToolOptions
 ): UseWebMCPToolResult<TInput, TOutput>
+```
+
+### useWebMCPTools
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/vue/src/index.ts).
+
+Registers the tools as one atomic set for the current component or effect scope.
+
+```ts
+declare function useWebMCPTools(
+  tools: readonly WebMCPTool[],
+  options?: UseWebMCPToolOptions
+): UseWebMCPToolsResult
 ```
 
 ## @vampaz/webmcp-kit/zod
@@ -1576,7 +1773,8 @@ export interface DefineZodToolOptions<TSchema extends z.ZodType, TOutput = unkno
   outputSchema?: JsonSchema
   annotations?: ToolAnnotations
   confirmation?: ToolConfirmation
-  examples?: Array<z.infer<TSchema>>
+  /** Raw input examples, as resolvers send them before Zod parsing. */
+  examples?: Array<z.input<TSchema>>
   scope?: () => ToolScopeResult
   guard?: (input: z.infer<TSchema>) => boolean | string | Promise<boolean | string>
   execute: (input: z.infer<TSchema>, context: ToolContext) => Promise<TOutput> | TOutput
@@ -1606,6 +1804,17 @@ declare function defineZodTool<TSchema extends z.ZodType, TOutput = unknown>(
 
 ## @vampaz/webmcp-kit/pi
 
+### PiActivity
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/controller.ts).
+
+```ts
+export type PiActivity =
+  | { kind: 'resolving' }
+  | { kind: 'compacting' }
+  | { kind: 'tool'; toolName: string; phase: 'approval' | 'running' }
+```
+
 ### PiController
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/controller.ts).
@@ -1617,8 +1826,18 @@ export interface PiController {
   send(text: string): Promise<PiTurnOutcome>
   stop(): Promise<void>
   clear(): Promise<void>
+  /** Reloads saved history, for example after another tab finished a turn. */
+  refresh(): Promise<void>
   destroy(): Promise<void>
 }
+```
+
+### PiConversationOwner
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/conversations.ts).
+
+```ts
+export type PiConversationOwner = Pick<PiSession, 'namespace' | 'ownerId'>
 ```
 
 ### PiError
@@ -1629,6 +1848,10 @@ export interface PiController {
 export interface PiError {
   code: PiErrorCode
   message: string
+  /** Narrows codes such as `limit_reached` and `storage_failed` to a specific remedy. */
+  reason?: PiErrorReason
+  /** True when an application action was invoked during the failed turn and may have run. */
+  actionMayHaveRun?: boolean
 }
 ```
 
@@ -1649,6 +1872,38 @@ export type PiErrorCode =
   | 'conversation_busy'
 ```
 
+### PiErrorReason
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/controller.ts).
+
+```ts
+export type PiErrorReason =
+  | 'tool_calls'
+  | 'request_bytes'
+  | 'history_bytes'
+  | 'tool_result_bytes'
+  | 'storage_quota'
+  | 'context_overflow'
+  | 'timeout'
+```
+
+### PiFailure
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/errors.ts).
+
+```ts
+declare class PiFailure extends Error {
+  readonly reason?: PiErrorReason
+  readonly actionMayHaveRun?: boolean
+  readonly code: PiErrorCode
+  constructor(
+    code: PiErrorCode,
+    message: string,
+    details?: { reason?: PiErrorReason; actionMayHaveRun?: boolean }
+  )
+}
+```
+
 ### PiHarnessOptions
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/controller.ts).
@@ -1665,6 +1920,17 @@ export interface PiHarnessOptions {
 }
 ```
 
+### PiHistoryUsage
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/controller.ts).
+
+```ts
+export interface PiHistoryUsage {
+  historyBytes: number
+  maxHistoryBytes: number
+}
+```
+
 ### PiLimits
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/session.ts).
@@ -1677,6 +1943,12 @@ export interface PiLimits {
   maxHistoryBytes?: number
   /** UTF-8 bytes per resolver request; default 128 KiB. */
   maxRequestBytes?: number
+  /** Milliseconds per resolver request; 1,000–600,000, default 120,000. */
+  requestTimeoutMs?: number
+  /** Model context window in estimated tokens; 2,048–2,000,000, default 32,768. */
+  contextTokens?: number
+  /** Characters per user message; 1–100,000, default 16,000. */
+  maxMessageChars?: number
 }
 ```
 
@@ -1691,6 +1963,12 @@ export interface PiMessage {
   text: string
   toolName?: string
   failed?: boolean
+  /** Tool messages: the validated input the model chose. */
+  input?: Record<string, unknown>
+  /** Tool messages: `unknown` when an interruption hid whether the action ran. */
+  status?: PiToolStatus
+  /** Tool messages: successful output, as returned by the application. */
+  output?: unknown
 }
 ```
 
@@ -1728,6 +2006,10 @@ export interface PiSnapshot {
   state: PiState
   messages: readonly PiMessage[]
   error?: PiError
+  /** What a running turn is doing now; absent outside `running` and `stopping`. */
+  activity?: PiActivity
+  /** Durable log size, so a UI can warn before the history limit. */
+  usage?: PiHistoryUsage
 }
 ```
 
@@ -1779,9 +2061,27 @@ export interface PiToolHost {
   context(signal: AbortSignal): Promise<ResolverContext>
   invoke(
     call: { name: string; input: Record<string, unknown>; revision: string },
-    signal: AbortSignal
+    signal: AbortSignal,
+    /** Optional progress for UI activity; hosts without approval phases may ignore it. */
+    progress?: (phase: PiToolPhase) => void
   ): Promise<ToolInvocationResult>
 }
+```
+
+### PiToolPhase
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/host.ts).
+
+```ts
+export type PiToolPhase = 'approval' | 'running'
+```
+
+### PiToolStatus
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/controller.ts).
+
+```ts
+export type PiToolStatus = 'success' | 'error' | 'blocked' | 'unavailable' | 'unknown'
 ```
 
 ### PiTurnOutcome
@@ -1821,6 +2121,35 @@ declare function createRegistryToolHost(
 ): PiToolHost
 ```
 
+### deletePiConversations
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/conversations.ts).
+
+Deletes every stored conversation for one account partition. Destroy that account's controllers
+first; a conversation with an active operation is left in place and reported as busy.
+
+```ts
+declare function deletePiConversations(owner: PiConversationOwner): Promise<void>
+```
+
+### isPiError
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/errors.ts).
+
+```ts
+declare function isPiError(value: unknown): value is PiError
+```
+
+### listPiConversations
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/conversations.ts).
+
+Lists stored conversation IDs for one account partition, for example before sign-out.
+
+```ts
+declare function listPiConversations(owner: PiConversationOwner): Promise<string[]>
+```
+
 ## @vampaz/webmcp-kit/chat
 
 ### WebMCPChatElement
@@ -1830,6 +2159,58 @@ declare function createRegistryToolHost(
 ```ts
 export interface WebMCPChatElement extends HTMLElement {
   configure(options: WebMCPChatOptions): void
+  get controller(): PiController | undefined
+  set controller(controller: PiController)
+  open(): void
+  close(): void
+  toggle(): void
+  focusComposer(): void
+  setDraft(text: string): void
+}
+```
+
+### WebMCPChatLabels
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/chat/src/interfaces/chat.ts).
+
+```ts
+export interface WebMCPChatLabels {
+  user: string
+  newChat: string
+  send: string
+  stop: string
+  message: string
+  conversation: string
+  working: string
+  thinking: string
+  compacting: string
+  hint: string
+  jumpToLatest: string
+  newMessages: string
+  closeChat: string
+  moveChat: string
+  resizeChat: string
+  moveInstructions: string
+  resizeInstructions: string
+  editLastMessage: string
+  confirmClear: string
+  confirmClearAction: string
+  cancel: string
+  tool: string
+  toolInput: string
+  toolOutput: string
+  toolResult: string
+  responseFailedDetails: string
+  responseFailedExplanation: string
+  status: WebMCPChatStatusLabels
+  openChat(title: string): string
+  characterCount(count: number, max: number): string
+  tooLong(count: number, max: number): string
+  toolFailed(name: string): string
+  toolUnknown(name: string): string
+  runningTool(name: string): string
+  awaitingApproval(name: string): string
+  responseFailed(assistantLabel: string): string
 }
 ```
 
@@ -1839,14 +2220,45 @@ export interface WebMCPChatElement extends HTMLElement {
 
 ```ts
 export interface WebMCPChatOptions {
-  harness: PiController
+  controller: PiController
   mode?: 'inline' | 'popup'
+  /** Popup launcher side in the inline direction; defaults to `end`. */
+  placement?: 'end' | 'start'
+  /** Defaults to `light`; `auto` follows the user's color scheme. */
+  theme?: 'auto' | 'light' | 'dark'
   title?: string
   assistantLabel?: string
   placeholder?: string
   emptyState?: string
   suggestedPrompts?: readonly string[]
   disabled?: boolean
+  labels?: Partial<WebMCPChatLabels>
+  /** Locale for number formatting in the default labels. */
+  locale?: string
+  /** Characters per message; defaults to 16,000. */
+  maxMessageLength?: number
+  /**
+   * Renders a user or assistant message body into `target` when its text changes.
+   * Return `true` to skip the default plain-text rendering.
+   * Message text is untrusted user and model output: sanitize anything inserted as HTML.
+   */
+  renderMessage?: (message: PiMessage, target: HTMLElement) => boolean | void
+}
+```
+
+### WebMCPChatStatusLabels
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/chat/src/interfaces/chat.ts).
+
+```ts
+export interface WebMCPChatStatusLabels {
+  loading: string
+  interrupted: string
+  error: string
+  closed: string
+  lastFailed: string
+  newChatStarted: string
+  startingNewChat: string
 }
 ```
 
@@ -1869,6 +2281,8 @@ export interface InitWebMCPOptions {
   buttonLabel?: string
   confirmationHandler?: ConfirmationHandler
   context?: ResolverContext | (() => ResolverContext)
+  /** Shows the floating panel launcher. Default `true` for an element created by `initWebMCP()`. */
+  launcher?: boolean
   placeholder?: string
   resolver?: ToolResolver
   target?: string | WebMCPCommandInputElement
@@ -1899,6 +2313,12 @@ export type WebMCPCommandInputConfigureOptions = {
   floating?: boolean
   initialModel?: string
   initialResolverOptionId?: string
+  /** Visible label and accessible name of the command field. Default `Command`. */
+  label?: string
+  /** Replaces the custom visible strings; omitted keys use the defaults. */
+  labels?: Partial<WebMCPCommandInputLabels>
+  /** Shows a launcher button that toggles the floating panel. */
+  launcher?: boolean
   placeholder?: string
   settingsOpen?: boolean
 } & (
@@ -1917,6 +2337,10 @@ export interface WebMCPCommandInputElement extends HTMLElement {
   context?: ResolverContext | (() => ResolverContext)
   disabled: boolean
   floating: boolean
+  label: string
+  get labels(): WebMCPCommandInputLabels
+  set labels(value: Partial<WebMCPCommandInputLabels> | undefined)
+  launcher: boolean
   panelOpen: boolean
   placeholder: string
   resolver?: ToolResolver
@@ -1924,11 +2348,52 @@ export interface WebMCPCommandInputElement extends HTMLElement {
   closePanel(): void
   configure(options: WebMCPCommandInputConfigureOptions): void
   openPanel(): void
+  /**
+   * Failure results use `code: 'cancelled'` after Stop, Escape, or an aborted signal, and
+   * `code: 'resolver_failed'` when creating the resolver or resolving the command fails.
+   */
   run(
     message?: string,
     options?: WebMCPCommandInputRunOptions
   ): Promise<ToolInvocationResult | undefined>
   togglePanel(): void
+}
+```
+
+### WebMCPCommandInputLabels
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/command-input.ts).
+
+Visible text used by `<webmcp-command-input>`. Every key has an English default.
+
+```ts
+export interface WebMCPCommandInputLabels {
+  /** Accessible name of the command form. Default `WebMCP command input`. */
+  form: string
+  /** Idle text of the submit button. `buttonLabel` overrides it. Default `Run`. */
+  run: string
+  /** Text of the button while a command runs. Default `Stop`. */
+  stop: string
+  /** Text of the floating panel launcher. Default `Commands`. */
+  launcher: string
+  /** Summary of the resolver options disclosure. Default `Options`. */
+  options: string
+  /** Label of the provider select. Default `Provider`. */
+  provider: string
+  /** Label of the model select. Default `Model`. */
+  model: string
+  /** Summary of the slotted diagnostics disclosure. Default `Developer diagnostics`. */
+  diagnostics: string
+  /** Status before the resolver reports its own detail. Default `Resolver is waiting for a command.` */
+  idle: string
+  /** Status while the resolver is prepared. Default `Preparing...`. */
+  preparing: string
+  /** Status while the resolver selects a tool. Default `Resolving...`. */
+  resolving: string
+  /** Status while a tool runs; `{tool}` is replaced with the tool name. Default `Running {tool}.` */
+  executing: string
+  /** Status after the user or a signal stops a command. Default `Command was cancelled.` */
+  cancelled: string
 }
 ```
 

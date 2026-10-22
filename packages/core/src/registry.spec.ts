@@ -7,9 +7,11 @@ import {
   invokeTool,
   listTools,
   registerTool,
+  registerTools,
   unregisterTool,
   setConfirmationHandler
 } from './index'
+import type { ToolInvocation } from './interfaces/tool'
 
 describe('registry', () => {
   beforeEach(() => {
@@ -82,10 +84,12 @@ describe('registry', () => {
 
     expect(blocked.status).toBe('blocked')
 
+    setConfirmationHandler(function approveConfirmation() {
+      return true
+    })
     const confirmed = await invokeTool({
       toolName: 'void_invoice',
-      input: { invoiceId: 'inv_1' },
-      confirmed: true
+      input: { invoiceId: 'inv_1' }
     })
 
     expect(confirmed.status).toBe('success')
@@ -168,9 +172,9 @@ describe('registry', () => {
     expect(execute).not.toHaveBeenCalled()
   })
 
-  it('skips the confirmation handler when an invocation is already confirmed', async () => {
-    const confirm = vi.fn(function rejectConfirmation() {
-      return false
+  it('ignores caller-provided confirmation and approves only an explicit true', async () => {
+    const confirm = vi.fn(function returnDialogValue() {
+      return 'cancel' as unknown as boolean
     })
     setConfirmationHandler(confirm)
 
@@ -199,12 +203,110 @@ describe('registry', () => {
         toolName: 'void_invoice',
         input: { invoiceId: 'inv_1' },
         confirmed: true
-      })
+      } as ToolInvocation)
     ).resolves.toMatchObject({
-      status: 'success',
-      output: { invoiceId: 'inv_1' }
+      status: 'blocked',
+      code: 'confirmation_denied'
     })
-    expect(confirm).not.toHaveBeenCalled()
+    expect(confirm).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects input that is not plain JSON with a result instead of throwing', async () => {
+    const execute = vi.fn(function readStatus() {
+      return { ok: true }
+    })
+    registerTool(
+      defineTool({
+        name: 'read_status',
+        description: 'Read the current status for one filter value.',
+        inputSchema: {
+          type: 'object',
+          properties: { status: { enum: ['open', 'closed'] } },
+          additionalProperties: false
+        },
+        execute
+      })
+    )
+    const cyclic: Record<string, unknown> = {}
+    cyclic.self = cyclic
+
+    for (const input of [{ status: 10n }, cyclic, { status: new Date() }, { status: Number.NaN }]) {
+      await expect(
+        invokeTool({ toolName: 'read_status', input: input as Record<string, unknown> })
+      ).resolves.toMatchObject({ status: 'error', code: 'invalid_input' })
+    }
+    expect(execute).not.toHaveBeenCalled()
+  })
+
+  it('keeps a JSON __proto__ key as an own property that validation rejects', async () => {
+    const execute = vi.fn(function readAmount(input: Record<string, unknown>) {
+      return { amount: input.amount }
+    })
+    registerTool(
+      defineTool<Record<string, unknown>>({
+        name: 'read_amount',
+        description: 'Read the requested amount back to the caller for display.',
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        execute
+      })
+    )
+
+    const result = await invokeTool({
+      toolName: 'read_amount',
+      input: JSON.parse('{"__proto__":{"amount":5}}') as Record<string, unknown>
+    })
+
+    expect(result).toMatchObject({ status: 'error', code: 'invalid_input' })
+    expect(result.error).toContain('__proto__ is not allowed')
+    expect(execute).not.toHaveBeenCalled()
+  })
+
+  it('reports output that cannot be validated as invalid output', async () => {
+    registerTool(
+      defineTool({
+        name: 'read_total',
+        description: 'Read the current invoice total for the open workspace.',
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        outputSchema: { type: 'object', properties: { total: { enum: [1] } } },
+        execute() {
+          return { total: 10n }
+        }
+      })
+    )
+
+    await expect(invokeTool({ toolName: 'read_total', input: {} })).resolves.toMatchObject({
+      status: 'error',
+      code: 'invalid_output'
+    })
+  })
+
+  it('registers a set of tools atomically with one disposer', () => {
+    function tool(name: string) {
+      return defineTool({
+        name,
+        description: `Read the ${name.replace('_', ' ')} for the current workspace.`,
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        execute() {
+          return {}
+        }
+      })
+    }
+    registerTool(tool('read_taken'))
+
+    expect(function duplicate() {
+      registerTools([tool('read_first'), tool('read_taken')])
+    }).toThrow('already registered')
+    expect(getTool('read_first')).toBeUndefined()
+
+    const set = registerTools([tool('read_first'), tool('read_second')])
+    expect(set.registrations.map((registration) => registration.tool.name)).toEqual([
+      'read_first',
+      'read_second'
+    ])
+    set.unregister()
+    expect(getTool('read_first')).toBeUndefined()
+    expect(getTool('read_second')).toBeUndefined()
+    expect(getTool('read_taken')).toBeDefined()
   })
 
   it('returns an error before handlers run when input validation fails', async () => {
@@ -246,8 +348,7 @@ describe('registry', () => {
 
     const result = await invokeTool({
       toolName: 'create_invoice',
-      input: { customerName: 123, amount: 'not-a-number' },
-      confirmed: true
+      input: { customerName: 123, amount: 'not-a-number' }
     })
 
     expect(result.status).toBe('error')

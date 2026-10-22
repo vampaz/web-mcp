@@ -7,13 +7,15 @@ npm ci --ignore-scripts
 npm run dev:demo
 ```
 
-Open [https://webmcp-kit.localtest.me](https://webmcp-kit.localtest.me). The lab starts in Chat, with navigation ordered Chat, Harness, Core. Chat configures the reusable custom element against the harness. Its Presentation selector switches between inline and draggable popup modes without resetting the conversation. Open `/?mode=chat&presentation=popup` to start with the launcher. Harness runs the real Pi loop with plain controls. Core reads and writes an application counter through shared validation and confirmation. Source aliases resolve exact package entries to one page registry; the development server does not build the library.
+Open [https://webmcp-kit.localtest.me](https://webmcp-kit.localtest.me). The lab starts in Chat, with navigation ordered Chat, Harness, Core, Toolkit. Chat configures the reusable custom element against the harness. Its Presentation selector switches between inline and draggable popup modes without resetting the conversation. Open `/?mode=chat&presentation=popup` to start with the launcher. Harness runs the real Pi loop with plain controls. Core reads and writes an application counter through shared validation and confirmation. Toolkit registers a `defineZodTool` tool through the Vue `useWebMCPTool` helper, a `registerFormTool` form, and an offline `<webmcp-command-input>` that uses the local resolver. In development, it also loads the devtools overlay on demand. Source aliases resolve exact package entries to one page registry; the development server does not build the library.
 
 The Vite server uses [`@vampaz/vite-plugin-local-tls`](https://github.com/vampaz/vite-plugin-local-tls) 0.2.0. TLS terminates at its shared, loopback-only service. Vite's internal upstream binds `127.0.0.1:4173`; use the HTTPS hostname in the browser. The plugin prints that URL at startup and provides WSS HMR. Run `npm exec -- vite-local-tls doctor` to check CA trust and service health. First-time trust/service installation follows the plugin's operating-system authorization flow. Certificate verification stays enabled.
 
 ## LM Studio
 
 Copy `.env.example` to `.env.local` in this directory. Set `LM_STUDIO_MODEL` to the exact model ID you choose. Start the local LM Studio server and load that model. No model is downloaded or selected automatically. The example requests JSON-schema output, disables reasoning explicitly, uses temperature 0.2, and caps each response at 1,024 tokens. `LM_STUDIO_API_TOKEN` is optional and stays in the Vite server.
+
+To use Chat and Harness without a model, run `npm run dev:demo:fixtures`. It sets `WEBMCP_TEST_FIXTURES=true`, so the lab uses the deterministic fixture resolver and enables the storage fixture.
 
 The server binds loopback and proxies only GET `/__lmstudio/v1/models` and POST `/__lmstudio/v1/chat/completions`. It checks origins, methods, host, body size, and the configured model; redirects and arbitrary targets are rejected. Account credentials are never sent to LM Studio. Provider configuration remains outside the reusable chat.
 

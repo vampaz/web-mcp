@@ -24,7 +24,7 @@ The distribution bundles Pi implementation libraries; consumers do not install t
 
 For local package development, use the verified tarball described in [operations](./operations.md#validation-in-this-repository). Do not use a source alias as proof that the published package works. Keep the kit dependency deduplicated so the page's tool definitions, framework helpers, and harness use one registry.
 
-The package's Node requirement for tooling is `>=22.19.0`; this repository pins its development baseline in `.nvmrc`. Browser execution requires the APIs listed in [operations](./operations.md#browser-prerequisites). Framework and Zod peers are needed only for those subpaths. The [dependency model](./getting-started.md#dependency-model) maps every feature to its peers and separates application runtime requirements from repository tooling.
+The package's Node requirement for tooling is `>=24`, matching the development baseline pinned in `.nvmrc`. Browser execution requires the APIs listed in [operations](./operations.md#browser-prerequisites). Framework and Zod peers are needed only for those subpaths. The [dependency model](./getting-started.md#dependency-model) maps every feature to its peers and separates application runtime requirements from repository tooling.
 
 ## 2. Register the application's actions
 

@@ -2,5 +2,5 @@ import { defineWebMCPChat, type WebMCPChatElement } from '@vampaz/webmcp-kit/cha
 import { fakeController } from './controller.js'
 defineWebMCPChat()
 const element = document.createElement('webmcp-chat') as WebMCPChatElement
-element.configure({ harness: fakeController() })
+element.configure({ controller: fakeController() })
 document.body.append(element)

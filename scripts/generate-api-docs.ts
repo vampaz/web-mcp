@@ -112,10 +112,79 @@ function render(symbol: ts.Symbol): string {
     const type = checker.getTypeOfSymbolAtLocation(symbol, declaration)
     code = `declare const ${symbol.name}: ${checker.typeToString(type, declaration, ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.UseAliasDefinedOutsideCurrentScope)}`
     collectTypes(declaration.type)
+  } else if (ts.isClassDeclaration(declaration)) {
+    code = renderClass(symbol.name, declaration)
   } else throw new Error(`Unsupported public declaration: ${symbol.name}`)
   const description = ts.displayPartsToString(symbol.getDocumentationComment(checker))
   const path = relative(root, source.fileName).replaceAll('\\', '/')
   return `### ${symbol.name}\n\n[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/${path}).${description ? `\n\n${description}` : ''}\n\n\`\`\`ts\n${code}\n\`\`\``
+}
+
+// Classes show their public fields, including constructor parameter properties, and constructor signatures.
+function renderClass(name: string, declaration: ts.ClassDeclaration): string {
+  const source = declaration.getSourceFile()
+  const fields: string[] = []
+  const constructors: string[] = []
+  const overloaded = declaration.members.filter(ts.isConstructorDeclaration).length > 1
+  for (const member of declaration.members) {
+    if (!isPublic(member)) continue
+    if (ts.isPropertyDeclaration(member)) fields.push(renderField(member))
+    else if (ts.isConstructorDeclaration(member)) {
+      for (const parameter of member.parameters)
+        if (ts.isParameterPropertyDeclaration(parameter, member) && isPublic(parameter))
+          fields.push(renderField(parameter))
+      if (!overloaded || !member.body)
+        constructors.push(`constructor(${member.parameters.map(renderParameter).join(', ')})`)
+    } else throw new Error(`Unsupported public class member in ${name}: ${member.getText(source)}`)
+  }
+  for (const clause of declaration.heritageClauses ?? []) collectTypes(clause)
+  for (const parameter of declaration.typeParameters ?? []) collectTypes(parameter)
+  const typeParameters = declaration.typeParameters
+    ? `<${declaration.typeParameters
+        .map(function typeParameter(parameter) {
+          return parameter.getText(source)
+        })
+        .join(', ')}>`
+    : ''
+  const heritage = (declaration.heritageClauses ?? []).map(function clause(item) {
+    return ` ${item.getText(source)}`
+  })
+  const abstract = ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Abstract
+  const body = [...fields, ...constructors]
+    .map(function indent(line) {
+      return `  ${line}`
+    })
+    .join('\n')
+  return `declare ${abstract ? 'abstract ' : ''}class ${name}${typeParameters}${heritage.join('')} {\n${body}\n}`
+}
+
+function isPublic(node: ts.ClassElement | ts.ParameterDeclaration): boolean {
+  return (
+    !(node.name && ts.isPrivateIdentifier(node.name)) &&
+    !(ts.getCombinedModifierFlags(node) & (ts.ModifierFlags.Private | ts.ModifierFlags.Protected))
+  )
+}
+
+function renderField(node: ts.PropertyDeclaration | ts.ParameterDeclaration): string {
+  const flags = ts.getCombinedModifierFlags(node)
+  const optional = node.questionToken ? '?' : ''
+  return `${flags & ts.ModifierFlags.Static ? 'static ' : ''}${flags & ts.ModifierFlags.Readonly ? 'readonly ' : ''}${node.name.getText()}${optional}: ${renderType(node)}`
+}
+
+function renderParameter(parameter: ts.ParameterDeclaration): string {
+  const optional = parameter.questionToken || parameter.initializer ? '?' : ''
+  return `${parameter.dotDotDotToken ? '...' : ''}${parameter.name.getText()}${optional}: ${renderType(parameter)}`
+}
+
+function renderType(node: ts.PropertyDeclaration | ts.ParameterDeclaration): string {
+  collectTypes(node.type)
+  return node.type
+    ? node.type.getText()
+    : checker.typeToString(
+        checker.getTypeAtLocation(node),
+        node,
+        ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.UseAliasDefinedOutsideCurrentScope
+      )
 }
 
 function collectTypes(node: ts.Node | undefined): void {

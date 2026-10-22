@@ -2,6 +2,7 @@ import type { ToolInvocationResult, ToolResolution, ToolResolutionStep } from '.
 import type { WebMCPCommandStepEventDetail } from './interfaces/command-input'
 import { isResolverOutcomeToolName } from './resolution-validation'
 import { invokeTool } from './registry'
+import { raceAbort } from './abort'
 
 export async function invokeResolvedSteps(
   resolution: ToolResolution,
@@ -60,9 +61,16 @@ export async function invokeResolvedSteps(
   )
 }
 
+export const commandCancelledMessage = 'Command was cancelled.'
+
 export function throwIfAborted(signal: AbortSignal | undefined): void {
   if (!signal?.aborted) return
-  throw new Error('Command was cancelled.')
+  throw new Error(commandCancelledMessage)
+}
+
+/** Stops waiting when the command is cancelled, even if the awaited work ignores the signal. */
+export function waitUnlessAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  return raceAbort(promise, signal, commandCancelledMessage)
 }
 
 function getResolutionSteps(resolution: ToolResolution): ToolResolutionStep[] {

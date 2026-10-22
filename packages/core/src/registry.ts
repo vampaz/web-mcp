@@ -3,6 +3,7 @@ import { assertValidTool } from './define-tool'
 import { emitWebMCPKitEvent } from './events'
 import type {
   RegisteredTool,
+  RegisteredTools,
   RegistrySnapshot,
   ToolInvocation,
   ToolInvocationResult,
@@ -87,6 +88,21 @@ export function registerToolWithCleanup<TInput = Record<string, unknown>, TOutpu
   return registration
 }
 
+/** Registers every tool or none; one disposer unregisters the whole set. */
+export function registerTools(tools: readonly WebMCPTool[]): RegisteredTools {
+  const registrations: RegisteredTool[] = []
+  function unregister() {
+    for (const registration of registrations.splice(0).reverse()) registration.unregister()
+  }
+  try {
+    for (const tool of tools) registrations.push(registerTool(tool))
+  } catch (error) {
+    unregister()
+    throw error
+  }
+  return { registrations: [...registrations], unregister }
+}
+
 export function unregisterTool(name: string): boolean {
   const registration = registeredTools.get(name)
   if (!registration) return false
@@ -139,7 +155,6 @@ export async function invokeTool<TOutput = unknown>(
 
   const result = (await invokeToolPipeline(registration.tool, {
     invocationId: invocation.id,
-    confirmed: invocation.confirmed,
     isCurrent() {
       return registeredTools.get(invocation.toolName) === registration
     },

@@ -181,6 +181,49 @@ if (form) {
 
 The helper applies `toolname`, `tooldescription`, and official field metadata attributes such as `toolparamdescription`. Through the kit invocation path, the default execution fills fields and returns `FormData`; it does not submit the form. To create a ticket, supply `execute(input, form)` that calls the application's submission action, plus required confirmation. Native declarative form submission remains a separate browser path, so the form's submit handler must enforce application authorization and approval. The returned registration removes the tool and restores the previous form attributes when `unregister()` is called.
 
+## Zod Tool
+
+```ts
+import { registerTool } from '@vampaz/webmcp-kit'
+import { defineZodTool } from '@vampaz/webmcp-kit/zod'
+import * as z from 'zod'
+
+registerTool(
+  defineZodTool({
+    name: 'schedule_reminder',
+    description: 'Schedule a reminder for the signed-in user at a future time.',
+    schema: z.object({
+      text: z.string().min(1).max(200),
+      minutesFromNow: z.int().positive().max(1440)
+    }),
+    examples: [{ text: 'Stand-up', minutesFromNow: 15 }],
+    confirmation: { reason: 'Schedule this reminder?' },
+    execute({ text, minutesFromNow }) {
+      return scheduleReminder(text, minutesFromNow)
+    }
+  })
+)
+```
+
+Zod parses the input before approval, so refinements and defaults apply before the user is asked. `examples` use the raw input shape. The generated schema's `exclusiveMinimum` (from `.positive()`) is also enforced by the core validator.
+
+## Local MCP Bridge
+
+```ts
+import { createLocalMCPBridge } from '@vampaz/webmcp-kit/mcp-bridge'
+
+const bridge = createLocalMCPBridge()
+const listed = await bridge.handleRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
+const called = await bridge.handleRequest({
+  jsonrpc: '2.0',
+  id: 2,
+  method: 'tools/call',
+  params: { name: 'read_counter', arguments: {} }
+})
+```
+
+The bridge lists currently available tools and routes calls through the normal approval path with `source: 'mcp-bridge'`. It is an in-process adapter; connect it to a transport yourself.
+
 ## Eval Fixtures
 
 ```ts
