@@ -23,6 +23,7 @@ beforeEach(function setup() {
       return { status: 'completed' as const }
     }),
     clear: vi.fn(async function clear() {}),
+    refresh: vi.fn(async function refresh() {}),
     stop: vi.fn(async function stop() {}),
     destroy: vi.fn(async function destroy() {})
   }

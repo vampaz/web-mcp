@@ -1,30 +1,37 @@
-import { defineTool } from './define-tool'
-import type { ToolContext, WebMCPTool } from './interfaces/tool'
+import { defineTool, type SchemaTypedWebMCPTool } from './define-tool'
+import type { InferToolInput } from './interfaces/schema-inference'
+import type { JsonSchema, ToolContext, WebMCPTool } from './interfaces/tool'
 
-export interface DefineServerToolOptions<
-  TInput = Record<string, unknown>,
-  TOutput = unknown
-> extends Omit<WebMCPTool<TInput, TOutput>, 'execute'> {
+export interface ServerToolEndpointOptions {
   endpoint: string | URL
   fetch?: ServerToolFetch
   headers?: Record<string, string>
 }
 
+export interface DefineServerToolOptions<TInput = Record<string, unknown>, TOutput = unknown>
+  extends Omit<WebMCPTool<TInput, TOutput>, 'execute'>, ServerToolEndpointOptions {}
+
+export type SchemaTypedServerToolOptions<TSchema extends JsonSchema, TOutput = unknown> = Omit<
+  SchemaTypedWebMCPTool<TSchema, TOutput>,
+  'execute'
+> &
+  ServerToolEndpointOptions
+
 export type ServerToolFetch = (input: string | URL, init?: RequestInit) => Promise<Response>
 
+export function defineServerTool<const TSchema extends JsonSchema, TOutput = unknown>(
+  options: SchemaTypedServerToolOptions<TSchema, TOutput>
+): WebMCPTool<InferToolInput<TSchema>, TOutput>
 export function defineServerTool<TInput = Record<string, unknown>, TOutput = unknown>(
   options: DefineServerToolOptions<TInput, TOutput>
-): WebMCPTool<TInput, TOutput> {
-  return defineTool<TInput, TOutput>({
-    name: options.name,
-    description: options.description,
-    inputSchema: options.inputSchema,
-    outputSchema: options.outputSchema,
-    annotations: options.annotations,
-    confirmation: options.confirmation,
-    examples: options.examples,
-    scope: options.scope,
-    guard: options.guard,
+): WebMCPTool<TInput, TOutput>
+export function defineServerTool(
+  options: DefineServerToolOptions<unknown, unknown>
+): WebMCPTool<unknown, unknown> {
+  // Forward every tool field (parseInput, scope, guard, …); only execution moves to the server.
+  const { endpoint: _endpoint, fetch: _fetch, headers: _headers, ...tool } = options
+  return defineTool<unknown, unknown>({
+    ...tool,
     async execute(input, context) {
       return callServerTool(options, input, context)
     }

@@ -17,17 +17,19 @@
     </header>
     <nav class="mode-nav" aria-label="Example mode">
       <a
-        v-for="example in ['chat', 'harness', 'core']"
+        v-for="example in ['chat', 'harness', 'core', 'toolkit']"
         :key="example"
         :href="`?mode=${example}`"
         :aria-current="mode === example ? 'page' : undefined"
         >{{ example[0].toUpperCase() + example.slice(1)
         }}<span class="nav-description">{{
-          example === 'core'
-            ? 'Tool registry'
-            : example === 'harness'
-              ? 'Headless agent'
-              : 'Conversation UI'
+          example === 'toolkit'
+            ? 'Helpers and devtools'
+            : example === 'core'
+              ? 'Tool registry'
+              : example === 'harness'
+                ? 'Headless agent'
+                : 'Conversation UI'
         }}</span></a
       >
     </nav>
@@ -135,6 +137,7 @@
           </form>
           <pre id="harness-snapshot">{{ JSON.stringify(snapshot, null, 2) }}</pre>
         </template>
+        <ToolkitExamples v-else-if="mode === 'toolkit'" />
         <template v-else>
           <div class="preview-heading">
             <h2>The application is in control.</h2>
@@ -184,15 +187,21 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, shallowRef } from 'vue'
 import { getSupportLabel, invokeTool } from '@vampaz/webmcp-kit'
 import type { PiController, PiSnapshot } from '@vampaz/webmcp-kit/pi'
 import type { WebMCPChatElement } from '@vampaz/webmcp-kit/chat'
 import { installApprovalDialog, registerCounterTools } from '@/tools'
 
+const ToolkitExamples = defineAsyncComponent(function load() {
+  return import('@/ToolkitExamples.vue')
+})
+
 const parameters = new URLSearchParams(location.search)
 const requestedMode = parameters.get('mode') ?? 'chat'
-const mode = ['core', 'harness', 'chat', 'storage'].includes(requestedMode) ? requestedMode : 'chat'
+const mode = ['core', 'harness', 'chat', 'toolkit', 'storage'].includes(requestedMode)
+  ? requestedMode
+  : 'chat'
 const counter = ref(0)
 const draftValue = ref<number | string>(1)
 const toolResult = ref('')
@@ -243,7 +252,7 @@ function configureChats() {
   if (!controller) return
   for (const element of chatHost.value?.querySelectorAll<WebMCPChatElement>('webmcp-chat') ?? []) {
     element.configure({
-      harness: controller,
+      controller,
       mode: presentation.value,
       assistantLabel: 'Assistant',
       suggestedPrompts: ['Read the counter', 'Set the counter to 7'],

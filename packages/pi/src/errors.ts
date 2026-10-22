@@ -1,11 +1,18 @@
-import type { PiError, PiErrorCode } from './interfaces/controller'
+import type { PiError, PiErrorCode, PiErrorReason } from './interfaces/controller'
 
 export class PiFailure extends Error {
+  readonly reason?: PiErrorReason
+  readonly actionMayHaveRun?: boolean
+
   constructor(
     readonly code: PiErrorCode,
-    message: string
+    message: string,
+    details: { reason?: PiErrorReason; actionMayHaveRun?: boolean } = {}
   ) {
     super(message)
+    this.name = 'PiFailure'
+    if (details.reason) this.reason = details.reason
+    if (details.actionMayHaveRun) this.actionMayHaveRun = true
   }
 }
 
@@ -28,10 +35,35 @@ export function isPiError(value: unknown): value is PiError {
 }
 
 export function piError(error: unknown, code: PiErrorCode = 'provider_failed'): PiError {
-  return {
-    code: isPiError(error) ? error.code : code,
-    message: isPiError(error) || error instanceof Error ? error.message : String(error)
+  // Libraries wrap failures (for example pi-durable's SessionFailed); the original code is in `cause`.
+  let current = error
+  for (let depth = 0; depth < 5 && current && !isPiError(current); depth++)
+    current = (current as { cause?: unknown }).cause
+  if (isPiError(current)) {
+    const known = current as PiError
+    return {
+      code: known.code,
+      message: known.message,
+      ...(known.reason ? { reason: known.reason } : {}),
+      ...(known.actionMayHaveRun ? { actionMayHaveRun: true } : {})
+    }
   }
+  const overflow = isContextOverflowError(error)
+  return {
+    code,
+    message: error instanceof Error ? error.message : String(error),
+    ...(overflow ? { reason: 'context_overflow' as const } : {})
+  }
+}
+
+/** Whether a failure, or one it wraps, is a typed resolver context overflow. */
+export function isContextOverflowError(error: unknown): boolean {
+  let current = error
+  for (let depth = 0; depth < 5 && current && typeof current === 'object'; depth++) {
+    if ((current as { code?: unknown }).code === 'context_overflow') return true
+    current = (current as { cause?: unknown }).cause
+  }
+  return false
 }
 
 export function jsonBytes(value: unknown): number {

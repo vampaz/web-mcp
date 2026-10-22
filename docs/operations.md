@@ -33,27 +33,26 @@ Configure `connect-src` only for the model/resolver endpoints your integration a
 
 Test the supplied components under your production Content Security Policy. They create shadow DOM through `innerHTML` and install inline shadow styles. The kit currently has no Trusted Types policy injection or style nonce option. A policy requiring Trusted Types or prohibiting those styles can prevent these components from rendering. A headless controller with application-owned UI is available when the supplied component cannot satisfy the host's policy. Do not weaken a site-wide policy without reviewing the concrete integration.
 
+Pi's bundled libraries validate tool arguments with TypeBox. On first use TypeBox tests whether it can compile validators with `new Function`. Under a policy without `'unsafe-eval'` the browser may report one CSP violation for that probe; TypeBox then uses its slower interpreted validator and Pi keeps working. Do not add `'unsafe-eval'` for this.
+
 Tool and assistant text is displayed as text, not interpreted as model-provided HTML. This does not make tool inputs trusted. Keep input validation, current-state guards, app-owned approval, and server authorization in the execution path. Native callers, resolvers, test helpers, devtools, and the local bridge use the core invocation rules.
 
-`ownerId` partitions browser history; it does not authenticate or encrypt it. Scripts on the same origin can access that origin's storage. Store only necessary conversation data. Destroy old controllers on account changes and apply the application's history-retention policy. Clearing history does not undo application actions.
+`ownerId` partitions browser history; it does not authenticate or encrypt it. Scripts on the same origin can access that origin's storage. Store only necessary conversation data. Destroy old controllers on account changes and apply the application's history-retention policy. On sign-out, call `deletePiConversations({ namespace, ownerId })` after destroying that account's controllers; IndexedDB database names include the owner partition. Clearing history does not undo application actions.
 
 ## Validation in this repository
 
 Install with `npm ci`. Installation does not build the package. Use the Node version specified by `.nvmrc` or a compatible version permitted by `package.json`.
 
-For implementation changes:
+For implementation changes, `npm run check` runs lint, format, both typechecks, API and link checks, and unit tests. Then run the browser suite:
 
 ```sh
-npm run typecheck
-npm run typecheck:demo
-npm run lint
-npm run format:check
-npm run docs:api:check
-npm run test
+npm run check
 npm run test:e2e
 ```
 
-The ordinary browser suite uses deterministic fixtures; it needs no model inference. The configured matrix includes Chromium, Firefox, WebKit, and native Chromium. Use a supported Linux runner when a local browser binary cannot start. A configured project is not evidence that its tests passed.
+`npm run test:coverage` reports unit coverage. `npm run docs:links` checks relative links and anchors in the documentation. `npm run dev:demo:fixtures` starts the lab with deterministic resolver fixtures, so Chat works without LM Studio.
+
+The ordinary browser suite uses deterministic fixtures; it needs no model inference. The configured matrix includes Chromium, Firefox, WebKit, and native Chromium. On macOS, Firefox uses isolated app data under `test-results/firefox-home` through `CFFIXED_USER_HOME`; this avoids accessing the personal Firefox directory protected by macOS 27. Remove this workaround when Playwright includes the [Firefox 158 fix](https://github.com/microsoft/playwright/issues/42768). Certificate validation stays enabled. A configured project is not evidence that its tests passed.
 
 For a packaging change or a release candidate, build once after the source and documentation are ready:
 
@@ -73,16 +72,16 @@ Run `npm audit` for advisories and `npm audit signatures` for registry verificat
 
 ## Release procedure
 
-The npm version must be new: the release workflow skips a version already present in the registry. Version 0.4.0 removes the Pi worker and changes public entry points and confirmation. Apply the migration guide before updating consumers.
+The release workflow skips cleanly only when npm, GitHub Packages, and the GitHub release all have the version; a partially published version can be completed by rerunning it. Version 0.5.0 changes approval, schema, chat, and Pi contracts. Apply the [migration guide](./migration-0.5.md) before updating consumers.
 
 1. Finish the review and validation above on the release branch, including the packed consumer tests. Check the manifest and lockfile versions together.
 2. Check `npm view @vampaz/webmcp-kit versions --json` and confirm the candidate version is unused. A registry or authentication error does not establish that a version is available.
-3. Verify the npm trusted publisher permits publishing from `vampaz/web-mcp`, workflow `release.yml`, on GitHub-hosted runners. The workflow requires `id-token: write`; a local npm login is not used by this release path.
+3. Verify the npm trusted publisher permits publishing from `vampaz/web-mcp`, workflow `release.yml`, on GitHub-hosted runners, and that the `npm-release` environment has protection rules. Only the publish job holds `id-token: write`; a local npm login is not used by this release path.
 4. After authorization to release, merge the reviewed revision into `master`. The workflow also permits manual runs on `master`, for recovery. Publication runs are not cancelled when another commit arrives.
 5. Wait for validation, npm publication, GitHub Packages publication, and GitHub release creation. A partial failure needs inspection before rerunning; a successful npm publication cannot be overwritten.
 6. Verify the registry version, provenance, and installed exports. Downstream applications can then replace a temporary Git or tarball dependency with the published version, update their lockfiles, and rerun consumer checks before deployment.
 
-The workflow builds once, tests `artifacts/webmcp-kit.tgz`, and publishes that tarball to both registries. Do not substitute a fresh working-directory pack after the consumer tests. Keep release authorization, CI success, registry publication, and downstream production verification separate.
+The workflow has three jobs. `prepare` reads which targets already have the version. `verify` runs the shared validation with read-only permissions and no caches, builds once, tests `artifacts/webmcp-kit.tgz`, and uploads it. `publish` runs in the protected `npm-release` environment, checks the artifact's digest and version, and publishes only the missing targets from those tested bytes. Third-party actions are pinned to commit SHAs. Do not substitute a fresh working-directory pack after the consumer tests. Keep release authorization, CI success, registry publication, and downstream production verification separate.
 
 ## Troubleshooting
 

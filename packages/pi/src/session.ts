@@ -29,12 +29,18 @@ export function resolvePiLimits(limits: PiLimits = {}): Required<PiLimits> {
     maxToolCalls: 12,
     maxHistoryBytes: 8 * 1024 * 1024,
     maxRequestBytes: 128 * 1024,
+    requestTimeoutMs: 120_000,
+    contextTokens: 32_768,
+    maxMessageChars: 16_000,
     ...limits
   }
   for (const [key, min, max] of [
     ['maxToolCalls', 1, 50],
     ['maxHistoryBytes', 65536, 8 * 1024 * 1024],
-    ['maxRequestBytes', 1024, 1024 * 1024]
+    ['maxRequestBytes', 1024, 1024 * 1024],
+    ['requestTimeoutMs', 1000, 600_000],
+    ['contextTokens', 2048, 2_000_000],
+    ['maxMessageChars', 1, 100_000]
   ] as const) {
     if (!Number.isSafeInteger(result[key]) || result[key] < min || result[key] > max) {
       throw new PiFailure('configuration', `${key} must be an integer between ${min} and ${max}.`)

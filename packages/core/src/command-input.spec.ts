@@ -232,7 +232,9 @@ describe('WebMCP command input', () => {
 
     const button = element.shadowRoot?.querySelector<HTMLButtonElement>('.webmcp-run-button')
     expect(button?.dataset.phase).toBe('resolving')
-    expect(button?.getAttribute('aria-busy')).toBe('true')
+    expect(button?.textContent).toBe('Stop')
+    expect(button?.disabled).toBe(false)
+    expect(element.shadowRoot?.querySelector('[role="status"]')?.textContent).toBe('Resolving...')
 
     resolutionRequest.resolve({
       toolName: 'search_products',
@@ -656,6 +658,305 @@ describe('WebMCP command input', () => {
   })
 })
 
+describe('WebMCP command input controls', () => {
+  afterEach(() => {
+    clearToolsForTest()
+    delete (window as WindowWithLanguageModel).LanguageModel
+    document.body.innerHTML = ''
+  })
+
+  it('turns the run button into a stable Stop control that cancels the command', async () => {
+    const element = createCommandInputElement()
+    const pending = createPendingResolver()
+    element.resolver = pending.resolver
+    document.body.append(element)
+    await Promise.resolve()
+
+    const button = getRunButton(element)
+    button.focus()
+    const running = element.run('Read items')
+    await vi.waitFor(function resolving() {
+      expect(pending.signal).toBeInstanceOf(AbortSignal)
+    })
+
+    expect(button.textContent).toBe('Stop')
+    expect(button.type).toBe('button')
+    expect(element.shadowRoot?.activeElement).toBe(button)
+    button.click()
+
+    expect(pending.signal?.aborted).toBe(true)
+    await expect(running).resolves.toMatchObject({
+      status: 'error',
+      code: 'cancelled',
+      error: 'Command was cancelled.'
+    })
+    expect(getRunButton(element)).toBe(button)
+    expect(button.textContent).toBe('Run')
+    expect(button.type).toBe('submit')
+    expect(element.shadowRoot?.activeElement).toBe(button)
+    expect(getFeedback(element).dataset.tone).toBe('info')
+  })
+
+  it('uses Escape to stop a running command before closing the floating panel', async () => {
+    const opener = document.createElement('button')
+    document.body.append(opener)
+    const element = createCommandInputElement()
+    const pending = createPendingResolver()
+    element.resolver = pending.resolver
+    element.floating = true
+    document.body.append(element)
+    await Promise.resolve()
+
+    opener.focus()
+    const running = element.run('Read items')
+    await vi.waitFor(function resolving() {
+      expect(pending.signal).toBeInstanceOf(AbortSignal)
+    })
+    const input = getPromptInput(element)
+    expect(element.shadowRoot?.activeElement).toBe(input)
+
+    input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))
+    expect(pending.signal?.aborted).toBe(true)
+    expect(element.panelOpen).toBe(true)
+    await expect(running).resolves.toMatchObject({ code: 'cancelled' })
+
+    input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }))
+    expect(element.panelOpen).toBe(false)
+    expect(document.activeElement).toBe(opener)
+  })
+
+  it('renders a launcher that toggles the floating panel and receives focus on close', async () => {
+    const element = createCommandInputElement()
+    element.configure({ floating: true, launcher: true, labels: { launcher: 'Ask' } })
+    document.body.append(element)
+    await Promise.resolve()
+
+    const launcher = element.shadowRoot?.querySelector<HTMLButtonElement>('[part="launcher"]')
+    const panel = element.shadowRoot?.querySelector<HTMLElement>('[part="panel"]')
+    if (!launcher || !panel) throw new Error('Expected launcher and panel.')
+    expect(launcher.textContent).toBe('Ask')
+    expect(launcher.getAttribute('aria-controls')).toBe(panel.id)
+    expect(launcher.getAttribute('aria-expanded')).toBe('false')
+    expect(element.hasAttribute('launcher')).toBe(true)
+
+    launcher.focus()
+    launcher.click()
+    expect(element.panelOpen).toBe(true)
+    expect(launcher.getAttribute('aria-expanded')).toBe('true')
+    expect(element.shadowRoot?.activeElement).toBe(getPromptInput(element))
+
+    getPromptInput(element).dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' })
+    )
+    expect(element.panelOpen).toBe(false)
+    expect(launcher.getAttribute('aria-expanded')).toBe('false')
+    expect(element.shadowRoot?.activeElement).toBe(launcher)
+
+    element.floating = false
+    expect(element.shadowRoot?.querySelector('[part="launcher"]')).toBeNull()
+  })
+
+  it('applies the field label and custom labels without renaming the button during a run', async () => {
+    const element = createCommandInputElement()
+    const pending = createPendingResolver()
+    element.setAttribute('label', 'Ask the catalog')
+    element.labels = { run: 'Go', stop: 'Halt', resolving: 'Thinking', form: 'Catalog commands' }
+    element.resolver = pending.resolver
+    document.body.append(element)
+    await Promise.resolve()
+
+    const input = getPromptInput(element)
+    expect(input.closest('label')?.textContent?.trim()).toBe('Ask the catalog')
+    expect(input.getAttribute('part')).toBe('input')
+    expect(getPromptForm(element).getAttribute('aria-label')).toBe('Catalog commands')
+    expect(getRunButton(element).textContent).toBe('Go')
+    expect(element.labels.provider).toBe('Provider')
+
+    const running = element.run('Read items')
+    await vi.waitFor(function resolving() {
+      expect(pending.signal).toBeInstanceOf(AbortSignal)
+    })
+    expect(getRunButton(element).textContent).toBe('Halt')
+    expect(getFeedback(element).textContent).toBe('Thinking')
+    pending.finish({ toolName: 'needs_clarification', input: {}, confidence: 0, reason: 'Which?' })
+    await running
+    expect(getRunButton(element).textContent).toBe('Go')
+
+    element.removeAttribute('label')
+    expect(input.closest('label')?.textContent?.trim()).toBe('Command')
+  })
+
+  it('exposes stable parts and keeps the same nodes across structural changes', async () => {
+    const element = createCommandInputElement()
+    document.body.append(element)
+    await Promise.resolve()
+
+    const input = getPromptInput(element)
+    input.focus()
+    element.configure({
+      resolverOptions: [
+        {
+          id: 'first',
+          label: 'First',
+          modelOptions: [
+            { label: 'Small', model: 'small' },
+            { label: 'Large', model: 'large' }
+          ],
+          createResolver: createReadyResolver
+        },
+        { id: 'second', label: 'Second', createResolver: createReadyResolver }
+      ]
+    })
+    element.floating = true
+    element.openPanel()
+
+    expect(getPromptInput(element)).toBe(input)
+    expect(element.shadowRoot?.activeElement).toBe(input)
+    expect(element.shadowRoot?.querySelector('[data-provider]')).not.toBeNull()
+    for (const part of ['panel', 'form', 'input', 'run', 'feedback']) {
+      expect(element.shadowRoot?.querySelector(`[part="${part}"]`)).not.toBeNull()
+    }
+  })
+
+  it('reflects disabled and floating to attributes', async () => {
+    const element = createCommandInputElement()
+    document.body.append(element)
+    await Promise.resolve()
+
+    element.disabled = true
+    element.floating = true
+    expect(element.hasAttribute('disabled')).toBe(true)
+    expect(element.hasAttribute('floating')).toBe(true)
+    expect(getPromptInput(element).disabled).toBe(true)
+    expect(getRunButton(element).getAttribute('aria-disabled')).toBe('true')
+    await expect(element.run('Read items')).resolves.toBeUndefined()
+
+    element.configure({ disabled: false, floating: false })
+    expect(element.hasAttribute('disabled')).toBe(false)
+    expect(element.hasAttribute('floating')).toBe(false)
+    expect(getRunButton(element).hasAttribute('aria-disabled')).toBe(false)
+  })
+
+  it('applies properties that were set before the element was defined', async () => {
+    const tagName = `webmcp-command-input-test-${tagCounter++}`
+    const element = document.createElement(tagName) as WebMCPCommandInputElement
+    const resolver = createReadyResolver()
+    const context = { route: 'catalog' }
+    Object.assign(element, { context, floating: true, label: 'Early', resolver })
+    document.body.append(element)
+
+    defineWebMCPCommandInput(tagName)
+    await Promise.resolve()
+
+    expect(element.resolver).toBe(resolver)
+    expect(element.context).toBe(context)
+    expect(element.hasAttribute('floating')).toBe(true)
+    expect(getPromptInput(element).closest('label')?.textContent?.trim()).toBe('Early')
+  })
+
+  it('keeps a command running when the element moves in the DOM', async () => {
+    registerTool(createReadTool())
+    const element = createCommandInputElement()
+    const pending = createPendingResolver()
+    element.resolver = pending.resolver
+    document.body.append(element)
+    const running = element.run('Read items')
+    await vi.waitFor(function resolving() {
+      expect(pending.signal).toBeInstanceOf(AbortSignal)
+    })
+
+    const container = document.createElement('div')
+    document.body.append(container)
+    container.append(element)
+    await Promise.resolve()
+
+    expect(pending.signal?.aborted).toBe(false)
+    pending.finish({ toolName: 'read_items', input: {}, confidence: 1, reason: 'Read' })
+    await expect(running).resolves.toMatchObject({ status: 'success' })
+  })
+
+  it('keeps a running command when resolver options are rebuilt with equal choices', async () => {
+    const element = createCommandInputElement()
+    const pending = createPendingResolver()
+    function create() {
+      return pending.resolver
+    }
+    function choices() {
+      return [
+        { id: 'only', label: 'Only', modelOptions: [{ label: 'M', model: 'm' }], create }
+      ].map(function toOption(choice) {
+        return {
+          id: choice.id,
+          label: choice.label,
+          modelOptions: choice.modelOptions,
+          createResolver: choice.create
+        }
+      })
+    }
+    element.configure({ resolverOptions: choices() })
+    document.body.append(element)
+    const running = element.run('Read items')
+    await vi.waitFor(function resolving() {
+      expect(pending.signal).toBeInstanceOf(AbortSignal)
+    })
+
+    element.configure({ resolverOptions: choices() })
+    expect(pending.signal?.aborted).toBe(false)
+
+    element.configure({
+      resolverOptions: [{ ...choices()[0]!, createResolver: createReadyResolver }]
+    })
+    expect(pending.signal?.aborted).toBe(true)
+    await expect(running).resolves.toMatchObject({ code: 'cancelled' })
+  })
+
+  it('reports resolver failures with a resolver_failed code', async () => {
+    const element = createCommandInputElement()
+    element.resolver = {
+      ...createReadyResolver(),
+      async resolve() {
+        throw new Error('Provider is offline')
+      }
+    }
+    document.body.append(element)
+
+    await expect(element.run('Read items')).resolves.toMatchObject({
+      status: 'error',
+      code: 'resolver_failed',
+      error: 'Provider is offline'
+    })
+    expect(getFeedback(element).dataset.tone).toBe('error')
+  })
+
+  it.each([
+    ['available', 1],
+    ['unavailable', 3]
+  ] as const)(
+    'recreates the automatic resolver before a run only when it is not ready (%s)',
+    async function test(availability, expectedChecks) {
+      const check = vi.fn(async function check() {
+        return availability
+      })
+      ;(window as WindowWithLanguageModel).LanguageModel = {
+        availability: check,
+        async create() {
+          throw new Error('Not used by this spec.')
+        }
+      }
+      const element = createCommandInputElement()
+      document.body.append(element)
+      await vi.waitFor(function created() {
+        expect(check).toHaveBeenCalledOnce()
+      })
+
+      await element.run('Read items')
+      await element.run('Read items')
+
+      expect(check).toHaveBeenCalledTimes(expectedChecks)
+    }
+  )
+})
+
 function createCommandInputElement(): WebMCPCommandInputElement {
   const tagName = `webmcp-command-input-test-${tagCounter++}`
   defineWebMCPCommandInput(tagName)
@@ -666,6 +967,71 @@ function getPromptInput(element: WebMCPCommandInputElement): HTMLInputElement {
   const input = element.shadowRoot?.querySelector<HTMLInputElement>('[data-command-input]')
   if (!input) throw new Error('Expected command input.')
   return input
+}
+
+function getRunButton(element: WebMCPCommandInputElement): HTMLButtonElement {
+  const button = element.shadowRoot?.querySelector<HTMLButtonElement>('[part="run"]')
+  if (!button) throw new Error('Expected run button.')
+  return button
+}
+
+function getFeedback(element: WebMCPCommandInputElement): HTMLElement {
+  const feedback = element.shadowRoot?.querySelector<HTMLElement>('[part="feedback"]')
+  if (!feedback) throw new Error('Expected feedback.')
+  return feedback
+}
+
+function createReadyResolver(): ToolResolver {
+  return {
+    name: 'Ready resolver',
+    available: true,
+    status: 'ready',
+    detail: 'Ready for tests.',
+    async resolve() {
+      return { toolName: 'no_tools_match', input: {}, confidence: 0, reason: 'No match.' }
+    }
+  }
+}
+
+function createPendingResolver(): {
+  finish: (resolution: ToolResolution) => void
+  resolver: ToolResolver
+  readonly signal: AbortSignal | undefined
+} {
+  let finish: ((resolution: ToolResolution) => void) | undefined
+  let signal: AbortSignal | undefined
+  return {
+    finish(resolution) {
+      if (!finish) throw new Error('Resolver has not started.')
+      finish(resolution)
+    },
+    resolver: {
+      name: 'Pending resolver',
+      available: true,
+      status: 'ready',
+      detail: 'Pending.',
+      resolve(_message, _tools, _context, options) {
+        signal = options?.signal
+        return new Promise<ToolResolution>(function wait(resolve) {
+          finish = resolve
+        })
+      }
+    },
+    get signal() {
+      return signal
+    }
+  }
+}
+
+function createReadTool() {
+  return defineTool({
+    name: 'read_items',
+    description: 'Read visible items.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    execute() {
+      return { items: [] }
+    }
+  })
 }
 
 function getPromptForm(element: WebMCPCommandInputElement): HTMLFormElement {

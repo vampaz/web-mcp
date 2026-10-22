@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { defineTool } from './define-tool'
 import { initWebMCP } from './init'
 import { hasConfirmationHandler, setConfirmationHandler } from './confirmation'
+import type { WebMCPCommandInputElement } from './interfaces/command-input'
+import type { ToolResolver } from './interfaces/tool'
 import { clearToolsForTest, getTool, invokeTool, listTools, registerTool } from './registry'
 
 describe('initWebMCP', () => {
@@ -26,6 +28,7 @@ describe('initWebMCP', () => {
     expect(document.querySelector('webmcp-command-input')).toBe(handle.element)
     expect(handle.element.hasAttribute('floating')).toBe(true)
     expect(handle.element.placeholder).toBe('Ask the workspace...')
+    expect(handle.element.shadowRoot?.querySelector('[part="launcher"]')).not.toBeNull()
 
     handle.destroy()
 
@@ -40,10 +43,39 @@ describe('initWebMCP', () => {
     const handle = initWebMCP({ tools: [createInitTool('select_items')] })
 
     expect(handle.element).toBe(existing)
+    expect(existing.shadowRoot?.querySelector('[part="launcher"]')).toBeNull()
 
     handle.destroy()
 
     expect(document.querySelector('webmcp-command-input')).toBe(existing)
+  })
+
+  it('clears the resolver and context it set on a host-supplied element on destroy', () => {
+    const existing = document.createElement('webmcp-command-input')
+    document.body.append(existing)
+    const resolver = createInitResolver('Init')
+    const context = { route: 'catalog' }
+
+    const handle = initWebMCP({ context, resolver, target: existing as WebMCPCommandInputElement })
+
+    expect(handle.element.resolver).toBe(resolver)
+    expect(handle.element.context).toBe(context)
+
+    handle.destroy()
+
+    expect(handle.element.resolver).toBeUndefined()
+    expect(handle.element.context).toBeUndefined()
+    expect(document.querySelector('webmcp-command-input')).toBe(existing)
+  })
+
+  it('keeps a resolver the host replaced after initialization', () => {
+    const handle = initWebMCP({ resolver: createInitResolver('Init') })
+    const replacement = createInitResolver('Replacement')
+    handle.element.resolver = replacement
+
+    handle.destroy()
+
+    expect(handle.element.resolver).toBe(replacement)
   })
 
   it('throws when the target selector matches nothing', () => {
@@ -52,6 +84,18 @@ describe('initWebMCP', () => {
     }).toThrowError('found no element matching "#missing-command-input"')
   })
 })
+
+function createInitResolver(name: string): ToolResolver {
+  return {
+    name,
+    available: true,
+    status: 'ready',
+    detail: 'Ready.',
+    async resolve() {
+      return { toolName: 'no_tools_match', input: {}, confidence: 0, reason: 'No match.' }
+    }
+  }
+}
 
 function createInitTool(name: string) {
   return defineTool({

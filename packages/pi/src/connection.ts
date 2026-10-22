@@ -57,6 +57,10 @@ export async function createPiHarness(options: PiHarnessOptions): Promise<PiCont
         await suspension
         return controller.send(text)
       },
+      async refresh() {
+        await suspension
+        return controller.refresh()
+      },
       clear: controller.clear,
       stop,
       destroy

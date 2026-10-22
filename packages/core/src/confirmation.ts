@@ -34,7 +34,8 @@ export async function requestToolConfirmation(
 
   if (handler) {
     try {
-      return await handler({ tool, input, reason, ...(signal ? { signal } : {}) })
+      // Only an explicit true approves; dialog return values such as 'cancel' must not.
+      return (await handler({ tool, input, reason, ...(signal ? { signal } : {}) })) === true
     } catch (error) {
       throw new Error(`Confirmation handler failed: ${getErrorMessage(error)}`)
     }

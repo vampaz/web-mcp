@@ -1,12 +1,25 @@
-import type { WebMCPTool } from './interfaces/tool'
+import type { JsonSchema, WebMCPTool } from './interfaces/tool'
+import { checkedStringFormats } from './schema'
 
+// Matched with common inflections (deletes, sending, created); docs/security.md lists the core verbs.
 const sensitiveWords = [
+  'create',
   'delete',
   'remove',
+  'trash',
+  'destroy',
   'void',
+  'cancel',
+  'refund',
   'charge',
   'pay',
+  'purchase',
+  'buy',
+  'checkout',
+  'transfer',
   'send',
+  'notify',
+  'submit',
   'publish',
   'export',
   'email'
@@ -46,10 +59,16 @@ export function getToolWarnings<TInput = Record<string, unknown>, TOutput = unkn
   }
 
   const looksSensitive = sensitiveWords.some(
-    (word) => containsWord(tool.name, word) || containsWord(tool.description, word)
+    (word) => containsVerb(tool.name, word) || containsVerb(tool.description, word)
   )
   if (looksSensitive && !tool.confirmation && tool.annotations?.readOnlyHint !== true) {
     warnings.push('Sensitive action likely needs explicit confirmation metadata.')
+  }
+
+  for (const [path, format] of findUncheckedFormats(tool.inputSchema, 'inputSchema')) {
+    warnings.push(
+      `${path} uses format "${format}", which is not checked; add a pattern or validate in parseInput().`
+    )
   }
 
   if (tool.inputSchema['x-webmcp-source'] === 'form') {
@@ -57,6 +76,21 @@ export function getToolWarnings<TInput = Record<string, unknown>, TOutput = unkn
   }
 
   return warnings
+}
+
+function findUncheckedFormats(schema: JsonSchema, path: string): [string, string][] {
+  const found: [string, string][] =
+    typeof schema.format === 'string' && !checkedStringFormats.has(schema.format)
+      ? [[path, schema.format]]
+      : []
+  for (const [name, child] of Object.entries(schema.properties ?? {}))
+    found.push(...findUncheckedFormats(child, `${path}.properties.${name}`))
+  if (schema.items) found.push(...findUncheckedFormats(schema.items, `${path}.items`))
+  for (const key of ['anyOf', 'oneOf', 'allOf', 'prefixItems'] as const) {
+    for (const [index, child] of (schema[key] ?? []).entries())
+      found.push(...findUncheckedFormats(child, `${path}.${key}[${index}]`))
+  }
+  return found
 }
 
 function getFormToolWarnings<TInput = Record<string, unknown>, TOutput = unknown>(
@@ -105,9 +139,17 @@ function isUnconstrainedField(schema: WebMCPTool['inputSchema']): boolean {
 }
 
 function containsWord(text: string, word: string): boolean {
-  const normalized = text
+  return new RegExp(`\\b${word.replace(/_/g, ' ')}\\b`).test(normalizeWords(text))
+}
+
+function containsVerb(text: string, verb: string): boolean {
+  const stem = verb.endsWith('e') ? verb.slice(0, -1) : verb
+  return new RegExp(`\\b${stem}(?:e|es|s|ed|d|ing)?\\b`).test(normalizeWords(text))
+}
+
+function normalizeWords(text: string): string {
+  return text
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/_/g, ' ')
     .toLowerCase()
-  return new RegExp(`\\b${word.replace(/_/g, ' ')}\\b`).test(normalized)
 }

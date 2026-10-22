@@ -22,7 +22,7 @@ export async function openDemoHarness(
   } else {
     if (!config.modelId)
       throw new Error(
-        'Set LM_STUDIO_MODEL in apps/demo/.env.local, start LM Studio, and load that exact model.'
+        'Set LM_STUDIO_MODEL in apps/demo/.env.local, start LM Studio, and load that exact model. To try the lab without a model, run npm run dev:demo:fixtures for deterministic fixture responses.'
       )
     const response = await fetch('/__lmstudio/v1/models')
     if (!response.ok)

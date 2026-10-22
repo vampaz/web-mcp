@@ -4,7 +4,7 @@ Expose application actions as typed tools. WebMCP Kit connects those actions to 
 
 The core, command input, Pi controller, and chat custom element work without a framework. Optional Vue, React, and Svelte helpers manage tool registration in their component lifecycles.
 
-Version **0.4.0** introduces breaking API changes. See the [migration guide](./docs/migration-0.4.md) when upgrading from 0.3.
+Version **0.5.0** introduces breaking API changes. See the [0.5 migration guide](./docs/migration-0.5.md) when upgrading from 0.4.
 
 ## Quick start
 

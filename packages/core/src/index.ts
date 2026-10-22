@@ -29,6 +29,7 @@ export {
   type RegisterFormToolOptions
 } from './forms'
 export type {
+  ConfirmationEventDetail,
   IntegrationDiagnostic,
   IntegrationHealthReport,
   JsonSchema,
@@ -40,6 +41,7 @@ export type {
   ResolverRequest,
   ResolverRunOptions,
   RegisteredTool,
+  RegisteredTools,
   RegistrySnapshot,
   ToolConfirmation,
   ToolAnnotations,
@@ -55,9 +57,11 @@ export type {
   WebMCPTool
 } from './interfaces/tool'
 export { createResolver, normalizeJsonText } from './resolver'
+export { isResolverError, ResolverError, type ResolverErrorCode } from './resolver-error'
 export {
   isResolverOutcomeToolName,
   resolverOutcomeToolNames,
+  ToolResolutionValidationError,
   toolResolutionSchema,
   validateToolResolution,
   type ResolverOutcomeToolName,
@@ -70,6 +74,7 @@ export {
   invokeTool,
   listTools,
   registerTool,
+  registerTools,
   unregisterTool
 } from './registry'
 export { formatJsonValueValidationError, validateJsonSchema, validateJsonValue } from './schema'
@@ -86,5 +91,11 @@ export {
   type ObjectInputSchemaOptions,
   type StringParamOptions
 } from './schema-builders'
-export { defineServerTool, type DefineServerToolOptions, type ServerToolFetch } from './server-tool'
+export {
+  defineServerTool,
+  type DefineServerToolOptions,
+  type SchemaTypedServerToolOptions,
+  type ServerToolEndpointOptions,
+  type ServerToolFetch
+} from './server-tool'
 export { getSupportLabel, isWebMCPSupported } from './support'

@@ -2,10 +2,10 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import localTls from '@vampaz/vite-plugin-local-tls'
-import { demoOrigin, demoTlsOptions, demoTestOrigin, demoTestTlsOptions } from './local-tls'
-import { sourceAliases } from '../../source-aliases'
-import { resolveDemoConfig } from './src/config'
-import { handleLocalModelRequest } from './src/local-model-proxy'
+import { demoOrigin, demoTlsOptions, demoTestOrigin, demoTestTlsOptions } from './local-tls.ts'
+import { sourceAliases } from '../../source-aliases.ts'
+import { resolveDemoConfig } from './src/config.ts'
+import { handleLocalModelRequest } from './src/local-model-proxy.ts'
 
 const root = fileURLToPath(new URL('.', import.meta.url))
 

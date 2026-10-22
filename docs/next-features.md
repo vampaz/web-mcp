@@ -2,7 +2,7 @@
 
 This roadmap starts from the current implementation. The first foundation layer is now in place: runtime input and output validation, Zod tool definitions, Vue/React/Svelte helpers, app-level confirmation handlers, scope-aware tool selection, bounded tool sequences, explicit resolver outcomes, server-backed tools, and repeatable resolver eval suites.
 
-This file contains proposals, not additional exports. Version `0.2.0` adds the implemented [Pi](./pi.md) and [chat](./chat.md) surfaces. Use the [API reference](./api-reference.md) to distinguish implemented APIs from the illustrative proposals below.
+This file contains proposals, not additional exports. Code samples below are illustrative; for example, `createToolMetrics` and `defineRecipe` do not exist. Use the [API reference](./api-reference.md) to distinguish implemented APIs from proposals. [Pi](./pi.md) and [chat](./chat.md) are implemented surfaces.
 
 ## Existing foundations
 
@@ -152,16 +152,17 @@ This would help multi-page apps, documentation, and pre-navigation agent workflo
 
 The next useful layer is resolver reliability: output-aware sequences, structured errors, and clearer clarification UX. After that, recipes, undo, observability, and manifests make WebMCP Kit easier to operate in larger applications.
 
-## Deferred from the 0.4.0 refactor
+## Backlog after 0.5.0
 
 These additions remain backlog work:
 
 - `mountAssistant()` and reusable dialog approval helpers.
 - A `/server` resolver endpoint helper.
-- External MCP transport and connection lifecycle, including `initialize` and `ping`. The existing local bridge remains available.
-- Bulk `registerTools()` and React `useWebMCPTools()`.
-- A command-input launcher, chat dark mode, parts, configurable labels, and renaming `harness` to `controller`.
-- Account-wide conversation deletion and development warnings for duplicate package copies.
-- Incremental durable replay, a long-lived storage connection, and cross-tab notifications. These need a separate concurrency design and measured benefit.
+- External MCP transport and connection lifecycle, including `initialize` and `ping`. The local bridge remains available.
+- Development warnings for duplicate package copies.
+- Relaxed IndexedDB durability for Pi commits. Recovery already aborts unfinished tasks, but an OS crash could lose the turn-started marker and its interrupted warning, so this needs a measured benefit first.
+- An option in Pi's bundled libraries to skip their TypeBox argument validation, which repeats core validation and adds bundle weight. This needs an upstream change.
 
-Invocation still rechecks registration, schema, scope, and cancellation across asynchronous boundaries. Replacing those checks with frozen definitions needs a separate contract decision; this refactor preserves their safety behavior.
+0.5.0 delivered bulk registration helpers, a command-input launcher, chat dark mode, parts and labels, the `controller` rename, account-wide conversation deletion, and cross-tab history reloads. Incremental durable replay and a long-lived storage connection were measured and deferred: per-turn local work stays near 110 ms at 600 turns in simulated storage, within the 8 MiB history bound.
+
+Invocation still rechecks registration, schema, scope, and cancellation after each asynchronous boundary. Replacing those checks with frozen definitions needs a separate contract decision.

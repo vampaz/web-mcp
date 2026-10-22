@@ -218,6 +218,157 @@ describe('React useWebMCPTool', () => {
   })
 })
 
+describe('React useWebMCPTools', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  afterEach(() => {
+    vi.resetModules()
+    vi.doUnmock('react')
+  })
+
+  async function setup() {
+    const runtime = createReactHookRuntime()
+    vi.doMock('react', function mockReact() {
+      return runtime
+    })
+    const { useWebMCPTools } = await import('./index')
+    const kit = await import('@vampaz/webmcp-kit')
+
+    function createTool(name: string, execute: () => unknown = () => name) {
+      return kit.defineTool({
+        name,
+        description: `Run ${name} from the current React screen.`,
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        execute
+      })
+    }
+
+    function getToolNames() {
+      return kit.listTools().map((registration) => registration.tool.name)
+    }
+
+    return { createTool, getToolNames, kit, runtime, useWebMCPTools }
+  }
+
+  it('registers the tool set after effects run and unregisters it on cleanup', async () => {
+    const { createTool, getToolNames, runtime, useWebMCPTools } = await setup()
+    const handles: Array<ReturnType<typeof useWebMCPTools>> = []
+    function render() {
+      handles.push(useWebMCPTools([createTool('read_cart'), createTool('clear_cart')]))
+    }
+
+    runtime.render(render)
+    runtime.render(render)
+
+    expect(getToolNames()).toEqual(['read_cart', 'clear_cart'])
+    expect(handles[0]).toBe(handles[1])
+    expect(handles[0]!.getRegistrations().map((registration) => registration.tool.name)).toEqual([
+      'read_cart',
+      'clear_cart'
+    ])
+
+    runtime.cleanup()
+
+    expect(getToolNames()).toEqual([])
+    expect(handles[0]!.getRegistrations()).toEqual([])
+  })
+
+  it('registers and unregisters the set as the when option toggles', async () => {
+    const { createTool, getToolNames, runtime, useWebMCPTools } = await setup()
+    let available = false
+    function render() {
+      useWebMCPTools([createTool('read_cart'), createTool('clear_cart')], { when: available })
+    }
+
+    runtime.render(render)
+    expect(getToolNames()).toEqual([])
+
+    available = true
+    runtime.render(render)
+    expect(getToolNames()).toEqual(['read_cart', 'clear_cart'])
+
+    available = false
+    runtime.render(render)
+    expect(getToolNames()).toEqual([])
+
+    runtime.cleanup()
+  })
+
+  it('keeps registrations across inline rerenders and invokes committed callbacks', async () => {
+    const { createTool, kit, runtime, useWebMCPTools } = await setup()
+    let approve!: (approved: boolean) => void
+    const dispose = kit.setConfirmationHandler(function confirm() {
+      return new Promise<boolean>(function pending(resolve) {
+        approve = resolve
+      })
+    })
+    let version = 1
+    function render() {
+      const committedVersion = version
+      useWebMCPTools([
+        createTool('read_cart'),
+        kit.defineTool({
+          name: 'clear_cart',
+          description: 'Clear every line from the current cart.',
+          inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+          confirmation: { reason: 'Clear the cart?' },
+          execute() {
+            return committedVersion
+          }
+        })
+      ])
+    }
+
+    runtime.render(render)
+    const registrations = kit.listTools()
+    const invocation = kit.invokeTool({ toolName: 'clear_cart', input: {} })
+    version = 2
+    runtime.render(render)
+
+    expect(kit.listTools()[0]).toBe(registrations[0])
+    expect(kit.listTools()[1]).toBe(registrations[1])
+    approve(true)
+    expect(await invocation).toMatchObject({ status: 'success', output: 2 })
+    runtime.cleanup()
+    dispose()
+  })
+
+  it('re-registers the set when a tool definition changes', async () => {
+    const { createTool, getToolNames, runtime, useWebMCPTools } = await setup()
+    let names = ['read_cart']
+    function render() {
+      useWebMCPTools(names.map((name) => createTool(name)))
+    }
+
+    runtime.render(render)
+    expect(getToolNames()).toEqual(['read_cart'])
+
+    names = ['read_cart', 'clear_cart']
+    runtime.render(render)
+    expect(getToolNames()).toEqual(['read_cart', 'clear_cart'])
+
+    runtime.cleanup()
+    expect(getToolNames()).toEqual([])
+  })
+
+  it('registers no tool from the set when one name is already registered', async () => {
+    const { createTool, kit, runtime, useWebMCPTools } = await setup()
+    const existing = kit.registerTool(createTool('clear_cart'))
+
+    expect(function render() {
+      runtime.render(function renderHook() {
+        useWebMCPTools([createTool('read_cart'), createTool('clear_cart')])
+      })
+    }).toThrow('"clear_cart" is already registered')
+
+    expect(kit.listTools()).toEqual([existing])
+    runtime.cleanup()
+    expect(kit.listTools()).toEqual([existing])
+  })
+})
+
 function createReactHookRuntime() {
   const refs: Array<{ current: unknown }> = []
   let refIndex = 0

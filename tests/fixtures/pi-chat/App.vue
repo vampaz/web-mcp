@@ -28,7 +28,7 @@ useWebMCPTool({
 })
 
 function showPopup() {
-  if (harness) chat?.configure({ harness, mode: 'popup' })
+  if (harness) chat?.configure({ controller: harness, mode: 'popup' })
 }
 
 onMounted(async function mount() {
@@ -59,7 +59,7 @@ onMounted(async function mount() {
   defineWebMCPChat()
   const element = document.createElement('webmcp-chat') as WebMCPChatElement
   chat = element
-  element.configure({ harness })
+  element.configure({ controller: harness })
   container.value?.append(element)
   registryCount.value = listTools().length
 })

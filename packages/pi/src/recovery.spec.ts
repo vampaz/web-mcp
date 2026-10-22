@@ -85,7 +85,118 @@ it('keeps assistant prose, tool results, and failures without displaying raw act
   } as unknown as ConversationView
   expect(normalizeMessages(view)).toEqual([
     { id: 'entry:1', role: 'assistant', text: 'Checking the counter.' },
-    { id: 'entry:2', role: 'tool', toolName: 'read_counter', text: '7', failed: false },
+    {
+      id: 'entry:2',
+      role: 'tool',
+      toolName: 'read_counter',
+      text: '7',
+      status: 'success',
+      failed: false
+    },
     { id: 'entry:3', role: 'assistant', text: 'Provider unavailable', failed: true }
+  ])
+})
+
+it('shows structured outcomes and marks interrupted invoked actions as unknown', () => {
+  const view = {
+    entries: [
+      {
+        id: 'a',
+        kind: 'pi.assistant',
+        model: [
+          {
+            role: 'assistant',
+            content: [
+              { type: 'toolCall', id: 'call-1', name: 'set_counter', arguments: { value: 3 } }
+            ]
+          }
+        ]
+      },
+      {
+        id: 'b',
+        kind: 'webmcp.action.invoking',
+        data: { callId: 'call-1', toolName: 'set_counter' }
+      },
+      {
+        id: 'c',
+        kind: 'pi.tool',
+        model: [
+          {
+            role: 'toolResult',
+            toolCallId: 'call-1',
+            toolName: 'set_counter',
+            isError: true,
+            content: [
+              { type: 'text', text: '<harness>\n[error] Tool set_counter was aborted\n</harness>' }
+            ]
+          }
+        ]
+      },
+      {
+        id: 'd',
+        kind: 'pi.assistant',
+        model: [
+          {
+            role: 'assistant',
+            content: [{ type: 'toolCall', id: 'call-2', name: 'read_counter', arguments: {} }]
+          }
+        ]
+      },
+      {
+        id: 'e',
+        kind: 'pi.tool',
+        model: [
+          {
+            role: 'toolResult',
+            toolCallId: 'call-2',
+            toolName: 'read_counter',
+            isError: false,
+            content: [{ type: 'text', text: '{"status":"success","output":{"value":3}}' }]
+          },
+          {
+            role: 'toolResult',
+            toolCallId: 'call-3',
+            toolName: 'clear_counter',
+            isError: true,
+            content: [
+              {
+                type: 'text',
+                text: '<harness>\n[error] Tool clear_counter was aborted\n</harness>'
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  } as unknown as ConversationView
+
+  expect(normalizeMessages(view).filter((message) => message.role === 'tool')).toEqual([
+    {
+      id: 'c:0',
+      role: 'tool',
+      toolName: 'set_counter',
+      input: { value: 3 },
+      text: 'Outcome unknown: the turn stopped after this action started. Check application state before retrying.',
+      status: 'unknown',
+      failed: true
+    },
+    {
+      id: 'e:0',
+      role: 'tool',
+      toolName: 'read_counter',
+      input: {},
+      text: '{"value":3}',
+      status: 'success',
+      output: { value: 3 },
+      failed: false
+    },
+    {
+      id: 'e:1',
+      role: 'tool',
+      toolName: 'clear_counter',
+      text: 'Not run: the turn stopped before this action started.',
+      status: 'error',
+      failed: true
+    }
   ])
 })

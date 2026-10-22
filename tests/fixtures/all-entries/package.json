@@ -1,0 +1,12 @@
+{
+  "name": "webmcp-fixture-all-entries",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "react": "18.0.0",
+    "svelte": "4.0.0",
+    "vue": "3.3.0",
+    "zod": "4.0.0"
+  }
+}

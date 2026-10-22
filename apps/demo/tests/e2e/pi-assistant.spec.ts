@@ -30,7 +30,8 @@ test('coexists with an application root PWA worker', async function pwa({ page }
     await navigator.serviceWorker.ready
   })
   await page.goto('/?mode=chat')
-  await expect(page.locator('webmcp-chat').getByRole('status')).toHaveText('Ready')
+  await expect(page.locator('webmcp-chat ol[aria-busy="false"]')).toHaveCount(1)
+  await expect(page.locator('webmcp-chat').getByRole('status')).toHaveText('')
   const result = await page.evaluate(async function registrations() {
     return {
       scopes: (await navigator.serviceWorker.getRegistrations())
@@ -54,6 +55,7 @@ test('stopping a pending approval closes the application dialog and never execut
   await expect(page.getByRole('dialog')).toBeVisible()
   // The dialog is modal. Cancel through the public controller, as a host account/navigation event does.
   await page.evaluate(async function cancel() {
+    // @ts-expect-error This runs in the page, where Vite serves the lab source at this URL.
     const { stopDemoHarness } = await import('/src/harness.ts')
     await stopDemoHarness()
   })

@@ -10,148 +10,129 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
-permissions:
-  contents: write
-  id-token: write
-  packages: write
+permissions: {}
 
 jobs:
-  publish:
+  prepare:
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      version: ${{ steps.targets.outputs.version }}
+      npm: ${{ steps.targets.outputs.npm }}
+      github-packages: ${{ steps.targets.outputs.github-packages }}
+      github-release: ${{ steps.targets.outputs.github-release }}
+      pending: ${{ steps.targets.outputs.pending }}
     steps:
-      - uses: actions/checkout@v6
-
-      - name: Set node version to 24
-        uses: actions/setup-node@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Check npm version
-        run: npm --version
-
-      - run: npm ci --ignore-scripts
-
-      - name: Run lint
-        run: npm run lint
-
-      - name: Run format check
-        run: npm run format:check
-
-      - name: Run typecheck
-        run: npm exec tsc -- --noEmit
-
-      - name: Run tests
-        run: npm run test
-
-      - name: Typecheck demo
-        run: npm run typecheck:demo
-
-      - name: Check API documentation
-        run: npm run docs:api:check
-
-      - name: Install test browsers
-        run: npm exec playwright -- install --with-deps chromium firefox webkit
-
-      - name: Prepare trusted TLS on this disposable runner
+          persist-credentials: false
+          sparse-checkout: /package.json
+          sparse-checkout-cone-mode: false
+      - name: Check which release targets already have this version
+        id: targets
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libcap2-bin libnss3-tools openssl
-          sudo setcap cap_net_bind_service=+ep "$(readlink -f "$(command -v node)")"
-          node --experimental-strip-types scripts/setup-test-tls.ts
-
-      - name: Run deterministic browser tests
-        run: npm run test:e2e
-
-      - name: Run build
-        run: npm run build
-
-      - name: Pack unpublished artifact
-        run: npm run pack:package
-
-      - name: Test package consumers before publication
-        run: npm run test:package
-
-      - name: Stop test TLS proxy
-        if: always()
-        run: npm exec -- vite-local-tls proxy stop
-
-      - name: Configure npm registry for trusted publishing
-        run: printf 'registry=https://registry.npmjs.org/\n' > ~/.npmrc
-
-      - name: Check if version already published
-        id: npm-check
-        run: |
-          VERSION=$(node --input-type=module -e "import fs from 'node:fs'; const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); process.stdout.write(pkg.version)")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
-          if npm view @vampaz/webmcp-kit@"$VERSION" version >/dev/null 2>&1; then
-            echo "published=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "published=false" >> "$GITHUB_OUTPUT"
+          version=$(jq -r .version package.json)
+          # npm expands NODE_AUTH_TOKEN when it reads the file, so the token is not written to disk.
+          # shellcheck disable=SC2016
+          printf '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n' > "$RUNNER_TEMP/github-packages.npmrc"
+          npm=false
+          github_packages=false
+          github_release=false
+          if npm view "@vampaz/webmcp-kit@$version" version --registry=https://registry.npmjs.org/ >/dev/null 2>&1; then
+            npm=true
           fi
+          if NPM_CONFIG_USERCONFIG="$RUNNER_TEMP/github-packages.npmrc" npm view "@vampaz/webmcp-kit@$version" version --registry=https://npm.pkg.github.com >/dev/null 2>&1; then
+            github_packages=true
+          fi
+          if gh release view "v$version" >/dev/null 2>&1; then
+            github_release=true
+          fi
+          pending=true
+          if [ "$npm$github_packages$github_release" = truetruetrue ]; then
+            pending=false
+            echo "::notice::Version $version is already on npm, GitHub Packages, and GitHub releases. Skipping validation and publication."
+          fi
+          {
+            echo "version=$version"
+            echo "npm=$npm"
+            echo "github-packages=$github_packages"
+            echo "github-release=$github_release"
+            echo "pending=$pending"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: Skip if version already published
-        if: steps.npm-check.outputs.published == 'true'
-        run: echo "Version ${{ steps.npm-check.outputs.version }} already published. Skipping npm publish."
+  verify:
+    needs: prepare
+    if: needs.prepare.outputs.pending == 'true'
+    uses: ./.github/workflows/validate.yml
+    permissions:
+      contents: read
+    with:
+      cache: false
+
+  publish:
+    needs: [prepare, verify]
+    if: needs.prepare.outputs.pending == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: npm-release
+    permissions:
+      contents: write
+      id-token: write
+      packages: write
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: /.nvmrc
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: webmcp-kit-package
+          path: artifacts
+      - name: Verify the tested tarball
+        run: |
+          echo "$(jq -r .sha256 artifacts/webmcp-kit.json)  artifacts/webmcp-kit.tgz" | sha256sum --check --strict
+          test "$(tar -xzOf artifacts/webmcp-kit.tgz package/package.json | jq -r .version)" = "$VERSION"
 
       - name: Publish to npm
-        if: steps.npm-check.outputs.published != 'true'
-        run: npm publish ./artifacts/webmcp-kit.tgz --provenance --access public
+        if: needs.prepare.outputs.npm != 'true'
+        run: |
+          printf 'registry=https://registry.npmjs.org/\n' > ~/.npmrc
+          npm publish ./artifacts/webmcp-kit.tgz --provenance --access public
         env:
           NPM_CONFIG_PROVENANCE: true
 
-      - name: Configure GitHub Packages registry
+      - name: Publish to GitHub Packages
+        if: needs.prepare.outputs.github-packages != 'true'
         run: |
           printf '@vampaz:registry=https://npm.pkg.github.com\n' > ~/.npmrc
+          # npm expands NODE_AUTH_TOKEN when it reads the file, so the token is not written to disk.
+          # shellcheck disable=SC2016
           printf '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}\n' >> ~/.npmrc
+          npm publish ./artifacts/webmcp-kit.tgz --registry=https://npm.pkg.github.com
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Check if version already published to GitHub Packages
-        id: github-packages-check
-        run: |
-          if npm view @vampaz/webmcp-kit@"${{ steps.npm-check.outputs.version }}" version --registry=https://npm.pkg.github.com >/dev/null 2>&1; then
-            echo "published=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "published=false" >> "$GITHUB_OUTPUT"
-          fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Skip if version already published to GitHub Packages
-        if: steps.github-packages-check.outputs.published == 'true'
-        run: echo "Version ${{ steps.npm-check.outputs.version }} already published to GitHub Packages. Skipping GitHub Packages publish."
-
-      - name: Publish to GitHub Packages
-        if: steps.github-packages-check.outputs.published != 'true'
-        run: npm publish ./artifacts/webmcp-kit.tgz --registry=https://npm.pkg.github.com
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Check if GitHub release exists
-        id: release-check
-        run: |
-          if gh release view "${{ steps.npm-check.outputs.tag }}" >/dev/null 2>&1; then
-            echo "published=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "published=false" >> "$GITHUB_OUTPUT"
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Skip if GitHub release exists
-        if: steps.release-check.outputs.published == 'true'
-        run: echo "Release ${{ steps.npm-check.outputs.tag }} already exists. Skipping GitHub release creation."
 
       - name: Create GitHub release
-        if: steps.release-check.outputs.published != 'true'
+        if: needs.prepare.outputs.github-release != 'true'
         run: |
-          gh release create "${{ steps.npm-check.outputs.tag }}" \
+          gh release create "v$VERSION" \
             --target "$GITHUB_SHA" \
-            --title "@vampaz/webmcp-kit ${{ steps.npm-check.outputs.tag }}" \
+            --title "@vampaz/webmcp-kit v$VERSION" \
             --generate-notes
         env:
+          GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

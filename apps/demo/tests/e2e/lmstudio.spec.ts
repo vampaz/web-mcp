@@ -65,7 +65,8 @@ test('answers and discovers tools through the actual model and Pi loop', async f
     'Name the two available application tools, without calling either tool. Explain briefly what each does.'
   )
   await input.press('Enter')
-  await expect(page.locator('webmcp-chat').getByRole('status')).toHaveText('Ready')
+  await expect(page.locator('webmcp-chat ol[aria-busy="false"]')).toHaveCount(1)
+  await expect(page.locator('webmcp-chat').getByRole('status')).toHaveText('')
   const assistant = page.locator('webmcp-chat li[data-role=assistant]')
   await expect(assistant).toContainText('read_counter')
   await expect(assistant).toContainText('set_counter')
@@ -87,7 +88,8 @@ test('popup reads, confirms a result-dependent write, re-resolves, and restores 
   ).toBeVisible()
   await expect(page.locator('webmcp-chat summary').first()).toHaveText('read_counter')
   await page.getByRole('button', { name: 'Approve', exact: true }).click()
-  await expect(page.locator('webmcp-chat').getByRole('status')).toHaveText('Ready')
+  await expect(page.locator('webmcp-chat ol[aria-busy="false"]')).toHaveCount(1)
+  await expect(page.locator('webmcp-chat').getByRole('status')).toHaveText('')
   await expect(page.locator('#counter')).toHaveText('7')
   await expect(
     page.locator('webmcp-chat summary').filter({ hasText: /^read_counter$/ })

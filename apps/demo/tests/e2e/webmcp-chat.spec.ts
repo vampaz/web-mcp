@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Locator } from '@playwright/test'
 import type { PiSnapshot, PiTurnOutcome } from '@vampaz/webmcp-kit/pi'
 import type { WebMCPChatElement } from '@vampaz/webmcp-kit/chat'
 
@@ -10,7 +10,7 @@ test('sends, confirms, re-resolves, and restores dialogue without replay', async
   await page.getByRole('button', { name: 'Send', exact: true }).click()
   await page.getByRole('button', { name: 'Approve', exact: true }).click()
   await expect(page.locator('#counter')).toHaveText('7')
-  await expect(page.locator('webmcp-chat').getByRole('status')).toHaveText('Ready')
+  await expectIdle(page.locator('webmcp-chat'))
   await expect(page.locator('webmcp-chat')).toContainText('Counter: 7')
   await expect(page.locator('webmcp-chat img')).toHaveCount(0)
   await expect(page.locator('webmcp-chat details')).not.toHaveAttribute('open')
@@ -19,6 +19,7 @@ test('sends, confirms, re-resolves, and restores dialogue without replay', async
   await expect(page.locator('#counter')).toHaveText('0')
   await expect(page.getByRole('dialog')).not.toBeVisible()
   await page.getByRole('button', { name: 'New chat', exact: true }).click()
+  await page.getByRole('button', { name: 'Delete', exact: true }).click()
   await expect(page.locator('webmcp-chat ol li')).toHaveCount(0)
 })
 
@@ -48,7 +49,7 @@ test('supports keyboard, narrow layouts, and distinct controls in two instances'
   await first.press('Shift+Enter')
   await expect(first).toHaveValue('read\n')
   await first.press('Enter')
-  await expect(chats.first().getByRole('status')).toHaveText('Ready')
+  await expectIdle(chats.first())
   await expect(first).toBeFocused()
   expect(
     await page.evaluate(function noOverflow() {
@@ -100,7 +101,7 @@ test('stops resolving and reports a failed provider without a fallback', async f
 test('keeps focus outside chat when a pending response arrives', async function focus({ page }) {
   await page.goto('/?mode=chat')
   const chat = page.locator('webmcp-chat')
-  await expect(chat.getByRole('status')).toHaveText('Ready')
+  await expectIdle(chat)
   await page.evaluate(function configure() {
     const chat = document.querySelector('webmcp-chat') as WebMCPChatElement
     let snapshot: PiSnapshot = { state: 'idle', messages: [] }
@@ -121,7 +122,7 @@ test('keeps focus outside chat when a pending response arrives', async function 
     }
     chat.after(outside, finish)
     chat.configure({
-      harness: {
+      controller: {
         getSnapshot() {
           return snapshot
         },
@@ -139,6 +140,7 @@ test('keeps focus outside chat when a pending response arrives', async function 
         },
         async stop() {},
         async clear() {},
+        async refresh() {},
         async destroy() {}
       }
     })
@@ -152,7 +154,7 @@ test('keeps focus outside chat when a pending response arrives', async function 
   await expect(chat.getByRole('button', { name: 'Send', exact: true })).toBeDisabled()
   await page.getByRole('textbox', { name: 'Outside chat' }).fill('Keep typing')
   await page.getByRole('button', { name: 'Finish response' }).click()
-  await expect(chat.getByRole('status')).toHaveText('Ready')
+  await expectIdle(chat)
   await expect(chat.getByRole('log').locator('.working')).toBeHidden()
   await expect(page.getByRole('textbox', { name: 'Outside chat' })).toBeFocused()
   await expect(input).toHaveValue('My next question')
@@ -164,7 +166,7 @@ test('honors a compact maximum height and keeps controls reachable in a short pa
   await page.setViewportSize({ width: 320, height: 700 })
   await page.goto('/?mode=chat')
   const chat = page.locator('webmcp-chat')
-  await expect(chat.getByRole('status')).toHaveText('Ready')
+  await expectIdle(chat)
   for (const height of [24, 12]) {
     await chat.evaluate(function resize(element, height) {
       ;(element as HTMLElement).style.setProperty('--webmcp-chat-height', `${height}rem`)
@@ -185,9 +187,10 @@ test('honors a compact maximum height and keeps controls reachable in a short pa
     const input = chat.getByRole('textbox', { name: 'Message', exact: true })
     await input.fill('read')
     await chat.getByRole('button', { name: 'Send', exact: true }).click()
-    await expect(chat.getByRole('status')).toHaveText('Ready')
+    await expectIdle(chat)
     await expect(chat).toContainText('Fixture answer')
     await chat.getByRole('button', { name: 'New chat', exact: true }).click()
+    await chat.getByRole('button', { name: 'Delete', exact: true }).click()
     await expect(chat.locator('ol li')).toHaveCount(0)
   }
 })
@@ -201,7 +204,7 @@ test('wraps long text and preserves the reader position when a new message arriv
   const input = chat.getByRole('textbox', { name: 'Message', exact: true })
   await input.fill('x'.repeat(15900))
   await input.press('Enter')
-  await expect(chat.getByRole('status')).toHaveText('Ready')
+  await expectIdle(chat)
   const transcript = chat.getByRole('log', { name: 'Conversation' })
   expect(
     await transcript.evaluate(function scrollable(element) {
@@ -209,7 +212,7 @@ test('wraps long text and preserves the reader position when a new message arriv
     })
   ).toBe(true)
   await page.reload()
-  await expect(chat.getByRole('status')).toHaveText('Ready')
+  await expectIdle(chat)
   expect(
     await transcript.evaluate(function latest(element) {
       return element.scrollHeight - element.scrollTop - element.clientHeight
@@ -220,7 +223,7 @@ test('wraps long text and preserves the reader position when a new message arriv
   })
   await input.fill('read')
   await input.press('Enter')
-  await expect(chat.getByRole('status')).toHaveText('Ready')
+  await expectIdle(chat)
   expect(
     await transcript.evaluate(function position(element) {
       return element.scrollTop
@@ -240,7 +243,7 @@ test('wraps long text and preserves the reader position when a new message arriv
   ).toBe(true)
 })
 
-test('starts a new chat from the keyboard without confirmation and persists the empty history', async function newChat({
+test('starts a new chat from the keyboard after confirming and persists the empty history', async function newChat({
   page
 }) {
   await page.goto('/?mode=chat')
@@ -248,18 +251,25 @@ test('starts a new chat from the keyboard without confirmation and persists the 
   const input = chat.getByRole('textbox', { name: 'Message', exact: true })
   await input.fill('read')
   await input.press('Enter')
-  await expect(chat.getByRole('status')).toHaveText('Ready')
+  await expectIdle(chat)
   await input.fill('Previous draft')
   const button = chat.getByRole('button', { name: 'New chat', exact: true })
   await button.focus()
   await button.press('Enter')
   await expect(chat.getByRole('dialog')).toHaveCount(0)
+  const cancel = chat.getByRole('button', { name: 'Cancel', exact: true })
+  await expect(cancel).toBeFocused()
+  await cancel.press('Escape')
+  await expect(button).toBeFocused()
+  await expect(chat.locator('ol li')).not.toHaveCount(0)
+  await button.press('Enter')
+  await chat.getByRole('button', { name: 'Delete', exact: true }).press('Enter')
   await expect(chat.locator('ol li')).toHaveCount(0)
   await expect(chat.getByRole('status')).toHaveText('New chat started.')
   await expect(input).toHaveValue('')
   await expect(input).toBeFocused()
   await page.reload()
-  await expect(chat.getByRole('status')).toHaveText('Ready')
+  await expectIdle(chat)
   await expect(chat.locator('ol li')).toHaveCount(0)
 })
 
@@ -268,7 +278,7 @@ test('keeps a short viewport readable and protects long drafts', async function 
   await page.goto('/?mode=chat')
   const chat = page.locator('webmcp-chat')
   const input = chat.getByRole('textbox', { name: 'Message', exact: true })
-  await expect(chat.getByRole('status')).toHaveText('Ready')
+  await expectIdle(chat)
   expect(
     await chat.getByRole('log').evaluate(function readable(element) {
       const style = getComputedStyle(element)
@@ -286,7 +296,7 @@ test('keeps a short viewport readable and protects long drafts', async function 
   await expect(chat.getByRole('button', { name: 'Send', exact: true })).toBeDisabled()
   await input.fill('read')
   await input.press('Enter')
-  await expect(chat.getByRole('status')).toHaveText('Ready')
+  await expectIdle(chat)
   await expect(chat).toContainText('Fixture answer')
   await expect(chat.locator('li[data-role=assistant]')).not.toContainText('read_counter({})')
 })
@@ -295,7 +305,7 @@ test('opens saved history at the latest reply when a hidden chat becomes visible
   page
 }) {
   await page.goto('/?mode=chat')
-  await expect(page.locator('webmcp-chat').getByRole('status')).toHaveText('Ready')
+  await expectIdle(page.locator('webmcp-chat'))
   await page.evaluate(function prepare() {
     const panel = document.createElement('div')
     panel.hidden = true
@@ -312,7 +322,7 @@ test('opens saved history at the latest reply when a hidden chat becomes visible
       })
     }
     chat.configure({
-      harness: {
+      controller: {
         getSnapshot() {
           return snapshot
         },
@@ -325,6 +335,7 @@ test('opens saved history at the latest reply when a hidden chat becomes visible
         },
         async stop() {},
         async clear() {},
+        async refresh() {},
         async destroy() {}
       }
     })
@@ -356,7 +367,7 @@ test('switches inline and popup modes while keeping the conversation and draft',
   const input = chat.getByRole('textbox', { name: 'Message', exact: true })
   await input.fill('read')
   await input.press('Enter')
-  await expect(chat.getByRole('status')).toHaveText('Ready')
+  await expectIdle(chat)
   await input.fill('Keep my draft')
   await page.getByLabel('Presentation', { exact: true }).selectOption('popup')
   const launcher = chat.getByRole('button', { name: 'Open Assistant', exact: true })
@@ -376,8 +387,9 @@ test('switches inline and popup modes while keeping the conversation and draft',
   await input.press('Enter')
   await page.getByRole('button', { name: 'Approve', exact: true }).click()
   await expect(page.locator('#counter')).toHaveText('7')
-  await expect(chat.getByRole('status')).toHaveText('Ready')
+  await expectIdle(chat)
   await chat.getByRole('button', { name: 'New chat', exact: true }).click()
+  await chat.getByRole('button', { name: 'Delete', exact: true }).click()
   await expect(chat.locator('ol li')).toHaveCount(0)
   await expect(page.locator('#counter')).toHaveText('7')
   await expect(panel).toBeVisible()
@@ -391,7 +403,7 @@ test('switches inline and popup modes while keeping the conversation and draft',
 
 for (const viewport of [
   { width: 1280, height: 720 },
-  { width: 390, height: 844 }
+  { width: 600, height: 844 }
 ]) {
   test(`restores the popup anchor after resizing at ${viewport.width}px`, async function anchor({
     page
@@ -428,6 +440,21 @@ for (const viewport of [
   })
 }
 
+test('opens the popup as a full-width bottom sheet on a phone', async function sheet({ page }) {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/?mode=chat&presentation=popup')
+  const chat = page.locator('webmcp-chat')
+  await chat.getByRole('button', { name: 'Open Assistant', exact: true }).click()
+  const panel = chat.getByRole('dialog', { name: 'Assistant', exact: true })
+  await expect(panel).toBeVisible()
+  const bounds = (await panel.boundingBox())!
+  expect(bounds.x).toBeLessThan(1)
+  expect(bounds.width).toBeGreaterThan(388)
+  expect(bounds.y + bounds.height).toBeGreaterThan(843)
+  await expect(chat.getByRole('button', { name: 'Move chat', exact: true })).not.toBeVisible()
+  await expect(chat.getByRole('button', { name: 'Close chat', exact: true })).toBeVisible()
+})
+
 test('drags the popup launcher and panel, resizes by keyboard, and stays within the viewport', async function geometry({
   page
 }) {
@@ -436,6 +463,18 @@ test('drags the popup launcher and panel, resizes by keyboard, and stays within 
   const chat = page.locator('webmcp-chat')
   const launcher = chat.getByRole('button', { name: 'Open Assistant', exact: true })
   await expect(launcher).toBeVisible()
+  // The default launcher is 52.5px wide; offsetWidth rounds it and must not imply zoom.
+  await expect
+    .poll(async function launcherContained() {
+      const bounds = (await launcher.boundingBox())!
+      return (
+        bounds.x >= 0 &&
+        bounds.y >= 0 &&
+        bounds.x + bounds.width <= 1100 &&
+        bounds.y + bounds.height <= 800
+      )
+    })
+    .toBe(true)
   const start = (await launcher.boundingBox())!
   await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2)
   await page.mouse.down()
@@ -465,21 +504,22 @@ test('drags the popup launcher and panel, resizes by keyboard, and stays within 
   const reduced = (await panel.boundingBox())!
   await resize.press('Shift+ArrowLeft')
   expect((await panel.boundingBox())!.width).toBeCloseTo(reduced.width - 40, 0)
+  // Below 30rem the popup becomes a bottom sheet that spans the viewport width.
   await page.setViewportSize({ width: 320, height: 420 })
   await expect
     .poll(async function contained() {
       const bounds = (await panel.boundingBox())!
       return (
-        bounds.x >= 7 &&
-        bounds.y >= 7 &&
-        bounds.x + bounds.width <= 313 &&
-        bounds.y + bounds.height <= 413
+        bounds.x >= 0 &&
+        bounds.y >= 0 &&
+        bounds.x + bounds.width <= 320 &&
+        bounds.y + bounds.height <= 420
       )
     })
     .toBe(true)
   await chat.getByRole('textbox', { name: 'Message', exact: true }).fill('read')
   await chat.getByRole('button', { name: 'Send', exact: true }).click()
-  await expect(chat.getByRole('status')).toHaveText('Ready')
+  await expectIdle(chat)
   await chat.getByRole('button', { name: 'Close chat', exact: true }).click()
   await launcher.press('Shift+ArrowLeft')
   await launcher.press('Enter')
@@ -527,6 +567,17 @@ test('keeps popup controls reachable through clipping, zoom, and reconnect', asy
     document.body.style.zoom = '2'
   })
   await expect
+    .poll(async function launcherContained() {
+      const bounds = (await launcher.boundingBox())!
+      return (
+        bounds.x >= 0 &&
+        bounds.y >= 0 &&
+        bounds.x + bounds.width <= 1100 &&
+        bounds.y + bounds.height <= 800
+      )
+    })
+    .toBe(true)
+  await expect
     .poll(async function contained() {
       const bounds = (await panel.boundingBox())!
       return (
@@ -544,9 +595,15 @@ test('keeps popup controls reachable through clipping, zoom, and reconnect', asy
     element.remove()
     parent.append(element)
   })
-  await expect(panel).not.toBeVisible()
-  await launcher.click()
+  // Moving the element keeps an open popup open.
+  await expect(panel).toBeVisible()
   await expect(input).toHaveValue('Draft survives reconnect')
   await expect(chat.getByRole('heading', { name: 'Assistant', exact: true })).toBeVisible()
   expect(errors).toEqual([])
 })
+
+// Idle chat has no status text and a transcript that is not busy; errors would show status text.
+async function expectIdle(chat: Locator) {
+  await expect(chat.locator('ol[aria-busy="false"]')).toHaveCount(1)
+  await expect(chat.getByRole('status')).toHaveText('')
+}

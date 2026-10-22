@@ -71,7 +71,7 @@ export function Assistant() {
         }
         harness = next
         const chat = document.createElement('webmcp-chat') as WebMCPChatElement
-        chat.configure({ harness })
+        chat.configure({ controller: harness })
         container.current?.append(chat)
       })
       .catch(function failed(cause) {
@@ -90,5 +90,18 @@ export function Assistant() {
       <div ref={container} />
     </>
   )
+}
+```
+
+## Register several tools
+
+`useWebMCPTools(tools, options?)` registers a list atomically. It re-registers only when a tool's definition or `when` changes; inline tool literals keep their registration and in-flight calls use the latest committed callbacks.
+
+```tsx
+import { useWebMCPTools } from '@vampaz/webmcp-kit/react'
+
+function Cart({ hasCart }: { hasCart: boolean }) {
+  useWebMCPTools([readCartTool, addToCartTool], { when: hasCart })
+  return null
 }
 ```

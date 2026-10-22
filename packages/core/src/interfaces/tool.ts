@@ -3,15 +3,25 @@ export interface JsonSchema {
   properties?: Record<string, JsonSchema>
   required?: readonly string[]
   items?: JsonSchema
+  prefixItems?: readonly JsonSchema[]
   anyOf?: readonly JsonSchema[]
   oneOf?: readonly JsonSchema[]
+  allOf?: readonly JsonSchema[]
+  not?: JsonSchema
   enum?: readonly unknown[]
   const?: unknown
   title?: string
   minimum?: number
   maximum?: number
+  exclusiveMinimum?: number
+  exclusiveMaximum?: number
+  multipleOf?: number
   minItems?: number
   maxItems?: number
+  uniqueItems?: boolean
+  minProperties?: number
+  maxProperties?: number
+  propertyNames?: JsonSchema
   minLength?: number
   maxLength?: number
   pattern?: string
@@ -54,7 +64,7 @@ export interface ToolAnnotations {
 }
 
 export interface ToolContext {
-  source: 'native' | 'fallback' | 'devtools' | 'resolver'
+  source: 'native' | 'fallback' | 'devtools' | 'resolver' | 'pi' | 'mcp-bridge'
   signal?: AbortSignal
 }
 
@@ -109,7 +119,6 @@ export interface ToolInvocation<TInput = Record<string, unknown>> {
   id?: string
   toolName: string
   input: TInput
-  confirmed?: boolean
   source?: ToolContext['source']
   signal?: AbortSignal
 }
@@ -125,8 +134,14 @@ export type ToolInvocationErrorCode =
   | 'invalid_input'
   | 'invalid_output'
   | 'not_registered'
+  | 'resolver_failed'
   | 'scope_failed'
   | 'scope_unavailable'
+
+export interface RegisteredTools {
+  registrations: RegisteredTool[]
+  unregister: () => void
+}
 
 export interface ToolInvocationResult<TOutput = unknown> {
   invocationId?: string
@@ -182,7 +197,7 @@ export interface RemoteResolverConfig {
   model?: string
   baseUrl?: string
   auth?: ResolverAuth
-  responseFormat?: 'json_object' | 'json_schema'
+  responseFormat?: 'json_object' | 'json_schema' | 'text'
   maxTokens?: number
   temperature?: number
   reasoningEffort?: 'none' | 'low' | 'medium' | 'high'
@@ -219,8 +234,25 @@ export interface ToolResolver {
 }
 
 export interface WebMCPKitEvent {
-  type: 'registered' | 'unregistered' | 'invoked' | 'succeeded' | 'failed' | 'blocked'
+  type:
+    | 'registered'
+    | 'unregistered'
+    | 'invoked'
+    | 'confirmation-requested'
+    | 'confirmation-settled'
+    | 'succeeded'
+    | 'failed'
+    | 'blocked'
   toolName: string
   timestamp: number
   detail?: unknown
+}
+
+/** Detail of `confirmation-requested` and `confirmation-settled` events. */
+export interface ConfirmationEventDetail {
+  id: string
+  toolName: string
+  source: ToolContext['source']
+  /** Set on `confirmation-settled`. */
+  approved?: boolean
 }

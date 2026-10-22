@@ -8,7 +8,7 @@ export function createFixtureResolver(): ToolResolver {
     status: 'ready',
     detail: 'Fault injection fixture.',
     async resolve(message, _tools, context, options): Promise<ToolResolution> {
-      message = message.split('\n\n')[0]
+      message = message.split('\n\nCurrent user request: ').at(-1)!.split('\n\n')[0]
       if (message === 'wait')
         await new Promise<void>(function wait(_resolve, reject) {
           options?.signal?.addEventListener(

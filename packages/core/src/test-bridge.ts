@@ -49,9 +49,13 @@ export function installWebMCPKitTestBridge(target: Window = window): () => void 
       return createToolSummaries()
     },
     invokeTool(invocation) {
+      // Pick known fields: browser tests send arbitrary JSON and cannot choose the source or skip approval.
       return invokeTool({
-        ...invocation,
-        confirmed: false
+        ...(invocation.id ? { id: invocation.id } : {}),
+        toolName: invocation.toolName,
+        input: invocation.input,
+        ...(invocation.signal ? { signal: invocation.signal } : {}),
+        source: 'fallback'
       })
     }
   }

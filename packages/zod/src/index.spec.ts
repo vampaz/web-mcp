@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { clearToolsForTest } from '@vampaz/webmcp-kit/testing'
 import { invokeTool, registerTool, setConfirmationHandler } from '@vampaz/webmcp-kit'
 
-import { defineZodTool } from './index'
+import { defineZodTool, type DefineZodToolOptions } from './index'
 
 describe('defineZodTool', () => {
   beforeEach(() => {
@@ -135,6 +135,35 @@ describe('defineZodTool', () => {
     })
     expect(approval).toHaveBeenCalledWith(expect.objectContaining({ input: { note: 'draft' } }))
     expect(execute).toHaveBeenCalledWith({ note: 'draft' }, { source: 'fallback' })
+  })
+
+  it('types examples as raw schema input and callbacks as parsed output', async () => {
+    const execute = vi.fn()
+    const schema = z.object({ count: z.string().transform(Number) })
+    const tool = defineZodTool({
+      name: 'add_items',
+      description: 'Add a number of items to the cart.',
+      schema,
+      examples: [{ count: '3' }],
+      guard(input) {
+        expectTypeOf(input.count).toEqualTypeOf<number>()
+        return true
+      },
+      execute(input) {
+        expectTypeOf(input.count).toEqualTypeOf<number>()
+        execute(input)
+      }
+    })
+    expectTypeOf<DefineZodToolOptions<typeof schema>['examples']>().toEqualTypeOf<
+      Array<{ count: string }> | undefined
+    >()
+
+    expect(tool.examples).toEqual([{ count: '3' }])
+    registerTool(tool)
+    expect(await invokeTool({ toolName: 'add_items', input: { count: '3' } })).toMatchObject({
+      status: 'success'
+    })
+    expect(execute).toHaveBeenCalledWith({ count: 3 })
   })
 
   it('forwards tool annotations to the core tool definition', () => {

@@ -15,7 +15,8 @@ export interface DefineZodToolOptions<TSchema extends z.ZodType, TOutput = unkno
   outputSchema?: JsonSchema
   annotations?: ToolAnnotations
   confirmation?: ToolConfirmation
-  examples?: Array<z.infer<TSchema>>
+  /** Raw input examples, as resolvers send them before Zod parsing. */
+  examples?: Array<z.input<TSchema>>
   scope?: () => ToolScopeResult
   guard?: (input: z.infer<TSchema>) => boolean | string | Promise<boolean | string>
   execute: (input: z.infer<TSchema>, context: ToolContext) => Promise<TOutput> | TOutput

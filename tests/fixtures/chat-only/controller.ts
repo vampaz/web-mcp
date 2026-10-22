@@ -26,6 +26,7 @@ export function fakeController(): PiController {
     },
     async stop() {},
     async clear() {},
+    async refresh() {},
     async destroy() {}
   }
 }

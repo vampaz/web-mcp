@@ -11,11 +11,15 @@ export interface PiToolCatalog {
   tools: PiToolDescription[]
 }
 
+export type PiToolPhase = 'approval' | 'running'
+
 export interface PiToolHost {
   discover(signal: AbortSignal): Promise<PiToolCatalog>
   context(signal: AbortSignal): Promise<ResolverContext>
   invoke(
     call: { name: string; input: Record<string, unknown>; revision: string },
-    signal: AbortSignal
+    signal: AbortSignal,
+    /** Optional progress for UI activity; hosts without approval phases may ignore it. */
+    progress?: (phase: PiToolPhase) => void
   ): Promise<ToolInvocationResult>
 }

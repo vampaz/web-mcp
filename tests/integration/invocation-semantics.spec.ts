@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { clearToolsForTest, installWebMCPKitTestBridge } from '@vampaz/webmcp-kit/testing'
-import { defineTool, invokeTool, registerTool, setConfirmationHandler } from '@vampaz/webmcp-kit'
+import {
+  defineTool,
+  invokeTool,
+  registerTool,
+  setConfirmationHandler,
+  type ToolInvocation
+} from '@vampaz/webmcp-kit'
 import { createLocalMCPBridge } from '@vampaz/webmcp-kit/mcp-bridge'
 
 describe('cross-surface invocation semantics', () => {
@@ -60,7 +66,7 @@ describe('cross-surface invocation semantics', () => {
           invoiceId: 123
         },
         confirmed: true
-      })
+      } as ToolInvocation)
     ).resolves.toMatchObject({
       status: 'error',
       error: 'input validation failed: /invoiceId expected string, got integer.'

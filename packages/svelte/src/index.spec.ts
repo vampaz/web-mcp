@@ -146,3 +146,102 @@ describe('Svelte useWebMCPTool', () => {
     if (typeof destroy === 'function') destroy()
   })
 })
+
+describe('Svelte useWebMCPTools', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  afterEach(() => {
+    vi.resetModules()
+    vi.doUnmock('svelte')
+  })
+
+  async function setup() {
+    const mountCallbacks: MountCallback[] = []
+    vi.doMock('svelte', function mockSvelte() {
+      return {
+        onMount(callback: MountCallback) {
+          mountCallbacks.push(callback)
+        }
+      }
+    })
+    const { useWebMCPTools } = await import('./index')
+    const kit = await import('@vampaz/webmcp-kit')
+
+    function createTool(name: string) {
+      return kit.defineTool({
+        name,
+        description: `Run ${name} from a Svelte component.`,
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        execute() {
+          return name
+        }
+      })
+    }
+
+    function getToolNames() {
+      return kit.listTools().map((registration) => registration.tool.name)
+    }
+
+    function mount() {
+      const destroy = mountCallbacks[0]?.()
+      return typeof destroy === 'function' ? destroy : () => {}
+    }
+
+    return { createTool, getToolNames, kit, mount, useWebMCPTools }
+  }
+
+  it('registers the tool set on mount and unregisters it on destroy', async () => {
+    const { createTool, getToolNames, mount, useWebMCPTools } = await setup()
+    const handle = useWebMCPTools([createTool('read_cart'), createTool('clear_cart')])
+
+    expect(handle.getRegistrations()).toEqual([])
+    const destroy = mount()
+    expect(getToolNames()).toEqual(['read_cart', 'clear_cart'])
+    expect(handle.getRegistrations().map((registration) => registration.tool.name)).toEqual([
+      'read_cart',
+      'clear_cart'
+    ])
+
+    destroy()
+    expect(getToolNames()).toEqual([])
+    expect(handle.getRegistrations()).toEqual([])
+  })
+
+  it('reacts to a readable when store', async () => {
+    const { createTool, getToolNames, mount, useWebMCPTools } = await setup()
+    const available = writable(false)
+    useWebMCPTools([createTool('read_cart'), createTool('clear_cart')], { when: available })
+
+    const destroy = mount()
+    expect(getToolNames()).toEqual([])
+
+    available.set(true)
+    expect(getToolNames()).toEqual(['read_cart', 'clear_cart'])
+
+    available.set(false)
+    expect(getToolNames()).toEqual([])
+
+    available.set(true)
+    destroy()
+    expect(getToolNames()).toEqual([])
+  })
+
+  it('respects a false when option', async () => {
+    const { createTool, getToolNames, mount, useWebMCPTools } = await setup()
+    useWebMCPTools([createTool('read_cart')], { when: false })
+
+    mount()
+    expect(getToolNames()).toEqual([])
+  })
+
+  it('registers no tool from the set when one name is already registered', async () => {
+    const { createTool, kit, mount, useWebMCPTools } = await setup()
+    const existing = kit.registerTool(createTool('clear_cart'))
+    useWebMCPTools([createTool('read_cart'), createTool('clear_cart')])
+
+    expect(mount).toThrow('"clear_cart" is already registered')
+    expect(kit.listTools()).toEqual([existing])
+  })
+})

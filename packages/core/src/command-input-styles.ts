@@ -1,3 +1,23 @@
+/**
+ * Shadow styles for `<webmcp-command-input>`.
+ *
+ * Theme tokens form one `--webmcp-*` base layer declared on `:host`. Set them on the element
+ * (for example `webmcp-command-input { --webmcp-paper: #17181c; }`) to theme every part:
+ *
+ * - `--webmcp-ink`: text, primary button background, and text on paper-coloured buttons.
+ * - `--webmcp-muted`: secondary text such as field labels and disclosure summaries.
+ * - `--webmcp-line`: borders and dividers.
+ * - `--webmcp-paper`: panel, feedback, and settings surface; text on ink-coloured buttons.
+ * - `--webmcp-field`: command field and select background.
+ * - `--webmcp-accent`: focus rings, open disclosures, and informational feedback.
+ * - `--webmcp-accent-dark`: primary button hover background.
+ * - `--webmcp-dark`: diagnostics surface and shadow colour.
+ * - `--webmcp-danger`: error feedback.
+ * - `--webmcp-success`: success feedback.
+ * - `--webmcp-floating-panel-max-height`: floating panel height limit (default `100svh - 16px`).
+ *
+ * Parts: `launcher`, `panel`, `form`, `input`, `run`, and `feedback`.
+ */
 export function getStyles(): string {
   return `
     :host {
@@ -9,6 +29,9 @@ export function getStyles(): string {
       --webmcp-accent: #2458ff;
       --webmcp-accent-dark: #141414;
       --webmcp-dark: #141414;
+      --webmcp-danger: #b42318;
+      --webmcp-success: #067647;
+      --_webmcp-panel-max-height: var(--webmcp-floating-panel-max-height, calc(100svh - 16px));
       display: block;
       position: relative;
       color: var(--webmcp-ink);
@@ -20,8 +43,22 @@ export function getStyles(): string {
       right: 8px;
       bottom: 8px;
       z-index: 1000;
+      display: flex;
+      flex-direction: column-reverse;
+      align-items: flex-end;
+      gap: 0.5rem;
       width: auto;
-      max-width: min(920px, calc(100vw - 16px));
+      max-width: min(920px, calc(100% - 16px));
+    }
+
+    :host([data-floating-expanded]) {
+      width: min(920px, calc(100% - 16px));
+    }
+
+    :host([data-launcher]) {
+      --_webmcp-panel-max-height: calc(
+        var(--webmcp-floating-panel-max-height, calc(100svh - 16px)) - 3.25rem
+      );
     }
 
     * {
@@ -35,7 +72,7 @@ export function getStyles(): string {
       padding: 0.625rem;
       border: 1px solid var(--webmcp-line);
       background: var(--webmcp-paper);
-      box-shadow: 0 16px 36px rgba(4, 10, 8, 0.12);
+      box-shadow: 0 16px 36px color-mix(in srgb, var(--webmcp-dark) 12%, transparent);
     }
 
     .webmcp-input-shell {
@@ -50,7 +87,7 @@ export function getStyles(): string {
 
     .webmcp-input-shell:focus-within {
       border-color: var(--webmcp-accent);
-      background: #ffffff;
+      background: var(--webmcp-paper);
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--webmcp-accent) 14%, transparent);
     }
 
@@ -85,36 +122,81 @@ export function getStyles(): string {
     .webmcp-settings input {
       padding: 0 0.75rem;
       border: 1px solid var(--webmcp-line);
-      background: #ffffff;
+      background: var(--webmcp-paper);
     }
 
     button {
       padding: 0 1.125rem;
       border: 1px solid var(--webmcp-ink);
       background: var(--webmcp-ink);
-      color: #ffffff;
+      color: var(--webmcp-paper);
       font-weight: 800;
       white-space: nowrap;
       cursor: pointer;
     }
 
-    button:hover:not(:disabled) {
+    button:hover:not([aria-disabled="true"]) {
       border-color: var(--webmcp-accent-dark);
       background: var(--webmcp-accent-dark);
     }
 
+    .webmcp-run-button[data-running] {
+      background: var(--webmcp-paper);
+      color: var(--webmcp-ink);
+    }
+
+    .webmcp-run-button[data-running]:hover {
+      border-color: var(--webmcp-ink);
+      background: color-mix(in srgb, var(--webmcp-ink) 8%, var(--webmcp-paper));
+    }
+
     .webmcp-run-button[data-phase="resolving"] {
-      opacity: 1;
       animation: webmcp-resolving-pulse 1.1s ease-in-out infinite;
     }
 
-    button:disabled {
-      cursor: progress;
+    button[aria-disabled="true"] {
+      cursor: not-allowed;
       opacity: 0.7;
     }
 
-    .webmcp-run-button[data-phase="resolving"]:disabled {
-      opacity: 1;
+    .webmcp-launcher {
+      min-height: 2.75rem;
+      box-shadow: 0 16px 36px color-mix(in srgb, var(--webmcp-dark) 24%, transparent);
+    }
+
+    .webmcp-launcher[aria-expanded="true"] {
+      background: var(--webmcp-paper);
+      color: var(--webmcp-ink);
+    }
+
+    .webmcp-launcher[aria-expanded="true"]:hover {
+      border-color: var(--webmcp-ink);
+      background: color-mix(in srgb, var(--webmcp-ink) 8%, var(--webmcp-paper));
+    }
+
+    [data-feedback] {
+      margin: 0;
+      padding: 0.5rem 0.75rem;
+      border-inline: 1px solid var(--webmcp-line);
+      border-bottom: 1px solid var(--webmcp-line);
+      background: var(--webmcp-paper);
+      color: var(--webmcp-ink);
+      font-size: 0.875rem;
+      overflow-wrap: anywhere;
+    }
+
+    [data-feedback][data-tone="info"] {
+      box-shadow: inset 3px 0 0 var(--webmcp-accent);
+    }
+
+    [data-feedback][data-tone="success"] {
+      box-shadow: inset 3px 0 0 var(--webmcp-success);
+      color: var(--webmcp-success);
+    }
+
+    [data-feedback][data-tone="error"] {
+      box-shadow: inset 3px 0 0 var(--webmcp-danger);
+      color: var(--webmcp-danger);
     }
 
     :is(button, summary, select, .webmcp-settings input):focus-visible {
@@ -122,14 +204,18 @@ export function getStyles(): string {
       outline-offset: 2px;
     }
 
+    .webmcp-panel {
+      min-width: 0;
+    }
+
     .webmcp-floating-panel {
       position: static;
       display: flex;
       flex-direction: column;
-      width: min(920px, calc(100vw - 16px));
-      max-height: var(--webmcp-floating-panel-max-height, calc(100svh - 16px));
+      width: 100%;
+      max-height: var(--_webmcp-panel-max-height);
       overflow: hidden;
-      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.48);
+      box-shadow: 0 24px 80px color-mix(in srgb, var(--webmcp-dark) 48%, transparent);
     }
 
     .webmcp-floating-panel[hidden] {
@@ -208,7 +294,7 @@ export function getStyles(): string {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 0.625rem;
       padding: 0.55rem 0.75rem 0.75rem;
-      border-top: 1px solid rgba(18, 24, 21, 0.09);
+      border-top: 1px solid color-mix(in srgb, var(--webmcp-ink) 9%, transparent);
     }
 
     .webmcp-settings label {
@@ -230,10 +316,10 @@ export function getStyles(): string {
       left: 0;
       max-height: min(40rem, 68svh);
       overflow: auto;
-      border: 1px solid rgba(224, 234, 229, 0.18);
+      border: 1px solid color-mix(in srgb, var(--webmcp-paper) 18%, transparent);
       border-top: 0;
       background: var(--webmcp-dark);
-      box-shadow: 0 1.2rem 2.5rem rgba(0, 0, 0, 0.32);
+      box-shadow: 0 1.2rem 2.5rem color-mix(in srgb, var(--webmcp-dark) 32%, transparent);
     }
 
     .webmcp-floating-panel .webmcp-diagnostics[open] {
@@ -249,14 +335,14 @@ export function getStyles(): string {
       flex: 0 1 auto;
       height: auto;
       min-height: 0;
-      max-height: calc(var(--webmcp-floating-panel-max-height, calc(100svh - 16px)) - 9.25rem);
+      max-height: calc(var(--_webmcp-panel-max-height) - 9.25rem);
       border-inline: 0;
       box-shadow: none;
       overscroll-behavior: contain;
     }
 
     .webmcp-floating-panel .webmcp-settings[open] ~ .webmcp-diagnostics .webmcp-diagnostics-content {
-      max-height: calc(var(--webmcp-floating-panel-max-height, calc(100svh - 16px)) - 14.5rem);
+      max-height: calc(var(--_webmcp-panel-max-height) - 14.5rem);
     }
 
     .webmcp-status {
@@ -306,7 +392,7 @@ export function getStyles(): string {
         grid-template-columns: 1fr;
       }
 
-      :host([data-floating]) {
+      :host([data-floating-expanded]) {
         right: 0.5rem;
         left: 0.5rem;
         width: auto;
@@ -334,6 +420,10 @@ export function getStyles(): string {
 
       button {
         width: 100%;
+      }
+
+      .webmcp-launcher {
+        width: auto;
       }
 
       .webmcp-run-button {

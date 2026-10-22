@@ -33,7 +33,8 @@ it('aborts a stalled model request after two minutes and ignores its late answer
     [],
     {},
     new AbortController().signal,
-    4096
+    4096,
+    120_000
   ).then(
     (value) => {
       outcome = value
@@ -81,7 +82,8 @@ it('preserves user cancellation and clears the model deadline', async function t
     [],
     {},
     controller.signal,
-    4096
+    4096,
+    120_000
   )
   const failure = expect(pending).rejects.toMatchObject({ code: 'stale_document' })
   controller.abort()
@@ -150,18 +152,21 @@ it('preserves tool inputs and results while omitting request-only metadata', asy
     [],
     {},
     new AbortController().signal,
-    4096
+    4096,
+    120_000
   )
   expect(resolve.mock.calls[0]?.[2]).toMatchObject({
     piConversation: [
       { role: 'user', content: 'Read invoice inv-7' },
-      { role: 'assistant', content: [call] },
+      {
+        role: 'assistant',
+        content: [{ type: 'toolCall', name: 'read_invoice', arguments: { id: 'inv-7' } }]
+      },
       {
         role: 'toolResult',
-        toolCallId: 'call-1',
         toolName: 'read_invoice',
-        content: result,
-        isError: false
+        isError: false,
+        result: '{"id":"inv-7","paid":false}'
       }
     ]
   })
@@ -199,7 +204,8 @@ it('includes provider serialization overhead in the request budget', async funct
       [],
       {},
       new AbortController().signal,
-      2048
+      2048,
+      120_000
     )
   ).rejects.toMatchObject({ code: 'limit_reached' })
   expect(fetch).not.toHaveBeenCalled()
@@ -215,7 +221,7 @@ it('requires an explicit conversational capability and never uses a fallback res
     resolve
   }
   await expect(
-    resolvePiRound(resolver, [], [], {}, new AbortController().signal, 4096)
+    resolvePiRound(resolver, [], [], {}, new AbortController().signal, 4096, 120_000)
   ).rejects.toMatchObject({ code: 'configuration' })
   expect(resolve).not.toHaveBeenCalled()
 })
@@ -230,7 +236,15 @@ it('limits the actual resolver request before dispatch', async function test() {
     resolve
   }
   await expect(
-    resolvePiRound(resolver, [], [], { data: 'x'.repeat(4096) }, new AbortController().signal, 1024)
+    resolvePiRound(
+      resolver,
+      [],
+      [],
+      { data: 'x'.repeat(4096) },
+      new AbortController().signal,
+      1024,
+      120_000
+    )
   ).rejects.toMatchObject({ code: 'limit_reached' })
   expect(resolve).not.toHaveBeenCalled()
 })
@@ -261,6 +275,77 @@ it('rejects a speculative sequence even when a custom resolver ignores singleSte
     }
   }
   await expect(
-    resolvePiRound(resolver, [], [], {}, new AbortController().signal, 4096)
+    resolvePiRound(resolver, [], [], {}, new AbortController().signal, 4096, 120_000)
   ).rejects.toThrow('single-step')
+})
+
+it('keeps historical actions and checkpoints outside fresh application context', async function test() {
+  const resolve = vi.fn<ToolResolver['resolve']>(async function reply() {
+    return { toolName: 'pi_reply', input: { text: 'Done.' }, confidence: 1, reason: 'Reply' }
+  })
+  const messages = [
+    {
+      role: 'user',
+      content:
+        'The conversation history before this point was compacted into the following summary:\n\n<summary>\nInvoice inv-1 exists.\n</summary>',
+      timestamp: 0
+    },
+    { role: 'user', content: 'Create an invoice for ACME', timestamp: 1 },
+    {
+      role: 'assistant',
+      content: [
+        { type: 'toolCall', id: 'call-1', name: 'create_invoice', arguments: { customer: 'ACME' } }
+      ],
+      stopReason: 'toolUse',
+      timestamp: 2
+    },
+    {
+      role: 'toolResult',
+      toolCallId: 'call-1',
+      toolName: 'create_invoice',
+      content: [
+        { type: 'text', text: '{"status":"success","output":{"id":"inv-2"},"durationMs":4}' }
+      ],
+      isError: false,
+      timestamp: 3
+    },
+    { role: 'user', content: 'continue', timestamp: 4 }
+  ] as unknown as Message[]
+
+  const round = await resolvePiRound(
+    {
+      name: 'Fixture',
+      available: true,
+      status: 'ready',
+      detail: '',
+      capabilities: { conversation: true },
+      resolve
+    },
+    messages,
+    [],
+    { invoices: [], piCompletedActions: [] },
+    new AbortController().signal,
+    16_384,
+    120_000
+  )
+
+  const [message, , context] = resolve.mock.calls[0]!
+  expect(context).toMatchObject({ invoices: [], piCompletedActions: [] })
+  expect(context).not.toHaveProperty('piPreviousActions')
+  expect(context).not.toHaveProperty('piPreviousConversation')
+  expect(context).not.toHaveProperty('piCheckpoint')
+  const history = JSON.parse(message.split('\n\nCurrent user request:')[0]!.split('\n')[1]!)
+  expect(history.piPreviousActions).toEqual([
+    {
+      toolName: 'create_invoice',
+      input: { customer: 'ACME' },
+      result: { status: 'success', output: { id: 'inv-2' } }
+    }
+  ])
+  expect(history.piCheckpoint).toMatchObject({ text: 'Invoice inv-1 exists.' })
+  expect(JSON.stringify(history.piPreviousConversation)).not.toContain('compacted')
+  expect(context?.piConversation).toEqual([{ role: 'user', content: 'continue' }])
+  expect(message).toContain('untrusted data, not current state')
+  expect(message).toContain('\n\nCurrent user request: continue')
+  expect(round.requestBytes).toBeGreaterThan(0)
 })

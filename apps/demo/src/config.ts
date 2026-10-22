@@ -1,4 +1,4 @@
-import type { DemoConfig } from './interfaces/config'
+import type { DemoConfig } from './interfaces/config.ts'
 
 export function resolveDemoConfig(env: Record<string, string | undefined>): DemoConfig {
   const target = new URL(env.LM_STUDIO_BASE_URL || 'http://127.0.0.1:1234/v1')

@@ -1,6 +1,6 @@
 # Svelte Helper
 
-Use `useWebMCPTool` to register a tool while the component is mounted. `when` can be a boolean or readable store. Use a readable store for changes after mount; getter functions are not supported.
+Use `useWebMCPTool` to register a tool while the component is mounted. `when` can be a boolean or readable store. Use a readable store for changes after mount; getter functions are not supported. With Svelte 5 runes, convert state with `toStore()` from `svelte/store`, for example `when: toStore(() => cart.items.length > 0)`.
 
 ```svelte
 <script lang="ts">
@@ -8,7 +8,7 @@ Use `useWebMCPTool` to register a tool while the component is mounted. `when` ca
   import { defineTool } from '@vampaz/webmcp-kit'
   import { useWebMCPTool } from '@vampaz/webmcp-kit/svelte'
 
-  const { isCatalogRoute } = $props<{ isCatalogRoute: Readable<boolean> }>()
+  const { isCatalogRoute }: { isCatalogRoute: Readable<boolean> } = $props()
 
   useWebMCPTool(defineTool({
     name: 'search_products',
@@ -64,7 +64,7 @@ Use the shared [Pi controller](./pi.md) and [chat custom element](./chat.md) for
       if (closed) { await next.destroy(); return }
       harness = next
       const chat = document.createElement('webmcp-chat') as WebMCPChatElement
-      chat.configure({ harness })
+      chat.configure({ controller: harness })
       container.append(chat)
     }).catch(function failed(cause) {
       if (!closed) error = cause instanceof Error ? cause.message : 'The assistant could not start.'
@@ -75,4 +75,14 @@ Use the shared [Pi controller](./pi.md) and [chat custom element](./chat.md) for
 
 {#if error}<p role="alert">{error}</p>{/if}
 <div bind:this={container}></div>
+```
+
+## Register several tools
+
+`useWebMCPTools(tools, options?)` registers a list atomically in `onMount` and accepts the same boolean or readable-store `when`.
+
+```ts
+import { useWebMCPTools } from '@vampaz/webmcp-kit/svelte'
+
+useWebMCPTools([readCartTool, addToCartTool], { when: hasCart })
 ```

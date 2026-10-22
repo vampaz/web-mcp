@@ -6,15 +6,18 @@ import type {
   ConfirmationHandler,
   ResolverContext,
   RegisteredTool,
+  RegisteredTools,
   ToolResolver,
   WebMCPTool
 } from './interfaces/tool'
-import { getTool, registerTool } from './registry'
+import { getTool, registerTools } from './registry'
 
 export interface InitWebMCPOptions {
   buttonLabel?: string
   confirmationHandler?: ConfirmationHandler
   context?: ResolverContext | (() => ResolverContext)
+  /** Shows the floating panel launcher. Default `true` for an element created by `initWebMCP()`. */
+  launcher?: boolean
   placeholder?: string
   resolver?: ToolResolver
   target?: string | WebMCPCommandInputElement
@@ -40,20 +43,23 @@ export function initWebMCP(options: InitWebMCPOptions = {}): WebMCPInitHandle {
   const { created, element } = resolveCommandInputElement(options.target)
 
   let disposeConfirmation: (() => void) | undefined
-  const registrations: RegisteredTool[] = []
+  let registered: RegisteredTools | undefined
 
   function rollback() {
-    for (const registration of registrations) {
-      registration.unregister()
-    }
+    registered?.unregister()
     disposeConfirmation?.()
-    if (created) element.remove()
+    if (created) {
+      element.remove()
+      return
+    }
+    // A host-supplied element outlives the handle, so drop what this call configured on it.
+    if (resolver && element.resolver === resolver) element.configure({ resolver: undefined })
+    if (options.context !== undefined && element.context === options.context)
+      element.configure({ context: undefined })
   }
 
   try {
-    for (const tool of options.tools ?? []) {
-      registrations.push(registerTool(tool))
-    }
+    registered = registerTools(options.tools ?? [])
 
     if (options.confirmationHandler) {
       disposeConfirmation = setConfirmationHandler(options.confirmationHandler)
@@ -62,6 +68,8 @@ export function initWebMCP(options: InitWebMCPOptions = {}): WebMCPInitHandle {
     element.configure({
       ...(options.buttonLabel !== undefined ? { buttonLabel: options.buttonLabel } : {}),
       ...(options.context !== undefined ? { context: options.context } : {}),
+      // A created element floats closed, so it needs a visible way to open.
+      ...(options.launcher !== undefined || created ? { launcher: options.launcher ?? true } : {}),
       ...(options.placeholder !== undefined ? { placeholder: options.placeholder } : {}),
       ...(resolver ? { resolver } : {})
     })
@@ -73,7 +81,7 @@ export function initWebMCP(options: InitWebMCPOptions = {}): WebMCPInitHandle {
   return {
     element,
     resolver,
-    registrations,
+    registrations: registered.registrations,
     destroy: rollback
   }
 }

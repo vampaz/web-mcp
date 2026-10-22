@@ -46,11 +46,13 @@ WebMCP Kit enforces confirmation before execution in both fallback and native wr
 
 When a tool declares `outputSchema`, WebMCP Kit validates the returned value before reporting a successful invocation. Treat an `invalid_output` result as a tool implementation failure; do not pass that output to another tool or UI assertion.
 
-The internal `confirmed: true` invocation flag is only for code paths that already performed approval inside the trusted app boundary. Public bridges and test helpers must not accept caller-provided confirmation bypasses; they should rely on `setConfirmationHandler()` or the browser confirmation fallback.
+There is no approval bypass on `invokeTool()`. Only a handler result of exactly `true` approves an action; dialog return values such as `'cancel'` deny it. Invocation input must be plain JSON, and event listeners receive copies, so a listener cannot change what executes. Public bridges and test helpers rely on `setConfirmationHandler()` or the browser confirmation fallback.
 
 Approval does not freeze application state. The kit rechecks registration identity, schema, scope, and cancellation across asynchronous approval and guard boundaries. Server authorization must still use current state. Cancellation after an action starts does not guarantee rollback or prove that a failed response means the action failed.
 
 Chained resolver output does not change this rule. A `tool_sequence` executes as individual tool invocations, so each mutating step still runs its own guard and confirmation check before execution. If the user rejects a confirmation or a guard blocks a step, the sequence stops and later steps do not run.
+
+Pi treats its model-written history checkpoint as untrusted data: it reaches the resolver as `piCheckpoint` in the historical-reference section, separate from the current user request and application context. Tool schemas that use keywords the validator cannot enforce, such as `$ref` or `if`/`then`, are rejected when the tool is defined instead of being silently skipped.
 
 Resolver outcomes are non-executing. `needs_clarification` returns a blocked command result, and `no_tools_match` returns an unavailable result. They cannot include steps, and app tools cannot use `tool_sequence`, `needs_clarification`, or `no_tools_match` as names.
 

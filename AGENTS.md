@@ -12,6 +12,8 @@
 WebMCP Kit is one ESM-only TypeScript npm package with multiple public entry points. The `packages/` directories organize its source; they are not independently installed npm workspaces. The kit exposes app actions through native browser WebMCP, with local registries and resolvers for unsupported browsers and tests.
 
 - `packages/core`: tool definitions, registry, resolvers, schema validation, events, confirmation handling, native adapter, test bridge.
+- `packages/command-input`: `/command-input` entry for the `<webmcp-command-input>` element and `initWebMCP()`; the implementation lives in core.
+- `packages/hosted`: `/hosted` entry for the hosted OpenAI-compatible resolver; the implementation lives in core.
 - `packages/pi`: persistent conversation runtime, page controller, and registry tool host running in the page.
 - `packages/chat`: framework-neutral chat custom element driven by a supplied controller.
 - `packages/devtools`: in-page tool inspection/invocation overlay.
@@ -61,12 +63,14 @@ WebMCP Kit is one ESM-only TypeScript npm package with multiple public entry poi
 
 ## Verification
 
-- Unit/integration tests: `npm run test`
+- All routine checks: `npm run check` (lint, format check, both typechecks, API reference and docs link checks, unit tests)
+- Unit/integration tests: `npm run test`; coverage report without thresholds: `npm run test:coverage`
 - Single test file: `npm run test -- path/to/file.spec.ts`
 - Typecheck: `npm run typecheck`; lab: `npm run typecheck:demo`
 - Browser tests: `npm run test:e2e`; real-model checks are separate: `npm run test:lmstudio`
-- Generated API reference: `npm run docs:api:check`
-- Authorized packaging checks: build once, then `npm run pack:package` and `npm run test:package`. See `docs/operations.md`.
+- Generated API reference and relative docs links/anchors: `npm run docs:api:check` (links alone: `npm run docs:links`)
+- Lab without a local model: `npm run dev:demo:fixtures`
+- Authorized packaging checks: build once, then `npm run pack:package` and `npm run test:package`. The package suite also enforces per-entry gzip budgets in `tests/package/bundle-size.spec.ts`. See `docs/operations.md`.
 - Do not add arbitrary Playwright timeouts; use locators, assertions, or `page.waitForSelector`.
 - After changing a test, run that test.
 - Vue component tests should use `mountWithDeps()`.

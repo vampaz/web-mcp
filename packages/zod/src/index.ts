@@ -18,7 +18,8 @@ export function defineZodTool<TSchema extends z.ZodType, TOutput = unknown>(
     outputSchema: options.outputSchema,
     annotations: options.annotations,
     confirmation: options.confirmation,
-    examples: options.examples,
+    // Core types examples as parsed input; Zod examples are raw resolver input.
+    examples: options.examples as Array<z.infer<TSchema>> | undefined,
     scope: options.scope,
     guard: options.guard,
     parseInput(input) {

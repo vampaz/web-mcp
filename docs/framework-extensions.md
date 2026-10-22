@@ -29,4 +29,6 @@ interface UseWebMCPToolResult<TInput, TOutput> {
 }
 ```
 
-Vue accepts refs, computed values, and getters for `when`. React accepts a boolean computed during render. Svelte accepts a boolean, function, or readable store.
+Vue accepts refs, computed values, and getters for `when`. React accepts a boolean computed during render. Svelte accepts a boolean or readable store; with runes, wrap state in `toStore(() => value)`.
+
+Each subpath also exports `useWebMCPTools(tools, options?)`. It registers the whole list atomically through core `registerTools()` with the same lifecycle and `when` rules, and returns `{ unregister, getRegistrations }`. A duplicate name registers none of the list.

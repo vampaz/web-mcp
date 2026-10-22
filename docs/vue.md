@@ -78,7 +78,7 @@ onMounted(async function mount() {
     }
     harness = next
     const chat = document.createElement('webmcp-chat') as WebMCPChatElement
-    chat.configure({ harness })
+    chat.configure({ controller: harness })
     container.value?.append(chat)
   } catch (cause) {
     if (!closed)
@@ -90,4 +90,15 @@ onUnmounted(function cleanup() {
   void harness?.destroy()
 })
 </script>
+```
+
+## Register several tools
+
+`useWebMCPTools(tools, options?)` registers a list atomically with the same `when` and lifecycle rules. A duplicate name registers none of the list.
+
+```ts
+import { useWebMCPTools } from '@vampaz/webmcp-kit/vue'
+
+const cartTools = useWebMCPTools([readCartTool, addToCartTool], { when: hasCart })
+cartTools.getRegistrations() // RegisteredTool[] while registered
 ```
