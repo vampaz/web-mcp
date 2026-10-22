@@ -39,6 +39,8 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Use Ubuntu's main package mirror
+        run: printf '%s\n' 'https://archive.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt > /dev/null
       - name: Install Playwright browsers and system dependencies
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npm exec playwright -- install --with-deps chromium firefox webkit
