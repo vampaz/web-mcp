@@ -105,4 +105,4 @@ General provider-failure retries remain disabled. The validation correction and 
 
 The host selects safe context and safe tool outputs. Context is requested afresh per round. After a successful action, Pi refreshes available tools before preparing its next round. A tool that opens an editor can therefore expose the editor's save action in the same turn. If the catalog changes during model resolution or finishes mounting before the next model round, Pi discards the stale choice and resolves again through an internal refresh round. Internal refresh rounds count toward `maxToolCalls`. Catalog changes during approval still reject the stale action. Never include credentials or hidden server values. Browser storage can be evicted; `navigator.storage.persist()` is an optional host request and cannot guarantee retention.
 
-The local demo has a new namespace. No legacy pathname-based history is migrated. Decide how to handle existing anonymous history before changing a namespace.
+Changing a namespace creates a separate history partition. Decide how to handle existing anonymous history before changing a namespace.

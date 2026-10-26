@@ -97,7 +97,7 @@ See `WebMCPChatLabels` and `WebMCPChatStatusLabels` in the [API reference](./api
 
 ## Styling
 
-Styles live in a shadow root and do not depend on global or demo CSS. Inner sizes use `em`, so `webmcp-chat { font-size: 1.125rem }` scales the whole component. The component reflows in narrow containers, respects reduced motion, and supports forced-colors mode.
+Styles live in a shadow root and do not depend on application styles. Inner sizes use `em`, so `webmcp-chat { font-size: 1.125rem }` scales the whole component. The component reflows in narrow containers, respects reduced motion, and supports forced-colors mode.
 
 `theme: 'light'` is the default. `theme: 'dark'` uses the dark palette, and `theme: 'auto'` follows `prefers-color-scheme`. Explicit custom properties override either palette:
 

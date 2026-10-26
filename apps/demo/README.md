@@ -1,6 +1,6 @@
 # Local package lab
 
-The lab is a small Vue 3 application served by Vite. Run all examples from this repository. The existing sibling demo is not required and remains unchanged.
+The lab is a small Vue 3 application served by Vite. Run all examples from this repository.
 
 ```sh
 npm ci --ignore-scripts
@@ -41,4 +41,4 @@ The checks workflow builds and packs an unpublished artifact, then runs `npm run
 
 Package fixtures install the tarball in isolated temporary directories, with source aliases disabled. They check core and chat without framework peers, declarations, a Vite + Vue consumer without explicit Pi dependencies, an in-page controller under `/nested/`, inline/popup chat over trusted HTTPS, and one page registry. Applications, local credentials, fixtures, and resolutions are excluded from the tarball. Root repository rules govern any explicitly requested local packaging build.
 
-Storage fixtures are available only on the explicit test server. The local lab uses its own IndexedDB namespace and does not touch the standalone demo's history.
+Storage fixtures are available only on the explicit test server. The local lab uses its own IndexedDB namespace.
