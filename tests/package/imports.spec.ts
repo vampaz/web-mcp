@@ -13,7 +13,7 @@ it('keeps the tarball limited to published code and documentation', async functi
   expect(stdout).not.toMatch(/package\/(apps|tests|temp-docs|scripts)\//)
   expect(stdout).not.toMatch(/\.env|\.spec\.|test-utils/)
   expect(stdout).not.toContain('package/dist/pi/worker.js')
-  expect(stdout).not.toMatch(/package\/docs\/(?:next-features|demo-integration)\.md/)
+  expect(stdout).not.toMatch(/package\/docs\/next-features\.md/)
   expect(stdout).toContain('package/docs/examples/counter-assistant.ts')
   const { stdout: sourceMap } = await run('tar', ['-xOf', artifact, 'package/dist/index.js.map'])
   expect(JSON.parse(sourceMap).sourcesContent).toBeUndefined()

@@ -27,7 +27,7 @@ Native registration follows the current Chrome WebMCP shape:
 
 Fallback mode keeps tools in an in-memory registry. It is useful for:
 
-- local demos
+- local development
 - devtools inspection
 - Playwright tests
 - provider resolution experiments
@@ -53,7 +53,7 @@ During development or preview deployments, mount `@vampaz/webmcp-kit/devtools` t
 
 ## Chrome And Lighthouse Inspection
 
-Use browser feature detection as the source of truth before documenting support for a specific environment. In supported Chrome or Lighthouse environments, inspect the native browser surface first, then compare it with the WebMCP Kit devtools overlay. In unsupported environments, the overlay and test bridge should still show fallback-registered tools so demos and QA remain usable.
+Use browser feature detection as the source of truth before documenting support for a specific environment. In supported Chrome or Lighthouse environments, inspect the native browser surface first, then compare it with the WebMCP Kit devtools overlay. In unsupported environments, the overlay and test bridge should still show fallback-registered tools so local examples and QA remain usable.
 
 Useful references:
 

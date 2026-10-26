@@ -19,7 +19,6 @@ test('sends, confirms, re-resolves, and restores dialogue without replay', async
   await expect(page.locator('#counter')).toHaveText('0')
   await expect(page.getByRole('dialog')).not.toBeVisible()
   await page.getByRole('button', { name: 'New chat', exact: true }).click()
-  await page.getByRole('button', { name: 'Delete', exact: true }).click()
   await expect(page.locator('webmcp-chat ol li')).toHaveCount(0)
 })
 
@@ -190,7 +189,6 @@ test('honors a compact maximum height and keeps controls reachable in a short pa
     await expectIdle(chat)
     await expect(chat).toContainText('Fixture answer')
     await chat.getByRole('button', { name: 'New chat', exact: true }).click()
-    await chat.getByRole('button', { name: 'Delete', exact: true }).click()
     await expect(chat.locator('ol li')).toHaveCount(0)
   }
 })
@@ -243,7 +241,7 @@ test('wraps long text and preserves the reader position when a new message arriv
   ).toBe(true)
 })
 
-test('starts a new chat from the keyboard after confirming and persists the empty history', async function newChat({
+test('starts a new chat immediately from the keyboard and persists the empty history', async function newChat({
   page
 }) {
   await page.goto('/?mode=chat')
@@ -257,13 +255,8 @@ test('starts a new chat from the keyboard after confirming and persists the empt
   await button.focus()
   await button.press('Enter')
   await expect(chat.getByRole('dialog')).toHaveCount(0)
-  const cancel = chat.getByRole('button', { name: 'Cancel', exact: true })
-  await expect(cancel).toBeFocused()
-  await cancel.press('Escape')
-  await expect(button).toBeFocused()
-  await expect(chat.locator('ol li')).not.toHaveCount(0)
-  await button.press('Enter')
-  await chat.getByRole('button', { name: 'Delete', exact: true }).press('Enter')
+  await expect(chat.getByRole('button', { name: 'Delete', exact: true })).toHaveCount(0)
+  await expect(chat.getByRole('button', { name: 'Cancel', exact: true })).toHaveCount(0)
   await expect(chat.locator('ol li')).toHaveCount(0)
   await expect(chat.getByRole('status')).toHaveText('New chat started.')
   await expect(input).toHaveValue('')
@@ -389,7 +382,6 @@ test('switches inline and popup modes while keeping the conversation and draft',
   await expect(page.locator('#counter')).toHaveText('7')
   await expectIdle(chat)
   await chat.getByRole('button', { name: 'New chat', exact: true }).click()
-  await chat.getByRole('button', { name: 'Delete', exact: true }).click()
   await expect(chat.locator('ol li')).toHaveCount(0)
   await expect(page.locator('#counter')).toHaveText('7')
   await expect(panel).toBeVisible()

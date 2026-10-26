@@ -57,10 +57,6 @@ export function defineWebMCPChat(): void {
     private readonly stopButton: HTMLButtonElement
     private readonly stopText: HTMLSpanElement
     private readonly clearButton: HTMLButtonElement
-    private readonly confirm: HTMLDivElement
-    private readonly confirmText: HTMLParagraphElement
-    private readonly confirmButton: HTMLButtonElement
-    private readonly cancelButton: HTMLButtonElement
     private readonly editButton: HTMLButtonElement
     private readonly suggestions: HTMLDivElement
     private readonly hint: HTMLParagraphElement
@@ -77,7 +73,6 @@ export function defineWebMCPChat(): void {
           <header part="header">
             <div class="identity"><span class="assistant-mark">${icon('M5 5h14v11H10l-5 4V5M9 9h6M9 12h4')}</span><h2 id="${id}-title" part="title"></h2></div>
             <div class="header-actions"><slot name="header-actions"></slot><button class="icon-button" type="button" data-clear part="new-chat">${icon('M12 5v14M5 12h14')}</button></div>
-            <div class="confirm-clear" role="group" aria-labelledby="${id}-confirm" hidden><p id="${id}-confirm"></p><div class="confirm-actions"><button type="button" data-confirm-clear></button><button type="button" data-cancel-clear></button></div></div>
           </header>
           <div class="conversation">
             <div class="transcript" part="transcript" tabindex="0" role="log"><div data-empty><slot name="empty"><p></p></slot></div><ol></ol><p class="working" hidden aria-hidden="true"><span class="working-dots"><span></span><span></span><span></span></span><span class="working-text"></span></p></div>
@@ -113,10 +108,6 @@ export function defineWebMCPChat(): void {
       this.stopButton = this.root.querySelector('[data-stop]')!
       this.stopText = this.root.querySelector('[data-stop] span')!
       this.clearButton = this.root.querySelector('[data-clear]')!
-      this.confirm = this.root.querySelector('.confirm-clear')!
-      this.confirmText = this.root.querySelector('.confirm-clear p')!
-      this.confirmButton = this.root.querySelector('[data-confirm-clear]')!
-      this.cancelButton = this.root.querySelector('[data-cancel-clear]')!
       this.editButton = this.root.querySelector('[data-edit-last]')!
       this.suggestions = this.root.querySelector('.suggestions')!
       this.hint = this.root.querySelector('.hint')!
@@ -149,26 +140,8 @@ export function defineWebMCPChat(): void {
         void this.perform('stop')
       })
       this.clearButton.addEventListener('click', () => {
-        if (this.snapshot.messages.length) {
-          this.confirm.hidden = false
-          this.cancelButton.focus()
-          return
-        }
         this.clearButton.focus()
         void this.perform('clear')
-      })
-      this.confirmButton.addEventListener('click', () => {
-        this.clearButton.focus()
-        this.confirm.hidden = true
-        void this.perform('clear')
-      })
-      this.cancelButton.addEventListener('click', () => this.cancelClear())
-      this.confirm.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && !event.isComposing) {
-          event.preventDefault()
-          event.stopPropagation()
-          this.cancelClear()
-        }
       })
       this.editButton.addEventListener('click', () => {
         const text = this.lastUserText()
@@ -238,7 +211,6 @@ export function defineWebMCPChat(): void {
         this.latestId = this.latestText = undefined
         this.notice = undefined
         this.unread = false
-        this.confirm.hidden = true
         this.revision++
         this.sending = false
         this.clearing = false
@@ -286,9 +258,6 @@ export function defineWebMCPChat(): void {
       this.transcript.setAttribute('aria-label', labels.conversation)
       this.messageLabel.textContent = labels.message
       this.hint.textContent = labels.hint
-      this.confirmText.textContent = labels.confirmClear
-      this.confirmButton.textContent = labels.confirmClearAction
-      this.cancelButton.textContent = labels.cancel
       this.editButton.textContent = labels.editLastMessage
     }
 
@@ -392,7 +361,6 @@ export function defineWebMCPChat(): void {
         busy ||
         (!snapshot.messages.length && !length && !['error', 'interrupted'].includes(snapshot.state))
       )
-      this.confirmButton.disabled = this.clearButton.disabled
       this.editButton.hidden = !this.turnFailed() || length > 0 || this.lastUserText() === undefined
       this.editButton.disabled = Boolean(disabled || this.clearing)
       for (const button of this.suggestions.querySelectorAll('button'))
@@ -429,11 +397,6 @@ export function defineWebMCPChat(): void {
       for (let index = messages.length - 1; index >= 0; index--)
         if (messages[index].role === 'user') return messages[index].text
       return undefined
-    }
-
-    private cancelClear() {
-      this.confirm.hidden = true
-      this.clearButton.focus()
     }
 
     private nearEnd() {
@@ -507,9 +470,7 @@ export function defineWebMCPChat(): void {
         this.input,
         this.sendButton,
         this.stopButton,
-        this.clearButton,
-        this.confirmButton,
-        this.cancelButton
+        this.clearButton
       ])
       let retained = this.root.activeElement !== null && controls.has(this.root.activeElement)
       const document = this.ownerDocument

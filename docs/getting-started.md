@@ -61,4 +61,4 @@ WebMCP Kit is one ESM package. Core, command input, Pi, chat, devtools, testing,
 
 Install `vue` for `/vue`, `react` for `/react`, `svelte` for `/svelte`, or `zod` for `/zod`. The accepted peer ranges are Vue 3.3+, React 18+, Svelte 4+, and Zod 4+. A declared range is not evidence that every version has been tested. The package requires Node 24 or newer for tooling, matching this repository's development version in `.nvmrc`.
 
-Browser capabilities depend on the chosen surface; see [operations](./operations.md#browser-prerequisites). The kit supplies no default hosted inference endpoint. An offline core installation does not contact the demo service.
+Browser capabilities depend on the chosen surface; see [operations](./operations.md#browser-prerequisites). The kit supplies no default hosted inference endpoint.
