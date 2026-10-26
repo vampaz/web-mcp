@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1 — 2026-10-26
+
+- **Chat:** restore immediate New chat when the plus button is clicked, without a confirmation step. Keep the history and draft if clearing fails.
+
 ## 0.5.0 — 2026-10-21
 
 Breaking release; see the [migration guide](./docs/migration-0.5.md).

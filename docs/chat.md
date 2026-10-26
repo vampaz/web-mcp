@@ -58,7 +58,7 @@ Errors appear in the status region with an error colour and icon at body size. T
 
 Enter sends and Shift+Enter adds a line on devices with a fine pointer. On touch devices Enter adds a line and the Send button sends. IME composition is preserved. Suggestions appear only with an empty conversation and composer. The composer stays editable during a turn, so users can draft a follow-up while Send is disabled. `maxMessageLength` (default 16,000) shows feedback near the limit and blocks oversized sends without truncating the draft; match it to the controller's `maxMessageChars` limit.
 
-New chat asks for confirmation when history exists: “Delete this conversation? It cannot be undone.” Delete calls `controller.clear()`; Cancel or Escape keeps the conversation and returns focus to New chat. Clearing never undoes application actions. If clearing fails, the history and draft stay available with an error message.
+New chat immediately calls `controller.clear()` without confirmation. After clearing succeeds, it resets the draft, focuses the composer, and announces completion. Clearing never undoes application actions. If clearing fails, the history and draft stay available with an error message.
 
 If a send fails before the controller records the user message, the composer restores the draft. Completion returns focus to the composer only while the user remains in the chat controls. Restored history opens at the latest message. Later messages scroll into view only when the reader is already near the end; a jump-to-latest button appears while reading earlier messages and indicates new arrivals.
 

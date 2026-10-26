@@ -2193,8 +2193,11 @@ export interface WebMCPChatLabels {
   moveInstructions: string
   resizeInstructions: string
   editLastMessage: string
+  /** @deprecated Unused; New chat starts immediately without confirmation. */
   confirmClear: string
+  /** @deprecated Unused; New chat starts immediately without confirmation. */
   confirmClearAction: string
+  /** @deprecated Unused; New chat starts immediately without confirmation. */
   cancel: string
   tool: string
   toolInput: string

@@ -315,7 +315,6 @@ it('does not steal focus when a pending clear finishes', async function test() {
   const clear = element.shadowRoot!.querySelector<HTMLButtonElement>('[data-clear]')!
   clear.focus()
   clear.click()
-  element.shadowRoot!.querySelector<HTMLButtonElement>('[data-confirm-clear]')!.click()
   outside.focus()
   complete()
   await Promise.resolve()
@@ -519,7 +518,6 @@ it('does not change a new controller when a previous chat reset finishes', async
   first.publish({ state: 'idle', messages: [{ id: 'a', role: 'user', text: 'Keep me' }] })
   const element = mount(first.api)
   element.shadowRoot!.querySelector<HTMLButtonElement>('[data-clear]')!.click()
-  element.shadowRoot!.querySelector<HTMLButtonElement>('[data-confirm-clear]')!.click()
   const second = controller()
   element.configure({ controller: second.api })
   const input = element.shadowRoot!.querySelector('textarea')!
@@ -568,7 +566,6 @@ it('keeps history and the draft when starting a new chat fails', async function 
   const input = element.shadowRoot!.querySelector('textarea')!
   input.value = 'Keep this draft'
   element.shadowRoot!.querySelector<HTMLButtonElement>('[data-clear]')!.click()
-  element.shadowRoot!.querySelector<HTMLButtonElement>('[data-confirm-clear]')!.click()
   await Promise.resolve()
   expect(input.value).toBe('Keep this draft')
   expect(input.disabled).toBe(false)
@@ -581,55 +578,33 @@ it('keeps history and the draft when starting a new chat fails', async function 
   expect(status.textContent).toBe('Storage is unavailable')
 })
 
-it('asks before deleting a conversation and restores focus when cancelled', async function confirmClear() {
-  const fixture = controller()
-  fixture.publish({ state: 'idle', messages: [{ id: 'a', role: 'user', text: 'Saved message' }] })
-  const element = mount(fixture.api)
-  const root = element.shadowRoot!
-  const clear = root.querySelector<HTMLButtonElement>('[data-clear]')!
-  const confirm = root.querySelector<HTMLElement>('.confirm-clear')!
-  const cancel = root.querySelector<HTMLButtonElement>('[data-cancel-clear]')!
-  expect(confirm.hidden).toBe(true)
-  clear.click()
-  expect(fixture.api.clear).not.toHaveBeenCalled()
-  expect(confirm.hidden).toBe(false)
-  expect(confirm.textContent).toContain('Delete this conversation? It cannot be undone.')
-  expect(root.activeElement).toBe(cancel)
-  cancel.dispatchEvent(
-    new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
-  )
-  expect(confirm.hidden).toBe(true)
-  expect(root.activeElement).toBe(clear)
-  clear.click()
-  cancel.click()
-  expect(confirm.hidden).toBe(true)
-  expect(root.activeElement).toBe(clear)
-  expect(fixture.api.clear).not.toHaveBeenCalled()
-  clear.click()
-  root.querySelector<HTMLButtonElement>('[data-confirm-clear]')!.click()
-  expect(confirm.hidden).toBe(true)
-  expect(fixture.api.clear).toHaveBeenCalledOnce()
-  await Promise.resolve()
-  expect(root.querySelector('[role=status]')!.textContent).toBe('New chat started.')
-  expect(root.activeElement).toBe(root.querySelector('textarea'))
-  fixture.publish({ state: 'idle', messages: [{ id: 'b', role: 'user', text: 'Another tab' }] })
-  expect(root.querySelector('[role=status]')!.textContent).toBe('')
-})
-
-it('keeps a popup open when Escape cancels the delete confirmation', function popupConfirm() {
-  const fixture = controller()
-  fixture.publish({ state: 'idle', messages: [{ id: 'a', role: 'user', text: 'Saved message' }] })
-  const element = mount(fixture.api)
-  element.configure({ controller: fixture.api, mode: 'popup' })
-  element.open()
-  const panel = element.shadowRoot!.querySelector('section')!
-  element.shadowRoot!.querySelector<HTMLButtonElement>('[data-clear]')!.click()
-  element
-    .shadowRoot!.querySelector('[data-cancel-clear]')!
-    .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
-  expect(panel.hidden).toBe(false)
-  expect(element.shadowRoot!.querySelector<HTMLElement>('.confirm-clear')!.hidden).toBe(true)
-})
+it.each(['inline', 'popup'] as const)(
+  'starts a new chat immediately with existing history in %s mode',
+  async function immediateNewChat(mode) {
+    const fixture = controller()
+    fixture.publish({ state: 'idle', messages: [{ id: 'a', role: 'user', text: 'Saved message' }] })
+    vi.mocked(fixture.api.clear).mockImplementationOnce(async function clear() {
+      fixture.publish({ state: 'idle', messages: [] })
+    })
+    const element = mount(fixture.api)
+    element.configure({ controller: fixture.api, mode })
+    if (mode === 'popup') element.open()
+    element.setDraft('Unsent draft')
+    const root = element.shadowRoot!
+    root.querySelector<HTMLButtonElement>('[data-clear]')!.click()
+    expect(fixture.api.clear).toHaveBeenCalledOnce()
+    expect(root.querySelector('[data-confirm-clear]')).toBeNull()
+    expect(root.querySelector('[data-cancel-clear]')).toBeNull()
+    await Promise.resolve()
+    expect(root.querySelector('ol')!.children).toHaveLength(0)
+    expect(root.querySelector('textarea')!.value).toBe('')
+    expect(root.querySelector('[role=status]')!.textContent).toBe('New chat started.')
+    expect(root.activeElement).toBe(root.querySelector('textarea'))
+    expect(root.querySelector('section')!.hidden).toBe(false)
+    fixture.publish({ state: 'idle', messages: [{ id: 'b', role: 'user', text: 'Another tab' }] })
+    expect(root.querySelector('[role=status]')!.textContent).toBe('')
+  }
+)
 
 it('shows errors with an error tone and stays quiet after a successful turn', function tone() {
   const fixture = controller()
