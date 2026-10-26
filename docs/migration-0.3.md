@@ -2,6 +2,8 @@
 
 [Documentation index](./README.md) · [API reference](./api-reference.md) · [Operations](./operations.md)
 
+This guide records the 0.2-to-0.3 changes. For the current 0.5.0 API, continue with the [0.4 migration](./migration-0.4.md), then the [0.5 migration](./migration-0.5.md). Some 0.3 APIs below were removed in those releases.
+
 Version `0.3.0` renames the model-provider adapter from _planner_ to _resolver_. The kit never planned anything: a resolver maps one user request onto one concrete tool invocation, and a resolution is that result. Every exported name, option, event, and wire string changed accordingly. There are no compatibility aliases, so `0.2.2` and `0.3.0` cannot be mixed in one application.
 
 Upgrade with `npm install @vampaz/webmcp-kit@^0.3.0` and apply the renames below. Tool definitions, schemas, guards, confirmations, and the invocation pipeline are unchanged.

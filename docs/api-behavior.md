@@ -45,7 +45,7 @@ The package is ESM-only. Importing core, `/pi`, or `/chat` is safe during SSR. B
 
 Re-registering an existing name throws; unregister it explicitly first. An old handle cannot unregister its replacement. Prefer unregistering on component or route teardown. A module that registers at top level must also unregister in `import.meta.hot?.dispose()`, or hot module replacement re-runs it against the existing name. `unregisterTool(name)` returns whether it found a registration. `getTool(name)` returns a registration or `undefined`; `listTools()` and `getRegistrySnapshot()` expose current registrations. Treat those definitions as application-owned objects, not detached serialized snapshots.
 
-The reserved core names are `tool_sequence`, `needs_clarification`, and `no_tools_match`. Pi additionally rejects a catalog containing `pi_reply`. The runtime owns that reply tool.
+The reserved core names are `tool_sequence`, `needs_clarification`, and `no_tools_match`. Pi additionally rejects a catalog containing `pi_reply` or `pi_refresh_catalog`; the runtime owns those names.
 
 ## Invocation, approval, and results
 
@@ -93,7 +93,7 @@ Only named, editable controls become inputs. Disabled controls, disabled fieldse
 
 `await createResolver(config?)` selects `auto`, `local`, `chrome-built-in`, or a remote provider. Automatic mode alone may fall back to deterministic resolution. Explicit providers report failure. `/hosted` provides the separate hosted session adapter. See [resolver providers](./resolver-providers.md) for request contracts and configuration.
 
-`ToolResolver.resolve(message, tools, context?, options?)` returns a `ToolResolution`. Options include cancellation, `singleStep`, and `maxRequestBytes`. Built-in resolvers enforce the byte limit on serialized requests; custom resolvers must implement that boundary too.
+`ToolResolver.resolve(message, tools, context?, options?)` returns a `ToolResolution`. Options include cancellation, `singleStep`, `purpose: 'summary'`, and `maxRequestBytes`. Built-in resolvers enforce the byte limit on serialized requests; custom resolvers must implement that boundary too and preserve the summary-only contract.
 
 Built-in remote, server-endpoint, and hosted resolvers throw `ResolverError` for HTTP failures. `code` is `context_overflow` when the provider says the input exceeded its context, otherwise `provider_failed`; `status` and a bounded provider message are included. A resolution that does not match the offered tools, and model text that is empty or is not JSON, throws `ToolResolutionValidationError`. Pi uses both types: overflow starts compaction, and an invalid resolution gets one correction round.
 
@@ -105,9 +105,27 @@ Configure one resolver instance or a list of `resolverOptions`. Each option has 
 
 Only presentation attributes are supported: `button-label`, `disabled`, `floating`, `label`, `launcher`, and `placeholder`. `disabled` and `floating` reflect their properties. Properties set before the element is defined are applied when it upgrades. Provider credentials and resolver settings belong in JavaScript factories. Errors and clarification appear in a visible status region with an error, success, or info tone. Changing resolver or model cancels active work; cosmetic configuration, and an equal new `resolverOptions` array, preserve it. Moving the element in the DOM does not cancel a command.
 
-During a run the submit button becomes Stop and cancels the command; Escape cancels first and closes the floating panel on a second press. Closing the panel returns focus to the control that opened it. `label` sets the field's visible label and accessible name (default “Command”), and `labels` replaces any visible string (see `WebMCPCommandInputLabels`). `launcher: true` adds a button that toggles the floating panel. Style the element through `part` names (`form`, `input`, `run`, `feedback`, `panel`, `launcher`) and the `--webmcp-*` custom properties documented in the generated reference.
+During a run the submit button becomes Stop and cancels the command; Escape cancels first and closes the floating panel on a second press. Closing the panel returns focus to the control that opened it. `label` sets the field's visible label and accessible name (default “Command”), and `labels` replaces any visible string (see `WebMCPCommandInputLabels`). `launcher: true` adds a button that toggles the floating panel. Style the element through `part` names (`form`, `input`, `run`, `feedback`, `panel`, `launcher`) and the custom properties below.
 
 `run(message?, { signal }?)` resolves and executes a command and returns a result. Failed runs carry `code: 'cancelled'` or `code: 'resolver_failed'`. Events include resolution, result, error, resolver status, step progress, and floating-panel toggles; see the generated interfaces. A supplied resolver belongs to the host. Factory-created resolvers belong to the element and are disposed when replaced or disconnected.
+
+### Command input styling
+
+Set these properties on `webmcp-command-input`; its shadow styles use them across the panel, controls, settings, and feedback.
+
+| Property                             | Default               | Purpose                                           |
+| ------------------------------------ | --------------------- | ------------------------------------------------- |
+| `--webmcp-ink`                       | `#141414`             | Text and primary button background.               |
+| `--webmcp-muted`                     | `#5d5d58`             | Secondary text.                                   |
+| `--webmcp-line`                      | `#d8d1c7`             | Borders and dividers.                             |
+| `--webmcp-paper`                     | `#fffaf1`             | Panel and feedback surfaces; primary button text. |
+| `--webmcp-field`                     | `#f7f3ec`             | Command field and select background.              |
+| `--webmcp-accent`                    | `#2458ff`             | Focus rings and informational feedback.           |
+| `--webmcp-accent-dark`               | `#141414`             | Primary button hover background.                  |
+| `--webmcp-dark`                      | `#141414`             | Diagnostics surface and shadows.                  |
+| `--webmcp-danger`                    | `#b42318`             | Error feedback.                                   |
+| `--webmcp-success`                   | `#067647`             | Success feedback.                                 |
+| `--webmcp-floating-panel-max-height` | `calc(100svh - 16px)` | Floating panel height limit.                      |
 
 ## Pi controller and custom hosts
 

@@ -94,6 +94,8 @@ The application supplies `appPublishableKey` and a compatible session service. T
 
 A supplied `expiresAt` controls refresh. Without it, the session stays cached until authentication fails. A 401 or 403 invalidates the token; the failed request is reported and the next request acquires a fresh session. No automatic paid inference retry occurs. Configure Turnstile with `browserChallengeSiteKey`, the `webmcp-turnstile-site-key` meta tag, or `window.webmcpCreateTurnstileToken`.
 
+Concurrent calls through one hosted resolver share a pending challenge and session request. Cancelling one caller stops its wait; the shared request is aborted only when all waiting callers cancel. Session acquisition has a 60-second deadline, and loading the Turnstile script has a 15-second deadline.
+
 ## Command input
 
 ```ts
@@ -133,7 +135,7 @@ Alternatively pass `{ resolver }`. Do not supply both. The first resolver option
 
 ## Custom app resolvers
 
-Implement `ToolResolver` for another backend. Its `resolve(message, tools, context?, options?)` returns a validated `ToolResolution`. Use `validateToolResolution()` and `normalizeJsonText()` from core when adapting provider responses. Check `options.signal`, enforce `options.maxRequestBytes` on the full serialized request, and honor `options.singleStep`.
+Implement `ToolResolver` for another backend. Its `resolve(message, tools, context?, options?)` returns a validated `ToolResolution`. Use `validateToolResolution(resolution, tools, options)` and `normalizeJsonText()` from core when adapting provider responses. Check `options.signal`, enforce `options.maxRequestBytes` on the full serialized request, and honor `options.singleStep` and `options.purpose`. Forward `purpose: 'summary'` to any downstream endpoint and validate its reply against the summary-only contract.
 
 Pi additionally requires `capabilities: { conversation: true }` and an available provider. Custom conversational resolvers must report provider errors without fallback. Pass only necessary visible context; model requests can include inputs, results, and conversation text.
 
@@ -148,6 +150,6 @@ an `action` envelope. Its schema pairs each tool name with that tool's input sch
 arguments for another tool from satisfying the selected branch. The resolver validates and unwraps
 this transport envelope; callers still receive `{ toolName, input, confidence, reason }`.
 The prompt still lists each tool's input schema, including property descriptions. Some providers, including LM Studio, apply `response_format` only as an output constraint and never show it to the model, so the prompt is the only place the model can read what each argument means. All JSON examples use the same `action` envelope.
-App-owned server resolvers and bounded Resolver mode retain their existing response contracts.
+App-owned server resolvers and the command input's bounded sequences retain their existing response contracts.
 
 Provider-side enforcement depends on the selected endpoint and model. The kit sends `json_schema` without `strict: true`; it validates returned actions locally before execution. OpenAI's [strict structured output](https://developers.openai.com/api/docs/guides/structured-outputs) supports a subset of JSON Schema and rejects unsupported strict schemas. [LM Studio](https://lmstudio.ai/docs/developer/openai-compat/structured-output) documents schema-constrained output through this endpoint. Verify support for the actual provider, model, and tool schemas; neither provider enforcement nor valid JSON replaces application validation and approval.

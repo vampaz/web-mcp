@@ -76,7 +76,7 @@ sequenceDiagram
       Tools-->>Page: Actual result or rejection
       Page-->>Pi: Invocation result
       Pi->>DB: Commit the result
-      Pi-->>Page: Publish a detached snapshot
+      Pi-->>Page: Publish a shared, deeply frozen snapshot
       Page-->>UI: Notify subscribers
     else Reply or failure
       Pi->>DB: Commit the outcome

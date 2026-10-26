@@ -120,15 +120,14 @@ test('selects items through the WebMCP test bridge', async function testSelectIt
     toolName: 'select_items',
     input: {
       ids: ['item_4', 'item_7']
-    },
-    source: 'resolver'
+    }
   })
 
   expect(result.status).toBe('success')
 })
 ```
 
-The test bridge does not let tests bypass confirmation by passing `confirmed: true`. Confirmed tools still use the app confirmation handler or the browser confirmation fallback.
+Install `installWebMCPKitTestBridge()` from `/testing` in deliberate test/development environments before using these helpers. The bridge always invokes with `source: 'fallback'`; callers cannot choose the source or bypass confirmation. Confirmed tools still use the app confirmation handler or the browser confirmation fallback.
 
 ## Server-Backed Tool
 
