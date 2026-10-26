@@ -68,7 +68,7 @@ Rename the controller option:
 chat.configure({ controller, mode: 'popup' })
 ```
 
-“New chat” now asks for confirmation before deleting stored history. Labels, parts, slots, themes, and the imperative API are additive; see [chat](./chat.md).
+In 0.5.1 and later, “New chat” immediately deletes the current conversation and draft without confirmation. Version 0.5.0 asked for confirmation. Labels, parts, slots, themes, and the imperative API are additive; see [chat](./chat.md).
 
 ## Command input
 

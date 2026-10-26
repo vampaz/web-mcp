@@ -2,7 +2,7 @@
 
 WebMCP Kit exposes application actions through one registry and invocation pipeline. Add a model provider adapter (the kit calls it a `resolver`) for commands, a Pi controller for persistent conversations, and the chat component when you want a supplied interface.
 
-This checkout targets 0.5.0. Apply the [0.5 migration guide](./migration-0.5.md) when upgrading from 0.4, after the [0.4 guide](./migration-0.4.md) for older versions. Pi runs in the page; its implementation libraries are bundled.
+This checkout targets 0.5.1. Apply the [0.5 migration guide](./migration-0.5.md) when upgrading from 0.4, after the [0.4 guide](./migration-0.4.md) for older versions. Pi runs in the page; its implementation libraries are bundled.
 
 ## Start here
 

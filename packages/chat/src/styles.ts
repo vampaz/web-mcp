@@ -39,11 +39,6 @@ button:disabled { opacity:.4; cursor:default }
 .icon-button { flex:none; inline-size:2.6em; min-block-size:2.6em; padding:.57em; border-color:transparent; color:var(--_muted) }
 button:focus-visible,textarea:focus-visible,summary:focus-visible,.transcript:focus-visible { outline:2px solid var(--_accent); outline-offset:3px }
 .transcript:focus-visible { outline-offset:-2px }
-.confirm-clear { flex:1 0 100%; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.5em .75em; padding:.6em .75em; border:1px solid var(--_error); border-radius:.63em; background:color-mix(in srgb,var(--_error) 6%,var(--_background)) }
-.confirm-clear p { margin:0; flex:1 1 14em }
-.confirm-actions { display:flex; flex-wrap:wrap; gap:.45em }
-[data-confirm-clear] { color:var(--_background); background:var(--_error); border-color:transparent }
-[data-confirm-clear]:hover:enabled { background:var(--_error); filter:brightness(.92) }
 .conversation { display:grid; position:relative; min-block-size:8em; min-inline-size:0 }
 .transcript { overflow:auto; overscroll-behavior:contain; min-block-size:0; padding:1.25em; scrollbar-gutter:stable; scroll-padding-block:1.15em }
 ol { list-style:none; padding:0; margin:0; display:grid; grid-template-columns:minmax(0,1fr); gap:1.43em }
