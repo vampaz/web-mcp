@@ -61,7 +61,7 @@ import { createResolver } from '@vampaz/webmcp-kit'
 import { initWebMCP } from '@vampaz/webmcp-kit/command-input'
 
 const commands = initWebMCP({ resolver: await createResolver({ provider: 'local' }) })
-// Floating panels start closed. Connect an application button to commands.element.openPanel().
+// Floating panels start closed; initWebMCP() supplies a launcher by default.
 // During teardown:
 commands.destroy()
 ```

@@ -2,6 +2,8 @@
 
 This is a breaking release. No compatibility aliases are included. Install `@vampaz/webmcp-kit@0.4.0` and apply the changes below.
 
+This guide records the 0.3-to-0.4 changes. Continue with the [0.5 migration](./migration-0.5.md) for the current API, including chat's `controller` option and the removal of approval bypasses.
+
 ## Imports and resolver setup
 
 | Previous API                                | New API                                                     |

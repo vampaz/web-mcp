@@ -76,4 +76,4 @@ Chat is independent: configure `<webmcp-chat>` with a Pi controller or your own 
 - [API reference](./docs/api-reference.md): generated public declarations with source links.
 - [Changelog](./CHANGELOG.md) and [contributing](./CONTRIBUTING.md).
 
-The [local lab](./apps/demo/README.md) and the independent [WebMCP demo](https://github.com/vampaz/web-mcp-demo) exercise the kit. Deterministic browser tests and separately authorized real-model checks provide different evidence.
+The [local lab](https://github.com/vampaz/web-mcp/blob/master/apps/demo/README.md) and the independent [WebMCP demo](https://github.com/vampaz/web-mcp-demo) exercise the kit. Deterministic browser tests and separately authorized real-model checks provide different evidence.

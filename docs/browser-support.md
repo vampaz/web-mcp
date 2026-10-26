@@ -39,7 +39,7 @@ Fallback mode exposes tools to application-controlled callers, including product
 
 The kit's Chrome resolver uses `window.LanguageModel` when available. It declares English text input and output. The local lab uses its configured LM Studio model; it does not automatically switch to browser AI.
 
-The command input adds Chrome built-in AI to the provider selector when the browser exposes an available `LanguageModel` API. Consumers can hide that option with `showChromeAI: false`.
+The command input uses the supplied `resolver` or `resolverOptions`. To offer Chrome AI in its selector, add an explicit option whose factory calls `createResolver({ provider: 'chrome-built-in' })`; omit that option to hide it. There is no `showChromeAI` option. Without a supplied resolver or option list, the element uses automatic Chrome/local resolution. See [resolver configuration](./resolver-providers.md#command-input).
 
 The automatic resolver uses local heuristics when Chrome AI is unavailable. Downloadable or downloading Chrome models remain selected and initialize from a user command. Non-strict Chrome resolution can fall back to heuristics on failure. Explicit Chrome selection and strict conversational resolution report failure without substituting another provider.
 
@@ -49,7 +49,7 @@ An application can configure the command input with a custom browser-local resol
 
 ## Inspecting Tools
 
-During development or preview deployments, mount `@vampaz/webmcp-kit/devtools` to inspect registered tools, warnings, prompt previews, sample inputs, and invocation history. The consuming application owns the environment/access gate and must deliberately mount the overlay; the kit and local lab do not mount it automatically.
+During development or preview deployments, mount `@vampaz/webmcp-kit/devtools` to inspect registered tools, warnings, prompt previews, sample inputs, and invocation history. The consuming application owns the environment/access gate and must deliberately mount the overlay. The local lab's Toolkit tab loads it on demand in development.
 
 ## Chrome And Lighthouse Inspection
 
