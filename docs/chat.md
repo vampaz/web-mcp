@@ -48,7 +48,7 @@ The element dispatches `webmcp-chat-toggle` (`detail: { open }`) and `webmcp-cha
 
 ## Conversation behavior
 
-The component includes a transcript, composer, Send, Stop, New chat, suggestions, a working indicator, and status. It contains no model selector, endpoint field, API-key entry, provider controls, or account settings. Configure model access in application code, as shown in [Pi setup](./pi.md).
+The component includes a transcript, composer, Send, Stop, New chat, suggestions, a working indicator, and status. Provider, model, and approval controls are optional. Omit `settings` to keep the conversation-only UI. Configure model access in application code, as shown in [Pi setup](./pi.md).
 
 While a turn runs, the working row shows the controller's `activity`: “Thinking…”, “Running set_counter…”, “Waiting for your approval: set_counter”, or “Summarizing earlier conversation…”. The status region announces each change once. A controller without `activity` shows “Working…”.
 
@@ -61,6 +61,50 @@ Enter sends and Shift+Enter adds a line on devices with a fine pointer. On touch
 New chat immediately calls `controller.clear()` without confirmation. After clearing succeeds, it resets the draft, focuses the composer, and announces completion. Clearing never undoes application actions. If clearing fails, the history and draft stay available with an error message.
 
 If a send fails before the controller records the user message, the composer restores the draft. Completion returns focus to the composer only while the user remains in the chat controls. Restored history opens at the latest message. Later messages scroll into view only when the reader is already near the end; a jump-to-latest button appears while reading earlier messages and indicates new arrivals.
+
+## Optional settings module
+
+Pass `settings` to add an icon inside the chat header. It opens provider, model, and optional approval controls inside the same chat window in inline and popup modes. This ports the standalone demo's controls into a framework-neutral module; it adds no model provider or inference dependency.
+
+```ts
+import type { WebMCPChatSettings } from '@vampaz/webmcp-kit/chat'
+
+const settings: WebMCPChatSettings = {
+  providers: [
+    { id: 'local', label: 'Local model', models: [{ model: 'my-model', label: 'My model' }] }
+  ],
+  providerId: 'local',
+  model: 'my-model',
+  detail: 'Runs through the application’s local model connection.',
+  disabled: false,
+  onChange(providerId, model) {
+    // The application switches its resolver/controller, then reconfigures the chat.
+    selectApplicationModel(providerId, model)
+  },
+  confirmations: {
+    enabled: true,
+    onChange(enabled) {
+      // Update the application's existing confirmation handler preference.
+      setApplicationApprovalPreference(enabled)
+    }
+  }
+}
+element.configure({ controller, settings })
+```
+
+The callbacks above are application functions. The module does not create resolvers, fetch model lists, persist preferences, or grant approval. It reports provider/model changes through `onChange`; changing providers requests that provider's first model, or `undefined` when its model list is empty. Reconfigure with the selected values and the complete options after a change. Use `settings.disabled` during active turns or provider changes, `detail` for status, and `error` for a visible failure. Omit `confirmations` if users must not change your approval policy. Never put credentials in provider labels, model IDs, status text, or slotted content.
+
+Settings replace the visible conversation while open, preserving its transcript, draft, and running turn. Close settings or Escape returns focus to the icon; Escape closes settings before closing a popup. The module keeps controls mounted and focused across configuration updates. Omit `settings` on reconfiguration to remove it. `focusComposer()` returns to the conversation. Keep a disabled, application-owned controller/view available during initialization or provider failure if users need settings to recover.
+
+Use the `settings` slot for app-specific diagnostics or additional controls:
+
+```html
+<webmcp-chat>
+  <p slot="settings">Model preferences carry across application pages.</p>
+</webmcp-chat>
+```
+
+The local lab uses this module to select LM Studio chat models or Chrome built-in AI and set its approval preference, with Presentation in the slot. Automated test responses are available only on the separate test server. The standalone demo uses it for provider/model selection and approvals, and supplies its Jev note and developer diagnostics through the slot.
 
 ## Message rendering
 
@@ -122,7 +166,7 @@ webmcp-chat {
 }
 ```
 
-These are the light-theme defaults; the dark theme uses its own colours unless you set them. Style internal elements through `::part()`: `panel`, `header`, `title`, `launcher`, `transcript`, `message`, `message-user`, `message-assistant`, `message-tool`, `composer`, `textarea`, `send`, `stop`, `new-chat`, `suggestion`, `status`, and `jump-latest`.
+These are the light-theme defaults; the dark theme uses its own colours unless you set them. Style internal elements through `::part()`: `panel`, `header`, `title`, `launcher`, `transcript`, `message`, `message-user`, `message-assistant`, `message-tool`, `composer`, `textarea`, `send`, `stop`, `new-chat`, `suggestion`, `status`, `jump-latest`, `settings-button`, and `settings`.
 
 ```css
 webmcp-chat::part(message-assistant) {
@@ -130,7 +174,7 @@ webmcp-chat::part(message-assistant) {
 }
 ```
 
-Slots add host content: `header-actions` (buttons beside New chat), `footer` (for example a disclaimer below the composer), and `empty` (replaces the empty-state text).
+Slots add host content: `header-actions` (buttons beside New chat), `footer` (for example a disclaimer below the composer), `empty` (replaces the empty-state text), and `settings` (additional content in the optional settings panel).
 
 ```html
 <webmcp-chat>
@@ -138,4 +182,4 @@ Slots add host content: `header-actions` (buttons beside New chat), `footer` (fo
 </webmcp-chat>
 ```
 
-Model or storage failures remain visible as controller errors; the chat never directs users to nonexistent provider settings.
+Model or storage failures remain visible as controller errors. Settings are available only when the application opts in.

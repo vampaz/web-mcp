@@ -40,6 +40,7 @@ function getProxy(url: string, headers: Record<string, string>): Promise<number 
 it('allows only exact methods, paths, and same-origin requests', function test() {
   const origin = 'https://webmcp-kit.localtest.me'
   expect(proxyRequestAllowed('/__lmstudio/v1/models', 'GET', undefined, origin)).toBe(true)
+  expect(proxyRequestAllowed('/__lmstudio/api/v0/models', 'GET', undefined, origin)).toBe(true)
   expect(proxyRequestAllowed('/__lmstudio/v1/chat/completions', 'POST', origin, origin)).toBe(true)
   expect(proxyRequestAllowed('/__lmstudio/v1/models', 'GET', 'https://evil.example', origin)).toBe(
     false
@@ -52,6 +53,19 @@ it('keeps the local token upstream and rejects malformed or foreign requests bef
   const forwarded = vi.fn()
   const upstream = await listen(
     createServer(function model(request, response) {
+      if (request.url === '/api/v0/models') {
+        response.setHeader('Content-Type', 'application/json')
+        response.end(
+          JSON.stringify({
+            data: [
+              { id: 'chosen', type: 'llm' },
+              { id: 'alternate', type: 'vlm' },
+              { id: 'embedding', type: 'embeddings' }
+            ]
+          })
+        )
+        return
+      }
       forwarded(request.headers.authorization)
       response.setHeader('Content-Type', 'application/json')
       response.end('{"choices":[]}')
@@ -82,7 +96,12 @@ it('keeps the local token upstream and rejects malformed or foreign requests bef
   expect(valid.status).toBe(200)
   expect(await valid.text()).not.toContain('token')
   expect(forwarded).toHaveBeenCalledWith('Bearer local-model-token')
-  for (const body of ['{', 'null', JSON.stringify({ model: 'different', messages: [] })]) {
+  for (const body of [
+    '{',
+    'null',
+    JSON.stringify({ model: 'different', messages: [] }),
+    JSON.stringify({ model: 'embedding', messages: [] })
+  ]) {
     expect(
       (await fetch(endpoint, { method: 'POST', headers: { Origin: origin }, body })).status
     ).toBe(400)
@@ -97,6 +116,16 @@ it('keeps the local token upstream and rejects malformed or foreign requests bef
     ).status
   ).toBe(403)
   expect(forwarded).toHaveBeenCalledTimes(1)
+  expect(
+    (
+      await fetch(endpoint, {
+        method: 'POST',
+        headers: { Origin: origin },
+        body: JSON.stringify({ model: 'alternate', messages: [] })
+      })
+    ).status
+  ).toBe(200)
+  expect(forwarded).toHaveBeenCalledTimes(2)
 })
 
 it('refuses upstream redirects without forwarding credentials to the redirect target', async function redirect() {

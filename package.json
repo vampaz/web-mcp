@@ -1,6 +1,6 @@
 {
   "name": "@vampaz/webmcp-kit",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "type": "module",
   "description": "WebMCP tool registration, resolvers, framework helpers, devtools, and testing helpers for web apps.",
   "homepage": "https://github.com/vampaz/web-mcp#readme",
@@ -94,7 +94,7 @@
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "dev:demo": "vite --config apps/demo/vite.config.ts",
-    "dev:demo:fixtures": "WEBMCP_TEST_FIXTURES=true vite --config apps/demo/vite.config.ts",
+    "dev:demo:fixtures": "WEBMCP_TEST_FIXTURES=true WEBMCP_BROWSER_TEST=true vite --config apps/demo/vite.config.ts",
     "typecheck": "tsc --noEmit",
     "typecheck:demo": "vue-tsc --noEmit -p apps/demo/tsconfig.json",
     "test:e2e": "playwright test",

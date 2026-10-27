@@ -10,6 +10,7 @@ import { createLabels } from './labels'
 import { chatStyles, popupStyles } from './styles'
 import { ChatPopup } from './popup'
 import { icon } from './icon'
+import { ChatSettings } from './settings'
 
 let instanceCount = 0
 const defaultMessageLimit = 16000
@@ -63,6 +64,7 @@ export function defineWebMCPChat(): void {
     private readonly limit: HTMLParagraphElement
     private readonly jumpButton: HTMLButtonElement
     private readonly popup: ChatPopup
+    private settings?: ChatSettings
 
     constructor() {
       super()
@@ -113,6 +115,9 @@ export function defineWebMCPChat(): void {
       this.hint = this.root.querySelector('.hint')!
       this.limit = this.root.querySelector('.limit')!
       this.jumpButton = this.root.querySelector('.jump-latest')!
+      this.root.querySelector('.panel')!.addEventListener('keydown', (event) => {
+        this.settings?.handleKeydown(event as KeyboardEvent)
+      })
       this.popup = new ChatPopup(
         this,
         this.root.querySelector('.presentation')!,
@@ -193,6 +198,7 @@ export function defineWebMCPChat(): void {
       this.popup.toggle()
     }
     focusComposer() {
+      this.settings?.setOpen(false)
       if (this.dataset.mode === 'popup' && !this.popup.isOpen) this.popup.setOpen(true)
       else this.input.focus()
     }
@@ -229,6 +235,13 @@ export function defineWebMCPChat(): void {
         options.placement ?? 'end'
       )
       this.applyLabels()
+      if (options.settings) {
+        this.settings ??= new ChatSettings(this.root.querySelector('.panel')!)
+        this.settings.configure(options.settings, this.labels)
+      } else {
+        this.settings?.destroy()
+        this.settings = undefined
+      }
       this.input.placeholder = options.placeholder ?? 'Ask the assistant'
       this.emptyText.textContent =
         options.emptyState ?? 'Ask a question or choose a suggestion to start.'

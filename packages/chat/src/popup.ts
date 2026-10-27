@@ -267,7 +267,9 @@ export class ChatPopup {
     this.launcher.setAttribute('aria-expanded', String(open))
     if (open) {
       this.placePanel()
-      this.panel.querySelector('textarea')!.focus({ preventScroll: true })
+      this.panel
+        .querySelector<HTMLElement>('.settings-panel:not([hidden]) button, textarea')!
+        .focus({ preventScroll: true })
     } else if (focused) this.launcher.focus({ preventScroll: true })
     this.host.dispatchEvent(
       new CustomEvent('webmcp-chat-toggle', { detail: { open }, bubbles: true, composed: true })

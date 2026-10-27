@@ -6,7 +6,7 @@ export function createFixtureResolver(): ToolResolver {
     capabilities: { conversation: true },
     available: true,
     status: 'ready',
-    detail: 'Fault injection fixture.',
+    detail: 'Automated test responses. No AI model is connected.',
     async resolve(message, _tools, context, options): Promise<ToolResolution> {
       message = message.split('\n\nCurrent user request: ').at(-1)!.split('\n\n')[0]
       if (message === 'wait')

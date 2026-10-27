@@ -50,7 +50,7 @@ npm run check
 npm run test:e2e
 ```
 
-`npm run test:coverage` reports unit coverage. `npm run docs:links` checks relative links and anchors in the documentation. `npm run dev:demo:fixtures` starts the lab with deterministic resolver fixtures, so Chat works without LM Studio.
+`npm run test:coverage` reports unit coverage. `npm run docs:links` checks relative links and anchors in the documentation. `npm run dev:demo:fixtures` starts the separate test server at `https://webmcp-kit-tests.localtest.me` with deterministic responses and isolated test conversations. The normal demo never substitutes test responses for an unavailable model.
 
 The ordinary browser suite uses deterministic fixtures; it needs no model inference. The configured matrix includes Chromium, Firefox, WebKit, and native Chromium. On macOS, Firefox uses isolated app data under `test-results/firefox-home` through `CFFIXED_USER_HOME`; this avoids accessing the personal Firefox directory protected by macOS 27. Remove this workaround when Playwright includes the [Firefox 158 fix](https://github.com/microsoft/playwright/issues/42768). Certificate validation stays enabled. A configured project is not evidence that its tests passed.
 

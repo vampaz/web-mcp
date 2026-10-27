@@ -13,11 +13,13 @@ The Vite server uses [`@vampaz/vite-plugin-local-tls`](https://github.com/vampaz
 
 ## LM Studio
 
-Copy `.env.example` to `.env.local` in this directory. Set `LM_STUDIO_MODEL` to the exact model ID you choose. Start the local LM Studio server and load that model. No model is downloaded or selected automatically. The example requests JSON-schema output, disables reasoning explicitly, uses temperature 0.2, and caps each response at 1,024 tokens. `LM_STUDIO_API_TOKEN` is optional and stays in the Vite server.
+Start the local LM Studio server, then open the **Demo settings** icon inside chat. Select **LM Studio (local)** and choose a downloaded chat model, or select **Chrome built-in AI** in a supported browser. The model list excludes embeddings and places loaded models first. LM Studio may load the selected model on the first message; the demo does not download models. Provider failures remain visible in settings, where you can select another provider.
 
-To use Chat and Harness without a model, run `npm run dev:demo:fixtures`. It sets `WEBMCP_TEST_FIXTURES=true`, so the lab uses the deterministic fixture resolver and enables the storage fixture.
+Copy `.env.example` to `.env.local` to change the loopback server URL, provide an optional server-only `LM_STUDIO_API_TOKEN`, or set `LM_STUDIO_MODEL` as the initial model preference. The selection is remembered across Chat and Harness in this browser. The example requests JSON-schema output, disables reasoning explicitly, uses temperature 0.2, and caps each response at 1,024 tokens.
 
-The server binds loopback and proxies only GET `/__lmstudio/v1/models` and POST `/__lmstudio/v1/chat/completions`. It checks origins, methods, host, body size, and the configured model; redirects and arbitrary targets are rejected. Account credentials are never sent to LM Studio. Provider configuration remains outside the reusable chat.
+To inspect automated tests without a model, run `npm run dev:demo:fixtures` and open `https://webmcp-kit-tests.localtest.me`. This separate server offers **Test responses (no AI)** and storage fixtures. Both test flags are required; the ordinary demo never exposes this provider or silently falls back to it. Test and real conversations use separate storage namespaces. Existing experimental history is retained in its old namespace and is not loaded into real conversations.
+
+The server binds loopback and proxies only GET `/__lmstudio/v1/models`, GET `/__lmstudio/api/v0/models`, and POST `/__lmstudio/v1/chat/completions`. It checks origins, methods, host, body size, and that the selected model is in LM Studio's chat-model list; redirects and arbitrary targets are rejected. Account credentials are never sent to LM Studio. The app owns provider selection and connection; the reusable chat only renders the supplied settings.
 
 ```sh
 npm run test

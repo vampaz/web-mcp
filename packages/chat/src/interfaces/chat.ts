@@ -1,4 +1,5 @@
 import type { PiController, PiMessage } from '@vampaz/webmcp-kit/pi'
+import type { WebMCPChatSettings } from './settings'
 
 export interface WebMCPChatStatusLabels {
   loading: string
@@ -13,6 +14,14 @@ export interface WebMCPChatStatusLabels {
 export interface WebMCPChatLabels {
   user: string
   newChat: string
+  settings: string
+  closeSettings: string
+  settingsIntro: string
+  conversationModel: string
+  provider: string
+  model: string
+  confirmations: string
+  confirmationsHint: string
   send: string
   stop: string
   message: string
@@ -65,6 +74,8 @@ export interface WebMCPChatOptions {
   emptyState?: string
   suggestedPrompts?: readonly string[]
   disabled?: boolean
+  /** Optional provider, model and approval controls. The application owns their behavior. */
+  settings?: WebMCPChatSettings
   labels?: Partial<WebMCPChatLabels>
   /** Locale for number formatting in the default labels. */
   locale?: string

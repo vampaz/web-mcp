@@ -167,11 +167,11 @@ See [Pi](./pi.md#persistence-and-limits) for exact budget defaults and bounds. S
 
 ## Chat UI
 
-`defineWebMCPChat()` registers `<webmcp-chat>` once. `element.configure(options)` requires `controller` and accepts `mode`, `placement`, `theme`, `title`, `assistantLabel`, `placeholder`, `emptyState`, `suggestedPrompts`, `disabled`, `labels`, `locale`, `maxMessageLength`, and `renderMessage`. Supply the complete desired options on reconfiguration; omitted values return to defaults. Setting `element.controller` replaces only the controller.
+`defineWebMCPChat()` registers `<webmcp-chat>` once. `element.configure(options)` requires `controller` and accepts `mode`, `placement`, `theme`, `title`, `assistantLabel`, `placeholder`, `emptyState`, `suggestedPrompts`, `disabled`, `settings`, `labels`, `locale`, `maxMessageLength`, and `renderMessage`. Supply the complete desired options on reconfiguration; omitted values return to defaults. Setting `element.controller` replaces only the controller.
 
 Defaults: inline mode, light theme, “Assistant” title/assistant label, “Ask the assistant” placeholder, a 16,000-character message limit, and an empty-state invitation. Changing presentation with the same controller preserves history and the draft. Replacing the controller clears that view's draft and subscription; destroy the old controller yourself when its owner ends. `disabled` disables controls but does not cancel an active turn.
 
-`open()`, `close()`, `toggle()`, `focusComposer()`, and `setDraft(text)` control the element; the popup methods do nothing in inline mode. The element dispatches `webmcp-chat-toggle` and `webmcp-chat-send`, which bubble and are composed. Use `controller.send()` for headless work. New chat immediately calls `controller.clear()` without confirmation. `renderMessage` receives untrusted text; sanitize anything inserted as HTML. See [chat behavior, keyboard controls, labels, parts, slots, and CSS properties](./chat.md).
+`open()`, `close()`, `toggle()`, `focusComposer()`, and `setDraft(text)` control the element; the popup methods do nothing in inline mode. The element dispatches `webmcp-chat-toggle` and `webmcp-chat-send`, which bubble and are composed. Optional `settings` adds the shared provider/model/approval controls and an in-chat icon. The host owns resolver changes, persistence, and the approval policy; the `settings` slot supplies additional content. Omit the option to remove the module. Use `controller.send()` for headless work. New chat immediately calls `controller.clear()` without confirmation. `renderMessage` receives untrusted text; sanitize anything inserted as HTML. See [chat behavior, keyboard controls, labels, parts, slots, and CSS properties](./chat.md).
 
 ## Framework lifecycle helpers
 

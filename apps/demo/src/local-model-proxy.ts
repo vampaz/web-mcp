@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { DemoConfig } from './interfaces/config.ts'
+import { chatModels } from './lm-studio-models.ts'
 
 export function proxyRequestAllowed(
   path: string,
@@ -9,7 +10,7 @@ export function proxyRequestAllowed(
 ): boolean {
   return (
     (!origin || origin === serverOrigin) &&
-    ((path === '/__lmstudio/v1/models' && method === 'GET') ||
+    ((['/__lmstudio/v1/models', '/__lmstudio/api/v0/models'].includes(path) && method === 'GET') ||
       (path === '/__lmstudio/v1/chat/completions' && method === 'POST'))
   )
 }
@@ -62,26 +63,38 @@ export async function handleLocalModelRequest(
         !payload ||
         typeof payload !== 'object' ||
         Array.isArray(payload) ||
-        !config.modelId ||
-        payload.model !== config.modelId ||
+        typeof payload.model !== 'string' ||
         !Array.isArray(payload.messages) ||
         payload.stream === true
       ) {
-        response.writeHead(400).end('Use the configured local model and non-streaming messages.')
+        response.writeHead(400).end('Select a local chat model and use non-streaming messages.')
+        return
+      }
+      const models = await fetch(new URL('/api/v0/models', config.baseUrl), {
+        headers: config.token ? { Authorization: `Bearer ${config.token}` } : {},
+        redirect: 'error',
+        signal: controller.signal
+      })
+      if (!models.ok) throw new Error('Model discovery failed.')
+      if (!chatModels(await models.json()).some((model) => model.model === payload.model)) {
+        response.writeHead(400).end('Select an available LM Studio chat model.')
         return
       }
       body = JSON.stringify(payload)
     }
-    const upstream = await fetch(config.baseUrl + request.url!.slice('/__lmstudio/v1'.length), {
-      method: request.method,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(config.token ? { Authorization: `Bearer ${config.token}` } : {})
-      },
-      body,
-      redirect: 'error',
-      signal: controller.signal
-    })
+    const upstream = await fetch(
+      new URL(request.url!.slice('/__lmstudio'.length), config.baseUrl),
+      {
+        method: request.method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(config.token ? { Authorization: `Bearer ${config.token}` } : {})
+        },
+        body,
+        redirect: 'error',
+        signal: controller.signal
+      }
+    )
     const output = await upstream.text()
     response.writeHead(upstream.ok ? 200 : 502, { 'Content-Type': 'application/json' })
     response.end(
@@ -95,7 +108,7 @@ export async function handleLocalModelRequest(
     if (!response.writableEnded)
       response.writeHead(502, { 'Content-Type': 'application/json' }).end(
         JSON.stringify({
-          error: 'LM Studio is unavailable. Start the local server and load LM_STUDIO_MODEL.'
+          error: 'LM Studio is unavailable. Start its local server and select a chat model.'
         })
       )
   } finally {
