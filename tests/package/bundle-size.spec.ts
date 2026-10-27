@@ -11,9 +11,11 @@ import { artifact, run, verifyArtifact } from './fixtures'
 // pi 25,749 eager / 144,094 total; react 23,340; svelte 23,287; testing 24,907; vue 23,348; zod 22,979.
 // New ceilings add 10% rounded up to 100 bytes. Preserve existing ceilings that already fit.
 // Raise a ceiling only after reviewing the artifact's size increase and import graph.
+// 0.6.0 chat: 13,707 bytes with the optional settings UI; no runtime dependencies added.
+// Give that reviewed graph the same 10% headroom, rounded up to 100 bytes.
 const budgets: Record<string, { eager: number; total: number }> = {
   '.': { eager: 25_000, total: 25_000 },
-  './chat': { eager: 13_700, total: 13_700 },
+  './chat': { eager: 15_100, total: 15_100 },
   './command-input': { eager: 29_800, total: 29_800 },
   './devtools': { eager: 33_300, total: 33_300 },
   './hosted': { eager: 9_200, total: 9_200 },

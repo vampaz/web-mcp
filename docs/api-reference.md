@@ -2177,6 +2177,14 @@ export interface WebMCPChatElement extends HTMLElement {
 export interface WebMCPChatLabels {
   user: string
   newChat: string
+  settings: string
+  closeSettings: string
+  settingsIntro: string
+  conversationModel: string
+  provider: string
+  model: string
+  confirmations: string
+  confirmationsHint: string
   send: string
   stop: string
   message: string
@@ -2235,6 +2243,8 @@ export interface WebMCPChatOptions {
   emptyState?: string
   suggestedPrompts?: readonly string[]
   disabled?: boolean
+  /** Optional provider, model and approval controls. The application owns their behavior. */
+  settings?: WebMCPChatSettings
   labels?: Partial<WebMCPChatLabels>
   /** Locale for number formatting in the default labels. */
   locale?: string
@@ -2246,6 +2256,32 @@ export interface WebMCPChatOptions {
    * Message text is untrusted user and model output: sanitize anything inserted as HTML.
    */
   renderMessage?: (message: PiMessage, target: HTMLElement) => boolean | void
+}
+```
+
+### WebMCPChatSettings
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/chat/src/interfaces/settings.ts).
+
+```ts
+export interface WebMCPChatSettings {
+  providers: readonly {
+    id: string
+    label: string
+    models: readonly { model: string; label: string }[]
+  }[]
+  providerId: string
+  model?: string
+  detail?: string
+  error?: string
+  /** Disable changes while the application is switching providers or running a turn. */
+  disabled?: boolean
+  onChange(providerId: string, model?: string): void
+  /** Omit when the application does not offer an approval preference. */
+  confirmations?: {
+    enabled: boolean
+    onChange(enabled: boolean): void
+  }
 }
 ```
 

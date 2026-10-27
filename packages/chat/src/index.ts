@@ -1,4 +1,5 @@
 export { defineWebMCPChat } from './chat'
+export type { WebMCPChatSettings } from './interfaces/settings'
 export type {
   WebMCPChatElement,
   WebMCPChatLabels,

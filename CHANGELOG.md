@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0 — 2026-10-27
+
+- **Chat:** add an optional settings module with an in-chat icon, provider/model selectors, app-owned approval preferences, status/error feedback, and a slot for diagnostics. Preserve conversation state and keyboard focus while switching views.
+- **Local demo:** select LM Studio chat models or Chrome built-in AI through shared settings, retain model preferences, and move Presentation into chat settings. Keep automated test responses and conversations on the separate test server.
+- **Documentation:** document settings configuration, callbacks, labels, slots, and application ownership in the chat guide and API reference.
+
 ## 0.5.2 — 2026-10-26
 
 - **Documentation:** keep package guides self-contained and clarify application-owned Astro deployment resources.

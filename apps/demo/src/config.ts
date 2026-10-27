@@ -18,6 +18,6 @@ export function resolveDemoConfig(env: Record<string, string | undefined>): Demo
     baseUrl: target.href.replace(/\/$/, ''),
     modelId,
     token: env.LM_STUDIO_API_TOKEN || undefined,
-    fixtures: env.WEBMCP_TEST_FIXTURES === 'true'
+    fixtures: env.WEBMCP_TEST_FIXTURES === 'true' && env.WEBMCP_BROWSER_TEST === 'true'
   }
 }

@@ -23,6 +23,22 @@ export const chatStyles = `
 * { box-sizing:border-box }
 .presentation:not([popover]) { display:contents }
 .panel { display:grid; grid-template-rows:auto minmax(8em,1fr) auto; min-block-size:0 }
+.panel[data-settings-open] { grid-template-rows:auto minmax(0,1fr) }
+.panel[data-settings-open] [data-clear] { display:none }
+.settings-panel { min-inline-size:0; min-block-size:0; padding:1.25em; overflow:auto; overscroll-behavior:contain }
+.settings-heading { display:flex; align-items:center; justify-content:space-between; gap:.75em }
+.settings-heading h3 { margin:0; font-size:1.2em }
+.settings-intro,.settings-detail,.settings-error { margin:.75em 0 1.25em; font-size:.9em; overflow-wrap:anywhere; color:var(--_muted) }
+.settings-error { color:var(--_error) }
+.settings-panel fieldset { display:grid; gap:.5em; min-inline-size:0; border:0; padding:0; margin:0 }
+.settings-panel legend { padding:0; margin-block-end:.75em; font-weight:650 }
+.settings-panel select { inline-size:100%; min-inline-size:0; padding:.65em; border:1px solid var(--_border); border-radius:.4em; background:var(--_background); color:inherit; font:inherit }
+.settings-panel :is(input,select):focus-visible { outline:2px solid var(--_accent); outline-offset:3px }
+.settings-panel :disabled { opacity:.65; cursor:not-allowed }
+.settings-approval { display:flex; align-items:start; gap:.7em; padding-block:1em; border-block:1px solid var(--_border); cursor:pointer }
+.settings-approval input { flex:none; margin:.25em 0 0; accent-color:var(--_accent) }
+.settings-approval strong,.settings-approval small { display:block }
+.settings-approval small { margin-block-start:.35em; color:var(--_muted) }
 header {
   display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.45em;
   padding:.75em .95em; border-block-end:1px solid var(--_border);

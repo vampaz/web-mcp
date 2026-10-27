@@ -43,7 +43,10 @@ export function registerCounterTools(onChange: (value: number) => void) {
   }
 }
 
-export function installApprovalDialog(dialog: HTMLDialogElement): () => void {
+export function installApprovalDialog(
+  dialog: HTMLDialogElement,
+  requiresApproval: () => boolean = () => true
+): () => void {
   let pending: ((approved: boolean) => void) | undefined
   let cleanup: (() => void) | undefined
   function cancel() {
@@ -51,6 +54,7 @@ export function installApprovalDialog(dialog: HTMLDialogElement): () => void {
   }
   const disposeConfirmation = setConfirmationHandler(function confirm({ input, reason, signal }) {
     cancel()
+    if (!requiresApproval()) return true
     return new Promise<boolean>(function approval(resolve) {
       function finish(approved: boolean) {
         pending = undefined
