@@ -26,9 +26,9 @@ export const chatStyles = `
 .panel[data-settings-open] { grid-template-rows:auto minmax(0,1fr) }
 .panel[data-settings-open] [data-clear] { display:none }
 .settings-panel { min-inline-size:0; min-block-size:0; padding:1.25em; overflow:auto; overscroll-behavior:contain }
-.settings-heading { display:flex; align-items:center; justify-content:space-between; gap:.75em }
+.settings-heading { display:flex; align-items:center; justify-content:space-between; gap:.75em; margin-block-end:1.25em }
 .settings-heading h3 { margin:0; font-size:1.2em }
-.settings-intro,.settings-detail,.settings-error { margin:.75em 0 1.25em; font-size:.9em; overflow-wrap:anywhere; color:var(--_muted) }
+.settings-detail,.settings-error { margin:.75em 0 1.25em; font-size:.9em; overflow-wrap:anywhere; color:var(--_muted) }
 .settings-error { color:var(--_error) }
 .settings-panel fieldset { display:grid; gap:.5em; min-inline-size:0; border:0; padding:0; margin:0 }
 .settings-panel legend { padding:0; margin-block-end:.75em; font-weight:650 }

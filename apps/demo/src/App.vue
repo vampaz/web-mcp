@@ -235,7 +235,7 @@ const pendingController: PiController = {
     return function unsubscribe() {}
   },
   async send() {
-    throw new Error('Choose an available model in Demo settings.')
+    throw new Error('Choose an available model in Settings.')
   },
   async stop() {},
   async clear() {},
@@ -301,7 +301,6 @@ function configureChats() {
           }
         }
       },
-      labels: { settings: 'Demo settings', closeSettings: 'Close demo settings' },
       assistantLabel: 'Assistant',
       suggestedPrompts: ['Read the counter', 'Set the counter to 7'],
       emptyState: 'Ask a question or request an action to get started.'

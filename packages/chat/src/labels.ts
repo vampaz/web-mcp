@@ -13,7 +13,7 @@ export function createLabels(
     newChat: 'New chat',
     settings: 'Settings',
     closeSettings: 'Close settings',
-    settingsIntro: 'Configure the assistant for this conversation.',
+    settingsIntro: '',
     conversationModel: 'Conversation model',
     provider: 'Provider',
     model: 'Model',

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1 — 2026-10-27
+
+- **Chat:** remove the redundant settings introduction and use the shared **Settings** labels in integrations. Retain the deprecated `settingsIntro` label for source compatibility.
+
 ## 0.6.0 — 2026-10-27
 
 - **Chat:** add an optional settings module with an in-chat icon, provider/model selectors, app-owned approval preferences, status/error feedback, and a slot for diagnostics. Preserve conversation state and keyboard focus while switching views.
