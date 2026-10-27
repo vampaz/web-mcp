@@ -2179,6 +2179,7 @@ export interface WebMCPChatLabels {
   newChat: string
   settings: string
   closeSettings: string
+  /** @deprecated Unused; settings show labeled controls without an introduction. */
   settingsIntro: string
   conversationModel: string
   provider: string

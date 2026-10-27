@@ -13,7 +13,7 @@ The Vite server uses [`@vampaz/vite-plugin-local-tls`](https://github.com/vampaz
 
 ## LM Studio
 
-Start the local LM Studio server, then open the **Demo settings** icon inside chat. Select **LM Studio (local)** and choose a downloaded chat model, or select **Chrome built-in AI** in a supported browser. The model list excludes embeddings and places loaded models first. LM Studio may load the selected model on the first message; the demo does not download models. Provider failures remain visible in settings, where you can select another provider.
+Start the local LM Studio server, then open the **Settings** icon inside chat. Select **LM Studio (local)** and choose a downloaded chat model, or select **Chrome built-in AI** in a supported browser. The model list excludes embeddings and places loaded models first. LM Studio may load the selected model on the first message; the demo does not download models. Provider failures remain visible in settings, where you can select another provider.
 
 Copy `.env.example` to `.env.local` to change the loopback server URL, provide an optional server-only `LM_STUDIO_API_TOKEN`, or set `LM_STUDIO_MODEL` as the initial model preference. The selection is remembered across Chat and Harness in this browser. The example requests JSON-schema output, disables reasoning explicitly, uses temperature 0.2, and caps each response at 1,024 tokens.
 

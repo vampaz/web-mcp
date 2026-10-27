@@ -26,7 +26,6 @@ export class ChatSettings {
     this.region.hidden = true
     this.region.innerHTML = `
       <div class="settings-heading"><h3 id="${id}-title"></h3><button type="button" class="icon-button" data-settings-close>${icon('M6 6l12 12M18 6 6 18')}</button></div>
-      <p class="settings-intro"></p>
       <fieldset><legend></legend>
         <label for="${id}-provider" data-provider-label></label><select id="${id}-provider"></select>
         <label for="${id}-model" data-model-label></label><select id="${id}-model"></select>
@@ -65,7 +64,6 @@ export class ChatSettings {
     this.closeButton.setAttribute('aria-label', labels.closeSettings)
     this.closeButton.title = labels.closeSettings
     this.region.querySelector('h3')!.textContent = labels.settings
-    this.region.querySelector('.settings-intro')!.textContent = labels.settingsIntro
     this.region.querySelector('legend')!.textContent = labels.conversationModel
     this.region.querySelector('[data-provider-label]')!.textContent = labels.provider
     const modelLabel = this.region.querySelector<HTMLElement>('[data-model-label]')!

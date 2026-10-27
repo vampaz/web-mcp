@@ -64,7 +64,7 @@ If a send fails before the controller records the user message, the composer res
 
 ## Optional settings module
 
-Pass `settings` to add an icon inside the chat header. It opens provider, model, and optional approval controls inside the same chat window in inline and popup modes. This ports the standalone demo's controls into a framework-neutral module; it adds no model provider or inference dependency.
+Pass `settings` to add an icon inside the chat header. It opens a **Settings** panel with provider, model, and optional approval controls inside the same chat window in inline and popup modes. The module adds no model provider or inference dependency.
 
 ```ts
 import type { WebMCPChatSettings } from '@vampaz/webmcp-kit/chat'
