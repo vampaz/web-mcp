@@ -159,6 +159,72 @@ test('keeps focus outside chat when a pending response arrives', async function 
   await expect(input).toHaveValue('My next question')
 })
 
+for (const mode of ['inline', 'popup'] as const) {
+  test(`keeps the header and composer visible with many suggestions in ${mode} mode`, async function suggestions({
+    page
+  }) {
+    await page.goto(`/?mode=chat&presentation=${mode}`)
+    const chat = page.locator('webmcp-chat')
+    if (mode === 'popup') await chat.getByRole('button', { name: 'Open Assistant' }).click()
+    await expectIdle(chat)
+    await chat.evaluate(function configure(element, mode) {
+      if (mode === 'inline') (element as HTMLElement).style.inlineSize = '24rem'
+      let snapshot: PiSnapshot = { state: 'idle', messages: [] }
+      let notify: (snapshot: PiSnapshot) => void
+      ;(element as WebMCPChatElement).configure({
+        mode,
+        controller: {
+          getSnapshot: () => snapshot,
+          subscribe(listener) {
+            notify = listener
+            listener(snapshot)
+            return function remove() {}
+          },
+          async send() {
+            snapshot = { state: 'idle', messages: [{ id: '1', role: 'user', text: 'Hello' }] }
+            notify(snapshot)
+            return { status: 'completed' }
+          },
+          async stop() {},
+          async clear() {
+            snapshot = { state: 'idle', messages: [] }
+            notify(snapshot)
+          },
+          async refresh() {},
+          async destroy() {}
+        },
+        suggestedPrompts: Array.from({ length: 15 }, (_, index) => `Suggested action ${index + 1}`)
+      })
+    }, mode)
+    const log = chat.getByRole('log')
+    const panel = chat.locator('.panel')
+    const header = chat.locator('header')
+    const input = chat.getByRole('textbox', { name: 'Message', exact: true })
+    await expect(log.getByRole('button', { name: 'Suggested action 1', exact: true })).toBeVisible()
+    await expect(chat.locator('.jump-latest')).toBeHidden()
+    expect(await log.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true)
+    expect(await log.evaluate((element) => element.scrollTop)).toBe(0)
+    expect(await panel.evaluate((element) => element.scrollHeight <= element.clientHeight)).toBe(
+      true
+    )
+    const before = await header.evaluate((element) => (element as HTMLElement).offsetTop)
+    await log.getByRole('button', { name: 'Suggested action 15' }).focus()
+    expect(await header.evaluate((element) => (element as HTMLElement).offsetTop)).toBe(before)
+    expect(await panel.evaluate((element) => element.scrollTop)).toBe(0)
+    const panelBox = (await panel.boundingBox())!
+    const inputBox = (await input.boundingBox())!
+    expect(inputBox.y + inputBox.height).toBeLessThanOrEqual(panelBox.y + panelBox.height)
+    await page.keyboard.press('Enter')
+    await expect(input).toHaveValue('Suggested action 15')
+    await expect(input).toBeFocused()
+    await input.press('Enter')
+    await expect(chat.locator('ol li')).toHaveCount(1)
+    await chat.getByRole('button', { name: 'New chat' }).click()
+    await expect(chat.locator('ol li')).toHaveCount(0)
+    expect(await log.evaluate((element) => element.scrollTop)).toBe(0)
+  })
+}
+
 test('honors a compact maximum height and keeps controls reachable in a short panel', async function height({
   page
 }) {

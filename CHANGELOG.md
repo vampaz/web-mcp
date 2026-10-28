@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.2 — 2026-10-28
+
+- **Chat:** keep the header and message input visible when many suggested prompts need scrolling.
+
 ## 0.6.1 — 2026-10-27
 
 - **Chat:** remove the redundant settings introduction and use the shared **Settings** labels in integrations. Retain the deprecated `settingsIntro` label for source compatibility.

@@ -37,7 +37,7 @@ export function defineWebMCPChat(): void {
     private readonly resizeObserver = new ResizeObserver(() => {
       if (!this.initiallyScrolled) this.update()
       else {
-        if (this.nearEnd()) this.scrollToEnd()
+        if (this.snapshot.messages.length > 0 && this.nearEnd()) this.scrollToEnd()
         this.updateJump()
       }
     })
@@ -77,12 +77,11 @@ export function defineWebMCPChat(): void {
             <div class="header-actions"><slot name="header-actions"></slot><button class="icon-button" type="button" data-clear part="new-chat">${icon('M12 5v14M5 12h14')}</button></div>
           </header>
           <div class="conversation">
-            <div class="transcript" part="transcript" tabindex="0" role="log"><div data-empty><slot name="empty"><p></p></slot></div><ol></ol><p class="working" hidden aria-hidden="true"><span class="working-dots"><span></span><span></span><span></span></span><span class="working-text"></span></p></div>
+            <div class="transcript" part="transcript" tabindex="0" role="log"><div data-empty><slot name="empty"><p></p></slot></div><div class="suggestions"></div><ol></ol><p class="working" hidden aria-hidden="true"><span class="working-dots"><span></span><span></span><span></span></span><span class="working-text"></span></p></div>
             <p class="visually-hidden" aria-live="polite" data-activity></p>
             <button type="button" class="jump-latest" part="jump-latest" hidden></button>
           </div>
           <form class="composer" part="composer">
-            <div class="suggestions"></div>
             <div class="message-box">
               <label class="visually-hidden" for="${id}-message"></label>
               <textarea id="${id}-message" part="textarea" rows="2" enterkeyhint="send"></textarea>
@@ -282,6 +281,7 @@ export function defineWebMCPChat(): void {
 
     private update(snapshot = this.snapshot) {
       const stateChanged = snapshot.state !== this.snapshot.state
+      const cleared = this.snapshot.messages.length > 0 && snapshot.messages.length === 0
       this.snapshot = snapshot
       const nearEnd = this.nearEnd()
       const latest = snapshot.messages.at(-1)
@@ -315,8 +315,9 @@ export function defineWebMCPChat(): void {
       if (this.list.getAttribute('aria-busy') !== busy) this.list.setAttribute('aria-busy', busy)
       this.updateStatus()
       this.updateComposer()
+      if (cleared) this.transcript.scrollTop = 0
       if (this.isConnected && (!this.initiallyScrolled || (changed && nearEnd))) {
-        this.scrollToEnd()
+        if (snapshot.messages.length > 0) this.scrollToEnd()
         this.initiallyScrolled = snapshot.state !== 'loading' && this.transcript.clientHeight > 0
       }
       this.updateJump()
@@ -425,7 +426,7 @@ export function defineWebMCPChat(): void {
     private updateJump() {
       const nearEnd = this.nearEnd()
       if (nearEnd) this.unread = false
-      this.jumpButton.hidden = nearEnd
+      this.jumpButton.hidden = nearEnd || this.snapshot.messages.length === 0
       const text = this.unread ? this.labels.newMessages : this.labels.jumpToLatest
       if (this.jumpButton.textContent !== text) this.jumpButton.textContent = text
     }
