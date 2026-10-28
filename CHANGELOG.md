@@ -3,6 +3,8 @@
 ## 0.6.2 — 2026-10-28
 
 - **Chat:** keep the header and message input visible when many suggested prompts need scrolling.
+- **Chat:** hide suggestions during pending turns and scroll to the latest message when history first arrives in an empty conversation.
+- **Accessibility:** keep suggested prompts outside the nested message log. The scrolling `::part(transcript)` now uses `role="region"`.
 
 ## 0.6.1 — 2026-10-27
 

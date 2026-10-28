@@ -181,7 +181,10 @@ for (const mode of ['inline', 'popup'] as const) {
             return function remove() {}
           },
           async send() {
-            snapshot = { state: 'idle', messages: [{ id: '1', role: 'user', text: 'Hello' }] }
+            snapshot = {
+              state: 'idle',
+              messages: [{ id: '1', role: 'user', text: 'Long message. '.repeat(120) }]
+            }
             notify(snapshot)
             return { status: 'completed' }
           },
@@ -196,7 +199,7 @@ for (const mode of ['inline', 'popup'] as const) {
         suggestedPrompts: Array.from({ length: 15 }, (_, index) => `Suggested action ${index + 1}`)
       })
     }, mode)
-    const log = chat.getByRole('log')
+    const log = chat.locator('.transcript')
     const panel = chat.locator('.panel')
     const header = chat.locator('header')
     const input = chat.getByRole('textbox', { name: 'Message', exact: true })
@@ -207,9 +210,13 @@ for (const mode of ['inline', 'popup'] as const) {
     expect(await panel.evaluate((element) => element.scrollHeight <= element.clientHeight)).toBe(
       true
     )
-    const before = await header.evaluate((element) => (element as HTMLElement).offsetTop)
+    await panel.scrollIntoViewIfNeeded()
+    const before = (await header.boundingBox())!
+    const composerBefore = (await chat.locator('.composer').boundingBox())!
     await log.getByRole('button', { name: 'Suggested action 15' }).focus()
-    expect(await header.evaluate((element) => (element as HTMLElement).offsetTop)).toBe(before)
+    expect(await log.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+    expect((await header.boundingBox())!.y).toBeCloseTo(before.y, 1)
+    expect((await chat.locator('.composer').boundingBox())!.y).toBeCloseTo(composerBefore.y, 1)
     expect(await panel.evaluate((element) => element.scrollTop)).toBe(0)
     const panelBox = (await panel.boundingBox())!
     const inputBox = (await input.boundingBox())!
@@ -219,9 +226,204 @@ for (const mode of ['inline', 'popup'] as const) {
     await expect(input).toBeFocused()
     await input.press('Enter')
     await expect(chat.locator('ol li')).toHaveCount(1)
+    expect(await log.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
     await chat.getByRole('button', { name: 'New chat' }).click()
     await expect(chat.locator('ol li')).toHaveCount(0)
     expect(await log.evaluate((element) => element.scrollTop)).toBe(0)
+  })
+
+  test(`follows the first turn with overflowing suggestions in ${mode} mode`, async function firstTurn({
+    page
+  }) {
+    await page.goto(`/?mode=chat&presentation=${mode}`)
+    const chat = page.locator('webmcp-chat')
+    if (mode === 'popup') await chat.getByRole('button', { name: 'Open Assistant' }).click()
+    await expectIdle(chat)
+    await chat.evaluate(function configure(element, mode) {
+      if (mode === 'inline') (element as HTMLElement).style.inlineSize = '24rem'
+      let snapshot: PiSnapshot = { state: 'idle', messages: [] }
+      let notify: (snapshot: PiSnapshot) => void
+      ;(element as WebMCPChatElement).configure({
+        mode,
+        suggestedPrompts: Array.from({ length: 15 }, (_, index) => `Suggested action ${index + 1}`),
+        controller: {
+          getSnapshot: () => snapshot,
+          subscribe(listener) {
+            notify = listener
+            listener(snapshot)
+            return function remove() {}
+          },
+          send(text) {
+            snapshot = { state: 'running', messages: [] }
+            notify(snapshot)
+            return new Promise(function pending(resolve) {
+              element.addEventListener(
+                'record-first-message',
+                function record() {
+                  snapshot = { state: 'running', messages: [{ id: 'q', role: 'user', text }] }
+                  notify(snapshot)
+                },
+                { once: true }
+              )
+              element.addEventListener(
+                'finish-first-turn',
+                function finish() {
+                  snapshot = {
+                    state: 'idle',
+                    messages: [
+                      ...snapshot.messages,
+                      { id: 'a', role: 'assistant', text: 'Reply. '.repeat(300) }
+                    ]
+                  }
+                  notify(snapshot)
+                  resolve({ status: 'completed' })
+                },
+                { once: true }
+              )
+            })
+          },
+          async stop() {},
+          async clear() {},
+          async refresh() {},
+          async destroy() {}
+        }
+      })
+    }, mode)
+    const transcript = chat.locator('.transcript')
+    const input = chat.getByRole('textbox', { name: 'Message', exact: true })
+    expect(
+      await transcript.evaluate((element) => element.scrollHeight > element.clientHeight)
+    ).toBe(true)
+    await input.fill('Long first message. '.repeat(100))
+    await input.press('Enter')
+    await expect(chat.locator('.suggestions')).toBeHidden()
+    await expect(chat.locator('.working')).toBeInViewport({ ratio: 1 })
+    await chat.dispatchEvent('record-first-message')
+    await expect(chat.locator('ol li')).toHaveCount(1)
+    await expect(chat.locator('.working')).toBeInViewport({ ratio: 1 })
+    await expect(chat.locator('.jump-latest')).toBeHidden()
+    await chat.dispatchEvent('finish-first-turn')
+    await expectIdle(chat)
+    await expect(chat.locator('ol li')).toHaveCount(2)
+    await expect
+      .poll(() =>
+        transcript.evaluate(
+          (element) => element.scrollHeight - element.scrollTop - element.clientHeight
+        )
+      )
+      .toBeLessThan(2)
+  })
+
+  test(`restores incoming history and resets cleared or replaced conversations in ${mode} mode`, async function controllers({
+    page
+  }) {
+    await page.goto(`/?mode=chat&presentation=${mode}`)
+    const chat = page.locator('webmcp-chat')
+    if (mode === 'popup') await chat.getByRole('button', { name: 'Open Assistant' }).click()
+    await expectIdle(chat)
+    await chat.evaluate(function configure(element, mode) {
+      if (mode === 'inline') (element as HTMLElement).style.inlineSize = '24rem'
+      const chat = element as WebMCPChatElement
+      let snapshot: PiSnapshot = { state: 'idle', messages: [] }
+      let notify: (snapshot: PiSnapshot) => void
+      const saved: PiSnapshot = {
+        state: 'idle',
+        messages: Array.from({ length: 30 }, (_, index) => ({
+          id: String(index),
+          role: 'assistant',
+          text: `Saved reply ${index}. More content to read.`
+        }))
+      }
+      chat.configure({
+        mode,
+        suggestedPrompts: Array.from({ length: 15 }, (_, index) => `Suggested action ${index + 1}`),
+        controller: {
+          getSnapshot: () => snapshot,
+          subscribe(listener) {
+            notify = listener
+            listener(snapshot)
+            return function remove() {}
+          },
+          async send() {
+            return { status: 'completed' }
+          },
+          async stop() {},
+          async clear() {},
+          async refresh() {},
+          async destroy() {}
+        }
+      })
+      const original = chat.controller!
+      element.addEventListener('load-history', function load() {
+        snapshot = saved
+        notify(snapshot)
+      })
+      element.addEventListener('clear-history', function clear() {
+        snapshot = { state: 'idle', messages: [] }
+        notify(snapshot)
+      })
+      element.addEventListener(
+        'switch-conversation',
+        function switchConversation() {
+          const empty: PiSnapshot = { state: 'idle', messages: [] }
+          chat.controller = {
+            ...original,
+            getSnapshot: () => empty,
+            subscribe(listener) {
+              listener(empty)
+              return function remove() {}
+            }
+          }
+        },
+        { once: true }
+      )
+      element.addEventListener(
+        'restore-conversation',
+        function restore() {
+          chat.controller = original
+        },
+        { once: true }
+      )
+    }, mode)
+    const transcript = chat.locator('.transcript')
+    expect(
+      await transcript.evaluate((element) => element.scrollHeight > element.clientHeight)
+    ).toBe(true)
+    expect(await transcript.evaluate((element) => element.scrollTop)).toBe(0)
+    await chat.dispatchEvent('load-history')
+    await expect(chat.locator('ol li')).toHaveCount(30)
+    await expect
+      .poll(() =>
+        transcript.evaluate(
+          (element) => element.scrollHeight - element.scrollTop - element.clientHeight
+        )
+      )
+      .toBeLessThan(2)
+    await expect(chat.locator('.jump-latest')).toBeHidden()
+    await chat.dispatchEvent('clear-history')
+    await expect(chat.locator('ol li')).toHaveCount(0)
+    expect(await transcript.evaluate((element) => element.scrollTop)).toBe(0)
+    await chat.dispatchEvent('load-history')
+    await expect(chat.locator('ol li')).toHaveCount(30)
+    expect(await transcript.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+    await chat.dispatchEvent('switch-conversation')
+    await expect(chat.locator('ol li')).toHaveCount(0)
+    expect(
+      await transcript.evaluate((element) => element.scrollHeight > element.clientHeight)
+    ).toBe(true)
+    expect(await transcript.evaluate((element) => element.scrollTop)).toBe(0)
+    await expect(
+      chat.getByRole('button', { name: 'Suggested action 1', exact: true })
+    ).toBeInViewport({ ratio: 1 })
+    await chat.dispatchEvent('restore-conversation')
+    await expect(chat.locator('ol li')).toHaveCount(30)
+    await expect
+      .poll(() =>
+        transcript.evaluate(
+          (element) => element.scrollHeight - element.scrollTop - element.clientHeight
+        )
+      )
+      .toBeLessThan(2)
   })
 }
 
@@ -244,7 +446,7 @@ test('honors a compact maximum height and keeps controls reachable in a short pa
     })
     expect(size.actual).toBeLessThanOrEqual(size.maximum)
     expect(
-      await chat.getByRole('log').evaluate(function readable(element) {
+      await chat.getByRole('region', { name: 'Conversation' }).evaluate(function readable(element) {
         const style = getComputedStyle(element)
         return element.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
       })
@@ -269,7 +471,7 @@ test('wraps long text and preserves the reader position when a new message arriv
   await input.fill('x'.repeat(15900))
   await input.press('Enter')
   await expectIdle(chat)
-  const transcript = chat.getByRole('log', { name: 'Conversation' })
+  const transcript = chat.getByRole('region', { name: 'Conversation' })
   expect(
     await transcript.evaluate(function scrollable(element) {
       return element.scrollHeight > element.clientHeight
@@ -339,7 +541,7 @@ test('keeps a short viewport readable and protects long drafts', async function 
   const input = chat.getByRole('textbox', { name: 'Message', exact: true })
   await expectIdle(chat)
   expect(
-    await chat.getByRole('log').evaluate(function readable(element) {
+    await chat.getByRole('region', { name: 'Conversation' }).evaluate(function readable(element) {
       const style = getComputedStyle(element)
       return element.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
     })
@@ -407,7 +609,7 @@ test('opens saved history at the latest reply when a hidden chat becomes visible
     document.querySelector('#example')!.append(show, panel)
   })
   await page.getByRole('button', { name: 'Open saved conversation', exact: true }).click()
-  const transcript = page.locator('#saved-chat').getByRole('log')
+  const transcript = page.locator('#saved-chat').getByRole('region', { name: 'Conversation' })
   await expect(transcript).toBeVisible()
   await expect
     .poll(async function latest() {

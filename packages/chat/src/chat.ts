@@ -45,6 +45,7 @@ export function defineWebMCPChat(): void {
     private readonly status: HTMLParagraphElement
     private readonly statusText: HTMLSpanElement
     private readonly transcript: HTMLDivElement
+    private readonly log: HTMLDivElement
     private readonly list: HTMLOListElement
     private readonly empty: HTMLDivElement
     private readonly emptyText: HTMLParagraphElement
@@ -77,7 +78,7 @@ export function defineWebMCPChat(): void {
             <div class="header-actions"><slot name="header-actions"></slot><button class="icon-button" type="button" data-clear part="new-chat">${icon('M12 5v14M5 12h14')}</button></div>
           </header>
           <div class="conversation">
-            <div class="transcript" part="transcript" tabindex="0" role="log"><div data-empty><slot name="empty"><p></p></slot></div><div class="suggestions"></div><ol></ol><p class="working" hidden aria-hidden="true"><span class="working-dots"><span></span><span></span><span></span></span><span class="working-text"></span></p></div>
+            <div class="transcript" part="transcript" tabindex="0" role="region"><div data-empty><slot name="empty"><p></p></slot></div><div class="suggestions"></div><div role="log"><ol></ol><p class="working" hidden aria-hidden="true"><span class="working-dots"><span></span><span></span><span></span></span><span class="working-text"></span></p></div></div>
             <p class="visually-hidden" aria-live="polite" data-activity></p>
             <button type="button" class="jump-latest" part="jump-latest" hidden></button>
           </div>
@@ -97,6 +98,7 @@ export function defineWebMCPChat(): void {
       this.status = this.root.querySelector('.status')!
       this.statusText = this.root.querySelector('.status span')!
       this.transcript = this.root.querySelector('.transcript')!
+      this.log = this.root.querySelector('[role=log]')!
       this.list = this.root.querySelector('ol')!
       this.empty = this.root.querySelector('[data-empty]')!
       this.emptyText = this.root.querySelector('[data-empty] p')!
@@ -211,6 +213,7 @@ export function defineWebMCPChat(): void {
       if (this.options?.controller !== options.controller) {
         this.input.value = ''
         this.list.replaceChildren()
+        this.transcript.scrollTop = 0
         this.snapshot = options.controller.getSnapshot()
         this.initiallyScrolled = false
         this.latestId = this.latestText = undefined
@@ -268,6 +271,7 @@ export function defineWebMCPChat(): void {
       this.sendButton.title = labels.send
       this.stopText.textContent = labels.stop
       this.transcript.setAttribute('aria-label', labels.conversation)
+      this.log.setAttribute('aria-label', labels.conversation)
       this.messageLabel.textContent = labels.message
       this.hint.textContent = labels.hint
       this.editButton.textContent = labels.editLastMessage
@@ -282,8 +286,8 @@ export function defineWebMCPChat(): void {
     private update(snapshot = this.snapshot) {
       const stateChanged = snapshot.state !== this.snapshot.state
       const cleared = this.snapshot.messages.length > 0 && snapshot.messages.length === 0
+      const nearEnd = this.snapshot.messages.length === 0 || this.nearEnd()
       this.snapshot = snapshot
-      const nearEnd = this.nearEnd()
       const latest = snapshot.messages.at(-1)
       if ((latest?.id !== this.latestId || latest?.text !== this.latestText) && !nearEnd)
         this.unread = true
@@ -348,7 +352,7 @@ export function defineWebMCPChat(): void {
       const disabled = !this.options || this.options.disabled || snapshot.state === 'closed'
       const tooLong = length > max
       const coarse = this.coarsePointer.matches
-      this.suggestions.hidden = snapshot.messages.length > 0 || length > 0
+      this.suggestions.hidden = snapshot.messages.length > 0 || length > 0 || busy
       this.input.disabled = Boolean(disabled || this.clearing || snapshot.state === 'loading')
       this.input.setAttribute('aria-invalid', String(tooLong))
       this.limit.hidden = length < max * 0.9
