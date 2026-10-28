@@ -78,6 +78,9 @@ test('stops resolving and reports a failed provider without a fallback', async f
   const input = page.getByRole('textbox', { name: 'Message', exact: true })
   await input.fill('wait')
   await input.press('Enter')
+  await expect(
+    page.locator('webmcp-chat').getByRole('log').getByText('Thinking…', { exact: true })
+  ).toBeVisible()
   await page.getByRole('button', { name: 'Stop', exact: true }).click()
   await expect(page.locator('webmcp-chat').getByRole('status')).toContainText('interrupted')
   await page.reload()
