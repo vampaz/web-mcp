@@ -30,6 +30,7 @@ export function registerNativeTool<TInput = Record<string, unknown>, TOutput = u
         name: tool.name,
         description: tool.description,
         inputSchema: tool.inputSchema,
+        outputSchema: tool.outputSchema,
         annotations: tool.annotations,
         async execute(input: TInput, options?: { signal?: AbortSignal }) {
           const result = await invokeToolPipeline(tool, {

@@ -49,6 +49,12 @@ describe('native WebMCP adapter', () => {
     const registration = registerTool(
       defineTool({
         name: 'search_products',
+        outputSchema: {
+          type: 'object',
+          properties: { query: { type: 'string' } },
+          required: ['query']
+        },
+        annotations: { readOnlyHint: true },
         description:
           'Search the local product catalog and return matching products for the current shopper.',
         inputSchema: {
@@ -69,7 +75,13 @@ describe('native WebMCP adapter', () => {
     expect(registerNativeTool).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'search_products',
-        description: expect.stringContaining('Search the local product catalog')
+        description: expect.stringContaining('Search the local product catalog'),
+        outputSchema: {
+          type: 'object',
+          properties: { query: { type: 'string' } },
+          required: ['query']
+        },
+        annotations: { readOnlyHint: true }
       }),
       expect.objectContaining({
         signal: expect.any(AbortSignal)

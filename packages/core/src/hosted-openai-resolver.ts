@@ -472,6 +472,8 @@ function createHostedToolCatalog(tools: WebMCPTool[]) {
     return {
       description: tool.description,
       inputSchema: tool.inputSchema,
+      ...(tool.outputSchema ? { outputSchema: tool.outputSchema } : {}),
+      ...(tool.annotations ? { annotations: tool.annotations } : {}),
       name: tool.name
     }
   })

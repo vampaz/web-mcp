@@ -1,9 +1,22 @@
-import type { JsonSchema, ResolverContext, ToolInvocationResult } from '@vampaz/webmcp-kit'
+import type {
+  JsonSchema,
+  ResolverContext,
+  ToolAnnotations,
+  ToolInvocationResult,
+  WebMCPTool
+} from '@vampaz/webmcp-kit'
 
 export interface PiToolDescription {
   name: string
   description: string
   inputSchema: JsonSchema
+  outputSchema?: JsonSchema
+  annotations?: ToolAnnotations
+}
+
+export interface RegistryToolHostOptions {
+  /** Limits discovery and invocation to tools intended for this agent. */
+  include?(tool: WebMCPTool): boolean
 }
 
 export interface PiToolCatalog {
