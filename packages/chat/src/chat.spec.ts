@@ -440,6 +440,7 @@ it('keeps the composer usable without submitting a second turn while waiting', a
   expect(element.shadowRoot!.activeElement).toBe(input)
   expect(element.shadowRoot!.querySelector('[role=status]')!.textContent).toBe('')
   expect(element.shadowRoot!.querySelector<HTMLElement>('.working')!.hidden).toBe(false)
+  expect(element.shadowRoot!.querySelector<HTMLElement>('.suggestions')!.hidden).toBe(true)
   element.configure({ controller: fixture.api, title: 'Updated title' })
   input.value = 'Follow-up draft'
   input.dispatchEvent(new Event('input'))
@@ -451,6 +452,26 @@ it('keeps the composer usable without submitting a second turn while waiting', a
   expect(element.shadowRoot!.querySelector<HTMLButtonElement>('[type=submit]')!.disabled).toBe(
     false
   )
+})
+
+it('keeps suggestions outside message announcements when the draft is cleared', function announcements() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  const root = element.shadowRoot!
+  const log = root.querySelector('[role=log]')!
+  const suggestion = root.querySelector<HTMLButtonElement>('.suggestions button')!
+  expect(log.contains(suggestion)).toBe(false)
+  suggestion.click()
+  expect(root.querySelector('textarea')!.value).toBe('Read the counter')
+  element.setDraft('')
+  expect(root.querySelector<HTMLElement>('.suggestions')!.hidden).toBe(false)
+  expect(log.contains(suggestion)).toBe(false)
+  fixture.publish({
+    state: 'idle',
+    messages: [{ id: 'reply', role: 'assistant', text: 'Counter: 7' }]
+  })
+  expect(log.textContent).toContain('Counter: 7')
+  expect(log.getAttribute('aria-label')).toBe('Conversation')
 })
 
 it('shows the working indicator in the transcript instead of the status region', async function test() {
