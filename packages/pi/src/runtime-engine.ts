@@ -148,6 +148,8 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
     let aborting: Promise<void> | undefined
     let toolCalls = 0
     const completedActions: PiActionOutcome[] = []
+    const unchangedReads = new Map<string, { result: string; count: number }>()
+    let progressCorrected = false
     let catalogRefreshed = false
     let corrected = false
     let activity: PiActivity | undefined
@@ -323,6 +325,22 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                           input: actionInput,
                           status: result.status
                         })
+                        if (
+                          tool.annotations?.readOnlyHint === true &&
+                          result.status === 'success'
+                        ) {
+                          const key = canonicalJson([roundCatalog.revision, tool.name, actionInput])
+                          const output = result.output as { status?: unknown } | undefined
+                          if (output?.status === 'pending') unchangedReads.delete(key)
+                          else {
+                            const value = canonicalJson([roundCatalog.revision, result.output])
+                            const previous = unchangedReads.get(key)
+                            unchangedReads.set(key, {
+                              result: value,
+                              count: previous?.result === value ? previous.count + 1 : 1
+                            })
+                          }
+                        } else unchangedReads.clear()
                         actionInFlight = false
                         if (result.status !== 'success')
                           failure = {
@@ -445,6 +463,27 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                     { reason: 'tool_calls' }
                   )
                 result = await round(getErrorMessage(error))
+              }
+              function repeatsUnchangedRead(candidate: PiRoundResult) {
+                const { toolName, input } = candidate.resolution
+                return (
+                  (unchangedReads.get(canonicalJson([current.revision, toolName, input]))?.count ??
+                    0) >= 2
+                )
+              }
+              if (repeatsUnchangedRead(result)) {
+                const message =
+                  'The same read returned unchanged results twice. Use pi_reply if the request is satisfied, or choose a different action that makes progress.'
+                if (!progressCorrected) {
+                  progressCorrected = true
+                  result = await round(message)
+                }
+                if (repeatsUnchangedRead(result))
+                  throw new PiFailure(
+                    'limit_reached',
+                    'This turn stopped because repeated reads made no progress. Check the results before continuing.',
+                    { reason: 'no_progress' }
+                  )
               }
               const latest = await hostCall(options.host.discover(currentSignal), currentSignal)
               if (latest.revision !== current.revision)
@@ -701,4 +740,13 @@ function freeze<T>(value: T): T {
     for (const child of Object.values(value)) freeze(child)
   }
   return value
+}
+
+function canonicalJson(value: unknown): string {
+  return JSON.stringify(value, function ordered(_key, item) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return item
+    return Object.fromEntries(
+      Object.entries(item).sort(([left], [right]) => left.localeCompare(right))
+    )
+  })
 }

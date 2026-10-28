@@ -1,25 +1,28 @@
 import { invokeTool, subscribeWebMCPKitEvents } from '@vampaz/webmcp-kit'
 import { listAvailableTools } from '../../core/src/registry'
 import type { ConfirmationEventDetail, ResolverContext } from '@vampaz/webmcp-kit'
-import type { PiToolHost } from './interfaces/host'
+import type { PiToolHost, RegistryToolHostOptions } from './interfaces/host'
 import { PiFailure } from './errors'
 
 export function createRegistryToolHost(
   context: () => ResolverContext | Promise<ResolverContext> = function empty() {
     return {}
-  }
+  },
+  options: RegistryToolHostOptions = {}
 ): PiToolHost {
   let previous: unknown[] = []
   let revision = 0
   let schema = ''
   async function discover(signal: AbortSignal) {
     signal.throwIfAborted()
-    const registrations = listAvailableTools()
+    const registrations = listAvailableTools().filter(({ tool }) => options.include?.(tool) ?? true)
     const tools = registrations.map(function describe({ tool }) {
       return {
         name: tool.name,
         description: tool.description,
-        inputSchema: structuredClone(tool.inputSchema)
+        inputSchema: structuredClone(tool.inputSchema),
+        ...(tool.outputSchema ? { outputSchema: structuredClone(tool.outputSchema) } : {}),
+        ...(tool.annotations ? { annotations: structuredClone(tool.annotations) } : {})
       }
     })
     const nextSchema = JSON.stringify(tools)
@@ -43,7 +46,10 @@ export function createRegistryToolHost(
     },
     async invoke(call, signal, progress) {
       const current = await discover(signal)
-      if (current.revision !== call.revision)
+      if (
+        current.revision !== call.revision ||
+        !current.tools.some((tool) => tool.name === call.name)
+      )
         throw new PiFailure('stale_document', 'The tool catalog changed. Send a new request.')
       const id = `pi_${crypto.randomUUID()}`
       // Approval events carry the invocation ID, so the activity shows when the app asks the user.

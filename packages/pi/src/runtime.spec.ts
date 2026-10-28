@@ -628,6 +628,91 @@ it('enforces the configured tool call limit', async function test() {
   expect(config.invoke).toHaveBeenCalledTimes(1)
 })
 
+it('corrects a repeated unchanged read before another invocation and stops if ignored', async function test() {
+  const config = options(Array.from({ length: 5 }, () => resolution('read_counter', {})))
+  const discover = config.host.discover
+  config.host.discover = async function readOnly(signal) {
+    const catalog = await discover(signal)
+    catalog.tools[0]!.annotations = { readOnlyHint: true }
+    return catalog
+  }
+  runtime = await createPiRuntime(config)
+  expect(await runtime.send('Read the counter')).toMatchObject({
+    status: 'error',
+    error: { code: 'limit_reached', reason: 'no_progress' }
+  })
+  expect(config.invoke).toHaveBeenCalledTimes(2)
+  expect(vi.mocked(config.resolver.resolve).mock.calls.at(-1)?.[2]?.piCorrection).toContain(
+    'unchanged'
+  )
+})
+
+it('lets the model finish after a repeated-read correction', async function test() {
+  const config = options([
+    resolution('read_counter', {}),
+    resolution('read_counter', {}),
+    resolution('read_counter', {}),
+    resolution()
+  ])
+  const discover = config.host.discover
+  config.host.discover = async function readOnly(signal) {
+    const catalog = await discover(signal)
+    catalog.tools[0]!.annotations = { readOnlyHint: true }
+    return catalog
+  }
+  runtime = await createPiRuntime(config)
+  expect(await runtime.send('Read the counter')).toEqual({ status: 'completed' })
+  expect(config.invoke).toHaveBeenCalledTimes(2)
+  expect(vi.mocked(config.resolver.resolve).mock.calls.at(-1)?.[2]?.piCorrection).toContain(
+    'unchanged'
+  )
+})
+
+it('allows repeated reads when their results change', async function test() {
+  const config = options([
+    ...Array.from({ length: 4 }, () => resolution('read_counter', {})),
+    resolution()
+  ])
+  const discover = config.host.discover
+  config.host.discover = async function readOnly(signal) {
+    const catalog = await discover(signal)
+    catalog.tools[0]!.annotations = { readOnlyHint: true }
+    return catalog
+  }
+  let value = 0
+  config.invoke.mockImplementation(async () => ({
+    toolName: 'read_counter',
+    status: 'success',
+    output: { value: ++value },
+    durationMs: 0
+  }))
+  runtime = await createPiRuntime(config)
+  expect(await runtime.send('Watch the counter change')).toEqual({ status: 'completed' })
+  expect(config.invoke).toHaveBeenCalledTimes(4)
+})
+
+it('allows polling while an explicitly pending operation has not completed', async function test() {
+  const config = options([
+    ...Array.from({ length: 4 }, () => resolution('read_counter', {})),
+    resolution()
+  ])
+  const discover = config.host.discover
+  config.host.discover = async function readOnly(signal) {
+    const catalog = await discover(signal)
+    catalog.tools[0]!.annotations = { readOnlyHint: true }
+    return catalog
+  }
+  config.invoke.mockImplementation(async () => ({
+    toolName: 'read_counter',
+    status: 'success',
+    output: { value: 7, status: 'pending' },
+    durationMs: 0
+  }))
+  runtime = await createPiRuntime(config)
+  expect(await runtime.send('Wait for the counter')).toEqual({ status: 'completed' })
+  expect(config.invoke).toHaveBeenCalledTimes(4)
+})
+
 it('stops an uncooperative provider and settles the turn', async function test() {
   const config = options([])
   let requested!: () => void

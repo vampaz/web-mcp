@@ -1667,3 +1667,50 @@ function createSelectItemsTool(): WebMCPTool {
     additionalProperties: false
   })
 }
+
+it('includes action annotations and output contracts in the actual model prompt', async function test() {
+  const fetch = vi.fn().mockResolvedValue(
+    Response.json({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              toolName: 'metadata_tool',
+              input: {},
+              confidence: 1,
+              reason: 'Read'
+            })
+          }
+        }
+      ]
+    })
+  )
+  vi.stubGlobal('fetch', fetch)
+  try {
+    const resolver = await createResolver({
+      provider: 'openai-compatible',
+      baseUrl: 'http://127.0.0.1:1234/v1',
+      auth: { mode: 'none' }
+    })
+    await resolver.resolve(
+      'Read the status',
+      [
+        {
+          name: 'metadata_tool',
+          description: 'Read status',
+          inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+          outputSchema: { type: 'object' },
+          annotations: { readOnlyHint: true },
+          execute() {}
+        }
+      ],
+      {},
+      { singleStep: true }
+    )
+    const prompt = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)).messages[1].content
+    expect(prompt).toContain('"annotations":{"readOnlyHint":true}')
+    expect(prompt).toContain('"outputSchema":{"type":"object"}')
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})

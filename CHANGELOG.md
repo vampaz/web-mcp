@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0 — 2026-10-28
+
+- **Pi:** preserve tool annotations and output schemas, filter host controls from discovery and invocation, and stop unchanged read loops with one bounded correction.
+- **Resolvers:** preserve tool metadata across native, direct and hosted provider paths.
+- **LM Studio:** expose `listLmStudioModels()` for shared chat model settings using the server’s actual model and loaded-instance IDs.
+
 ## 0.6.2 — 2026-10-28
 
 - **Chat:** keep the header and message input visible when many suggested prompts need scrolling.

@@ -39,7 +39,16 @@ describe('createHostedOpenAIResolver', function describeHostedOpenAIResolver() {
       model: 'gpt-5.4-mini',
       sessionEndpoint: '/api/webmcp/session'
     })
-    const resolution = await resolver.resolve('Select water', [createSelectItemsTool()], {})
+    const tool = {
+      ...createSelectItemsTool(),
+      annotations: { readOnlyHint: false, destructiveHint: false },
+      outputSchema: { type: 'object' }
+    }
+    const resolution = await resolver.resolve('Select water', [tool], {})
+    expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body)).tools[0]).toMatchObject({
+      annotations: tool.annotations,
+      outputSchema: tool.outputSchema
+    })
 
     expect(resolution.toolName).toBe('select_items')
     expect(fetch).toHaveBeenNthCalledWith(

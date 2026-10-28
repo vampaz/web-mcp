@@ -43,7 +43,13 @@ interface ResolverEndpointRequest {
   provider: ResolverProviderKind
   model: string
   message: string
-  tools: Array<{ name: string; description: string; inputSchema: JsonSchema }>
+  tools: Array<{
+    name: string
+    description: string
+    inputSchema: JsonSchema
+    outputSchema?: JsonSchema
+    annotations?: ToolAnnotations
+  }>
   context: ResolverContext
   responseSchema: JsonSchema
   singleStep?: true
@@ -153,3 +159,7 @@ The prompt still lists each tool's input schema, including property descriptions
 App-owned server resolvers and the command input's bounded sequences retain their existing response contracts.
 
 Provider-side enforcement depends on the selected endpoint and model. The kit sends `json_schema` without `strict: true`; it validates returned actions locally before execution. OpenAI's [strict structured output](https://developers.openai.com/api/docs/guides/structured-outputs) supports a subset of JSON Schema and rejects unsupported strict schemas. [LM Studio](https://lmstudio.ai/docs/developer/openai-compat/structured-output) documents schema-constrained output through this endpoint. Verify support for the actual provider, model, and tool schemas; neither provider enforcement nor valid JSON replaces application validation and approval.
+
+## LM Studio model choices
+
+Use `listLmStudioModels(serverUrl?, signal?)` from `@vampaz/webmcp-kit` to populate shared chat settings. It reads LM Studio’s `/api/v1/models`, excludes non-chat models and sorts loaded instances first. Each option has `model`, `label` and `loaded`; pass its `model` to `createResolver`. It uses the running instance ID when loaded and the model key otherwise. The default server is `http://127.0.0.1:1234`; requests omit application credentials and time out after ten seconds. Discovery errors are reported rather than substituting a model. The host owns selection, CORS and server configuration.

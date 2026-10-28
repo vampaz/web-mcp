@@ -208,6 +208,18 @@ export interface JsonSchema {
 }
 ```
 
+### LmStudioModelOption
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/model.ts).
+
+```ts
+export interface LmStudioModelOption {
+  model: string
+  label: string
+  loaded: boolean
+}
+```
+
 ### NumberParamOptions
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/schema-builders.ts).
@@ -983,6 +995,19 @@ declare function isResolverOutcomeToolName(toolName: string): toolName is Resolv
 
 ```ts
 declare function isWebMCPSupported(): boolean
+```
+
+### listLmStudioModels
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/lm-studio-models.ts).
+
+Lists LM Studio chat models without sending application credentials.
+
+```ts
+declare function listLmStudioModels(
+  serverUrl?: string,
+  signal?: AbortSignal
+): Promise<LmStudioModelOption[]>
 ```
 
 ### listTools
@@ -1879,6 +1904,7 @@ export type PiErrorCode =
 ```ts
 export type PiErrorReason =
   | 'tool_calls'
+  | 'no_progress'
   | 'request_bytes'
   | 'history_bytes'
   | 'tool_result_bytes'
@@ -2048,6 +2074,8 @@ export interface PiToolDescription {
   name: string
   description: string
   inputSchema: JsonSchema
+  outputSchema?: JsonSchema
+  annotations?: ToolAnnotations
 }
 ```
 
@@ -2095,6 +2123,17 @@ export interface PiTurnOutcome {
 }
 ```
 
+### RegistryToolHostOptions
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/interfaces/host.ts).
+
+```ts
+export interface RegistryToolHostOptions {
+  /** Limits discovery and invocation to tools intended for this agent. */
+  include?(tool: WebMCPTool): boolean
+}
+```
+
 ### createPiHarness
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/connection.ts).
@@ -2117,7 +2156,8 @@ declare function createPiRuntime(options: PiRuntimeOptions): Promise<PiControlle
 
 ```ts
 declare function createRegistryToolHost(
-  context?: () => ResolverContext | Promise<ResolverContext>
+  context?: () => ResolverContext | Promise<ResolverContext>,
+  options?: RegistryToolHostOptions
 ): PiToolHost
 ```
 

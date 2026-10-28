@@ -23,6 +23,7 @@ export type PiErrorCode =
 
 export type PiErrorReason =
   | 'tool_calls'
+  | 'no_progress'
   | 'request_bytes'
   | 'history_bytes'
   | 'tool_result_bytes'

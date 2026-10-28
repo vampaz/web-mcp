@@ -535,7 +535,9 @@ function createToolCatalog(tools: WebMCPTool[]) {
   return tools.map((tool) => ({
     name: tool.name,
     description: tool.description,
-    inputSchema: tool.inputSchema
+    inputSchema: tool.inputSchema,
+    ...(tool.outputSchema ? { outputSchema: tool.outputSchema } : {}),
+    ...(tool.annotations ? { annotations: tool.annotations } : {})
   }))
 }
 
