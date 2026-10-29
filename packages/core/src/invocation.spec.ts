@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 
 import { setConfirmationHandler } from './confirmation'
 import { defineTool } from './define-tool'
+import { ToolExecutionError } from './tool-execution-error'
 import { subscribeWebMCPKitEvents } from './events'
 import type { ConfirmationHandler, WebMCPKitEvent } from './interfaces/tool'
 import { clearToolsForTest, invokeTool, registerTool, unregisterTool } from './registry'
@@ -236,4 +237,53 @@ it('leaves output that cannot be cloned out of event details', async () => {
   expect(result.output).toBe(handle)
   expect(details[0]).toMatchObject({ status: 'success' })
   expect(details[0]).not.toHaveProperty('output')
+})
+
+it('preserves partial application failures without exposing mutable details to listeners', async () => {
+  const details = { saved: false, accepted: 2, remaining: 3, reason: 'The third save failed.' }
+  registerTool(
+    defineTool({
+      name: 'accept_proposals',
+      description: 'Accept the selected proposals through the application save handler.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      execute() {
+        throw new ToolExecutionError('execution_failed', 'Some proposals were not saved.', details)
+      }
+    })
+  )
+  const unsubscribe = subscribeWebMCPKitEvents(function tamper(event) {
+    if (event.type === 'failed')
+      (event.detail as { details: { accepted: number } }).details.accepted = 99
+  })
+  const result = await invokeTool({ toolName: 'accept_proposals', input: {} })
+  unsubscribe()
+  details.accepted = 100
+  expect(result).toMatchObject({
+    status: 'error',
+    code: 'execution_failed',
+    details: {
+      saved: false,
+      accepted: 2,
+      remaining: 3,
+      reason: 'The third save failed.'
+    }
+  })
+})
+
+it('omits non-JSON error details', async () => {
+  registerTool(
+    defineTool({
+      name: 'read_value',
+      description: 'Read the current value through the application handler.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      execute() {
+        throw new ToolExecutionError('execution_failed', 'Failed.', { handle() {} })
+      }
+    })
+  )
+  expect(await invokeTool({ toolName: 'read_value', input: {} })).toMatchObject({
+    status: 'error',
+    error: 'Failed.'
+  })
+  expect((await invokeTool({ toolName: 'read_value', input: {} })).details).toBeUndefined()
 })

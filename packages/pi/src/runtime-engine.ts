@@ -371,6 +371,7 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                           status: result.status,
                           ...(result.code ? { code: result.code } : {}),
                           ...(result.error ? { error: result.error } : {}),
+                          ...(result.details ? { details: result.details } : {}),
                           ...(result.output !== undefined ? { output: result.output } : {})
                         }
                         return {

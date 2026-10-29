@@ -52,7 +52,7 @@ export interface PiMessage {
   input?: Record<string, unknown>
   /** Tool messages: `unknown` when an interruption hid whether the action ran. */
   status?: PiToolStatus
-  /** Tool messages: successful output, as returned by the application. */
+  /** Tool messages: application output, or a structured failure when partial-result details exist. */
   output?: unknown
 }
 

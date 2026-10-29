@@ -1,4 +1,10 @@
-import { defineTool, objectInputSchema, registerTool, stringParam } from '@vampaz/webmcp-kit'
+import {
+  ToolExecutionError,
+  defineTool,
+  objectInputSchema,
+  registerTool,
+  stringParam
+} from '@vampaz/webmcp-kit'
 import { defineWebMCPCommandInput } from '@vampaz/webmcp-kit/command-input'
 import { createPiRuntime, type PiController } from '@vampaz/webmcp-kit/pi'
 import { defineWebMCPChat, type WebMCPChatElement } from '@vampaz/webmcp-kit/chat'
@@ -9,7 +15,7 @@ import { useWebMCPTool as useSvelteTool } from '@vampaz/webmcp-kit/svelte'
 import { defineZodTool } from '@vampaz/webmcp-kit/zod'
 import { mountDevtoolsOverlay } from '@vampaz/webmcp-kit/devtools'
 import { installWebMCPKitTestBridge } from '@vampaz/webmcp-kit/testing'
-import { waitForWebMCPTool } from '@vampaz/webmcp-kit/testing/playwright'
+import { runNativeWebMCPAgent, waitForWebMCPTool } from '@vampaz/webmcp-kit/testing/playwright'
 import { createLocalMCPBridge } from '@vampaz/webmcp-kit/mcp-bridge'
 import { readable } from 'svelte/store'
 import { ref } from 'vue'
@@ -41,6 +47,8 @@ export function connectChat(chat: WebMCPChatElement, controller: PiController) {
 }
 
 void [
+  ToolExecutionError,
+  runNativeWebMCPAgent,
   registerTool,
   defineWebMCPCommandInput,
   createPiRuntime,

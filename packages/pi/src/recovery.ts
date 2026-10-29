@@ -108,6 +108,16 @@ function toolOutcome(
           : (result.error ?? 'The action did not succeed.'),
         status: result.status,
         ...(success && result.output !== undefined ? { output: result.output } : {}),
+        ...(!success && result.details !== undefined
+          ? {
+              output: {
+                status: result.status,
+                code: result.code,
+                error: result.error,
+                details: result.details
+              }
+            }
+          : {}),
         failed: !success
       }
     }

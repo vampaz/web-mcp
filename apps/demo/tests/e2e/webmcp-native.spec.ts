@@ -70,3 +70,32 @@ test('native cancellation reaches the pending application approval', async funct
   await expect(page.getByRole('dialog')).not.toBeVisible()
   await expect(page.locator('#counter')).toHaveText('0')
 })
+
+test('native agents receive actionable validation errors without changing the application', async ({
+  page
+}) => {
+  await page.goto('/?mode=core')
+  await expect(page.locator('#model-status')).toHaveText('Native WebMCP available')
+  const result = await page.evaluate(async () => {
+    const api = (
+      document as unknown as {
+        modelContext: {
+          getTools(): Promise<{ name: string }[]>
+          executeTool(tool: unknown, input: unknown): Promise<unknown>
+        }
+      }
+    ).modelContext
+    return api.executeTool(
+      (await api.getTools()).find((tool) => tool.name === 'set_counter'),
+      { value: 'seven' }
+    )
+  })
+  expect(JSON.parse(String(result))).toMatchObject({
+    isError: true,
+    status: 'error',
+    code: 'invalid_input',
+    error: expect.stringContaining('/value')
+  })
+  await expect(page.getByRole('dialog')).not.toBeVisible()
+  await expect(page.locator('#counter')).toHaveText('0')
+})

@@ -531,6 +531,30 @@ it('refreshes tools that finish mounting between the action result and the next 
   }
 })
 
+it('retains partial-save details after closing and reopening a failed conversation', async () => {
+  const details = { accepted: 1, remaining: 4 }
+  const config = options([resolution('read_counter', {})], {
+    async invoke() {
+      return {
+        toolName: 'read_counter',
+        status: 'error',
+        code: 'execution_failed',
+        error: 'Partial save.',
+        details,
+        durationMs: 0
+      }
+    }
+  })
+  runtime = await createPiRuntime(config)
+  expect(await runtime.send('Read')).toMatchObject({ status: 'error' })
+  const history = runtime.getSnapshot().messages
+  expect(history.find((message) => message.role === 'tool')?.output).toMatchObject({ details })
+  await runtime.destroy()
+  runtime = await createPiRuntime(config)
+  expect(runtime.getSnapshot().messages).toEqual(history)
+  expect(config.resolver.resolve).toHaveBeenCalledTimes(1)
+})
+
 it('ends a denied action without another model round', async function test() {
   const config = options([resolution('read_counter', {})], {
     async invoke() {
