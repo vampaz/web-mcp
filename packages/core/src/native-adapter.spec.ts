@@ -77,9 +77,10 @@ describe('native WebMCP adapter', () => {
         name: 'search_products',
         description: expect.stringContaining('Search the local product catalog'),
         outputSchema: {
-          type: 'object',
-          properties: { query: { type: 'string' } },
-          required: ['query']
+          anyOf: [
+            { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] },
+            expect.objectContaining({ required: ['isError', 'status', 'code', 'error'] })
+          ]
         },
         annotations: { readOnlyHint: true }
       }),
@@ -273,7 +274,11 @@ describe('native WebMCP adapter', () => {
     expect(call.source).toBe('native')
     expect(events[2]!.detail).toMatchObject({ invocationId: call.id, output: 7 })
     registration.unregister()
-    await expect(nativeTool.execute({})).rejects.toThrow('tool changed')
+    await expect(nativeTool.execute({})).resolves.toMatchObject({
+      isError: true,
+      status: 'unavailable',
+      code: 'tool_changed'
+    })
     unsubscribe()
   })
 
@@ -402,9 +407,12 @@ describe('native WebMCP adapter', () => {
       })
     )
 
-    await expect(nativeExecute?.({ query: 42 })).rejects.toThrow(
-      'input validation failed: /query expected string, got integer.'
-    )
+    await expect(nativeExecute?.({ query: 42 })).resolves.toMatchObject({
+      isError: true,
+      status: 'error',
+      code: 'invalid_input',
+      error: expect.stringContaining('/query expected string, got integer.')
+    })
     expect(execute).not.toHaveBeenCalled()
   })
 
@@ -488,9 +496,12 @@ describe('native WebMCP adapter', () => {
       })
     )
 
-    await expect(nativeExecute?.({ id: 'inv_2' })).rejects.toThrow(
-      'Invoice is not visible in the current workspace.'
-    )
+    await expect(nativeExecute?.({ id: 'inv_2' })).resolves.toMatchObject({
+      isError: true,
+      status: 'blocked',
+      code: 'guard_blocked',
+      error: 'Invoice is not visible in the current workspace.'
+    })
     expect(execute).not.toHaveBeenCalled()
 
     await expect(nativeExecute?.({ id: 'inv_1' })).resolves.toEqual({ id: 'inv_1' })
@@ -531,9 +542,12 @@ describe('native WebMCP adapter', () => {
       })
     )
 
-    await expect(nativeExecute?.({ invoiceId: 'inv_1' })).rejects.toThrow(
-      'Confirmation handler failed: modal crashed'
-    )
+    await expect(nativeExecute?.({ invoiceId: 'inv_1' })).resolves.toMatchObject({
+      isError: true,
+      status: 'error',
+      code: 'confirmation_failed',
+      error: 'Confirmation handler failed: modal crashed'
+    })
     expect(execute).not.toHaveBeenCalled()
   })
 })

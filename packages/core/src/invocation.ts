@@ -9,6 +9,7 @@ import type {
   WebMCPTool
 } from './interfaces/tool'
 import { formatJsonValueValidationError, validateJsonValue } from './schema'
+import { ToolExecutionError } from './tool-execution-error'
 
 export interface ToolInvocationPipelineOptions {
   invocationId?: string
@@ -57,7 +58,8 @@ export async function invokeToolPipeline<TInput, TOutput>(
 // Listeners get a deep copy, so redacting or changing it cannot change the caller's validated result.
 // Output that cannot be cloned, such as FormData, is left out of the event.
 function copyResultForEvent<TOutput>(result: ToolInvocationResult<TOutput>) {
-  const { output, ...rest } = result
+  const { output, details, ...fields } = result
+  const rest = { ...fields, ...(details ? { details: structuredClone(details) } : {}) }
   if (output === undefined) return { ...rest }
   try {
     return { ...rest, output: structuredClone(output) }
@@ -246,14 +248,19 @@ async function executePipeline<TInput, TOutput>(
       ...(options.signal ? { signal: options.signal } : {})
     })
   } catch (error) {
-    return createInvocationResult<TOutput>(
+    const result = createInvocationResult<TOutput>(
       tool.name,
       'error',
       startedAt,
       undefined,
       error instanceof Error ? error.message : 'Tool invocation failed.',
-      'execution_failed'
+      error instanceof ToolExecutionError ? error.code : 'execution_failed'
     )
+    if (error instanceof ToolExecutionError && error.details) {
+      const details = copyJsonInput(error.details)
+      if (details.valid) result.details = details.value as Record<string, unknown>
+    }
+    return result
   }
   if (tool.outputSchema) {
     let outputValidationErrors: string[]

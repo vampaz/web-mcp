@@ -150,6 +150,7 @@ export interface ToolInvocationResult<TOutput = unknown> {
   code?: ToolInvocationErrorCode
   output?: TOutput
   error?: string
+  details?: Record<string, unknown>
   durationMs: number
 }
 

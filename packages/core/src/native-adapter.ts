@@ -30,7 +30,18 @@ export function registerNativeTool<TInput = Record<string, unknown>, TOutput = u
         name: tool.name,
         description: tool.description,
         inputSchema: tool.inputSchema,
-        outputSchema: tool.outputSchema,
+        outputSchema: tool.outputSchema
+          ? {
+              anyOf: [
+                tool.outputSchema,
+                {
+                  type: 'object',
+                  properties: { isError: { const: true } },
+                  required: ['isError', 'status', 'code', 'error']
+                }
+              ]
+            }
+          : undefined,
         annotations: tool.annotations,
         async execute(input: TInput, options?: { signal?: AbortSignal }) {
           const result = await invokeToolPipeline(tool, {
@@ -42,7 +53,7 @@ export function registerNativeTool<TInput = Record<string, unknown>, TOutput = u
             source: 'native'
           })
           if (result.status !== 'success') {
-            throw new Error(result.error ?? `Tool invocation ${result.status}.`)
+            return { ...result, isError: true }
           }
 
           return result.output
@@ -59,6 +70,7 @@ export function registerNativeTool<TInput = Record<string, unknown>, TOutput = u
             return true
           })
           .catch(function handleNativeRegistrationFailure(error) {
+            if (!active) return false
             console.warn('[WebMCP Kit] Native registration failed; using fallback registry.', error)
             return false
           })

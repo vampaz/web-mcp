@@ -71,7 +71,22 @@ There is no approval bypass on `invokeTool()`. Code that already approved an act
 | `not_registered`      | `error`       | Tool no longer exists or the name is wrong.                          |
 | `resolver_failed`     | `error`       | Command input only: the resolver failed before any tool ran.         |
 
-Successful results contain `status: 'success'`, `toolName`, `output`, and `durationMs`. Native and registry invocations receive an `invocationId`. Missing `output` is valid. Native wrappers turn non-success results into errors for the browser API. The command input converts resolution outcomes into blocked/unavailable results without executing an application tool.
+Successful results contain `status: 'success'`, `toolName`, `output`, and `durationMs`. Native and registry invocations receive an `invocationId`. Missing `output` is valid. Native wrappers return non-success results as structured `isError` envelopes. The command input converts resolution outcomes into blocked/unavailable results without executing an application tool.
+
+### Application and native failures
+
+Throw `new ToolExecutionError('execution_failed', 'Some saves failed.', { accepted: 2, remaining: 1 })`
+from an application handler to preserve a meaningful error code and JSON-safe partial results.
+The shared invocation result carries `details`; Pi records it with the failed outcome. A Pi tool message with partial-result details exposes the structured failure in `output`, including after reopening the conversation. Details are
+copied before subscribers receive events. Invalid/non-JSON details are omitted, not exposed.
+
+Native WebMCP success still returns the tool's raw output. Application failures now return
+`{ isError: true, status, code, error, details? }` instead of rejecting the native callback, because a
+browser exception can hide the application message. Native callers must check `isError` before
+interpreting a result as success. A declared native `outputSchema` accepts either the original
+success schema or the error envelope; the shared pipeline still validates successful output against
+the original schema. Browser transport errors and cancellation can still reject. A partial failure
+does not undo completed writes and must not be automatically replayed.
 
 ## Schemas, forms, and server actions
 

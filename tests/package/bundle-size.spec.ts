@@ -23,8 +23,11 @@ const budgets: Record<string, { eager: number; total: number }> = {
   './pi': { eager: 28_400, total: 152_300 },
   './react': { eager: 25_700, total: 25_700 },
   './svelte': { eager: 25_700, total: 25_700 },
-  './testing': { eager: 27_400, total: 27_400 },
-  './testing/playwright': { eager: 500, total: 500 },
+  // 0.8.0 shares the native runner through the Playwright helper entry: 27,418 bytes.
+  './testing': { eager: 30_200, total: 30_200 },
+  // 0.8.0 native journey runner adds shared resolution/schema validation: 25,596 bytes.
+  // This Node-side testing entry has no effect on application entry budgets.
+  './testing/playwright': { eager: 28_200, total: 28_200 },
   './vue': { eager: 25_700, total: 25_700 },
   './zod': { eager: 25_300, total: 25_300 }
 }

@@ -122,3 +122,37 @@ Treat these as eval failures, not just warnings:
 - A tool description overlaps another tool enough that the resolver frequently chooses either one.
 
 These cases usually mean the tool strategy needs tightening: rename the tool, clarify the description, make the schema more specific, add enum values, or expose/hide tools based on current state.
+
+## Native browser journeys
+
+Use `runNativeWebMCPAgent` from `@vampaz/webmcp-kit/testing/playwright` for full agent journeys.
+It discovers and executes through `document.modelContext`, without the test bridge, Pi context or
+private application state. Enable native WebMCP and its testing API in Chrome with
+`--enable-blink-features=WebMCP` and `--enable-features=WebMCPTesting`.
+
+```ts
+import { runNativeWebMCPAgent } from '@vampaz/webmcp-kit/testing/playwright'
+
+const report = await runNativeWebMCPAgent(page, {
+  resolver,
+  message: 'Show unreviewed records.',
+  maxToolCalls: 4
+})
+expect(report.outcome).toBe('replied')
+expect(report.repeatedCalls).toBe(0)
+// Also assert the actual visible filter and persisted data where applicable.
+```
+
+The helper refreshes discovery between model rounds and rechecks the selected contract before
+execution. `agent_reply` is reserved for the evaluation's final response. A failed application call
+permits only a final explanation; it cannot replay the failed action. Invalid model output gets one
+correction attempt per journey, with no execution, and each resolver request receives a 120-second abort signal.
+
+Reports include steps, outcome, tool calls, repeated calls, resolver errors and UTF-8 byte totals for
+catalogs, results and serialized resolver inputs. `resolverInputBytes` excludes provider-specific
+prompt/schema overhead; measure actual HTTP request bodies separately when comparing transport cost.
+`replied` means the model finished, not that the task succeeded: assert the UI, save response and
+post-reload state. Include duplicate labels, collapsed/unrendered rows, active versus selected IDs,
+read-only state preservation, stale targets and partial saves. Run equivalent Assistant prompts and
+compare task success, call count, repeated discovery and payload size. Keep real-model checks opt-in
+and record the model, browser and package revision alongside results.

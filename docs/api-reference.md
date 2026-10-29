@@ -581,6 +581,20 @@ export interface ToolContext {
 }
 ```
 
+### ToolExecutionError
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/tool-execution-error.ts).
+
+An application failure whose JSON details must reach the agent, including partial results.
+
+```ts
+declare class ToolExecutionError extends Error {
+  readonly code: ToolInvocationErrorCode
+  readonly details?: Record<string, unknown>
+  constructor(code: ToolInvocationErrorCode, message: string, details?: Record<string, unknown>)
+}
+```
+
 ### ToolInvocation
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
@@ -628,6 +642,7 @@ export interface ToolInvocationResult<TOutput = unknown> {
   code?: ToolInvocationErrorCode
   output?: TOutput
   error?: string
+  details?: Record<string, unknown>
   durationMs: number
 }
 ```
@@ -1668,6 +1683,68 @@ declare function waitForWebMCPTool(
 
 ## @vampaz/webmcp-kit/testing/playwright
 
+### NativeAgentEvaluation
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/interfaces/native-agent.ts).
+
+```ts
+export interface NativeAgentEvaluation {
+  outcome:
+    | 'replied'
+    | 'tool_error'
+    | 'limit_reached'
+    | 'needs_clarification'
+    | 'no_tools_match'
+    | 'resolver_error'
+  reply?: string
+  steps: NativeAgentStep[]
+  toolCalls: number
+  repeatedCalls: number
+  catalogBytes: number
+  resultBytes: number
+  resolverInputBytes: number
+  resolverErrors: string[]
+}
+```
+
+### NativeAgentOptions
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/interfaces/native-agent.ts).
+
+```ts
+export interface NativeAgentOptions {
+  resolver: ToolResolver
+  message: string
+  maxToolCalls?: number
+}
+```
+
+### NativeAgentStep
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/interfaces/native-agent.ts).
+
+```ts
+export interface NativeAgentStep {
+  toolName: string
+  input: Record<string, unknown>
+  result: unknown
+}
+```
+
+### NativeAgentTool
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/interfaces/native-agent.ts).
+
+```ts
+export interface NativeAgentTool {
+  name: string
+  description: string
+  inputSchema: JsonSchema
+  annotations?: ToolAnnotations
+  outputSchema?: JsonSchema
+}
+```
+
 ### WebMCPTestingPage
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/playwright.ts).
@@ -1713,6 +1790,19 @@ declare function invokeWebMCPTool<TOutput = unknown>(
 
 ```ts
 declare function listWebMCPTools(page: WebMCPTestingPage): Promise<TestBridgeTool[]>
+```
+
+### runNativeWebMCPAgent
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/native-agent.ts).
+
+Runs through browser discovery and execution only, without the Kit bridge or private page context.
+
+```ts
+declare function runNativeWebMCPAgent(
+  page: WebMCPTestingPage,
+  options: NativeAgentOptions
+): Promise<NativeAgentEvaluation>
 ```
 
 ### waitForWebMCPTool
@@ -1993,7 +2083,7 @@ export interface PiMessage {
   input?: Record<string, unknown>
   /** Tool messages: `unknown` when an interruption hid whether the action ran. */
   status?: PiToolStatus
-  /** Tool messages: successful output, as returned by the application. */
+  /** Tool messages: application output, or a structured failure when partial-result details exist. */
   output?: unknown
 }
 ```

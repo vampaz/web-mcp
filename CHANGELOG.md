@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0 — 2026-10-29
+
+- **Native WebMCP:** return structured failure envelopes instead of rejecting application failures. Native callers must check `isError`; successful output is unchanged.
+- **Core/Pi:** add `ToolExecutionError` and preserve JSON-safe partial-result details through invocation and conversation outcomes.
+- **Testing:** add native browser agent journeys with live discovery, guarded execution, bounded correction and call/payload metrics.
+
 ## 0.7.0 — 2026-10-28
 
 - **Pi:** preserve tool annotations and output schemas, filter host controls from discovery and invocation, and stop unchanged read loops with one bounded correction.

@@ -1,5 +1,12 @@
 import type { TestBridgeSnapshot, TestBridgeTool } from '@vampaz/webmcp-kit/testing'
 import type { ToolInvocation, ToolInvocationResult } from '@vampaz/webmcp-kit'
+export { runNativeWebMCPAgent } from './native-agent'
+export type {
+  NativeAgentEvaluation,
+  NativeAgentOptions,
+  NativeAgentStep,
+  NativeAgentTool
+} from './interfaces/native-agent'
 
 export interface WebMCPTestingPage {
   evaluate<TResult>(pageFunction: () => TResult | Promise<TResult>): Promise<TResult>
