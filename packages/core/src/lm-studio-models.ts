@@ -6,19 +6,28 @@ export async function listLmStudioModels(
   signal?: AbortSignal
 ): Promise<LmStudioModelOption[]> {
   const deadline = AbortSignal.timeout(10_000)
-  const response = await fetch(`${serverUrl.replace(/\/$/, '')}/api/v1/models`, {
+  const payload = await fetch(`${serverUrl.replace(/\/$/, '')}/api/v1/models`, {
     headers: { Accept: 'application/json' },
     credentials: 'omit',
     signal: signal ? AbortSignal.any([signal, deadline]) : deadline
-  }).catch(function connectionFailed(error: unknown) {
-    if (error instanceof TypeError)
-      throw new Error(
-        `Could not reach LM Studio at ${serverUrl}. Start the server and enable CORS.`
-      )
-    throw error
   })
-  if (!response.ok) throw new Error(`LM Studio returned ${response.status} while listing models.`)
-  const payload = await response.json()
+    .then(function readModels(response) {
+      if (!response.ok)
+        throw new Error(`LM Studio returned ${response.status} while listing models.`)
+      return response.json()
+    })
+    .catch(function connectionFailed(error: unknown) {
+      if (signal?.aborted) throw error
+      if (
+        error instanceof TypeError ||
+        (error instanceof DOMException && error.name === 'TimeoutError')
+      )
+        throw new Error(
+          `Could not reach LM Studio at ${serverUrl}. Start the server, enable CORS, and allow this site to access apps on your device if your browser asks. Then try again.`,
+          { cause: error }
+        )
+      throw error
+    })
   if (!Array.isArray(payload?.models)) throw new Error('LM Studio returned an invalid model list.')
   const models: LmStudioModelOption[] = []
   for (const entry of payload.models) {

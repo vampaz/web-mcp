@@ -85,6 +85,12 @@ The workflow has three jobs. `prepare` reads which targets already have the vers
 
 ## Troubleshooting
 
+When a deployed HTTPS app connects directly to LM Studio on this device, the browser may ask for
+permission to access local apps. Start the LM Studio server, enable its CORS option, and grant the
+site permission if you intend to use that local model. Model discovery has a ten-second deadline;
+if the permission prompt outlasts it, grant access and retry discovery. `listLmStudioModels()` reports
+connection and timeout failures with these recovery steps and preserves caller cancellation.
+
 | Symptom                                      | Inspect and correct                                                                                                                                                                                                                                              |
 | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Unknown planner export such as `ToolPlanner` | Planner names were removed in `0.3.0`. Rename them with the [0.3 guide](./migration-0.3.md), then apply the [0.4](./migration-0.4.md) and [0.5](./migration-0.5.md) API changes when upgrading to the current release.                                           |
