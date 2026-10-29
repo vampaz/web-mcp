@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.1 — 2026-10-29
+
+- **LM Studio:** explain server, CORS and browser permission recovery when model discovery fails or times out. Caller cancellation remains unchanged.
+
 ## 0.8.0 — 2026-10-29
 
 - **Native WebMCP:** return structured failure envelopes instead of rejecting application failures. Native callers must check `isError`; successful output is unchanged.
