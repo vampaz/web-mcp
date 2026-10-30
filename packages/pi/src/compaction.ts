@@ -1,5 +1,5 @@
 import type { Message } from '@earendil-works/pi-ai'
-import type { ToolResolution, ToolResolver } from '@vampaz/webmcp-kit'
+import type { ResolverModelLimits, ToolResolution, ToolResolver } from '@vampaz/webmcp-kit'
 import { jsonBytes, piError, PiFailure } from './errors'
 import { isPiContextOverflow } from './model-adapter'
 import { modelVisibleToolResult, piReplyTool, requestPiResolution } from './resolver-adapter'
@@ -9,17 +9,26 @@ export interface PiCompactionSettings {
   timeoutMs: number
 }
 
-function compactionThreshold(maxRequestBytes: number, contextTokens: number) {
-  return Math.min(contextTokens / 2, Math.max(64, Math.floor(maxRequestBytes / 16)))
+function checkpointBudget(maxRequestBytes: number, contextTokens: number) {
+  return Math.max(64, Math.floor(Math.min((contextTokens || Infinity) / 4, maxRequestBytes / 16)))
 }
 
-export function piCompactionPolicy(maxRequestBytes: number, contextTokens: number) {
-  // Leave room for the tool catalog, response schema and JSON transport escaping.
-  const threshold = compactionThreshold(maxRequestBytes, contextTokens)
+export function piCompactionPolicy(
+  maxRequestBytes: number,
+  contextTokens: number,
+  model?: ResolverModelLimits
+) {
+  const outputTokens = model?.maxOutputTokens ?? Math.min(2048, Math.floor(contextTokens / 4))
+  const threshold = contextTokens
+    ? Math.min(model?.maxInputTokens ?? Infinity, contextTokens - outputTokens)
+    : 0
   return {
     enabled: maxRequestBytes >= 8192,
     reserveTokens: contextTokens - threshold,
-    keepRecentTokens: Math.max(16, Math.floor(threshold / 4)),
+    keepRecentTokens: Math.max(
+      16,
+      Math.floor(Math.min(threshold || Infinity, maxRequestBytes / 16) / 4)
+    ),
     backgroundTokens: 0
   }
 }
@@ -78,8 +87,7 @@ export async function summarizePiHistory(
       .join('\n')
     if (!transcript) return
 
-    // A byte per threshold token leaves room for recent context, even with ASCII checkpoints.
-    const checkpointBytes = compactionThreshold(maxRequestBytes, settings.contextTokens)
+    const checkpointBytes = checkpointBudget(maxRequestBytes, settings.contextTokens)
     const tools = [
       { ...piReplyTool, description: 'Return the requested conversation checkpoint only.' }
     ]

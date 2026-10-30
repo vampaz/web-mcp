@@ -16,6 +16,86 @@ import { openPiStorage } from './storage'
 import { piSessionKey, resolvePiLimits } from './session'
 import { deletePiConversations, listPiConversations } from './conversations'
 
+it.each([undefined, 1_050_000])(
+  'does not summarize a large unchanged tool catalog on each message (context %s)',
+  async function largeCatalog(contextWindow) {
+    const summarize = vi.spyOn(historyCompaction, 'summarizePiHistory')
+    const config = options([], {
+      async discover() {
+        return {
+          revision: '1',
+          tools: [
+            {
+              name: 'read_counter',
+              description: 'Page documentation. '.repeat(2000),
+              inputSchema: { type: 'object', properties: {}, additionalProperties: false }
+            }
+          ]
+        }
+      }
+    })
+    Object.assign(config.resolver, {
+      async getModelLimits() {
+        return contextWindow ? { contextWindow, maxOutputTokens: 128_000 } : undefined
+      }
+    })
+    config.resolver.resolve = vi.fn(async function reply() {
+      return resolution()
+    })
+    runtime = await createPiRuntime(config)
+    for (let turn = 0; turn < 4; turn++)
+      expect(await runtime.send('Check the page ' + turn)).toEqual({ status: 'completed' })
+    expect(summarize).not.toHaveBeenCalled()
+    expect(config.resolver.resolve).toHaveBeenCalledTimes(4)
+  }
+)
+
+it('uses the selected resolver capacity and refreshes it between turns', async function modelCapacity() {
+  const models = vi.spyOn(modelAdapter, 'createPiModels')
+  let contextWindow = 16_384
+  const config = options([resolution(), resolution()])
+  Object.assign(config.resolver, {
+    async getModelLimits() {
+      return { contextWindow, maxOutputTokens: 2048 }
+    }
+  })
+  runtime = await createPiRuntime(config)
+  expect(models.mock.calls.at(-1)?.[1]).toBe(0)
+  await runtime.send('First message')
+  expect(models.mock.calls.at(-1)?.[1]).toBe(16_384)
+  contextWindow = 131_072
+  await runtime.send('Second message')
+  expect(models.mock.calls.at(-1)?.[1]).toBe(131_072)
+})
+
+it('allows Stop while model metadata is pending without starting inference', async function stopMetadata() {
+  const config = options([resolution()])
+  const metadata = vi.fn(() => new Promise<undefined>(() => {}))
+  Object.assign(config.resolver, { getModelLimits: metadata })
+  runtime = await createPiRuntime(config)
+  expect(metadata).not.toHaveBeenCalled()
+  const turn = runtime.send('Hello')
+  await vi.waitFor(() => expect(metadata).toHaveBeenCalledOnce())
+  await runtime.stop()
+  expect(await turn).toMatchObject({ status: 'interrupted' })
+  expect(config.resolver.resolve).not.toHaveBeenCalled()
+})
+
+it('identifies model metadata failures as provider errors without calling the model', async function metadataError() {
+  const config = options([resolution()])
+  Object.assign(config.resolver, {
+    async getModelLimits() {
+      throw new Error('Session unavailable')
+    }
+  })
+  runtime = await createPiRuntime(config)
+  expect(await runtime.send('Hello')).toMatchObject({
+    status: 'error',
+    error: { code: 'provider_failed', message: expect.stringContaining('Session unavailable') }
+  })
+  expect(config.resolver.resolve).not.toHaveBeenCalled()
+})
+
 it('automatically compacts an active turn while retaining its objective, saved actions and full visible history', async function compaction() {
   const summarize = vi.spyOn(historyCompaction, 'summarizePiHistory')
   const applied: string[] = []
@@ -84,7 +164,10 @@ it('automatically compacts an active turn while retaining its objective, saved a
       return resolution('accept_proposal', { id: `p-${completed.length + 1}` })
     }
   )
-  runtime = await createPiRuntime({ ...config, limits: { maxRequestBytes: 32768 } })
+  runtime = await createPiRuntime({
+    ...config,
+    limits: { maxRequestBytes: 32768, contextTokens: 4096 }
+  })
   expect(await runtime.send(request)).toEqual({ status: 'completed' })
   expect(checkpoints.length).toBeGreaterThan(1)
   expect(
@@ -107,7 +190,10 @@ it('automatically compacts an active turn while retaining its objective, saved a
   ).toBe(false)
   const calls = vi.mocked(config.resolver.resolve).mock.calls.length
   await runtime.destroy()
-  runtime = await createPiRuntime({ ...config, limits: { maxRequestBytes: 32768 } })
+  runtime = await createPiRuntime({
+    ...config,
+    limits: { maxRequestBytes: 32768, contextTokens: 4096 }
+  })
   expect(runtime.getSnapshot().messages).toEqual(history)
   expect(vi.mocked(config.resolver.resolve).mock.calls).toHaveLength(calls)
   expect(applied).toHaveLength(4)
@@ -139,7 +225,10 @@ it('Stop interrupts compaction without placing a late checkpoint or replaying th
       return resolution('read_counter', {})
     }
   )
-  runtime = await createPiRuntime({ ...config, limits: { maxRequestBytes: 32768 } })
+  runtime = await createPiRuntime({
+    ...config,
+    limits: { maxRequestBytes: 32768, contextTokens: 4096 }
+  })
   const turn = runtime.send('Save once and continue')
   await summarizing
   await runtime.stop()
@@ -174,7 +263,10 @@ it('reports a failed compaction without continuing application actions or losing
       return resolution('read_counter', {})
     }
   )
-  runtime = await createPiRuntime({ ...config, limits: { maxRequestBytes: 32768 } })
+  runtime = await createPiRuntime({
+    ...config,
+    limits: { maxRequestBytes: 32768, contextTokens: 4096 }
+  })
   expect(await runtime.send('Save once and continue')).toMatchObject({
     status: 'error',
     error: { message: 'Local model is unavailable' }
@@ -1265,6 +1357,7 @@ it('gives malformed model JSON from a built-in resolver one correction round', a
   const resolver = await createResolver({
     provider: 'openai-compatible',
     baseUrl: 'https://models.example.test/v1',
+    modelLimits: { contextWindow: 32_768 },
     auth: { mode: 'none' }
   })
   runtime = await createPiRuntime({ ...options([]), resolver })

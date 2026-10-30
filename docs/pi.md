@@ -70,14 +70,14 @@ Commits reach IndexedDB before snapshots are published. Reopening aborts unfinis
 
 Defaults and accepted bounds:
 
-| `limits` field     | Default     | Bound           |
-| ------------------ | ----------- | --------------- |
-| `maxToolCalls`     | 12 per turn | 1–50            |
-| `maxHistoryBytes`  | 8 MiB       | 64 KiB–8 MiB    |
-| `maxRequestBytes`  | 128 KiB     | 1 KiB–1 MiB     |
-| `requestTimeoutMs` | 120,000     | 1,000–600,000   |
-| `contextTokens`    | 32,768      | 2,048–2,000,000 |
-| `maxMessageChars`  | 16,000      | 1–100,000       |
+| `limits` field     | Default                                                    | Bound         |
+| ------------------ | ---------------------------------------------------------- | ------------- |
+| `maxToolCalls`     | 12 per turn                                                | 1–50          |
+| `maxHistoryBytes`  | 8 MiB                                                      | 64 KiB–8 MiB  |
+| `maxRequestBytes`  | Four bytes per model context token; 128 KiB if unknown     | 1 KiB–8 MiB   |
+| `requestTimeoutMs` | 120,000                                                    | 1,000–600,000 |
+| `contextTokens`    | Selected resolver's context window; unknown if unavailable | 0–2,000,000   |
+| `maxMessageChars`  | 16,000                                                     | 1–100,000     |
 
 Built-in resolvers enforce `maxRequestBytes` on the serialized HTTP body, or the Chrome prompt and response constraint. This bounds data sent by the browser; server-added context and the model's internal session history are outside this limit. Custom resolvers must enforce the same boundary for their transport.
 
@@ -97,9 +97,11 @@ If the resolver returns a resolution that does not match the offered tools, or m
 
 Pi detects repeated successful reads marked `annotations.readOnlyHint: true`. After two identical results for the same tool, arguments and catalog revision, it gives the model one correction before another identical call. Continued repetition stops with `limit_reached` and reason `no_progress`. A changed result or an intervening mutation resets progress tracking. Read tools may return `{ status: 'pending' }` while an asynchronous operation is still in progress; these remain pollable within the normal call limit. Prefer awaiting the existing save handler and rejecting on failure.
 
-Compaction runs when needed before the next model request, without background inference. It requires `maxRequestBytes` of at least 8 KiB; smaller budgets keep direct resolution without automatic summarization. Its threshold reserves space for tool schemas and transport overhead within `maxRequestBytes`; the final serialized request still enforces that limit. A request-byte overflow can also trigger one compaction before retrying inference. Stop cancels summarization, and a failed summary ends the turn without replaying completed actions. A single oversized input, tool result, action record or catalog can still exceed the request budget. Compaction does not remove stored history or increase `maxHistoryBytes`.
+Compaction runs when needed before the next model request, without background inference. It requires `maxRequestBytes` of at least 8 KiB; smaller budgets keep direct resolution without automatic summarization. The final serialized request still enforces its byte limit independently of model capacity. An actual request-byte or provider-context overflow can trigger one compaction before retrying inference. Stop cancels summarization, and a failed summary ends the turn without replaying completed actions. A single oversized input, tool result, action record or catalog can still exceed the request budget. Compaction does not remove stored history or increase `maxHistoryBytes`.
 
-The trigger is `min(contextTokens / 2, max(64, floor(maxRequestBytes / 16)))` estimated tokens. With the default 32,768-token context and 128 KiB request budget the threshold is 8,192 estimated tokens. The estimate starts from the size of the last request actually sent (about four bytes per token), so stored history that the resolver never receives does not trigger extra summaries. This estimate does not measure provider token usage.
+Pi calls the selected resolver's optional `getModelLimits(signal)` before each user turn. The proactive trigger is the model's context window minus its output allowance, capped by `maxInputTokens` when reported. The byte budget does not lower this trigger. For example, GPT-6 Luna reports a 1,050,000-token context, a 922,000-token input limit and a 128,000-token output limit, so its trigger is 922,000 estimated input tokens. If the resolver does not report capacity, Pi does not invent a context window or proactively summarize; actual overflow recovery still works. `limits.contextTokens` can explicitly override the context window. Where an output limit is not reported, Pi reserves up to 2,048 tokens for a reply (at most one quarter of a small context).
+
+The usage estimate is based on serialized resolver input (about four bytes per token), not the provider's tokenizer or billed usage. Tool definitions and current page context are included. Summarizing history does not shrink a large tool catalog. Original messages and outcomes remain visible after compaction. See [model capacity discovery](resolver-providers.md#model-capacity) for built-in and custom resolvers.
 
 Choose a request budget that fits the configured model's context. The byte limit does not measure tokens or discover the model's context capacity. A recognized provider context overflow reduces the transcript chunk before trying again. Built-in resolvers report overflow as `ResolverError` with `code: 'context_overflow'`; custom resolvers can throw the same error so Pi compacts instead of failing. Rate limits and other provider failures end the turn.
 

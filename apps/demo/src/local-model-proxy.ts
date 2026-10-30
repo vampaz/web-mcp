@@ -10,7 +10,10 @@ export function proxyRequestAllowed(
 ): boolean {
   return (
     (!origin || origin === serverOrigin) &&
-    ((['/__lmstudio/v1/models', '/__lmstudio/api/v0/models'].includes(path) && method === 'GET') ||
+    ((['/__lmstudio/v1/models', '/__lmstudio/api/v0/models', '/__lmstudio/api/v1/models'].includes(
+      path
+    ) &&
+      method === 'GET') ||
       (path === '/__lmstudio/v1/chat/completions' && method === 'POST'))
   )
 }

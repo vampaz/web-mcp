@@ -336,6 +336,8 @@ export interface RemoteResolverConfig {
   maxTokens?: number
   temperature?: number
   reasoningEffort?: 'none' | 'low' | 'medium' | 'high'
+  /** Provider-reported limits for a model not covered by built-in discovery. */
+  modelLimits?: ResolverModelLimits
 }
 ```
 
@@ -380,6 +382,19 @@ declare class ResolverError extends Error {
 
 ```ts
 export type ResolverErrorCode = 'context_overflow' | 'provider_failed'
+```
+
+### ResolverModelLimits
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
+
+```ts
+export interface ResolverModelLimits {
+  /** Actual context window, including input and output tokens. */
+  contextWindow: number
+  maxInputTokens?: number
+  maxOutputTokens?: number
+}
 ```
 
 ### ResolverOutcomeToolName
@@ -716,6 +731,8 @@ export interface ToolResolutionValidationTool {
 ```ts
 export interface ToolResolver {
   capabilities?: { conversation: boolean }
+  /** Resolve the selected model's limits; undefined means its capacity is unknown. */
+  getModelLimits?: (signal?: AbortSignal) => Promise<ResolverModelLimits | undefined>
   name: string
   available: boolean
   status: 'ready' | 'downloadable' | 'downloading' | 'unavailable' | 'fallback' | 'needs-key'
@@ -2057,11 +2074,11 @@ export interface PiLimits {
   maxToolCalls?: number
   /** UTF-8 bytes in the durable commit log; default 8 MiB. */
   maxHistoryBytes?: number
-  /** UTF-8 bytes per resolver request; default 128 KiB. */
+  /** UTF-8 bytes per resolver request; default four bytes per model context token, or 128 KiB if unknown. */
   maxRequestBytes?: number
   /** Milliseconds per resolver request; 1,000–600,000, default 120,000. */
   requestTimeoutMs?: number
-  /** Model context window in estimated tokens; 2,048–2,000,000, default 32,768. */
+  /** Override the resolver's actual context window; unknown capacity does not trigger proactive summaries. */
   contextTokens?: number
   /** Characters per user message; 1–100,000, default 16,000. */
   maxMessageChars?: number
@@ -2738,6 +2755,7 @@ export interface HostedOpenAIResolverOptions {
   browserChallengeSiteKey?: string
   endpoint?: string
   model: string
+  modelLimits?: ResolverModelLimits
   sessionEndpoint?: string
 }
 ```

@@ -9,7 +9,11 @@ import {
   hook
 } from '@earendil-works/pi-durable'
 import type { Conversation, ConversationWatch, ConversationView } from '@earendil-works/pi-durable'
-import { getErrorMessage, ToolResolutionValidationError } from '@vampaz/webmcp-kit'
+import {
+  getErrorMessage,
+  ToolResolutionValidationError,
+  type ResolverModelLimits
+} from '@vampaz/webmcp-kit'
 import type {
   PiActivity,
   PiController,
@@ -182,6 +186,24 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
       return await withLock(waitSignal, async function operate() {
         try {
           signal.throwIfAborted()
+          const modelSignal = AbortSignal.any([
+            signal,
+            AbortSignal.timeout(limits.requestTimeoutMs)
+          ])
+          let model: ResolverModelLimits | undefined
+          try {
+            if (text !== undefined && options.resolver.getModelLimits)
+              model = await abortable(options.resolver.getModelLimits(modelSignal), modelSignal)
+          } catch (error) {
+            signal.throwIfAborted()
+            throw new PiFailure(
+              'provider_failed',
+              modelSignal.aborted
+                ? 'Loading model information timed out. Try again.'
+                : `Could not read the selected model's limits: ${getErrorMessage(error)}`
+            )
+          }
+          const turnLimits = resolvePiLimits(options.limits, model)
           // A reload must not create a database: a missing one was cleared by another controller,
           // and recreating it would leave an empty conversation behind. Opening still creates it,
           // so unavailable storage is reported as soon as a controller opens.
@@ -216,11 +238,14 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                           : compaction.messages,
                         text ?? '',
                         currentSignal,
-                        limits.maxRequestBytes,
+                        turnLimits.maxRequestBytes,
                         compaction.entries[0]?.kind === 'pi.compaction'
                           ? compaction.messages[0]
                           : undefined,
-                        { contextTokens: limits.contextTokens, timeoutMs: limits.requestTimeoutMs }
+                        {
+                          contextTokens: turnLimits.contextTokens,
+                          timeoutMs: turnLimits.requestTimeoutMs
+                        }
                       )
                       currentSignal.throwIfAborted()
                       if (summary && compaction.reason === 'overflow') failure = undefined
@@ -314,7 +339,7 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                             'The tool returned an invalid outcome. Check application state before continuing.'
                           )
                         // The next request must still fit the result beside history, tools and context.
-                        if (jsonBytes(result) > limits.maxRequestBytes / 2)
+                        if (jsonBytes(result) > turnLimits.maxRequestBytes / 2)
                           throw new PiFailure(
                             'limit_reached',
                             'The tool result is too large for the next model request. The action may have completed; check application state.',
@@ -444,8 +469,8 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                   current.tools,
                   roundContext,
                   currentSignal,
-                  limits.maxRequestBytes,
-                  limits.requestTimeoutMs,
+                  turnLimits.maxRequestBytes,
+                  turnLimits.requestTimeoutMs,
                   text,
                   correction
                 )
@@ -494,7 +519,7 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
               failure = piError(error)
               throw error
             }
-          }, limits.contextTokens)
+          }, turnLimits.contextTokens)
           storage = await openPiStorage(key, limits.maxHistoryBytes)
           try {
             harness = await Harness.open(
@@ -505,7 +530,11 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                 settings: {
                   toolExecution: 'sequential',
                   retry: { enabled: false },
-                  compaction: piCompactionPolicy(limits.maxRequestBytes, limits.contextTokens),
+                  compaction: piCompactionPolicy(
+                    turnLimits.maxRequestBytes,
+                    turnLimits.contextTokens,
+                    model
+                  ),
                   stream: { maxRetries: 0 }
                 }
               },

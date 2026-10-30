@@ -1,5 +1,6 @@
 import type {
   ResolverContext,
+  ResolverModelLimits,
   ResolverRunOptions,
   ToolResolution,
   ToolResolver,
@@ -12,6 +13,7 @@ import type {
 import { createToolResolutionSchema, validateToolResolution } from './resolution-validation'
 import { createResponseError } from './resolver-error'
 import { serializeResolverRequest } from './resolver-request'
+import { knownOpenAIModelLimits, validateModelLimits } from './resolver-model-limits'
 
 export interface HostedOpenAIResolverOptions {
   accessKey?: string
@@ -19,6 +21,7 @@ export interface HostedOpenAIResolverOptions {
   browserChallengeSiteKey?: string
   endpoint?: string
   model: string
+  modelLimits?: ResolverModelLimits
   sessionEndpoint?: string
 }
 
@@ -75,6 +78,7 @@ const defaultSessionEndpointPath = '/api/webmcp/session'
 let turnstileScriptPromise: Promise<void> | undefined
 
 export function createHostedOpenAIResolver(rawOptions: HostedOpenAIResolverOptions): ToolResolver {
+  if (rawOptions.modelLimits) validateModelLimits(rawOptions.modelLimits)
   const options = resolveHostedOpenAIResolverOptions(rawOptions)
   if (!options.accessKey) {
     return {
@@ -131,6 +135,12 @@ export function createHostedOpenAIResolver(rawOptions: HostedOpenAIResolverOptio
 
   return {
     capabilities: { conversation: true },
+    async getModelLimits(signal) {
+      signal?.throwIfAborted()
+      return options.modelLimits
+        ? { ...options.modelLimits }
+        : knownOpenAIModelLimits(options.model)
+    },
     available: true,
     detail: 'Hosted OpenAI will resolve through the WebMCP paid endpoint.',
     name: 'Hosted OpenAI',

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.2 — 2026-10-30
+
+- **Pi:** base history compaction on the selected model's context and output limits instead of the request-byte threshold. Unknown capacity no longer triggers speculative summaries; actual overflow recovery and conversation history remain intact.
+- **Resolvers:** expose model limits from documented OpenAI capacities, OpenRouter metadata, loaded LM Studio instances and Chrome AI sessions. Custom resolvers can report their own model limits.
+
 ## 0.8.1 — 2026-10-29
 
 - **LM Studio:** explain server, CORS and browser permission recovery when model discovery fails or times out. Caller cancellation remains unchanged.

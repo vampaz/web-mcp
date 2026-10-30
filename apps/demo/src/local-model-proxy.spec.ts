@@ -41,6 +41,8 @@ it('allows only exact methods, paths, and same-origin requests', function test()
   const origin = 'https://webmcp-kit.localtest.me'
   expect(proxyRequestAllowed('/__lmstudio/v1/models', 'GET', undefined, origin)).toBe(true)
   expect(proxyRequestAllowed('/__lmstudio/api/v0/models', 'GET', undefined, origin)).toBe(true)
+  expect(proxyRequestAllowed('/__lmstudio/api/v1/models', 'GET', undefined, origin)).toBe(true)
+  expect(proxyRequestAllowed('/__lmstudio/api/v1/models', 'POST', origin, origin)).toBe(false)
   expect(proxyRequestAllowed('/__lmstudio/v1/chat/completions', 'POST', origin, origin)).toBe(true)
   expect(proxyRequestAllowed('/__lmstudio/v1/models', 'GET', 'https://evil.example', origin)).toBe(
     false

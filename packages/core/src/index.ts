@@ -37,6 +37,7 @@ export type {
   ResolverAuth,
   ResolverProviderConfig,
   RemoteResolverConfig,
+  ResolverModelLimits,
   ResolverProviderKind,
   ResolverRequest,
   ResolverRunOptions,

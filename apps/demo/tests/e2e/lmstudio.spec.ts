@@ -60,6 +60,14 @@ test('answers and discovers tools through the actual model and Pi loop', async f
 }) {
   await page.goto('/?mode=chat')
   await expect(page.locator('#model-status')).toContainText('LM Studio')
+  const metadata = page.waitForResponse((response) =>
+    response.url().endsWith('/__lmstudio/api/v1/models')
+  )
+  const purposes: unknown[] = []
+  page.on('request', function request(request) {
+    if (request.url().endsWith('/chat/completions') && request.method() === 'POST')
+      purposes.push(request.postDataJSON().messages[0].content)
+  })
   const input = page.getByRole('textbox', { name: 'Message', exact: true })
   await input.fill(
     'Name the two available application tools, without calling either tool. Explain briefly what each does.'
@@ -71,6 +79,22 @@ test('answers and discovers tools through the actual model and Pi loop', async f
   await expect(assistant).toContainText('read_counter')
   await expect(assistant).toContainText('set_counter')
   await expect(page.locator('webmcp-chat details')).toHaveCount(0)
+  const catalog = await (await metadata).json()
+  expect(
+    catalog.models.some((model: { loaded_instances: { config: { context_length: number } }[] }) =>
+      model.loaded_instances.some((instance) => instance.config.context_length > 0)
+    )
+  ).toBe(true)
+  await input.fill('Use read_counter once and tell me its current value.')
+  await input.press('Enter')
+  await expect(page.locator('webmcp-chat ol[aria-busy="false"]')).toHaveCount(1)
+  await expect(page.locator('webmcp-chat').getByRole('status')).toHaveText('')
+  await expect(assistant).toHaveCount(2)
+  await expect(page.locator('webmcp-chat summary')).toHaveText('read_counter')
+  expect(
+    purposes.some((prompt) => String(prompt).includes('Summarize the supplied conversation'))
+  ).toBe(false)
+  await page.screenshot({ path: 'test-results/context-chat-live.png', fullPage: true })
 })
 
 test('popup reads, confirms a result-dependent write, re-resolves, and restores without replay', async function actions({

@@ -202,6 +202,15 @@ export interface RemoteResolverConfig {
   maxTokens?: number
   temperature?: number
   reasoningEffort?: 'none' | 'low' | 'medium' | 'high'
+  /** Provider-reported limits for a model not covered by built-in discovery. */
+  modelLimits?: ResolverModelLimits
+}
+
+export interface ResolverModelLimits {
+  /** Actual context window, including input and output tokens. */
+  contextWindow: number
+  maxInputTokens?: number
+  maxOutputTokens?: number
 }
 
 export interface ResolverRequest {
@@ -221,6 +230,8 @@ export interface ResolverRunOptions {
 
 export interface ToolResolver {
   capabilities?: { conversation: boolean }
+  /** Resolve the selected model's limits; undefined means its capacity is unknown. */
+  getModelLimits?: (signal?: AbortSignal) => Promise<ResolverModelLimits | undefined>
   name: string
   available: boolean
   status: 'ready' | 'downloadable' | 'downloading' | 'unavailable' | 'fallback' | 'needs-key'

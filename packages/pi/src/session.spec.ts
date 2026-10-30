@@ -19,3 +19,17 @@ it('bounds configurable tool, history, and request budgets', function test() {
       resolvePiLimits({ maxToolCalls })
     }).toThrow()
 })
+
+it('derives defaults from actual model capacity and preserves explicit transport limits', function capacity() {
+  const model = { contextWindow: 1_050_000, maxOutputTokens: 128_000 }
+  expect(resolvePiLimits({}, model)).toMatchObject({
+    contextTokens: 1_050_000,
+    maxRequestBytes: 4_200_000
+  })
+  expect(resolvePiLimits({ maxRequestBytes: 131072 }, model).maxRequestBytes).toBe(131072)
+  expect(resolvePiLimits().contextTokens).toBe(0)
+  expect(() => resolvePiLimits({}, { contextWindow: NaN })).toThrow('invalid model limits')
+  expect(() => resolvePiLimits({}, { contextWindow: 8192, maxOutputTokens: 8192 })).toThrow(
+    'fit its context window'
+  )
+})

@@ -20,8 +20,12 @@ import {
 import { formatJsonValueValidationError, validateJsonValue } from './schema'
 import { ResolverRequestLimitError, serializeResolverRequest } from './resolver-request'
 import { createResponseError, isContextOverflowText, ResolverError } from './resolver-error'
+import { validateModelLimits } from './resolver-model-limits'
+import { remoteModelLimits } from './remote-model-limits'
 
 interface LanguageModelSession {
+  contextWindow?: number
+  inputQuota?: number
   clone: (options?: { signal?: AbortSignal }) => Promise<LanguageModelSession>
   prompt: (message: string, options?: ChromeAIPromptOptions) => Promise<string>
   destroy?: () => void
@@ -173,6 +177,7 @@ export async function createResolver(config?: ResolverProviderConfig): Promise<T
 }
 
 export function createRemoteResolver(config: RemoteResolverConfig): ToolResolver {
+  if (config.modelLimits) validateModelLimits(config.modelLimits)
   if (
     config.maxTokens !== undefined &&
     (!Number.isSafeInteger(config.maxTokens) || config.maxTokens < 1 || config.maxTokens > 65536)
@@ -216,6 +221,9 @@ export function createRemoteResolver(config: RemoteResolverConfig): ToolResolver
 
   return {
     capabilities: { conversation: true },
+    getModelLimits(signal) {
+      return remoteModelLimits(config, model, key, signal)
+    },
     name: providerLabel,
     available: true,
     status: 'ready',
@@ -565,8 +573,34 @@ function createActiveChromeResolver(
         : `Chrome is downloading the built-in AI model (${Math.round(loaded * 100)}%).`
   }
 
+  async function getSession(signal?: AbortSignal) {
+    throwIfAborted(signal)
+    if (disposed) throw new Error('The resolver was disposed.')
+    pendingSession ??= createChromeAISession(languageModel, reportProgress)
+      .then(function created(value) {
+        if (disposed) {
+          disposeChromeAISession(value)
+          throw new Error('The resolver was disposed.')
+        }
+        session = value
+        reportProgress(1)
+        return value
+      })
+      .catch(function failed(error) {
+        pendingSession = undefined
+        throw error
+      })
+    // Cancelling a caller does not cancel another caller's model download.
+    return raceAbort(pendingSession, signal, 'Resolver request was cancelled.')
+  }
+
   const resolver: ToolResolver = {
     capabilities: { conversation: strict },
+    async getModelLimits(signal) {
+      const base = await getSession(signal)
+      const contextWindow = base.contextWindow ?? base.inputQuota
+      return contextWindow ? { contextWindow } : undefined
+    },
     name: 'Chrome built-in AI',
     available: true,
     status,
@@ -580,26 +614,7 @@ function createActiveChromeResolver(
       try {
         throwIfAborted(options?.signal)
         if (disposed) throw new Error('The resolver was disposed.')
-        pendingSession ??= createChromeAISession(languageModel, reportProgress)
-          .then(function created(value) {
-            if (disposed) {
-              disposeChromeAISession(value)
-              throw new Error('The resolver was disposed.')
-            }
-            session = value
-            reportProgress(1)
-            return value
-          })
-          .catch(function failed(error) {
-            pendingSession = undefined
-            throw error
-          })
-        // A caller can stop waiting for a model download; the shared session keeps loading for others.
-        const base = await raceAbort(
-          pendingSession,
-          options?.signal,
-          'Resolver request was cancelled.'
-        )
+        const base = await getSession(options?.signal)
         throwIfAborted(options?.signal)
         const current = await base.clone({ signal: options?.signal })
         try {

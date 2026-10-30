@@ -18,6 +18,19 @@ Built-in remote, server, and hosted resolvers throw `ResolverError` on HTTP fail
 
 Remote providers are `openai`, `openrouter`, `openai-compatible`, and `cloudflare-binding`. Choose a model that your endpoint permits; example identifiers are placeholders, not availability claims.
 
+## Model capacity
+
+Conversational resolvers can expose `getModelLimits(signal)`, returning `{ contextWindow, maxInputTokens?, maxOutputTokens? }` or `undefined` when capacity is unknown. Pi reads this before each user turn and uses it for history compaction. Opening a saved conversation does not request model metadata or start a model download.
+
+Built-in resolvers use these sources:
+
+- OpenAI and hosted OpenAI: documented limits for `gpt-6-luna`, `gpt-5.4-mini`, and its `gpt-5.4-mini-2026-03-17` snapshot. Unknown IDs are not assigned another model's limits. Sources: [GPT-6 Luna](https://developers.openai.com/api/docs/models/gpt-6-luna) and [GPT-5.4 Mini](https://developers.openai.com/api/docs/models/gpt-5.4-mini).
+- OpenRouter: the selected model's `context_length` and completion limit from its [model catalog](https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties).
+- LM Studio through an OpenAI-compatible resolver: the selected loaded instance's `config.context_length` from [`/api/v1/models`](https://lmstudio.ai/docs/developer/rest/list), refreshed between turns. An unloaded model's advertised maximum is not its loaded capacity. The metadata endpoint keeps the configured URL prefix; proxies must forward this route.
+- Chrome built-in AI: the created session's `contextWindow`, with `inputQuota` support for earlier API versions. Session creation remains lazy until the user sends a message.
+
+For a private model or a server with different limits, pass `modelLimits` to `createResolver()` or `createHostedOpenAIResolver()`. Custom adapters should implement `getModelLimits()` using their server's metadata. Missing or unavailable metadata leaves capacity unknown and does not switch providers or disable actual-overflow recovery.
+
 ## Production: server mode
 
 ```ts

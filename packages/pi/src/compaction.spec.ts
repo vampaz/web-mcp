@@ -1,10 +1,22 @@
 // @vitest-environment node
 import { afterEach, expect, it, vi } from 'vitest'
 import { createResolver, validateJsonValue, type ToolResolver } from '@vampaz/webmcp-kit'
-import { summarizePiHistory } from './compaction'
+import { piCompactionPolicy, summarizePiHistory } from './compaction'
 
 afterEach(function cleanup() {
   vi.unstubAllGlobals()
+})
+
+it('bases the trigger on model input capacity, independently of the transport budget', function capacity() {
+  const model = { contextWindow: 1_050_000, maxInputTokens: 922_000, maxOutputTokens: 128_000 }
+  for (const bytes of [128 * 1024, 4 * 1024 * 1024]) {
+    const policy = piCompactionPolicy(bytes, model.contextWindow, model)
+    expect(model.contextWindow - policy.reserveTokens).toBe(922_000)
+    expect(policy.enabled).toBe(true)
+  }
+  expect(
+    piCompactionPolicy(131072, 16384, { contextWindow: 16384, maxOutputTokens: 2048 }).reserveTokens
+  ).toBe(2048)
 })
 
 it.each(['json_schema', 'json_object', 'text'] as const)(
