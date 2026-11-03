@@ -1,3 +1,12 @@
+import { createStateMachine } from './state-machine'
+import { createDeferred } from './deferred'
+import type {
+  CommandState,
+  CommandEvent,
+  CommandResolverState,
+  CommandResolverEvent
+} from './interfaces/command-state'
+import { transitionCommand, transitionCommandResolver } from './command-state'
 import type {
   ResolverContext,
   ToolInvocationResult,
@@ -10,7 +19,6 @@ import type {
   WebMCPCommandInputElement,
   WebMCPCommandInputLabels,
   WebMCPCommandInputResolverOption,
-  WebMCPCommandInputPhase,
   WebMCPCommandPanelToggleEventDetail,
   WebMCPCommandResolutionEventDetail,
   WebMCPCommandResolverEventDetail,
@@ -58,7 +66,6 @@ type CommandInputRuntimeState = {
   labels: Partial<WebMCPCommandInputLabels>
   launcher: boolean
   model: string
-  phase: WebMCPCommandInputPhase
   resolverOptionId?: string
   placeholder: string
   prompt: string
@@ -123,15 +130,27 @@ export function defineWebMCPCommandInput(
 
     private providedContext?: ResolverContext | (() => ResolverContext)
     private providedResolverOptions?: WebMCPCommandInputResolverOption[]
-    private pendingResolver?: Promise<ToolResolver>
-    private currentResolver?: ToolResolver
+    private readonly resolverMachine = createStateMachine<
+      CommandResolverState,
+      CommandResolverEvent
+    >({ kind: 'empty', revision: 0 }, transitionCommandResolver)
     private isConnectedToDom = false
     private lightDomObserver?: MutationObserver
     private panelOpener?: HTMLElement
-    private resolverRevision = 0
     private providedResolver?: ToolResolver
-    private running = false
-    private activeCommand?: AbortController
+    private readonly commandMachine = createStateMachine<CommandState, CommandEvent>(
+      { kind: 'idle' },
+      transitionCommand
+    )
+
+    private get running() {
+      return 'controller' in this.commandMachine.state
+    }
+    private get activeCommand() {
+      return 'controller' in this.commandMachine.state
+        ? this.commandMachine.state.controller
+        : undefined
+    }
     private userSelectedResolver = false
     private readonly dom: CommandInputDom
     private readonly state: CommandInputRuntimeState = {
@@ -143,7 +162,6 @@ export function defineWebMCPCommandInput(
       labels: {},
       launcher: false,
       model: '',
-      phase: 'idle',
       placeholder: defaultPlaceholder,
       prompt: '',
       resolverName: 'Resolver',
@@ -375,14 +393,18 @@ export function defineWebMCPCommandInput(
       if (this.running || this.disabled || !command) return undefined
 
       this.state.prompt = command
-      this.running = true
-      this.setPhase('preparing', this.labels.preparing)
       let signal: AbortSignal | undefined
 
+      const controller = new AbortController()
+      if (
+        !this.commandMachine.send({ type: 'start', controller }, () => {
+          this.setDetail(this.labels.preparing, 'info')
+          this.renderIfConnected()
+        })
+      )
+        return undefined
       try {
         this.invalidateAutoResolverBeforeRun()
-        const controller = new AbortController()
-        this.activeCommand = controller
         signal = options.signal
           ? AbortSignal.any([controller.signal, options.signal])
           : controller.signal
@@ -433,8 +455,7 @@ export function defineWebMCPCommandInput(
           durationMs: 0
         }
       } finally {
-        this.activeCommand = undefined
-        this.running = false
+        this.commandMachine.send({ type: 'release' })
         this.renderIfConnected()
       }
     }
@@ -506,36 +527,43 @@ export function defineWebMCPCommandInput(
 
     private async getCurrentResolver(): Promise<ToolResolver> {
       if (this.providedResolver) return this.providedResolver
-      if (this.currentResolver) return this.currentResolver
-      if (this.pendingResolver) return this.pendingResolver
-      const revision = this.resolverRevision
+      if (this.resolverMachine.state.kind === 'ready') return this.resolverMachine.state.resolver
+      if (this.resolverMachine.state.kind === 'creating') return this.resolverMachine.state.promise
+      const revision = this.resolverMachine.state.revision
       const option = this.getSelectedResolverOption()
       const model = this.state.model
       // Share one creation between status refresh and a command that starts immediately.
-      const pending = Promise.resolve()
-        .then(async function create() {
-          return option
-            ? option.createResolver({
-                model: model || undefined,
-                modelOption: option.modelOptions?.find(function selected(item) {
-                  return item.model === model
-                })
+      const task = createDeferred<ToolResolver>()
+      const pending = task.promise
+      if (
+        !this.resolverMachine.send({ type: 'create', promise: pending }, () => {
+          task.resolve(
+            Promise.resolve()
+              .then(async function create() {
+                return option
+                  ? option.createResolver({
+                      model: model || undefined,
+                      modelOption: option.modelOptions?.find(function selected(item) {
+                        return item.model === model
+                      })
+                    })
+                  : createResolver()
               })
-            : createResolver()
+              .then((resolver) => {
+                if (!this.resolverMachine.send({ type: 'resolve', revision, resolver })) {
+                  resolver.dispose?.()
+                  throw new Error(supersededResolverRefreshMessage)
+                }
+                return resolver
+              })
+          )
         })
-        .then((resolver) => {
-          if (revision !== this.resolverRevision) {
-            resolver.dispose?.()
-            throw new Error(supersededResolverRefreshMessage)
-          }
-          this.currentResolver = resolver
-          return resolver
-        })
-      this.pendingResolver = pending
+      )
+        task.reject(new Error(supersededResolverRefreshMessage))
       try {
         return await pending
       } finally {
-        if (this.pendingResolver === pending) this.pendingResolver = undefined
+        this.resolverMachine.send({ type: 'reject', promise: pending })
       }
     }
 
@@ -564,26 +592,42 @@ export function defineWebMCPCommandInput(
     }
 
     private invalidateResolver() {
-      this.activeCommand?.abort()
-      this.resolverRevision += 1
-      this.pendingResolver = undefined
-      this.currentResolver?.dispose?.()
-      this.currentResolver = undefined
+      this.cancelCommand()
+      this.resetResolver()
+    }
+
+    private resetResolver() {
+      this.resolverMachine.send({ type: 'invalidate' }, function dispose({ previous }) {
+        if (previous.kind === 'ready') previous.resolver.dispose?.()
+      })
     }
 
     private invalidateAutoResolverBeforeRun() {
       if (this.providedResolver || this.getSelectedResolverOption()) return
       // Keep a ready automatic resolver (and its Chrome AI session); retry anything else.
-      if (this.currentResolver?.status === 'ready') return
+      if (
+        this.resolverMachine.state.kind === 'ready' &&
+        this.resolverMachine.state.resolver.status === 'ready'
+      )
+        return
       // A creation already in flight is fresh, so reuse it instead of starting another one.
-      if (!this.currentResolver && this.pendingResolver) return
-      this.invalidateResolver()
+      if (this.resolverMachine.state.kind === 'creating') return
+      this.resetResolver()
     }
 
-    private setPhase(phase: WebMCPCommandInputPhase, detail?: string, tone?: CommandInputTone) {
-      this.state.phase = phase
-      if (detail !== undefined) this.setDetail(detail, tone ?? 'info')
-      this.renderIfConnected()
+    private setPhase(
+      phase: 'resolving' | 'executing' | 'completed' | 'failed',
+      detail?: string,
+      tone?: CommandInputTone
+    ) {
+      const event =
+        phase === 'completed' || phase === 'failed'
+          ? { type: 'settle' as const, phase }
+          : { type: 'progress' as const, phase }
+      this.commandMachine.send(event, () => {
+        if (detail !== undefined) this.setDetail(detail, tone ?? 'info')
+        this.renderIfConnected()
+      })
     }
 
     private setDetail(detail: string, tone: CommandInputTone) {
@@ -678,10 +722,16 @@ export function defineWebMCPCommandInput(
       void this.run()
     }
 
+    private cancelCommand() {
+      this.commandMachine.send({ type: 'cancel' }, function cancel({ state }) {
+        if ('controller' in state) state.controller.abort()
+      })
+    }
+
     private handleRunClick(event: MouseEvent) {
       if (!this.activeCommand) return
       event.preventDefault()
-      this.activeCommand.abort()
+      this.cancelCommand()
     }
 
     private handleLauncherClick() {
@@ -729,7 +779,7 @@ export function defineWebMCPCommandInput(
       // The first Escape stops a running command; the next one closes the floating panel.
       if (this.activeCommand && !this.activeCommand.signal.aborted) {
         event.preventDefault()
-        this.activeCommand.abort()
+        this.cancelCommand()
         return
       }
       if (!this.state.floating || !this.state.floatingExpanded) return
@@ -822,7 +872,11 @@ export function defineWebMCPCommandInput(
         optionsStatus: resolverOption
           ? getResolverOptionStatusText(resolverOption, model)
           : this.state.resolverName,
-        phase: this.state.phase,
+        phase:
+          this.commandMachine.state.kind === 'stopping' ||
+          this.commandMachine.state.kind === 'settling'
+            ? this.commandMachine.state.phase
+            : this.commandMachine.state.kind,
         placeholder: this.state.placeholder,
         prompt: this.state.prompt,
         provider: showProviderControl

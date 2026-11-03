@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.3 — 2026-11-03
+
+- **State management:** replace implicit lifecycle flags with explicit typed machines and enforced transition actions across Pi, command input, hosted and Chrome AI resolvers, chat, and popups. Public exports remain unchanged.
+- **Pi:** preserve refresh cancellation and overlapping cached-page suspensions, deliver closed snapshots, and prevent stale work after shutdown. Distinguish received action results from durable outcomes when reporting interruption risks.
+- **Chat and resolvers:** preserve pending requests across DOM moves, recover interrupted popup gestures, and ignore stale resolver and hosted-session completions.
+
 ## 0.8.2 — 2026-10-30
 
 - **Pi:** base history compaction on the selected model's context and output limits instead of the request-byte threshold. Unknown capacity no longer triggers speculative summaries; actual overflow recovery and conversation history remain intact.

@@ -1,3 +1,6 @@
+import { createStateMachine } from '../../core/src/state-machine'
+import type { ChatOperationState, ChatOperationEvent } from './interfaces/chat-state'
+import { transitionChatOperation } from './chat-state'
 import type { PiController, PiSnapshot } from '@vampaz/webmcp-kit/pi'
 import type {
   ChatStatus,
@@ -22,9 +25,17 @@ export function defineWebMCPChat(): void {
     private labels: WebMCPChatLabels = createLabels()
     private unsubscribe?: () => void
     private snapshot: PiSnapshot = { state: 'loading', messages: [] }
-    private revision = 0
-    private sending = false
-    private clearing = false
+    private readonly operation = createStateMachine<ChatOperationState, ChatOperationEvent>(
+      { kind: 'idle', revision: 0 },
+      transitionChatOperation
+    )
+
+    private get sending() {
+      return this.operation.state.kind === 'sending'
+    }
+    private get clearing() {
+      return this.operation.state.kind === 'clearing'
+    }
     private initiallyScrolled = false
     private latestId?: string
     private latestText?: string
@@ -173,13 +184,15 @@ export function defineWebMCPChat(): void {
     }
     disconnectedCallback() {
       this.popup.disconnect()
-      this.revision++
-      this.sending = false
-      this.clearing = false
-      this.resizeObserver.disconnect()
-      for (const finish of this.focusTrackers) finish()
-      this.unsubscribe?.()
-      this.unsubscribe = undefined
+      queueMicrotask(() => {
+        if (this.isConnected) return
+        this.operation.send({ type: 'reset' }, () => {
+          this.resizeObserver.disconnect()
+          for (const finish of this.focusTrackers) finish()
+          this.unsubscribe?.()
+          this.unsubscribe = undefined
+        })
+      })
     }
 
     get controller(): PiController | undefined {
@@ -219,9 +232,7 @@ export function defineWebMCPChat(): void {
         this.latestId = this.latestText = undefined
         this.notice = undefined
         this.unread = false
-        this.revision++
-        this.sending = false
-        this.clearing = false
+        this.operation.send({ type: 'reset' })
         for (const finish of this.focusTrackers) finish()
       }
       this.unsubscribe?.()
@@ -439,7 +450,7 @@ export function defineWebMCPChat(): void {
       if (!this.options || this.sendButton.disabled) return
       const draft = this.input.value
       const text = draft.trim()
-      const revision = this.revision
+      const revision = this.operation.state.revision
       const controller = this.options.controller
       const previousMessages = new Set(
         this.snapshot.messages.map(function id(message) {
@@ -450,26 +461,40 @@ export function defineWebMCPChat(): void {
       const focusComposer = this.root.activeElement === this.sendButton
       let errorText: string | undefined
       let failed = false
-      this.input.value = ''
-      this.sending = true
-      this.notice = undefined
-      this.update()
-      if (focusComposer) this.input.focus()
-      this.dispatchEvent(
-        new CustomEvent('webmcp-chat-send', { detail: { text }, bubbles: true, composed: true })
-      )
+      const request = this.operation.act({ type: 'send' }, () => {
+        this.input.value = ''
+        this.notice = undefined
+        this.update()
+        if (focusComposer) this.input.focus()
+        this.dispatchEvent(
+          new CustomEvent('webmcp-chat-send', { detail: { text }, bubbles: true, composed: true })
+        )
+        try {
+          return controller.send(text)
+        } catch (error) {
+          return Promise.reject(error)
+        }
+      })
+      if (!request.accepted) {
+        finishFocus()
+        return
+      }
       try {
-        const outcome = await controller.send(text)
+        const outcome = await request.value
         errorText = outcome.error?.message
         failed = outcome.status !== 'completed'
       } catch (error) {
         failed = true
-        if (revision === this.revision)
+        if (revision === this.operation.state.revision)
           errorText = error instanceof Error ? error.message : 'The message could not be sent.'
       } finally {
         const restoreFocus = finishFocus()
-        if (revision === this.revision) {
-          this.sending = false
+        if (revision === this.operation.state.revision) {
+          this.operation.send({
+            type: 'settle',
+            operation: 'sending',
+            revision
+          })
           const recorded = this.snapshot.messages.some(function sent(message) {
             return (
               message.role === 'user' && message.text === text && !previousMessages.has(message.id)
@@ -513,22 +538,41 @@ export function defineWebMCPChat(): void {
 
     private async perform(action: 'stop' | 'clear') {
       if (!this.options || (action === 'clear' && this.clearButton.disabled)) return
-      const revision = this.revision
+      const revision = this.operation.state.revision
       const finishFocus = this.trackFocus()
       let errorText: string | undefined
-      if (action === 'clear') {
-        this.clearing = true
-        this.notice = undefined
+      const controller = this.options.controller
+      const request =
+        action === 'clear'
+          ? this.operation.act({ type: 'clear' }, () => {
+              this.notice = undefined
+              this.update()
+              try {
+                return controller.clear()
+              } catch (error) {
+                return Promise.reject(error)
+              }
+            })
+          : undefined
+      if (request && !request.accepted) {
+        finishFocus()
+        return
       }
-      this.update()
+      if (action === 'stop') this.update()
       try {
-        await this.options.controller[action]()
+        if (request?.accepted) await request.value
+        else await controller.stop()
       } catch (error) {
         errorText = (error instanceof Error && error.message) || 'The operation failed.'
       } finally {
         const restoreFocus = finishFocus()
-        if (revision === this.revision) {
-          this.clearing = false
+        if (revision === this.operation.state.revision) {
+          if (action === 'clear')
+            this.operation.send({
+              type: 'settle',
+              operation: 'clearing',
+              revision
+            })
           if (action === 'clear' && !errorText) this.input.value = ''
           this.update()
           if (errorText) this.showNotice(errorText, 'error')

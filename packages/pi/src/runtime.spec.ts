@@ -68,6 +68,33 @@ it('uses the selected resolver capacity and refreshes it between turns', async f
   expect(models.mock.calls.at(-1)?.[1]).toBe(131_072)
 })
 
+it('does not submit input when Stop lands while the durable turn marker is saved', async function stopStarting() {
+  const open = Harness.open
+  let stopping: Promise<void> | undefined
+  vi.spyOn(Harness, 'open').mockImplementation(async function intercept(...args) {
+    const harness = await open(...args)
+    const root = harness.root.bind(harness)
+    vi.spyOn(harness, 'root').mockImplementation(async function rootConversation(...args) {
+      const conversation = await root(...args)
+      const submit = conversation.submit.bind(conversation)
+      vi.spyOn(conversation, 'submit').mockImplementation(async function record(draft, context) {
+        const result = await submit(draft, context)
+        if (draft.type === 'write' && draft.entry.kind === 'webmcp.turn.started')
+          stopping = runtime!.stop()
+        return result
+      })
+      return conversation
+    })
+    return harness
+  })
+  const config = options([resolution()])
+  runtime = await createPiRuntime(config)
+  expect(await runtime.send('Do not submit')).toMatchObject({ status: 'interrupted' })
+  await stopping
+  expect(config.resolver.resolve).not.toHaveBeenCalled()
+  expect(runtime.getSnapshot().messages.some((message) => message.role === 'user')).toBe(false)
+})
+
 it('allows Stop while model metadata is pending without starting inference', async function stopMetadata() {
   const config = options([resolution()])
   const metadata = vi.fn(() => new Promise<undefined>(() => {}))
@@ -951,6 +978,69 @@ it('keeps separate owners and rejects a changed catalog before invocation', asyn
     session: { ...config.session, ownerId: 'someone-else' }
   })
   expect(runtime.getSnapshot().messages).toEqual([])
+})
+
+it('shares destruction and aborts an admitted turn before starting provider work', async function closing() {
+  const config = options([resolution()])
+  const metadata = vi.fn(async function limits() {
+    return undefined
+  })
+  Object.assign(config.resolver, { getModelLimits: metadata })
+  runtime = await createPiRuntime(config)
+  const turn = runtime.send('Hello')
+  const first = runtime.destroy()
+  const second = runtime.destroy()
+  expect(first).toBe(second)
+  await second
+  expect(runtime.getSnapshot().state).toBe('closed')
+  expect(await turn).toMatchObject({ status: 'interrupted' })
+  expect(metadata).not.toHaveBeenCalled()
+  expect(config.resolver.resolve).not.toHaveBeenCalled()
+  expect(await runtime.send('Late')).toMatchObject({ error: { code: 'conversation_busy' } })
+})
+
+it('waits for destruction when Stop is requested during closing', async function stopClosing() {
+  const config = options([resolution()])
+  const metadata = vi.fn(() => new Promise<undefined>(() => {}))
+  Object.assign(config.resolver, { getModelLimits: metadata })
+  runtime = await createPiRuntime(config)
+  const turn = runtime.send('Wait')
+  await vi.waitFor(() => expect(metadata).toHaveBeenCalledOnce())
+  const closing = runtime.destroy()
+  await runtime.stop()
+  expect(runtime.getSnapshot().state).toBe('closed')
+  await Promise.all([turn, closing])
+})
+
+it('waits for a stopped history reload before admitting the next send', async function stoppedRefresh() {
+  const config = options([resolution()])
+  runtime = await createPiRuntime(config)
+  const discover = config.host.discover
+  let entered!: () => void
+  const started = new Promise<void>(function ready(resolve) {
+    entered = resolve
+  })
+  config.host.discover = async function pending() {
+    entered()
+    return new Promise(function wait() {})
+  }
+  const reload = runtime.refresh()
+  await started
+  const stopping = runtime.stop()
+  config.host.discover = discover
+  const turn = runtime.send('Hello')
+  expect(await turn).toMatchObject({ status: 'completed' })
+  await Promise.all([reload, stopping])
+})
+
+it('delivers the closed snapshot before detaching subscribers', async function closedNotification() {
+  runtime = await createPiRuntime(options([]))
+  const states: string[] = []
+  runtime.subscribe(function changed(snapshot) {
+    states.push(snapshot.state)
+  })
+  await runtime.destroy()
+  expect(states.at(-1)).toBe('closed')
 })
 
 it('settles a pending clear before destruction closes the controller', async function test() {

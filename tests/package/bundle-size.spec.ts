@@ -13,23 +13,27 @@ import { artifact, run, verifyArtifact } from './fixtures'
 // Raise a ceiling only after reviewing the artifact's size increase and import graph.
 // 0.6.0 chat: 13,707 bytes with the optional settings UI; no runtime dependencies added.
 // Give that reviewed graph the same 10% headroom, rounded up to 100 bytes.
+// 0.8.3 explicit lifecycle machines share transition/deferred chunks and add no dependencies.
+// Reviewed eager bytes: root 25,467; mcp-bridge 26,280; react 26,165; svelte 26,112;
+// vue 26,173; zod 25,804; pi 29,428; command-input 29,838; hosted 9,630.
+// Pi total is 149,727 bytes. Raise only exceeded ceilings with the same 10% policy above.
 const budgets: Record<string, { eager: number; total: number }> = {
-  '.': { eager: 25_000, total: 25_000 },
+  '.': { eager: 28_100, total: 28_100 },
   './chat': { eager: 15_100, total: 15_100 },
-  './command-input': { eager: 29_800, total: 29_800 },
+  './command-input': { eager: 32_900, total: 32_900 },
   './devtools': { eager: 33_300, total: 33_300 },
-  './hosted': { eager: 9_200, total: 9_200 },
-  './mcp-bridge': { eager: 25_800, total: 25_800 },
-  './pi': { eager: 28_400, total: 152_300 },
-  './react': { eager: 25_700, total: 25_700 },
-  './svelte': { eager: 25_700, total: 25_700 },
+  './hosted': { eager: 10_600, total: 10_600 },
+  './mcp-bridge': { eager: 29_000, total: 29_000 },
+  './pi': { eager: 32_400, total: 152_300 },
+  './react': { eager: 28_800, total: 28_800 },
+  './svelte': { eager: 28_800, total: 28_800 },
   // 0.8.0 shares the native runner through the Playwright helper entry: 27,418 bytes.
   './testing': { eager: 30_200, total: 30_200 },
   // 0.8.0 native journey runner adds shared resolution/schema validation: 25,596 bytes.
   // This Node-side testing entry has no effect on application entry budgets.
   './testing/playwright': { eager: 28_200, total: 28_200 },
-  './vue': { eager: 25_700, total: 25_700 },
-  './zod': { eager: 25_300, total: 25_300 }
+  './vue': { eager: 28_800, total: 28_800 },
+  './zod': { eager: 28_400, total: 28_400 }
 }
 
 it('keeps each entry chunk graph within its gzip budget', async function bundleSize() {

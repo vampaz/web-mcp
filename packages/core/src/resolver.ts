@@ -1,3 +1,11 @@
+import { createStateMachine } from './state-machine'
+import { createDeferred } from './deferred'
+import type {
+  ChromeSessionState,
+  ChromeSessionEvent,
+  LanguageModelSession
+} from './interfaces/chrome-session-state'
+import { transitionChromeSession } from './chrome-session-state'
 import type {
   ResolverAuth,
   ResolverContext,
@@ -22,15 +30,6 @@ import { ResolverRequestLimitError, serializeResolverRequest } from './resolver-
 import { createResponseError, isContextOverflowText, ResolverError } from './resolver-error'
 import { validateModelLimits } from './resolver-model-limits'
 import { remoteModelLimits } from './remote-model-limits'
-
-interface LanguageModelSession {
-  contextWindow?: number
-  inputQuota?: number
-  clone: (options?: { signal?: AbortSignal }) => Promise<LanguageModelSession>
-  prompt: (message: string, options?: ChromeAIPromptOptions) => Promise<string>
-  destroy?: () => void
-  dispose?: () => void
-}
 
 interface LanguageModelApi {
   availability: (options?: ChromeAIOptions) => Promise<ChromeAIAvailability>
@@ -63,11 +62,6 @@ interface ChromeAIOptions {
     role: 'system'
     content: string
   }>
-}
-
-interface ChromeAIPromptOptions {
-  responseConstraint?: unknown
-  signal?: AbortSignal
 }
 
 const chromeAITextOptions = {
@@ -560,38 +554,62 @@ function createActiveChromeResolver(
   detail: string,
   strict = false
 ): ToolResolver {
-  let session: LanguageModelSession | undefined
-  let pendingSession: Promise<LanguageModelSession> | undefined
-  let disposed = false
-  const activeSessions = new Set<LanguageModelSession>()
+  const sessionMachine = createStateMachine<ChromeSessionState, ChromeSessionEvent>(
+    { kind: 'empty', sessions: [] },
+    transitionChromeSession
+  )
+
+  function assertSessionActive() {
+    if (sessionMachine.state.kind === 'disposed') throw new Error('The resolver was disposed.')
+  }
 
   function reportProgress(loaded: number) {
-    resolver.status = loaded >= 1 ? 'ready' : 'downloading'
-    resolver.detail =
-      loaded >= 1
-        ? 'Chrome built-in AI is ready.'
-        : `Chrome is downloading the built-in AI model (${Math.round(loaded * 100)}%).`
+    sessionMachine.send({ type: 'progress', loaded }, function progress() {
+      resolver.status = loaded >= 1 ? 'ready' : 'downloading'
+      resolver.detail =
+        loaded >= 1
+          ? 'Chrome built-in AI is ready.'
+          : `Chrome is downloading the built-in AI model (${Math.round(loaded * 100)}%).`
+    })
   }
 
   async function getSession(signal?: AbortSignal) {
     throwIfAborted(signal)
-    if (disposed) throw new Error('The resolver was disposed.')
-    pendingSession ??= createChromeAISession(languageModel, reportProgress)
-      .then(function created(value) {
-        if (disposed) {
-          disposeChromeAISession(value)
-          throw new Error('The resolver was disposed.')
-        }
-        session = value
-        reportProgress(1)
-        return value
+    const state = sessionMachine.state
+    if (state.kind === 'disposed') throw new Error('The resolver was disposed.')
+    if (state.kind === 'ready')
+      return raceAbort(Promise.resolve(state.session), signal, 'Resolver request was cancelled.')
+    if (state.kind === 'creating')
+      return raceAbort(state.promise, signal, 'Resolver request was cancelled.')
+    const task = createDeferred<LanguageModelSession>()
+    if (
+      !sessionMachine.send({ type: 'create', promise: task.promise }, function create() {
+        task.run(function open() {
+          return createChromeAISession(languageModel, reportProgress)
+            .then(function created(session) {
+              if (
+                !sessionMachine.send(
+                  { type: 'resolve', promise: task.promise, session },
+                  function ready() {
+                    resolver.status = 'ready'
+                    resolver.detail = 'Chrome built-in AI is ready.'
+                  }
+                )
+              ) {
+                disposeChromeAISession(session)
+                throw new Error('The resolver was disposed.')
+              }
+              return session
+            })
+            .catch(function failed(error) {
+              sessionMachine.send({ type: 'reject', promise: task.promise })
+              throw error
+            })
+        })
       })
-      .catch(function failed(error) {
-        pendingSession = undefined
-        throw error
-      })
-    // Cancelling a caller does not cancel another caller's model download.
-    return raceAbort(pendingSession, signal, 'Resolver request was cancelled.')
+    )
+      task.reject(new Error('The resolver was disposed.'))
+    return raceAbort(task.promise, signal, 'Resolver request was cancelled.')
   }
 
   const resolver: ToolResolver = {
@@ -613,24 +631,28 @@ function createActiveChromeResolver(
     ) {
       try {
         throwIfAborted(options?.signal)
-        if (disposed) throw new Error('The resolver was disposed.')
+        assertSessionActive()
         const base = await getSession(options?.signal)
         throwIfAborted(options?.signal)
         const current = await base.clone({ signal: options?.signal })
         try {
-          activeSessions.add(current)
-          if (disposed) throw new Error('The resolver was disposed.')
+          sessionMachine.send({ type: 'cloned', session: current }, function cloned({ state }) {
+            if (state.kind === 'disposed') disposeChromeAISession(current)
+          })
+          assertSessionActive()
           const resolution = await resolveWithChromeAI(current, message, tools, context, options)
-          if (disposed) throw new Error('The resolver was disposed.')
+          assertSessionActive()
           validateToolResolution(resolution, tools, options)
           throwIfAborted(options?.signal)
           return resolution
         } finally {
-          if (activeSessions.delete(current)) disposeChromeAISession(current)
+          sessionMachine.send({ type: 'release', session: current }, function release() {
+            disposeChromeAISession(current)
+          })
         }
       } catch (error) {
         throwIfAborted(options?.signal)
-        if (disposed) throw new Error('The resolver was disposed.')
+        assertSessionActive()
         if (error instanceof ResolverRequestLimitError) throw error
         if (strict)
           throw wrapResolverError('Chrome built-in AI could not resolve this command', error)
@@ -642,11 +664,10 @@ function createActiveChromeResolver(
       }
     },
     dispose() {
-      disposed = true
-      disposeChromeAISession(session)
-      session = undefined
-      for (const active of activeSessions) disposeChromeAISession(active)
-      activeSessions.clear()
+      sessionMachine.send({ type: 'dispose' }, function dispose({ previous }) {
+        if (previous.kind === 'ready') disposeChromeAISession(previous.session)
+        for (const active of previous.sessions) disposeChromeAISession(active)
+      })
     }
   }
   return resolver

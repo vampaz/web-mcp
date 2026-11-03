@@ -1,3 +1,7 @@
+import { createStateMachine } from '../../core/src/state-machine'
+import { createDeferred } from '../../core/src/deferred'
+import type { TurnState, TurnEvent, CorrectionState, CatalogState } from './interfaces/turn-state'
+import { transitionTurn, transitionCorrection, transitionCatalog } from './turn-state'
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context'
 import { Type } from '@earendil-works/pi-ai'
 import {
@@ -27,9 +31,12 @@ import { createPiModels, piModel, type PiRoundResult } from './model-adapter'
 import { piRefreshCatalogToolName, resolvePiRound } from './resolver-adapter'
 import { normalizeMessages, lastTurnState, piActionInvokingKind, readPiHistory } from './recovery'
 import type { PiToolCatalog } from './interfaces/host'
-import type { PiActionOutcome } from './interfaces/action-outcome'
+import { transitionAction, withActionRisk } from './action-state'
+import type { PiActionState, PiActionEvent, PiActionOutcome } from './interfaces/action-outcome'
 import { piSessionKey, resolvePiLimits } from './session'
 import { clearPiStorage, openPiStorage, piStorageExists, type PiBrowserStorage } from './storage'
+import type { RuntimeState, RuntimeEvent } from './interfaces/runtime-state'
+import { transitionRuntime } from './runtime-state'
 import { piCompactionPolicy, summarizePiHistory } from './compaction'
 
 const context = BACKGROUND_CONTEXT
@@ -44,65 +51,100 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
     )
   let snapshot: PiSnapshot = freeze({ state: 'loading', messages: [] })
   const listeners = new Set<(snapshot: PiSnapshot) => void>()
-  let controller: AbortController | undefined
-  let active: Promise<PiTurnOutcome> | undefined
-  let closed = false
-  let clearing = false
-  let clearOperation: Promise<void> | undefined
-  // A history reload, often started by another tab; user operations wait for it instead of failing.
-  let refreshing: Promise<void> | undefined
-  let notifying = false
+  const lifecycle = createStateMachine<RuntimeState, RuntimeEvent>(
+    { kind: 'opening', pending: 'none' },
+    transitionRuntime
+  )
+  const notification = createStateMachine<'idle' | 'queued', 'queue' | 'flush'>(
+    'idle',
+    function transitionNotification(state, event) {
+      return event === 'queue' && state === 'idle'
+        ? 'queued'
+        : event === 'flush' && state === 'queued'
+          ? 'idle'
+          : state
+    }
+  )
   // Other tabs and controllers reload when this conversation changes.
   const channel = typeof BroadcastChannel === 'undefined' ? undefined : new BroadcastChannel(key)
   ;(channel as { unref?: () => void } | undefined)?.unref?.()
   channel?.addEventListener('message', function changedElsewhere(event: MessageEvent) {
-    if (closed) return
-    if (event.data === 'cleared') {
-      // The database was deleted; reopening it would recreate an empty conversation.
-      if (!active && !clearing)
-        publish({
-          state: 'idle',
-          messages: [],
-          usage: { historyBytes: 0, maxHistoryBytes: limits.maxHistoryBytes }
-        })
-      return
-    }
-    // Queue idle readers; a slow reload in another tab must not exhaust a retry window.
-    if (!active && !clearing) void reload(true)
+    lifecycle.send(
+      { type: event.data === 'cleared' ? 'cleared' : 'changed' },
+      function changed({ state, event }) {
+        if (state.kind !== 'ready') return
+        if (event.type === 'cleared') publishEmpty()
+        else void reload(true)
+      }
+    )
   })
+  function publishEmpty() {
+    publish({
+      state: 'idle',
+      messages: [],
+      usage: { historyBytes: 0, maxHistoryBytes: limits.maxHistoryBytes }
+    })
+  }
   function announce(change: 'changed' | 'cleared') {
-    if (!closed) channel?.postMessage(change)
+    if (lifecycle.state.kind !== 'closing' && lifecycle.state.kind !== 'closed')
+      channel?.postMessage(change)
   }
 
   function reload(waitForLock: boolean): Promise<PiTurnOutcome> {
-    controller = new AbortController()
-    const operation = run(undefined, controller.signal, { waitForLock })
-    active = operation
-    refreshing = operation.then(function reloaded() {})
-    return operation.finally(function settle() {
-      if (active === operation) {
-        active = undefined
-        controller = undefined
-      }
-      refreshing = undefined
+    return startTurn('refreshing', undefined, waitForLock)
+  }
+
+  function startTurn(kind: 'running' | 'refreshing', text?: string, waitForLock = false) {
+    const controller = new AbortController()
+    const task = createDeferred<PiTurnOutcome>()
+    const promise = task.promise.finally(function settle() {
+      lifecycle.send({ type: 'settle', promise }, function settled() {
+        if (kind === 'running') announce('changed')
+      })
     })
+    if (
+      !lifecycle.send(
+        { type: 'start', operation: { kind, controller, promise } },
+        function begin() {
+          if (kind === 'running') publish({ ...snapshot, state: 'running', error: undefined })
+          task.resolve(
+            Promise.resolve().then(function runTurn() {
+              return run(
+                text,
+                controller.signal,
+                kind === 'refreshing' ? { waitForLock } : undefined
+              )
+            })
+          )
+        }
+      )
+    )
+      task.resolve({
+        status: 'error',
+        error: piError(
+          new PiFailure('conversation_busy', 'Wait for the current operation to finish.')
+        )
+      })
+    return promise
   }
 
   // One frozen copy per change is shared by every reader; updates within a task notify once.
   function publish(next: PiSnapshot) {
     snapshot = freeze(structuredClone(next))
-    if (notifying) return
-    notifying = true
-    queueMicrotask(function notify() {
-      notifying = false
-      const current = snapshot
-      for (const listener of listeners) {
-        try {
-          listener(current)
-        } catch {
-          /* A subscriber cannot interrupt persistence. */
-        }
-      }
+    notification.send('queue', function queue() {
+      queueMicrotask(function notify() {
+        notification.send('flush', function deliver() {
+          const current = snapshot
+          for (const listener of listeners) {
+            try {
+              listener(current)
+            } catch {
+              /* Subscribers cannot interrupt persistence. */
+            }
+          }
+          if (current.state === 'closed') listeners.clear()
+        })
+      })
     })
   }
 
@@ -146,21 +188,32 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
     let harness: Harness | undefined
     let conversation: Conversation | undefined
     let watch: ConversationWatch | undefined
-    let accepting = false
+    const turn = createStateMachine<TurnState, TurnEvent>('recovering', transitionTurn)
     let failure: PiError | undefined
-    let interrupted = false
+    let recoveredTurn: ReturnType<typeof lastTurnState>
     let aborting: Promise<void> | undefined
     let toolCalls = 0
     const completedActions: PiActionOutcome[] = []
     const unchangedReads = new Map<string, { result: string; count: number }>()
-    let progressCorrected = false
-    let catalogRefreshed = false
-    let corrected = false
+    const progressCorrection = createStateMachine<CorrectionState, 'correct'>(
+      'available',
+      transitionCorrection
+    )
+    const catalogState = createStateMachine<CatalogState, 'refresh' | 'resolve'>(
+      'current',
+      transitionCatalog
+    )
+    const validationCorrection = createStateMachine<CorrectionState, 'correct'>(
+      'available',
+      transitionCorrection
+    )
     let activity: PiActivity | undefined
     let storage: PiBrowserStorage | undefined
     // An action reached the page but its result is not recorded yet.
-    let actionInFlight = false
-    let actionInvoked = false
+    const action = createStateMachine<PiActionState, PiActionEvent>(
+      { kind: 'not-started' },
+      transitionAction
+    )
     function usage() {
       return storage
         ? { historyBytes: storage.usedBytes, maxHistoryBytes: limits.maxHistoryBytes }
@@ -170,16 +223,10 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
       activity = next
       if (text !== undefined && !signal.aborted) publish({ ...snapshot, activity })
     }
-    // A lost save after an invoked action leaves its outcome unrecorded, so the user must check.
-    function withActionRisk(error: PiError): PiError {
-      const unsaved = error.code === 'storage_failed' || error.reason === 'history_bytes'
-      return actionInFlight || (unsaved && actionInvoked)
-        ? { ...error, actionMayHaveRun: true }
-        : error
-    }
     function abort() {
-      accepting = false
-      aborting ??= conversation?.abort(context)
+      turn.send('stop', function stop() {
+        aborting ??= conversation?.abort(context)
+      })
     }
     const waitSignal = reloading?.waitForLock ? signal : undefined
     try {
@@ -228,7 +275,7 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                       ...(taskContext.abortSignal ? [taskContext.abortSignal] : [])
                     ])
                     try {
-                      if (!accepting)
+                      if (turn.state !== 'accepting')
                         throw new PiFailure('stale_document', 'The turn is no longer active.')
                       setActivity({ kind: 'compacting' })
                       const summary = await summarizePiHistory(
@@ -287,7 +334,7 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                     replay: 'unsafe',
                     async execute(input, api, execution) {
                       try {
-                        if (!accepting)
+                        if (turn.state !== 'accepting')
                           throw new PiFailure('stale_document', 'The turn is no longer active.')
                         if (++toolCalls > limits.maxToolCalls)
                           throw new PiFailure(
@@ -317,18 +364,24 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                             data: { callId: api.callId, toolName: tool.name }
                           })
                         }, execution)
-                        actionInFlight = true
-                        actionInvoked = true
-                        const result = await abortable(
-                          options.host.invoke(
-                            { name: tool.name, input, revision: roundCatalog.revision },
-                            currentSignal,
-                            function progress(phase) {
-                              setActivity({ kind: 'tool', toolName: tool.name, phase })
-                            }
-                          ),
-                          currentSignal
+                        const invocation = action.act(
+                          { type: 'invoke', callId: api.callId },
+                          function invoke() {
+                            return options.host.invoke(
+                              { name: tool.name, input, revision: roundCatalog.revision },
+                              currentSignal,
+                              function progress(phase) {
+                                setActivity({ kind: 'tool', toolName: tool.name, phase })
+                              }
+                            )
+                          }
                         )
+                        if (!invocation.accepted)
+                          throw new PiFailure(
+                            'stale_document',
+                            'Another action is still awaiting its result.'
+                          )
+                        const result = await abortable(invocation.value, currentSignal)
                         if (
                           !result ||
                           result.toolName !== tool.name ||
@@ -366,7 +419,7 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                             })
                           }
                         } else unchangedReads.clear()
-                        actionInFlight = false
+                        action.send({ type: 'receive', callId: api.callId })
                         if (result.status !== 'success')
                           failure = {
                             code:
@@ -420,30 +473,31 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
           }
           installCatalog(catalog)
           function refreshCatalog(current: PiToolCatalog) {
-            if (catalogRefreshed)
+            const refreshed = catalogState.act('refresh', function refresh() {
+              if (++toolCalls > limits.maxToolCalls)
+                throw new PiFailure(
+                  'limit_reached',
+                  'This turn reached its tool limit. Send a new request to continue.',
+                  { reason: 'tool_calls' }
+                )
+              installCatalog(current)
+              catalog = current
+              return {
+                toolName: piRefreshCatalogToolName,
+                input: {},
+                confidence: 1,
+                reason: 'Refresh available tools.'
+              }
+            })
+            if (!refreshed.accepted)
               throw new PiFailure('stale_document', 'The tool catalog changed. Send a new request.')
-            if (++toolCalls > limits.maxToolCalls)
-              throw new PiFailure(
-                'limit_reached',
-                'This turn reached its tool limit. Send a new request to continue.',
-                { reason: 'tool_calls' }
-              )
-            installCatalog(current)
-            catalog = current
-            catalogRefreshed = true
-            // Pi captured its tools before this request; an internal round refreshes that snapshot.
-            return {
-              toolName: piRefreshCatalogToolName,
-              input: {},
-              confidence: 1,
-              reason: 'Refresh available tools.'
-            }
+            return refreshed.value
           }
           const models = createPiModels(async function resolution(
             messages,
             requestSignal
           ): Promise<PiRoundResult> {
-            if (!accepting)
+            if (turn.state !== 'accepting')
               throw new PiFailure(
                 'stale_document',
                 'An interrupted turn cannot request another action.'
@@ -457,7 +511,7 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
               const current = await hostCall(options.host.discover(currentSignal), currentSignal)
               if (current.revision !== catalog.revision)
                 return { resolution: refreshCatalog(current) }
-              catalogRefreshed = false
+              catalogState.send('resolve')
               const roundContext = {
                 ...(await hostCall(options.host.context(currentSignal), currentSignal)),
                 piCompletedActions: structuredClone(completedActions)
@@ -479,16 +533,19 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
               try {
                 result = await round()
               } catch (error) {
-                // Small models sometimes return one invalid action; allow one bounded correction per turn.
-                if (!(error instanceof ToolResolutionValidationError) || corrected) throw error
-                corrected = true
-                if (++toolCalls > limits.maxToolCalls)
-                  throw new PiFailure(
-                    'limit_reached',
-                    'This turn reached its tool limit. Send a new request to continue.',
-                    { reason: 'tool_calls' }
-                  )
-                result = await round(getErrorMessage(error))
+                // Small models get one bounded correction for invalid output per turn.
+                if (!(error instanceof ToolResolutionValidationError)) throw error
+                const correction = validationCorrection.act('correct', function correct() {
+                  if (++toolCalls > limits.maxToolCalls)
+                    throw new PiFailure(
+                      'limit_reached',
+                      'This turn reached its tool limit. Send a new request to continue.',
+                      { reason: 'tool_calls' }
+                    )
+                  return round(getErrorMessage(error))
+                })
+                if (!correction.accepted) throw error
+                result = await correction.value
               }
               function repeatsUnchangedRead(candidate: PiRoundResult) {
                 const { toolName, input } = candidate.resolution
@@ -500,10 +557,10 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
               if (repeatsUnchangedRead(result)) {
                 const message =
                   'The same read returned unchanged results twice. Use pi_reply if the request is satisfied, or choose a different action that makes progress.'
-                if (!progressCorrected) {
-                  progressCorrected = true
-                  result = await round(message)
-                }
+                const correction = progressCorrection.act('correct', function correct() {
+                  return round(message)
+                })
+                if (correction.accepted) result = await correction.value
                 if (repeatsUnchangedRead(result))
                   throw new PiFailure(
                     'limit_reached',
@@ -560,7 +617,7 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
             })
           )
           const previousTurn = lastTurnState({ entries })
-          interrupted = previousTurn === 'started' || previousTurn === 'interrupted'
+          recoveredTurn = previousTurn
           // Abort before enabling any resolver or page request on recovery.
           await conversation.abort(context)
           // Root creation options do not update a restored conversation's persisted model.
@@ -573,7 +630,12 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
           signal.addEventListener('abort', abort, { once: true })
           watch = await conversation.watch(context)
           function remember(view: ConversationView) {
-            for (const entry of view.entries) history.set(entry.id, entry)
+            for (const entry of view.entries) {
+              history.set(entry.id, entry)
+              for (const message of entry.model ?? [])
+                if (message.role === 'toolResult')
+                  action.send({ type: 'persist', callId: message.toolCallId })
+            }
             return normalizeMessages({
               entries: [...history.values()].sort(function chronological(left, right) {
                 return left.id < right.id ? -1 : 1
@@ -587,7 +649,7 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                 ? 'stopping'
                 : text !== undefined
                   ? 'running'
-                  : interrupted
+                  : recoveredTurn === 'started' || recoveredTurn === 'interrupted'
                     ? 'interrupted'
                     : 'idle',
               messages: remember(view),
@@ -608,13 +670,23 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
               { type: 'write', entry: { kind: 'webmcp.turn.started' } },
               context
             )
-            accepting = true
-            const submission = await conversation.submit(
-              { type: 'input', content: text, requestId: crypto.randomUUID(), whenBusy: 'reject' },
-              context
-            )
-            const settled = await submission.wait(context)
-            accepting = false
+            const submission = turn.act('start', function submit() {
+              return conversation!.submit(
+                {
+                  type: 'input',
+                  content: text,
+                  requestId: crypto.randomUUID(),
+                  whenBusy: 'reject'
+                },
+                context
+              )
+            })
+            if (!submission.accepted) {
+              signal.throwIfAborted()
+              throw new PiFailure('stale_document', 'The turn is no longer active.')
+            }
+            const settled = await (await submission.value).wait(context)
+            turn.send('settle')
             if (!signal.aborted && !failure && settled.status === 'unanswered')
               failure = {
                 code: 'provider_failed',
@@ -634,8 +706,11 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
           const current = await conversation.watch(context)
           const messages = remember(current.value)
           await current.stop()
-          const wasInterrupted = signal.aborted || (text === undefined && interrupted)
-          const finalError = failure && !signal.aborted ? withActionRisk(failure) : undefined
+          const wasInterrupted =
+            signal.aborted ||
+            (text === undefined && (recoveredTurn === 'started' || recoveredTurn === 'interrupted'))
+          const finalError =
+            failure && !signal.aborted ? withActionRisk(action.state, failure) : undefined
           publish({
             state: wasInterrupted ? 'interrupted' : failure ? 'error' : 'idle',
             messages,
@@ -647,7 +722,7 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
             ...(finalError ? { error: finalError } : {})
           }
         } finally {
-          accepting = false
+          turn.send('settle')
           signal.removeEventListener('abort', abort)
           try {
             await aborting
@@ -660,7 +735,7 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
     } catch (error) {
       const outcome: PiTurnOutcome = signal.aborted
         ? { status: 'interrupted' }
-        : { status: 'error', error: withActionRisk(piError(error, 'storage_failed')) }
+        : { status: 'error', error: withActionRisk(action.state, piError(error, 'storage_failed')) }
       const { activity: _activity, ...rest } = snapshot
       publish({
         ...rest,
@@ -676,22 +751,24 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
       return snapshot
     },
     subscribe(listener) {
-      listeners.add(listener)
+      if (lifecycle.state.kind !== 'closed') listeners.add(listener)
       listener(snapshot)
       return function unsubscribe() {
         listeners.delete(listener)
       }
     },
     async send(text) {
-      if (refreshing) await refreshing.catch(function settled() {})
-      if (closed || active || clearing)
+      if (lifecycle.state.kind === 'refreshing' || lifecycle.state.kind === 'refresh-stopping')
+        await lifecycle.state.promise
+      if (lifecycle.state.kind !== 'ready')
         return {
           status: 'error',
           error: {
             code: 'conversation_busy',
-            message: closed
-              ? 'This conversation has closed.'
-              : 'Wait for the current operation to finish.'
+            message:
+              lifecycle.state.kind === 'closing' || lifecycle.state.kind === 'closed'
+                ? 'This conversation has closed.'
+                : 'Wait for the current operation to finish.'
           }
         }
       if (typeof text !== 'string' || !text.trim() || text.length > limits.maxMessageChars)
@@ -702,65 +779,102 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
             message: `Enter a message of 1–${limits.maxMessageChars} characters.`
           }
         }
-      controller = new AbortController()
-      active = run(text.trim(), controller.signal)
-      publish({ ...snapshot, state: 'running', error: undefined })
-      try {
-        return await active
-      } finally {
-        active = undefined
-        controller = undefined
-        announce('changed')
-      }
+      return startTurn('running', text.trim())
     },
     async stop() {
-      if (!active) return
-      publish({ ...snapshot, state: 'stopping' })
-      controller?.abort()
-      await active
+      if (lifecycle.state.kind === 'closing') return lifecycle.state.promise
+      if (
+        lifecycle.state.kind !== 'running' &&
+        lifecycle.state.kind !== 'refreshing' &&
+        lifecycle.state.kind !== 'stopping' &&
+        lifecycle.state.kind !== 'refresh-stopping'
+      )
+        return
+      const operation = lifecycle.state
+      if (
+        !lifecycle.send({ type: 'stop' }, function stop() {
+          if ('controller' in operation) {
+            publish({ ...snapshot, state: 'stopping' })
+            operation.controller.abort()
+          }
+        })
+      ) {
+        if ('promise' in operation) await operation.promise
+        return
+      }
+      if ('promise' in operation) await operation.promise
     },
     async clear() {
-      if (refreshing) await refreshing.catch(function settled() {})
-      if (closed || active || clearing)
+      if (lifecycle.state.kind === 'refreshing' || lifecycle.state.kind === 'refresh-stopping')
+        await lifecycle.state.promise
+      if (lifecycle.state.kind !== 'ready')
         throw new PiFailure('conversation_busy', 'Stop the current turn before clearing chat.')
-      clearing = true
-      clearOperation = withLock(undefined, function clear() {
-        return clearPiStorage(key)
+      const task = createDeferred<void>()
+      const promise = task.promise.finally(function settle() {
+        lifecycle.send({ type: 'settle', promise })
       })
-      try {
-        await clearOperation
-        publish({
-          state: 'idle',
-          messages: [],
-          usage: { historyBytes: 0, maxHistoryBytes: limits.maxHistoryBytes }
-        })
-        announce('cleared')
-      } catch (error) {
-        publish({ ...snapshot, state: 'error', error: piError(error, 'storage_failed') })
-        throw error
-      } finally {
-        clearing = false
-        clearOperation = undefined
-      }
+      if (
+        !lifecycle.send(
+          { type: 'start', operation: { kind: 'clearing', promise } },
+          function clear() {
+            task.resolve(
+              withLock(undefined, function removeStorage() {
+                return clearPiStorage(key)
+              })
+                .then(function cleared() {
+                  publishEmpty()
+                  announce('cleared')
+                })
+                .catch(function failed(error) {
+                  publish({ ...snapshot, state: 'error', error: piError(error, 'storage_failed') })
+                  throw error
+                })
+            )
+          }
+        )
+      )
+        task.reject(
+          new PiFailure('conversation_busy', 'Stop the current turn before clearing chat.')
+        )
+      await promise
     },
     async refresh() {
-      if (closed) throw new PiFailure('conversation_busy', 'This conversation has closed.')
-      if (refreshing) return refreshing
-      if (active || clearing)
+      if (lifecycle.state.kind === 'closed' || lifecycle.state.kind === 'closing')
+        throw new PiFailure('conversation_busy', 'This conversation has closed.')
+      if (lifecycle.state.kind === 'refreshing' || lifecycle.state.kind === 'refresh-stopping')
+        return lifecycle.state.promise.then(function refreshed() {})
+      if (lifecycle.state.kind !== 'ready')
         throw new PiFailure('conversation_busy', 'Wait for the current operation to finish.')
       await reload(false)
     },
-    async destroy() {
-      if (closed) return
-      closed = true
-      await api.stop()
-      await clearOperation?.catch(function settled() {})
-      channel?.close()
-      publish({ ...snapshot, state: 'closed' })
-      listeners.clear()
+    destroy() {
+      if (lifecycle.state.kind === 'closed') return Promise.resolve()
+      if (lifecycle.state.kind === 'closing') return lifecycle.state.promise
+      const task = createDeferred<void>()
+      lifecycle.send({ type: 'close', promise: task.promise }, function close({ previous }) {
+        if ('controller' in previous) {
+          publish({ ...snapshot, state: 'stopping' })
+          previous.controller.abort()
+        }
+        task.resolve(
+          Promise.resolve().then(async function finish() {
+            if ('promise' in previous) await previous.promise.catch(function settled() {})
+            lifecycle.send({ type: 'closed' }, function closed() {
+              channel?.close()
+              publish({ ...snapshot, state: 'closed' })
+            })
+          })
+        )
+      })
+      return task.promise
     }
   }
   await run()
+  lifecycle.send({ type: 'opened' }, function opened({ previous }) {
+    if (previous.kind !== 'opening') return
+    if (previous.pending === 'cleared') publishEmpty()
+    else if (previous.pending === 'changed') void reload(true)
+  })
   return api
 }
 

@@ -1,3 +1,12 @@
+import { createStateMachine } from './state-machine'
+import { createDeferred } from './deferred'
+import type {
+  PaidAccessSession,
+  HostedSessionRequest,
+  HostedSessionState,
+  HostedSessionEvent
+} from './interfaces/hosted-session-state'
+import { transitionHostedSession } from './hosted-session-state'
 import type {
   ResolverContext,
   ResolverModelLimits,
@@ -28,12 +37,6 @@ export interface HostedOpenAIResolverOptions {
 interface ResolvedHostedOpenAIResolverOptions extends HostedOpenAIResolverOptions {
   endpoint: string
   sessionEndpoint: string
-}
-
-interface PaidAccessSession {
-  expiresAt?: string
-  token: string
-  tokenType: 'Bearer'
 }
 
 interface BrowserChallengeTokenInput {
@@ -93,43 +96,61 @@ export function createHostedOpenAIResolver(rawOptions: HostedOpenAIResolverOptio
     }
   }
 
-  let paidAccessSession: PaidAccessSession | null = null
-  let pendingSession:
-    | { promise: Promise<PaidAccessSession>; controller: AbortController; waiters: number }
-    | undefined
+  const sessionMachine = createStateMachine<HostedSessionState, HostedSessionEvent>(
+    { kind: 'empty' },
+    transitionHostedSession
+  )
 
-  // Concurrent resolves share one challenge and session request. It is cancelled only when every
-  // waiting caller has cancelled, and it times out on its own.
+  function acquireSession(): HostedSessionRequest {
+    const task = createDeferred<PaidAccessSession>()
+    const request: HostedSessionRequest = {
+      controller: new AbortController(),
+      promise: task.promise
+    }
+    if (
+      !sessionMachine.send({ type: 'acquire', request }, function acquire() {
+        task.resolve(
+          Promise.resolve()
+            .then(function requestSession() {
+              return requestPaidAccessSession(
+                options,
+                AbortSignal.any([
+                  request.controller.signal,
+                  AbortSignal.timeout(sessionRequestTimeoutMs)
+                ])
+              )
+            })
+            .then(function store(session) {
+              sessionMachine.send({ type: 'resolve', request, session })
+              return session
+            })
+            .finally(function settle() {
+              sessionMachine.send({ type: 'reject', request })
+            })
+        )
+      })
+    )
+      task.reject(new Error('Session acquisition is already active.'))
+    request.promise.catch(function observed() {})
+    return request
+  }
+
   async function getSession(signal?: AbortSignal): Promise<PaidAccessSession> {
     signal?.throwIfAborted()
-    if (paidAccessSession && isPaidAccessSessionFresh(paidAccessSession)) return paidAccessSession
-    if (!pendingSession) {
-      const controller = new AbortController()
-      const request = {
-        controller,
-        waiters: 0,
-        promise: requestPaidAccessSession(
-          options,
-          AbortSignal.any([controller.signal, AbortSignal.timeout(sessionRequestTimeoutMs)])
-        )
-          .then(function store(session) {
-            paidAccessSession = session
-            return session
-          })
-          .finally(function settle() {
-            if (pendingSession === request) pendingSession = undefined
-          })
-      }
-      request.promise.catch(function observed() {})
-      pendingSession = request
-    }
-    const request = pendingSession
-    request.waiters++
+    const current = sessionMachine.state
+    if (current.kind === 'ready' && isPaidAccessSessionFresh(current.session))
+      return current.session
+    const request = current.kind === 'acquiring' ? current.request : acquireSession()
+    sessionMachine.send({ type: 'join', request })
     try {
       return await waitForChallenge(request.promise, signal)
     } finally {
-      request.waiters--
-      if (request.waiters === 0 && signal?.aborted) request.controller.abort(signal.reason)
+      sessionMachine.send(
+        { type: 'leave', request, cancelled: signal?.aborted === true },
+        function release({ state }) {
+          if (state.kind === 'empty') request.controller.abort(signal?.reason)
+        }
+      )
     }
   }
 
@@ -180,8 +201,8 @@ export function createHostedOpenAIResolver(rawOptions: HostedOpenAIResolverOptio
       })
 
       // Only invalidate the session this request used; another request may already hold a newer one.
-      if ((response.status === 401 || response.status === 403) && paidAccessSession === session) {
-        paidAccessSession = null
+      if (response.status === 401 || response.status === 403) {
+        sessionMachine.send({ type: 'invalidate', session })
       }
 
       if (!response.ok) {

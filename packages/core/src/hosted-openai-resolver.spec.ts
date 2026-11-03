@@ -73,6 +73,82 @@ describe('createHostedOpenAIResolver', function describeHostedOpenAIResolver() {
     expect(JSON.stringify(resolutionRequest)).not.toContain(paidAccessKey)
   })
 
+  it('keeps a shared session request alive when one caller cancels', async function sharedCancellation() {
+    let finish!: (response: Response) => void
+    let sessionSignal: AbortSignal | undefined
+    const session = new Promise<Response>(function pending(resolve) {
+      finish = resolve
+    })
+    const fetch = vi.fn(async function hosted(url: string, init: RequestInit) {
+      if (url.endsWith('/session')) {
+        sessionSignal = init.signal as AbortSignal
+        return session
+      }
+      return Response.json({
+        toolName: 'select_items',
+        input: { ids: ['item_8'] },
+        confidence: 1,
+        reason: 'Selected'
+      })
+    })
+    vi.stubGlobal('fetch', fetch)
+    const resolver = createHostedOpenAIResolver({ accessKey: paidAccessKey, model: 'test-model' })
+    const controller = new AbortController()
+    const first = resolver.resolve(
+      'Select water',
+      [createSelectItemsTool()],
+      {},
+      { signal: controller.signal }
+    )
+    const second = resolver.resolve('Select water', [createSelectItemsTool()], {})
+    await vi.waitFor(() => expect(sessionSignal).toBeDefined())
+    controller.abort()
+    await expect(first).rejects.toThrow()
+    expect(sessionSignal!.aborted).toBe(false)
+    finish(Response.json({ token: 'shared-session', tokenType: 'Bearer' }))
+    expect((await second).toolName).toBe('select_items')
+    expect(fetch.mock.calls.filter(([url]) => url.endsWith('/session'))).toHaveLength(1)
+  })
+
+  it('starts a fresh session after all callers cancel and ignores a late old session', async function lastCancellation() {
+    let finish!: (response: Response) => void
+    let sessions = 0
+    const old = new Promise<Response>(function pending(resolve) {
+      finish = resolve
+    })
+    const tokens: string[] = []
+    const fetch = vi.fn(async function hosted(url: string, init: RequestInit) {
+      if (url.endsWith('/session'))
+        return ++sessions === 1 ? old : Response.json({ token: 'new-session' })
+      tokens.push((init.headers as Record<string, string>).Authorization)
+      return Response.json({
+        toolName: 'select_items',
+        input: { ids: ['item_8'] },
+        confidence: 1,
+        reason: 'Selected'
+      })
+    })
+    vi.stubGlobal('fetch', fetch)
+    const resolver = createHostedOpenAIResolver({ accessKey: paidAccessKey, model: 'test-model' })
+    const controller = new AbortController()
+    const first = resolver.resolve(
+      'Select water',
+      [createSelectItemsTool()],
+      {},
+      { signal: controller.signal }
+    )
+    await vi.waitFor(() => expect(sessions).toBe(1))
+    controller.abort()
+    await expect(first).rejects.toThrow()
+    await resolver.resolve('Select water', [createSelectItemsTool()], {})
+    const late = Response.json({ token: 'old-session' })
+    finish(late)
+    await vi.waitFor(() => expect(late.bodyUsed).toBe(true))
+    await resolver.resolve('Select water', [createSelectItemsTool()], {})
+    expect(sessions).toBe(2)
+    expect(tokens).toEqual(['Bearer new-session', 'Bearer new-session'])
+  })
+
   it('caches fresh sessions for later resolutions', async function testSessionCache() {
     const fetch = vi.fn(async function fetchHostedResolver(url: string) {
       if (url === '/api/webmcp/session') {

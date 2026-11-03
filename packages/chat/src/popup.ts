@@ -1,15 +1,39 @@
+import { createStateMachine } from '../../core/src/state-machine'
 import type { WebMCPChatLabels } from './interfaces/chat'
-import type { PopupDrag, PopupPosition, PopupResize } from './interfaces/popup'
+import { transitionPopup, transitionPopupGesture, transitionPopupSize } from './popup-state'
+import type {
+  PopupEvent,
+  PopupGesture,
+  PopupGestureEvent,
+  PopupPosition,
+  PopupSize,
+  PopupState
+} from './interfaces/popup'
 import { icon } from './icon'
 
 export class ChatPopup {
-  private enabled = false
-  private active = false
-  private opened = false
-  private drag?: PopupDrag
-  private resizing?: PopupResize
-  private dragged = false
-  private expanded = false
+  private readonly machine = createStateMachine<PopupState, PopupEvent>(
+    { kind: 'inline' },
+    transitionPopup
+  )
+  private readonly gesture = createStateMachine<PopupGesture, PopupGestureEvent>(
+    { kind: 'idle' },
+    transitionPopupGesture
+  )
+  private readonly size = createStateMachine<PopupSize, 'toggle' | 'reset'>(
+    'normal',
+    transitionPopupSize
+  )
+
+  private get enabled() {
+    return this.machine.state.kind !== 'inline'
+  }
+  private get opened() {
+    return (
+      this.machine.state.kind === 'open' ||
+      (this.machine.state.kind === 'detached' && this.machine.state.visibility === 'open')
+    )
+  }
   private placement: 'end' | 'start' = 'end'
   private pinnedInline = true
   private pinnedBottom = true
@@ -59,7 +83,7 @@ export class ChatPopup {
     panel.append(this.grip)
     surface.prepend(this.launcher, this.moveHelp, this.resizeHelp)
     this.launcher.addEventListener('click', (event) => {
-      if (this.dragged && event.detail) return
+      if (this.gesture.state.kind === 'dragged' && event.detail) return
       this.setOpen(!this.opened, true)
     })
     this.close.addEventListener('click', () => {
@@ -73,10 +97,11 @@ export class ChatPopup {
       }
     })
     this.resize.addEventListener('click', () => {
-      this.expanded = !this.expanded
-      panel.toggleAttribute('data-expanded', this.expanded)
-      panel.style.width = panel.style.height = ''
-      this.placePanel()
+      this.size.send('toggle', () => {
+        panel.toggleAttribute('data-expanded', this.size.state === 'expanded')
+        panel.style.width = panel.style.height = ''
+        this.placePanel()
+      })
     })
     this.resize.addEventListener('keydown', (event) => {
       if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return
@@ -92,30 +117,41 @@ export class ChatPopup {
       if (event.button !== 0 || !event.isPrimary) return
       event.preventDefault()
       const rect = panel.getBoundingClientRect()
-      this.resizing = {
-        pointerId: event.pointerId,
-        x: event.clientX,
-        y: event.clientY,
-        width: rect.width,
-        height: rect.height,
-        right: rect.right
-      }
-      this.grip.setPointerCapture(event.pointerId)
+      this.gesture.send(
+        {
+          type: 'resize',
+          start: {
+            pointerId: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+            width: rect.width,
+            height: rect.height,
+            right: rect.right
+          }
+        },
+        () => this.grip.setPointerCapture(event.pointerId)
+      )
     })
     this.grip.addEventListener('pointermove', (event) => {
-      const start = this.resizing
-      if (!start || start.pointerId !== event.pointerId) return
+      if (this.gesture.state.kind !== 'resizing') return
+      const start = this.gesture.state.start
+      if (start.pointerId !== event.pointerId) return
       event.preventDefault()
-      this.resizePanel(
-        start.right,
-        start.width + (event.clientX - start.x) * this.inlineSign(),
-        start.height + event.clientY - start.y
-      )
+      this.gesture.send({ type: 'resize-move', pointerId: event.pointerId }, () => {
+        this.resizePanel(
+          start.right,
+          start.width + (event.clientX - start.x) * this.inlineSign(),
+          start.height + event.clientY - start.y
+        )
+      })
     })
     for (const name of ['pointerup', 'pointercancel', 'lostpointercapture'])
       this.grip.addEventListener(name, (event) => {
-        if ((event as PointerEvent).pointerId === this.resizing?.pointerId)
-          this.resizing = undefined
+        if (this.gesture.state.kind === 'resizing')
+          this.gesture.send({
+            type: 'end',
+            pointerId: (event as PointerEvent).pointerId
+          })
       })
     for (const control of [this.launcher, this.move]) {
       control.addEventListener('keydown', (event) => {
@@ -138,28 +174,39 @@ export class ChatPopup {
           control === this.launcher
             ? control.getBoundingClientRect()
             : panel.getBoundingClientRect()
-        this.dragged = false
-        this.drag = {
-          pointerId: event.pointerId,
-          x: event.clientX,
-          y: event.clientY,
-          position: { x: rect.left, y: rect.top }
-        }
-        control.setPointerCapture(event.pointerId)
+        this.gesture.send(
+          {
+            type: 'press',
+            control,
+            start: {
+              pointerId: event.pointerId,
+              x: event.clientX,
+              y: event.clientY,
+              position: { x: rect.left, y: rect.top }
+            }
+          },
+          () => control.setPointerCapture(event.pointerId)
+        )
       })
       control.addEventListener('pointermove', (event) => {
-        const start = this.drag
-        if (!start || start.pointerId !== event.pointerId) return
+        if (this.gesture.state.kind !== 'pressed' && this.gesture.state.kind !== 'dragging') return
+        const start = this.gesture.state.start
+        if (start.pointerId !== event.pointerId || this.gesture.state.control !== control) return
         const x = event.clientX - start.x
         const y = event.clientY - start.y
-        if (!this.dragged && Math.hypot(x, y) < 3) return
-        this.dragged = true
-        event.preventDefault()
-        this.moveTo(control, { x: start.position.x + x, y: start.position.y + y })
+        if (this.gesture.state.kind === 'pressed' && Math.hypot(x, y) < 3) return
+        this.gesture.send({ type: 'move', pointerId: event.pointerId }, () => {
+          event.preventDefault()
+          this.moveTo(control, { x: start.position.x + x, y: start.position.y + y })
+        })
       })
       for (const name of ['pointerup', 'pointercancel', 'lostpointercapture'])
         control.addEventListener(name, (event) => {
-          if ((event as PointerEvent).pointerId === this.drag?.pointerId) this.drag = undefined
+          if (this.gesture.state.kind === 'pressed' || this.gesture.state.kind === 'dragging')
+            this.gesture.send({
+              type: 'end',
+              pointerId: (event as PointerEvent).pointerId
+            })
         })
     }
     this.onViewportChanged = this.reposition.bind(this)
@@ -181,62 +228,62 @@ export class ChatPopup {
     const changed = this.enabled !== (mode === 'popup')
     const moved = this.placement !== placement
     if (changed) this.teardown()
-    this.enabled = mode === 'popup'
-    this.host.dataset.mode = mode
-    if (moved) {
-      this.placement = placement
-      this.pinnedInline = true
-      this.position = this.panelPosition = undefined
-    }
-    this.moveHelp.hidden = this.resizeHelp.hidden = !this.enabled
-    this.launcher.hidden =
-      this.move.hidden =
-      this.resize.hidden =
-      this.close.hidden =
-      this.grip.hidden =
-        !this.enabled
-    this.launcher.setAttribute('aria-label', labels.openChat(title))
-    this.move.setAttribute('aria-label', labels.moveChat)
-    this.resize.setAttribute('aria-label', labels.resizeChat)
-    this.close.setAttribute('aria-label', labels.closeChat)
-    for (const control of [this.move, this.resize, this.close])
-      control.title = control.getAttribute('aria-label')!
-    this.moveHelp.textContent = labels.moveInstructions
-    this.resizeHelp.textContent = labels.resizeInstructions
-    this.panel.hidden = this.enabled && !this.opened
-    if (this.enabled) {
-      this.panel.setAttribute('role', 'dialog')
-      this.surface.setAttribute('popover', 'manual')
-    } else {
-      this.panel.removeAttribute('role')
-      this.panel.removeAttribute('data-expanded')
-      this.surface.removeAttribute('popover')
-      this.panel.style.cssText = ''
-      this.expanded = false
-    }
-    this.launcher.setAttribute('aria-expanded', String(this.opened))
-    if (this.host.isConnected && changed) this.connect()
-    else if (moved) this.reposition()
+    this.machine.send({ type: 'configure', mode }, () => {
+      this.host.dataset.mode = mode
+      if (moved) {
+        this.placement = placement
+        this.pinnedInline = true
+        this.position = this.panelPosition = undefined
+      }
+      this.moveHelp.hidden = this.resizeHelp.hidden = !this.enabled
+      this.launcher.hidden =
+        this.move.hidden =
+        this.resize.hidden =
+        this.close.hidden =
+        this.grip.hidden =
+          !this.enabled
+      this.launcher.setAttribute('aria-label', labels.openChat(title))
+      this.move.setAttribute('aria-label', labels.moveChat)
+      this.resize.setAttribute('aria-label', labels.resizeChat)
+      this.close.setAttribute('aria-label', labels.closeChat)
+      for (const control of [this.move, this.resize, this.close])
+        control.title = control.getAttribute('aria-label')!
+      this.moveHelp.textContent = labels.moveInstructions
+      this.resizeHelp.textContent = labels.resizeInstructions
+      this.panel.hidden = this.enabled && !this.opened
+      if (this.enabled) {
+        this.panel.setAttribute('role', 'dialog')
+        this.surface.setAttribute('popover', 'manual')
+      } else {
+        this.panel.removeAttribute('role')
+        this.panel.removeAttribute('data-expanded')
+        this.surface.removeAttribute('popover')
+        this.panel.style.cssText = ''
+        this.size.send('reset')
+      }
+      this.launcher.setAttribute('aria-expanded', String(this.opened))
+      if (this.host.isConnected && changed) this.connect()
+      else if (moved) this.reposition()
+    })
   }
 
   connect() {
-    if (!this.enabled) return
-    // The browser hides a popover when its element leaves the document.
-    this.surface.showPopover()
-    if (this.active) {
+    this.machine.send({ type: 'connect' }, ({ previous }) => {
+      this.surface.showPopover()
+      if (previous.kind === 'open' || previous.kind === 'closed') {
+        this.reposition()
+        return
+      }
+      this.panel.hidden = !this.opened
+      this.launcher.setAttribute('aria-expanded', String(this.opened))
+      window.addEventListener('resize', this.onViewportChanged)
+      window.visualViewport?.addEventListener('resize', this.onViewportChanged)
+      window.visualViewport?.addEventListener('scroll', this.onViewportChanged)
+      this.observer.observe(this.surface)
+      this.observer.observe(this.launcher)
+      this.observer.observe(this.panel)
       this.reposition()
-      return
-    }
-    this.active = true
-    this.panel.hidden = !this.opened
-    this.launcher.setAttribute('aria-expanded', String(this.opened))
-    window.addEventListener('resize', this.onViewportChanged)
-    window.visualViewport?.addEventListener('resize', this.onViewportChanged)
-    window.visualViewport?.addEventListener('scroll', this.onViewportChanged)
-    this.observer.observe(this.surface)
-    this.observer.observe(this.launcher)
-    this.observer.observe(this.panel)
-    this.reposition()
+    })
   }
 
   disconnect() {
@@ -260,32 +307,31 @@ export class ChatPopup {
    * A programmatic close moves focus only if it was inside the chat.
    */
   setOpen(open: boolean, userAction = false) {
-    if (!this.enabled || open === this.opened) return
     const focused = userAction || this.host.contains(this.host.ownerDocument.activeElement)
-    this.opened = open
-    this.panel.hidden = !open
-    this.launcher.setAttribute('aria-expanded', String(open))
-    if (open) {
-      this.placePanel()
-      this.panel
-        .querySelector<HTMLElement>('.settings-panel:not([hidden]) button, textarea')!
-        .focus({ preventScroll: true })
-    } else if (focused) this.launcher.focus({ preventScroll: true })
-    this.host.dispatchEvent(
-      new CustomEvent('webmcp-chat-toggle', { detail: { open }, bubbles: true, composed: true })
-    )
+    this.machine.send({ type: open ? 'open' : 'close' }, () => {
+      this.panel.hidden = !open
+      this.launcher.setAttribute('aria-expanded', String(open))
+      if (open) {
+        this.placePanel()
+        this.panel
+          .querySelector<HTMLElement>('.settings-panel:not([hidden]) button, textarea')!
+          .focus({ preventScroll: true })
+      } else if (focused) this.launcher.focus({ preventScroll: true })
+      this.host.dispatchEvent(
+        new CustomEvent('webmcp-chat-toggle', { detail: { open }, bubbles: true, composed: true })
+      )
+    })
   }
 
   private teardown() {
-    this.drag = undefined
-    this.resizing = undefined
-    this.observer.disconnect()
-    window.removeEventListener('resize', this.onViewportChanged)
-    window.visualViewport?.removeEventListener('resize', this.onViewportChanged)
-    window.visualViewport?.removeEventListener('scroll', this.onViewportChanged)
-    if (this.active) this.surface.hidePopover()
-    this.active = false
-    this.opened = false
+    this.machine.send({ type: 'disconnect' }, ({ previous }) => {
+      this.gesture.send({ type: 'reset' })
+      this.observer.disconnect()
+      window.removeEventListener('resize', this.onViewportChanged)
+      window.visualViewport?.removeEventListener('resize', this.onViewportChanged)
+      window.visualViewport?.removeEventListener('scroll', this.onViewportChanged)
+      if (previous.kind === 'open' || previous.kind === 'closed') this.surface.hidePopover()
+    })
   }
 
   private rtl(): boolean {

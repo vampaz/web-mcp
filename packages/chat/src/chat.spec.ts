@@ -166,7 +166,7 @@ it('sends on Enter, keeps Shift+Enter, and ignores composition', async function 
   await Promise.resolve()
 })
 
-it('disconnects subscriptions and replaces controllers without destroying either', function test() {
+it('disconnects subscriptions and replaces controllers without destroying either', async function test() {
   const first = controller()
   const second = controller()
   const element = mount(first.api)
@@ -188,6 +188,7 @@ it('disconnects subscriptions and replaces controllers without destroying either
   expect(second.listeners.size).toBe(1)
   expect(element.shadowRoot!.querySelector('textarea')!.disabled).toBe(true)
   element.remove()
+  await Promise.resolve()
   expect(second.listeners.size).toBe(0)
   document.body.append(element)
   expect(second.listeners.size).toBe(1)
@@ -954,4 +955,26 @@ it('returns focus to the launcher when the user closes even if the click did not
   element.close()
   expect(document.activeElement).toBe(outside)
   outside.remove()
+})
+
+it('keeps an in-flight draft and error restoration when the element moves', async function movingSend() {
+  const fixture = controller()
+  let complete!: (outcome: PiTurnOutcome) => void
+  vi.mocked(fixture.api.send).mockReturnValueOnce(
+    new Promise(function pending(resolve) {
+      complete = resolve
+    })
+  )
+  const element = mount(fixture.api)
+  const input = element.shadowRoot!.querySelector('textarea')!
+  input.value = 'Keep this request'
+  input.dispatchEvent(new Event('input'))
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }))
+  const destination = document.createElement('div')
+  document.body.append(destination)
+  destination.append(element)
+  complete({ status: 'error', error: { code: 'provider_failed', message: 'Send failed' } })
+  await Promise.resolve()
+  expect(input.value).toBe('Keep this request')
+  expect(element.shadowRoot!.querySelector('[role=status]')!.textContent).toBe('Send failed')
 })
