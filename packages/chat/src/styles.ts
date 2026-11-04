@@ -32,7 +32,12 @@ export const chatStyles = `
 .settings-error { color:var(--_error) }
 .settings-panel fieldset { display:grid; gap:.5em; min-inline-size:0; border:0; padding:0; margin:0 }
 .settings-panel legend { padding:0; margin-block-end:.75em; font-weight:650 }
-.settings-panel select { inline-size:100%; min-inline-size:0; padding:.65em; border:1px solid var(--_border); border-radius:.4em; background:var(--_background); color:inherit; font:inherit }
+.settings-panel select { inline-size:100%; min-inline-size:0; padding:.65em; padding-inline-end:2.35em; border:1px solid var(--_border); border-radius:.4em; background-color:var(--_background); background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%23657087' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right .8em center; background-size:.72em; color:inherit; font:inherit; appearance:none }
+.settings-panel select:dir(rtl) { background-position:left .8em center }
+:host([data-theme=dark]) .settings-panel select { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%239ba5b9' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") }
+@media (prefers-color-scheme:dark) {
+  :host([data-theme=auto]) .settings-panel select { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%239ba5b9' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") }
+}
 .settings-panel :is(input,select):focus-visible { outline:2px solid var(--_accent); outline-offset:3px }
 .settings-panel :disabled { opacity:.65; cursor:not-allowed }
 .settings-approval { display:flex; align-items:start; gap:.7em; padding-block:1em; border-block:1px solid var(--_border); cursor:pointer }
@@ -109,7 +114,7 @@ li[data-layout=failed] { border-inline-start:.23em solid currentColor; padding-i
 @media(max-height:36rem) { header,.composer { padding:.7em; gap:.45em } textarea { min-block-size:3em } }
 @media(pointer:coarse) { textarea { font-size:max(1rem,16px) } .hint { display:none } }
 @media(prefers-reduced-motion:reduce) { * { scroll-behavior:auto!important } .working-dots span { animation:none; opacity:.6 } }
-@media(forced-colors:active) { .working-dots span { background:CanvasText; forced-color-adjust:none } :host button { border:1px solid ButtonText } }
+@media(forced-colors:active) { .working-dots span { background:CanvasText; forced-color-adjust:none } :host button { border:1px solid ButtonText } .settings-panel select { appearance:auto; padding-inline-end:.65em; background-image:none } }
 `
 
 export const popupStyles = `

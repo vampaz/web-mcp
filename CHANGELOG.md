@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.5 — 2026-11-04
+
+- **Chat:** give the settings selects a spaced custom chevron so the native arrow no longer sits against the border. Preserve dark theme, RTL, disabled and forced-colors behavior.
+
 ## 0.8.4 — 2026-11-04
 
 - **Chat:** add the `composer-meta` slot for host content at the start of the row under the composer, beside the send hint. Existing slots and labels are unchanged.
