@@ -99,7 +99,7 @@ export function defineWebMCPChat(): void {
               <textarea id="${id}-message" part="textarea" rows="2" enterkeyhint="send"></textarea>
               <div class="actions"><button type="button" data-stop part="stop">${icon('M7 7h10v10H7z')}<span></span></button><button class="send icon-button" type="submit" part="send">${icon('M12 19V5M6 11l6-6 6 6')}</button></div>
             </div>
-            <div class="composer-meta"><p class="status" part="status" role="status" aria-live="polite">${icon('M12 8v5M12 16h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0')}<span></span></p><button type="button" data-edit-last hidden></button><p class="hint" id="${id}-hint"></p></div>
+            <div class="composer-meta"><slot name="composer-meta"></slot><p class="status" part="status" role="status" aria-live="polite">${icon('M12 8v5M12 16h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0')}<span></span></p><button type="button" data-edit-last hidden></button><p class="hint" id="${id}-hint"></p></div>
             <p class="limit" id="${id}-limit" hidden></p>
             <slot name="footer"></slot>
           </form>

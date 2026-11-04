@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.4 — 2026-11-04
+
+- **Chat:** add the `composer-meta` slot for host content at the start of the row under the composer, beside the send hint. Existing slots and labels are unchanged.
+
 ## 0.8.3 — 2026-11-03
 
 - **State management:** replace implicit lifecycle flags with explicit typed machines and enforced transition actions across Pi, command input, hosted and Chrome AI resolvers, chat, and popups. Public exports remain unchanged.

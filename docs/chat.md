@@ -174,10 +174,11 @@ webmcp-chat::part(message-assistant) {
 }
 ```
 
-Slots add host content: `header-actions` (buttons beside New chat), `footer` (for example a disclaimer below the composer), `empty` (replaces the empty-state text), and `settings` (additional content in the optional settings panel).
+Slots add host content: `header-actions` (buttons beside New chat), `composer-meta` (content at the start of the row under the composer, beside the send hint — for example the active provider and model), `footer` (for example a disclaimer below the composer), `empty` (replaces the empty-state text), and `settings` (additional content in the optional settings panel).
 
 ```html
 <webmcp-chat>
+  <p slot="composer-meta">Local model · my-model</p>
   <a slot="footer" href="/assistant-policy">How the assistant uses page data</a>
 </webmcp-chat>
 ```

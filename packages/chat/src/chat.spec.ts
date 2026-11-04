@@ -878,7 +878,7 @@ it('applies labels, locale formatting, message limits, theme, and parts', functi
     })
   ).toEqual([])
   expect(
-    ['header-actions', 'footer', 'empty'].filter(function missing(slot) {
+    ['header-actions', 'composer-meta', 'footer', 'empty'].filter(function missing(slot) {
       return !root.querySelector(`slot[name="${slot}"]`)
     })
   ).toEqual([])
@@ -898,6 +898,23 @@ it('lets a custom renderer own message bodies', function customRenderer() {
   })
   fixture.publish({ state: 'idle', messages: [{ id: 'a', role: 'assistant', text: 'hello' }] })
   expect(element.shadowRoot!.querySelector('li em')!.textContent).toBe('HELLO')
+})
+
+it('places composer-meta slot content at the start of the send hint row', function composerMetaSlot() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  const note = document.createElement('p')
+  note.slot = 'composer-meta'
+  note.textContent = 'OpenAI · my-model'
+  element.append(note)
+  element.configure({ controller: fixture.api })
+  const slot = element.shadowRoot!.querySelector<HTMLSlotElement>('slot[name="composer-meta"]')!
+  expect(slot.assignedElements()).toEqual([note])
+  expect(slot.parentElement!.className).toBe('composer-meta')
+  expect(
+    // Slotted content precedes the status and hint, so it renders on the row's start edge.
+    slot.parentElement!.firstElementChild
+  ).toBe(slot)
 })
 
 it.each([
