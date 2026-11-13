@@ -14,13 +14,15 @@ import { artifact, run, verifyArtifact } from './fixtures'
 // 0.6.0 chat: 13,707 bytes with the optional settings UI; no runtime dependencies added.
 // Give that reviewed graph the same 10% headroom, rounded up to 100 bytes.
 // 0.8.5 chat: 15,212 bytes after adding the themed settings select chevrons; no dependencies added.
+// 0.9.0 chat: 20,093 bytes with the composer model picker, grouped tool rows and refined styles;
+// no dependencies added.
 // 0.8.3 explicit lifecycle machines share transition/deferred chunks and add no dependencies.
 // Reviewed eager bytes: root 25,467; mcp-bridge 26,280; react 26,165; svelte 26,112;
 // vue 26,173; zod 25,804; pi 29,428; command-input 29,838; hosted 9,630.
 // Pi total is 149,727 bytes. Raise only exceeded ceilings with the same 10% policy above.
 const budgets: Record<string, { eager: number; total: number }> = {
   '.': { eager: 28_100, total: 28_100 },
-  './chat': { eager: 16_800, total: 16_800 },
+  './chat': { eager: 22_200, total: 22_200 },
   './command-input': { eager: 32_900, total: 32_900 },
   './devtools': { eager: 33_300, total: 33_300 },
   './hosted': { eager: 10_600, total: 10_600 },

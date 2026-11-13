@@ -43,6 +43,8 @@ Control the element from application code:
 | `toggle()`          | Toggle the popup.                                  |
 | `focusComposer()`   | Focus the composer, opening a closed popup first.  |
 | `setDraft(text)`    | Replace the composer draft without sending it.     |
+| `openSettings()`    | Open the settings view; needs `settings`.          |
+| `openModelPicker()` | Open the composer model picker; needs `settings`.  |
 
 The element dispatches `webmcp-chat-toggle` (`detail: { open }`) and `webmcp-chat-send` (`detail: { text }`). Both bubble and cross shadow boundaries.
 
@@ -52,11 +54,13 @@ The component includes a transcript, composer, Send, Stop, New chat, suggestions
 
 While a turn runs, the working row shows the controller's `activity`: “Thinking…”, “Running set_counter…”, “Waiting for your approval: set_counter”, or “Summarizing earlier conversation…”. The status region announces each change once. A controller without `activity` shows “Working…”.
 
-Tool messages start collapsed and show the tool's input and output in monospace. A failed tool is labeled “— failed”; a tool whose outcome is unknown after an interruption is labeled “— outcome unknown”. Raw tool requests do not appear as assistant replies. Failed replies keep a visible failure label and collapsed diagnostic details after reopening.
+User messages appear as bubbles and assistant replies as plain text. The “You” and assistant labels stay available to screen readers but are not shown. Each assistant reply has a Copy button that announces the result in the status region.
 
-Errors appear in the status region with an error colour and icon at body size. The region is empty while idle. After a failed or interrupted turn, “Edit last message” puts the last user message back in the composer without sending it; it is hidden while the composer has text.
+Consecutive tool calls form one activity block headed “Used N tools”. Each call is a collapsed row with a status icon, the tool name and a one-line argument preview; expanding it shows the input and output in monospace. A failed call shows “Failed” and a call whose outcome is unknown after an interruption shows “Outcome unknown”; screen readers hear “name — failed” or “name — outcome unknown”. While a tool runs, the working row shows a spinner. Raw tool requests do not appear as assistant replies. Failed replies keep a visible failure label and collapsed diagnostic details after reopening.
 
-Enter sends and Shift+Enter adds a line on devices with a fine pointer. On touch devices Enter adds a line and the Send button sends. IME composition is preserved. Suggestions appear only with an empty conversation and composer. The composer stays editable during a turn, so users can draft a follow-up while Send is disabled. `maxMessageLength` (default 16,000) shows feedback near the limit and blocks oversized sends without truncating the draft; match it to the controller's `maxMessageChars` limit.
+Errors appear in the status region under the composer with an error colour and icon, in place of the send hint. The region is empty while idle. Stop replaces Send while a turn runs. After a failed or interrupted turn, “Edit last message” puts the last user message back in the composer without sending it; it is hidden while the composer has text.
+
+Enter sends and Shift+Enter adds a line on devices with a fine pointer. On touch devices Enter adds a line and the Send button sends. IME composition is preserved. Suggestions appear only with an empty conversation and composer. The composer stays editable during a turn, so users can draft a follow-up while Stop replaces Send. `maxMessageLength` (default 16,000) shows feedback near the limit and blocks oversized sends without truncating the draft; match it to the controller's `maxMessageChars` limit.
 
 New chat immediately calls `controller.clear()` without confirmation. After clearing succeeds, it resets the draft, focuses the composer, and announces completion. Clearing never undoes application actions. If clearing fails, the history and draft stay available with an error message.
 
@@ -64,14 +68,20 @@ If a send fails before the controller records the user message, the composer res
 
 ## Optional settings module
 
-Pass `settings` to add an icon inside the chat header. It opens a **Settings** panel with provider, model, and optional approval controls inside the same chat window in inline and popup modes. The module adds no model provider or inference dependency.
+Pass `settings` to add a model button to the composer and a **Settings** icon to the header. The model button opens a picker grouped by provider; providers can add a `description` beside their heading and an `icon` (`cloud`, `route`, `server` or `chip`), and models can add a `detail` line and a `badge`. A provider without models appears as one option with its own `detail` and `badge`. A search field appears when there are more than eight options. The picker follows the listbox pattern: arrow keys, Home and End move, Enter chooses, Escape closes and returns focus to the button. Settings opens as a full view with a back button and the optional approval control. The module adds no model provider or inference dependency.
 
 ```ts
 import type { WebMCPChatSettings } from '@vampaz/webmcp-kit/chat'
 
 const settings: WebMCPChatSettings = {
   providers: [
-    { id: 'local', label: 'Local model', models: [{ model: 'my-model', label: 'My model' }] }
+    {
+      id: 'local',
+      label: 'Local model',
+      description: 'On this computer',
+      icon: 'server',
+      models: [{ model: 'my-model', label: 'My model', detail: '32K context' }]
+    }
   ],
   providerId: 'local',
   model: 'my-model',
@@ -92,9 +102,9 @@ const settings: WebMCPChatSettings = {
 element.configure({ controller, settings })
 ```
 
-The callbacks above are application functions. The module does not create resolvers, fetch model lists, persist preferences, or grant approval. It reports provider/model changes through `onChange`; changing providers requests that provider's first model, or `undefined` when its model list is empty. Reconfigure with the selected values and the complete options after a change. Use `settings.disabled` during active turns or provider changes, `detail` for status, and `error` for a visible failure. Omit `confirmations` if users must not change your approval policy. Never put credentials in provider labels, model IDs, status text, or slotted content.
+The callbacks above are application functions. The module does not create resolvers, fetch model lists, persist preferences, or grant approval. It reports the chosen option through `onChange(providerId, model)`; `model` is `undefined` for a provider offered without models. Choosing the current option does not call `onChange`. Reconfigure with the selected values and the complete options after a change. Use `settings.disabled` during active turns or provider changes, `detail` for status, and `error` for a visible failure. Omit `confirmations` if users must not change your approval policy. Never put credentials in provider labels, model IDs, status text, or slotted content.
 
-Settings replace the visible conversation while open, preserving its transcript, draft, and running turn. Close settings or Escape returns focus to the icon; Escape closes settings before closing a popup. The module keeps controls mounted and focused across configuration updates. Omit `settings` on reconfiguration to remove it. `focusComposer()` returns to the conversation. Keep a disabled, application-owned controller/view available during initialization or provider failure if users need settings to recover.
+Settings replace the visible conversation while open, preserving its transcript, draft, and running turn. In inline mode they also replace the header. The back button or Escape returns focus to the icon; Escape closes settings before closing a popup. The module keeps controls mounted and focused across configuration updates. Omit `settings` on reconfiguration to remove it. `focusComposer()` returns to the conversation. Keep a disabled, application-owned controller/view available during initialization or provider failure if users need settings to recover.
 
 Use the `settings` slot for app-specific diagnostics or additional controls:
 
@@ -148,15 +158,20 @@ Styles live in a shadow root and do not depend on application styles. Inner size
 ```css
 webmcp-chat {
   --webmcp-chat-background: #fff;
-  --webmcp-chat-color: #222b3c;
-  --webmcp-chat-muted: #657087;
-  --webmcp-chat-accent: #325ce8;
+  --webmcp-chat-surface: #f6f7f9;
+  --webmcp-chat-color: #171c27;
+  --webmcp-chat-muted: #5f6b7f;
+  --webmcp-chat-accent: #3b5bdb;
   --webmcp-chat-error: #b42318;
-  --webmcp-chat-border: #e1e5ed;
+  --webmcp-chat-success: #15803d;
+  --webmcp-chat-warning: #8a5007;
+  --webmcp-chat-border: #e6e8ee;
+  --webmcp-chat-line-strong: #d3d8e1;
+  --webmcp-chat-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --webmcp-chat-radius: 1.15em;
   --webmcp-chat-height: 75dvh;
   --webmcp-chat-min-height: 36.5em;
-  --webmcp-chat-user-background: #f0f3ff;
+  --webmcp-chat-user-background: #eef2fe;
   --webmcp-chat-button-color: #fff;
   --webmcp-chat-popup-width: 30em;
   --webmcp-chat-popup-height: 41em;
@@ -166,7 +181,7 @@ webmcp-chat {
 }
 ```
 
-These are the light-theme defaults; the dark theme uses its own colours unless you set them. Style internal elements through `::part()`: `panel`, `header`, `title`, `launcher`, `transcript`, `message`, `message-user`, `message-assistant`, `message-tool`, `composer`, `textarea`, `send`, `stop`, `new-chat`, `suggestion`, `status`, `jump-latest`, `settings-button`, and `settings`.
+These are the light-theme defaults; the dark theme uses its own colours unless you set them. Style internal elements through `::part()`: `panel`, `header`, `title`, `launcher`, `transcript`, `message`, `message-user`, `message-assistant`, `message-tool`, `composer`, `textarea`, `send`, `stop`, `new-chat`, `suggestion`, `status`, `jump-latest`, `settings-button`, `settings`, `model-button`, and `model-picker`.
 
 ```css
 webmcp-chat::part(message-assistant) {
@@ -174,7 +189,7 @@ webmcp-chat::part(message-assistant) {
 }
 ```
 
-Slots add host content: `header-actions` (buttons beside New chat), `composer-meta` (content at the start of the row under the composer, beside the send hint — for example the active provider and model), `footer` (for example a disclaimer below the composer), `empty` (replaces the empty-state text), and `settings` (additional content in the optional settings panel).
+Slots add host content: `identity` (replaces the assistant mark and visible title, for example with the current site; the title stays the panel's accessible name), `header-actions` (buttons beside New chat), `before-composer` (notices directly above the composer card), `composer-meta` (content in the row under the composer, beside the send hint), `footer` (for example a disclaimer below the composer), `empty` (replaces the empty-state text and its centred layout), and `settings` (additional content in the optional settings panel).
 
 ```html
 <webmcp-chat>

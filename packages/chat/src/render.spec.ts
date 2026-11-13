@@ -72,7 +72,10 @@ it('keeps tool results collapsed and marks failed answers after recovery', funct
     }
   ]
   updateTranscript(list, messages, 'Helper', labels)
-  expect(list.children[0].querySelector('summary')!.textContent).toBe('read_counter')
+  expect(list.children[0].querySelector('summary .visually-hidden')!.textContent).toBe(
+    'read_counter'
+  )
+  expect(list.children[0].querySelector<HTMLElement>('.tools-summary')!.hidden).toBe(true)
   expect(list.children[0].querySelector('details')!.open).toBe(false)
   expect(list.children[0].getAttribute('part')).toBe('message message-tool')
   expect(list.children[1].querySelector('strong')!.textContent).toBe('Helper — response failed')
@@ -114,10 +117,27 @@ it('labels tool outcomes and shows structured input and output as inert code', f
     'Assistant',
     labels
   )
-  const [done, failed, unknown] = Array.from(list.children)
-  expect(done.querySelector('summary')!.textContent).toBe('set_counter')
-  expect(failed.querySelector('summary')!.textContent).toBe('save — failed')
-  expect(unknown.querySelector('summary')!.textContent).toBe('pay — outcome unknown')
+  expect(list.children.length).toBe(1)
+  const group = list.children[0] as HTMLElement
+  expect(group.dataset.layout).toBe('tools')
+  expect(group.querySelector('.tools-summary')!.textContent).toBe('Used 3 tools')
+  const [done, failed, unknown] = Array.from(group.querySelectorAll<HTMLElement>('.tool-call'))
+  function label(row: Element) {
+    return row.querySelector('summary .visually-hidden')!.textContent
+  }
+  expect(label(done)).toBe('set_counter')
+  expect(label(failed)).toBe('save — failed')
+  expect(label(unknown)).toBe('pay — outcome unknown')
+  expect([done, failed, unknown].map((row) => row.dataset.status)).toEqual([
+    'success',
+    'failed',
+    'unknown'
+  ])
+  expect(done.querySelector('.tool-args')!.textContent).toBe('value: 7')
+  expect(done.querySelector<HTMLElement>('.tool-outcome')!.hidden).toBe(true)
+  expect(failed.querySelector<HTMLElement>('.tool-args')!.hidden).toBe(true)
+  expect(failed.querySelector('.tool-outcome')!.textContent).toBe('Failed')
+  expect(unknown.querySelector('.tool-outcome')!.textContent).toBe('Outcome unknown')
   const headings = Array.from(done.querySelectorAll('.tool-heading'), function text(node) {
     return node.textContent
   })
@@ -127,7 +147,65 @@ it('labels tool outcomes and shows structured input and output as inert code', f
   expect(code[1].textContent).toBe('{\n  "value": "<b>7</b>"\n}')
   expect(done.querySelector('b')).toBeNull()
   expect(failed.querySelector('.tool-heading')!.textContent).toBe('Result')
-  expect(failed.querySelector('code')!.textContent).toBe('Denied')
+  expect(failed.querySelector('.tool-section code')!.textContent).toBe('Denied')
+})
+
+it('groups only consecutive tool calls and keeps rows when a group grows', function grouping() {
+  const list = document.createElement('ol')
+  const first = { id: 'a', role: 'tool' as const, toolName: 'read', text: 'one' }
+  const messages = [
+    { id: 'question', role: 'user' as const, text: 'Go' },
+    first,
+    { id: 'answer', role: 'assistant' as const, text: 'Done' },
+    { id: 'b', role: 'tool' as const, toolName: 'write', text: 'two' }
+  ]
+  updateTranscript(list, messages, 'Assistant', labels)
+  expect(Array.from(list.children, (node) => (node as HTMLElement).dataset.layout)).toEqual([
+    'message',
+    'tools',
+    'message',
+    'tools'
+  ])
+  const row = list.querySelector('.tool-call')!
+  updateTranscript(
+    list,
+    [messages[0], first, { id: 'c', role: 'tool', toolName: 'save', text: 'three' }],
+    'Assistant',
+    labels
+  )
+  expect(list.children.length).toBe(2)
+  expect(list.querySelector('.tool-call')).toBe(row)
+  expect(list.querySelectorAll('.tool-call').length).toBe(2)
+})
+
+it('hides role labels visually and offers copy only on assistant replies', function labelsAndCopy() {
+  const list = document.createElement('ol')
+  updateTranscript(
+    list,
+    [
+      { id: 'question', role: 'user', text: 'Hello' },
+      { id: 'answer', role: 'assistant', text: 'Hi' }
+    ],
+    'Assistant',
+    labels
+  )
+  const [question, answer] = Array.from(list.children)
+  expect(question.querySelector('strong')!.textContent).toBe('You')
+  expect(question.querySelector('[data-copy]')).toBeNull()
+  expect(answer.querySelector('[data-copy]')!.getAttribute('aria-label')).toBe('Copy reply')
+})
+
+it('truncates long argument previews', function preview() {
+  const list = document.createElement('ol')
+  updateTranscript(
+    list,
+    [{ id: 't', role: 'tool', toolName: 'save', text: '', input: { text: 'x'.repeat(400) } }],
+    'Assistant',
+    labels
+  )
+  const text = list.querySelector('.tool-args')!.textContent!
+  expect(text.length).toBe(120)
+  expect(text.endsWith('…')).toBe(true)
 })
 
 it('calls a custom message renderer only when message text changes', function custom() {

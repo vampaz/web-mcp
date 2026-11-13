@@ -18,8 +18,11 @@ export interface WebMCPChatLabels {
   closeSettings: string
   /** @deprecated Unused; settings show labeled controls without an introduction. */
   settingsIntro: string
+  /** @deprecated Unused; models are chosen from the composer model picker. */
   conversationModel: string
+  /** @deprecated Unused; models are chosen from the composer model picker. */
   provider: string
+  /** Accessible name of the model list. */
   model: string
   confirmations: string
   confirmationsHint: string
@@ -51,8 +54,22 @@ export interface WebMCPChatLabels {
   toolResult: string
   responseFailedDetails: string
   responseFailedExplanation: string
+  /** Copy button under assistant replies. */
+  copyReply: string
+  copied: string
+  copyFailed: string
+  /** Visible outcome beside a failed tool call. */
+  toolStatusFailed: string
+  /** Visible outcome beside a tool call whose result is unknown. */
+  toolStatusUnknown: string
+  searchModels: string
+  noModelsMatch: string
   status: WebMCPChatStatusLabels
   openChat(title: string): string
+  /** Heading of a block of consecutive tool calls. */
+  toolsUsed(count: number): string
+  /** Accessible name of the composer model button; must contain the visible model label. */
+  chooseModel(model: string): string
   characterCount(count: number, max: number): string
   tooLong(count: number, max: number): string
   toolFailed(name: string): string
@@ -99,6 +116,10 @@ export interface WebMCPChatElement extends HTMLElement {
   toggle(): void
   focusComposer(): void
   setDraft(text: string): void
+  /** Opens the settings view. No effect without `settings`. */
+  openSettings(): void
+  /** Opens the composer model picker. No effect without `settings`. */
+  openModelPicker(): void
 }
 
 export interface ChatStatus {

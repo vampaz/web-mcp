@@ -14,6 +14,7 @@ import { chatStyles, popupStyles } from './styles'
 import { ChatPopup } from './popup'
 import { icon } from './icon'
 import { ChatSettings } from './settings'
+import { ChatModelPicker } from './model-picker'
 
 let instanceCount = 0
 const defaultMessageLimit = 16000
@@ -77,6 +78,7 @@ export function defineWebMCPChat(): void {
     private readonly jumpButton: HTMLButtonElement
     private readonly popup: ChatPopup
     private settings?: ChatSettings
+    private picker?: ChatModelPicker
 
     constructor() {
       super()
@@ -85,8 +87,8 @@ export function defineWebMCPChat(): void {
         <div class="presentation">
         <section class="panel" part="panel" id="${id}-panel" aria-labelledby="${id}-title">
           <header part="header">
-            <div class="identity"><span class="assistant-mark">${icon('M5 5h14v11H10l-5 4V5M9 9h6M9 12h4')}</span><h2 id="${id}-title" part="title"></h2></div>
-            <div class="header-actions"><slot name="header-actions"></slot><button class="icon-button" type="button" data-clear part="new-chat">${icon('M12 5v14M5 12h14')}</button></div>
+            <div class="identity"><slot name="identity"><span class="assistant-mark">${icon('M5 5h14v11H10l-5 4V5M9 9h6M9 12h4')}</span></slot><h2 id="${id}-title" part="title"></h2></div>
+            <div class="header-actions"><slot name="header-actions"></slot><button class="icon-button" type="button" data-clear part="new-chat">${icon('M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6M18.4 3.6a2 2 0 0 1 2.9 2.9L13 14.8l-3.8 1 1-3.8z')}</button></div>
           </header>
           <div class="conversation">
             <div class="transcript" part="transcript" tabindex="0" role="region"><div data-empty><slot name="empty"><p></p></slot></div><div class="suggestions"></div><div role="log"><ol></ol><p class="working" hidden aria-hidden="true"><span class="working-dots"><span></span><span></span><span></span></span><span class="working-text"></span></p></div></div>
@@ -94,10 +96,11 @@ export function defineWebMCPChat(): void {
             <button type="button" class="jump-latest" part="jump-latest" hidden></button>
           </div>
           <form class="composer" part="composer">
+            <slot name="before-composer"></slot>
             <div class="message-box">
               <label class="visually-hidden" for="${id}-message"></label>
               <textarea id="${id}-message" part="textarea" rows="2" enterkeyhint="send"></textarea>
-              <div class="actions"><button type="button" data-stop part="stop">${icon('M7 7h10v10H7z')}<span></span></button><button class="send icon-button" type="submit" part="send">${icon('M12 19V5M6 11l6-6 6 6')}</button></div>
+              <div class="composer-bar"><div class="composer-tools"></div><div class="actions"><button type="button" class="icon-button" data-stop part="stop">${icon('M7 7h10v10H7z')}<span class="visually-hidden"></span></button><button class="send icon-button" type="submit" part="send">${icon('M12 19V5M6 11l6-6 6 6')}</button></div></div>
             </div>
             <div class="composer-meta"><slot name="composer-meta"></slot><p class="status" part="status" role="status" aria-live="polite">${icon('M12 8v5M12 16h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0')}<span></span></p><button type="button" data-edit-last hidden></button><p class="hint" id="${id}-hint"></p></div>
             <p class="limit" id="${id}-limit" hidden></p>
@@ -128,7 +131,22 @@ export function defineWebMCPChat(): void {
       this.limit = this.root.querySelector('.limit')!
       this.jumpButton = this.root.querySelector('.jump-latest')!
       this.root.querySelector('.panel')!.addEventListener('keydown', (event) => {
+        this.picker?.handleKeydown(event as KeyboardEvent)
         this.settings?.handleKeydown(event as KeyboardEvent)
+      })
+      const identity = this.root.querySelector<HTMLSlotElement>('slot[name=identity]')!
+      identity.addEventListener('slotchange', () => {
+        // Slotted identity replaces the visible title; the heading still names the panel.
+        this.heading.classList.toggle('visually-hidden', identity.assignedNodes().length > 0)
+      })
+      const empty = this.root.querySelector<HTMLSlotElement>('slot[name=empty]')!
+      empty.addEventListener('slotchange', () => {
+        // Application empty states own their layout; the default text stays centred.
+        this.empty.toggleAttribute('data-custom', empty.assignedNodes().length > 0)
+      })
+      this.list.addEventListener('click', (event) => {
+        const button = (event.target as Element).closest('[data-copy]')
+        if (button) void this.copyReply(button.closest('li')!.dataset.id)
       })
       this.popup = new ChatPopup(
         this,
@@ -212,9 +230,22 @@ export function defineWebMCPChat(): void {
       this.popup.toggle()
     }
     focusComposer() {
+      this.picker?.close(false)
       this.settings?.setOpen(false)
       if (this.dataset.mode === 'popup' && !this.popup.isOpen) this.popup.setOpen(true)
       else this.input.focus()
+    }
+    openSettings() {
+      if (!this.settings) return
+      this.picker?.close(false)
+      if (this.dataset.mode === 'popup' && !this.popup.isOpen) this.popup.setOpen(true)
+      this.settings.setOpen(true, true)
+    }
+    openModelPicker() {
+      if (!this.picker) return
+      this.settings?.setOpen(false)
+      if (this.dataset.mode === 'popup' && !this.popup.isOpen) this.popup.setOpen(true)
+      this.picker.open()
     }
     setDraft(text: string) {
       this.input.value = text
@@ -249,9 +280,14 @@ export function defineWebMCPChat(): void {
       )
       this.applyLabels()
       if (options.settings) {
-        this.settings ??= new ChatSettings(this.root.querySelector('.panel')!)
+        const panel = this.root.querySelector<HTMLElement>('.panel')!
+        this.settings ??= new ChatSettings(panel)
         this.settings.configure(options.settings, this.labels)
+        this.picker ??= new ChatModelPicker(panel)
+        this.picker.configure(options.settings, this.labels)
       } else {
+        this.picker?.destroy()
+        this.picker = undefined
         this.settings?.destroy()
         this.settings = undefined
       }
@@ -320,6 +356,8 @@ export function defineWebMCPChat(): void {
         changed = true
       }
       const activity = working ? activityText(snapshot.activity, this.labels) : ''
+      const kind = working ? (snapshot.activity?.kind ?? 'resolving') : ''
+      if (this.working.dataset.kind !== kind) this.working.dataset.kind = kind
       if (activity !== this.activity) {
         this.activity = activity
         this.workingText.textContent = activity
@@ -355,6 +393,17 @@ export function defineWebMCPChat(): void {
       this.updateStatus()
     }
 
+    private async copyReply(id: string | undefined) {
+      const message = this.snapshot.messages.find((item) => item.id === id)
+      if (!message) return
+      try {
+        await navigator.clipboard.writeText(message.text)
+        this.showNotice(this.labels.copied)
+      } catch {
+        this.showNotice(this.labels.copyFailed, 'error')
+      }
+    }
+
     private updateComposer() {
       const snapshot = this.snapshot
       const length = this.input.value.length
@@ -385,6 +434,8 @@ export function defineWebMCPChat(): void {
       this.sendButton.disabled = Boolean(disabled || busy || tooLong || !this.input.value.trim())
       this.stopButton.disabled = Boolean(disabled || snapshot.state !== 'running')
       this.stopButton.hidden = !['running', 'stopping'].includes(snapshot.state)
+      // Stop takes the Send position while a turn runs.
+      this.sendButton.hidden = !this.stopButton.hidden
       this.clearButton.disabled = Boolean(
         disabled ||
         busy ||

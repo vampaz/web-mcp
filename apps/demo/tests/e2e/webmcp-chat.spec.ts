@@ -153,7 +153,9 @@ test('keeps focus outside chat when a pending response arrives', async function 
   await expect(input).toBeFocused()
   await expect(chat.getByRole('log').locator('.working')).toBeVisible()
   await input.fill('My next question')
-  await expect(chat.getByRole('button', { name: 'Send', exact: true })).toBeDisabled()
+  // Stop takes the Send position while the turn runs.
+  await expect(chat.getByRole('button', { name: 'Send', exact: true })).toBeHidden()
+  await expect(chat.getByRole('button', { name: 'Stop', exact: true })).toBeVisible()
   await page.getByRole('textbox', { name: 'Outside chat' }).fill('Keep typing')
   await page.getByRole('button', { name: 'Finish response' }).click()
   await expectIdle(chat)
@@ -297,6 +299,9 @@ for (const mode of ['inline', 'popup'] as const) {
     expect(
       await transcript.evaluate((element) => element.scrollHeight > element.clientHeight)
     ).toBe(true)
+    // Bring the whole composer into view as a user would; WebKit otherwise keeps stale
+    // intersection data when the page does not scroll.
+    await chat.locator('[part="composer"]').scrollIntoViewIfNeeded()
     await input.fill('Long first message. '.repeat(100))
     await input.press('Enter')
     await expect(chat.locator('.suggestions')).toBeHidden()

@@ -134,41 +134,98 @@ it('adds settings only when configured and preserves the draft and transcript', 
   expect(root.activeElement).toBe(root.querySelector('textarea'))
 })
 
-it('ports provider, model and approval controls without owning resolver or approval behavior', function () {
+function picker(root: ShadowRoot) {
+  return {
+    button: root.querySelector<HTMLButtonElement>('[part="model-button"]')!,
+    popover: root.querySelector<HTMLElement>('[part="model-picker"]')!,
+    listbox: root.querySelector<HTMLElement>('[role="listbox"]')!,
+    options: Array.from(root.querySelectorAll<HTMLElement>('[role="option"]'))
+  }
+}
+
+it('chooses models from the composer without owning resolver or approval behavior', function () {
   const fixture = controller()
   const element = mount(fixture.api)
   const options = settings()
   element.configure({ controller: fixture.api, settings: options })
   const root = element.shadowRoot!
-  root.querySelector<HTMLButtonElement>('[part="settings-button"]')!.click()
-  const [provider, model] = root.querySelectorAll('select')
-  provider.value = 'second'
-  provider.dispatchEvent(new Event('change'))
-  expect(options.onChange).toHaveBeenCalledWith('second', 'two')
-  element.configure({
-    controller: fixture.api,
-    settings: { ...options, providerId: 'second', model: 'two' }
-  })
-  model.focus()
-  model.value = 'three'
-  model.dispatchEvent(new Event('change'))
+  const { button, popover, listbox, options: choices } = picker(root)
+  expect(button.closest('.composer-tools')).not.toBeNull()
+  expect(button.getAttribute('aria-label')).toBe('Model: Model one')
+  expect(button.textContent).toBe('Model one')
+  expect(choices.map((option) => option.textContent)).toEqual([
+    'Model one',
+    'Model two',
+    'Model three',
+    'Built-in'
+  ])
+  expect(choices[0].getAttribute('aria-selected')).toBe('true')
+  expect(root.querySelectorAll('[role="group"]').length).toBe(3)
+  button.click()
+  expect(popover.hidden).toBe(false)
+  expect(button.getAttribute('aria-expanded')).toBe('true')
+  expect(root.activeElement).toBe(listbox)
+  expect(listbox.getAttribute('aria-activedescendant')).toBe(choices[0].id)
+  listbox.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true }))
+  listbox.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true }))
+  expect(listbox.getAttribute('aria-activedescendant')).toBe(choices[2].id)
+  listbox.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }))
   expect(options.onChange).toHaveBeenCalledWith('second', 'three')
-  element.configure({
-    controller: fixture.api,
-    settings: { ...options, providerId: 'second', model: 'three', detail: 'Updated status' }
-  })
-  expect(root.activeElement).toBe(model)
-  expect(root.querySelector<HTMLElement>('[part="settings"]')!.hidden).toBe(false)
+  expect(popover.hidden).toBe(true)
+  expect(root.activeElement).toBe(button)
+  button.click()
+  choices[3].click()
+  expect(options.onChange).toHaveBeenLastCalledWith('built-in', undefined)
+  button.click()
+  choices[0].click()
+  expect(options.onChange).toHaveBeenCalledTimes(2)
+  root.querySelector<HTMLButtonElement>('[part="settings-button"]')!.click()
   const checkbox = root.querySelector<HTMLInputElement>('[type="checkbox"]')!
   checkbox.click()
   expect(options.confirmations!.onChange).toHaveBeenCalledWith(false)
   expect(fixture.api.send).not.toHaveBeenCalled()
   element.configure({
     controller: fixture.api,
-    settings: { ...options, providerId: 'built-in', confirmations: undefined }
+    settings: { ...options, providerId: 'built-in', model: undefined, confirmations: undefined }
   })
-  expect(model.hidden).toBe(true)
-  expect(root.querySelector<HTMLElement>('.settings-approval')!.hidden).toBe(true)
+  expect(picker(root).button.textContent).toBe('Built-in')
+  expect(root.querySelector<HTMLElement>('.settings-approval-card')!.hidden).toBe(true)
+})
+
+it('closes the picker on Escape before other Escape handlers and searches long lists', function () {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  const options = settings()
+  const many = Array.from({ length: 9 }, (_, index) => ({
+    model: `m${index}`,
+    label: `Model ${index}`,
+    detail: index === 4 ? 'Large context' : undefined
+  }))
+  element.configure({
+    controller: fixture.api,
+    mode: 'popup',
+    settings: { ...options, providers: [{ id: 'many', label: 'Many', models: many }] }
+  })
+  element.open()
+  const root = element.shadowRoot!
+  const { button, popover } = picker(root)
+  button.click()
+  const search = root.querySelector<HTMLInputElement>('.model-search input')!
+  expect(root.activeElement).toBe(search)
+  search.value = 'large'
+  search.dispatchEvent(new Event('input'))
+  const visible = picker(root).options.filter((option) => !option.hidden)
+  expect(visible.map((option) => option.textContent)).toEqual(['Model 4Large context'])
+  expect(search.getAttribute('aria-activedescendant')).toBe(visible[0].id)
+  search.value = 'nothing'
+  search.dispatchEvent(new Event('input'))
+  expect(root.querySelector<HTMLElement>('.model-empty')!.hidden).toBe(false)
+  search.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+  )
+  expect(popover.hidden).toBe(true)
+  expect(root.querySelector<HTMLElement>('.panel')!.hidden).toBe(false)
+  expect(root.activeElement).toBe(button)
 })
 
 it('disables changes while busy and renders labels and errors as text', function () {
@@ -185,13 +242,28 @@ it('disables changes while busy and renders labels and errors as text', function
   expect(button.getAttribute('aria-label')).toBe('Definições')
   expect(button.disabled).toBe(false)
   button.click()
-  expect(root.querySelector('fieldset')!.disabled).toBe(true)
-  const provider = root.querySelector('select')!
-  provider.value = 'second'
-  provider.dispatchEvent(new Event('change'))
+  expect(root.querySelector<HTMLFieldSetElement>('.settings-approval-card')!.disabled).toBe(true)
+  const models = picker(root)
+  expect(models.button.disabled).toBe(true)
+  element.openModelPicker()
+  expect(models.popover.hidden).toBe(true)
+  models.options[1].click()
   expect(options.onChange).not.toHaveBeenCalled()
   expect(root.querySelector('.settings-error')!.textContent).toContain('<img')
   expect(root.querySelector('img')).toBeNull()
+})
+
+it('opens settings and the picker from the application', function () {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.configure({ controller: fixture.api, settings: settings() })
+  const root = element.shadowRoot!
+  element.openSettings()
+  expect(root.querySelector<HTMLElement>('[part="settings"]')!.hidden).toBe(false)
+  expect(root.activeElement).toBe(root.querySelector('[data-settings-close]'))
+  element.openModelPicker()
+  expect(root.querySelector<HTMLElement>('[part="settings"]')!.hidden).toBe(true)
+  expect(picker(root).popover.hidden).toBe(false)
 })
 
 it('closes settings before a popup on Escape and restores focus when reopened', function () {

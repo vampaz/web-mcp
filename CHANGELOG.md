@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased (0.9.0)
+- **Chat:** refine the default look. User messages are bubbles, assistant replies are plain text with a Copy button, and role labels are visually hidden but still announced. Consecutive tool calls form one “Used N tools” block with status icons and argument previews. Stop replaces Send while a turn runs, and errors replace the send hint under the composer.
+- **Chat:** move provider and model choice from the settings selects to a composer model picker (listbox with groups, details, badges and search). Settings open as a full view with a back button. `WebMCPChatSettings` providers accept `description`, `detail`, `badge` and `icon`; models accept `detail` and `badge`. `onChange` now reports the chosen model across providers.
+- **Chat:** add the `identity` and `before-composer` slots, the `model-button` and `model-picker` parts, `openSettings()` and `openModelPicker()`, and the `--webmcp-chat-surface`, `--webmcp-chat-line-strong`, `--webmcp-chat-success`, `--webmcp-chat-warning` and `--webmcp-chat-mono` properties. The `conversationModel` and `provider` labels are unused.
+
 ## 0.8.5 — 2026-11-04
 
 - **Chat:** give the settings selects a spaced custom chevron so the native arrow no longer sits against the border. Preserve dark theme, RTL, disabled and forced-colors behavior.

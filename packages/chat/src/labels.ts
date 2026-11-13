@@ -46,6 +46,13 @@ export function createLabels(
     responseFailedDetails: 'Response details',
     responseFailedExplanation:
       'This response could not be completed. Check application state before sending a new request.',
+    copyReply: 'Copy reply',
+    copied: 'Reply copied.',
+    copyFailed: 'The reply could not be copied.',
+    toolStatusFailed: 'Failed',
+    toolStatusUnknown: 'Outcome unknown',
+    searchModels: 'Search models',
+    noModelsMatch: 'No models match.',
     status: {
       loading: 'Loading conversation…',
       interrupted:
@@ -58,6 +65,12 @@ export function createLabels(
     },
     openChat(title) {
       return `Open ${title}`
+    },
+    toolsUsed(value) {
+      return `Used ${numbers.format(value)} tools`
+    },
+    chooseModel(model) {
+      return `Model: ${model}`
     },
     characterCount: count,
     tooLong(value, max) {

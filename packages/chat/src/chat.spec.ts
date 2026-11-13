@@ -878,10 +878,41 @@ it('applies labels, locale formatting, message limits, theme, and parts', functi
     })
   ).toEqual([])
   expect(
-    ['header-actions', 'composer-meta', 'footer', 'empty'].filter(function missing(slot) {
-      return !root.querySelector(`slot[name="${slot}"]`)
-    })
+    ['identity', 'header-actions', 'before-composer', 'composer-meta', 'footer', 'empty'].filter(
+      function missing(slot) {
+        return !root.querySelector(`slot[name="${slot}"]`)
+      }
+    )
   ).toEqual([])
+})
+
+it('lets slotted identity replace the visible title but keeps the panel name', async function identity() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.configure({ controller: fixture.api, title: 'Ask this page' })
+  const root = element.shadowRoot!
+  const heading = root.querySelector('h2')!
+  expect(heading.classList.contains('visually-hidden')).toBe(false)
+  const site = document.createElement('span')
+  site.slot = 'identity'
+  site.textContent = 'example.com'
+  element.append(site)
+  await new Promise((resolve) => setTimeout(resolve))
+  expect(heading.classList.contains('visually-hidden')).toBe(true)
+  expect(root.querySelector('section')!.getAttribute('aria-labelledby')).toBe(heading.id)
+  expect(heading.textContent).toBe('Ask this page')
+})
+
+it('shows Stop in place of Send while a turn runs', function stopPlacement() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  const root = element.shadowRoot!
+  const send = root.querySelector<HTMLButtonElement>('[type=submit]')!
+  const stop = root.querySelector<HTMLButtonElement>('[data-stop]')!
+  expect([send.hidden, stop.hidden]).toEqual([false, true])
+  fixture.publish({ state: 'running', messages: [] })
+  expect([send.hidden, stop.hidden]).toEqual([true, false])
+  expect(stop.textContent).toBe('Stop')
 })
 
 it('lets a custom renderer own message bodies', function customRenderer() {
