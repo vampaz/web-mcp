@@ -10,6 +10,8 @@ Start with the [integration guide](./integration.md) for a working application, 
 
 - [`@vampaz/webmcp-kit/mcp-bridge`](#vampazwebmcp-kitmcp-bridge)
 
+- [`@vampaz/webmcp-kit/page-bridge`](#vampazwebmcp-kitpage-bridge)
+
 - [`@vampaz/webmcp-kit/react`](#vampazwebmcp-kitreact)
 
 - [`@vampaz/webmcp-kit/svelte`](#vampazwebmcp-kitsvelte)
@@ -591,7 +593,7 @@ export interface ToolConfirmation {
 
 ```ts
 export interface ToolContext {
-  source: 'native' | 'fallback' | 'devtools' | 'resolver' | 'pi' | 'mcp-bridge'
+  source: 'native' | 'fallback' | 'devtools' | 'resolver' | 'pi' | 'mcp-bridge' | 'page-bridge'
   signal?: AbortSignal
 }
 ```
@@ -1337,6 +1339,134 @@ export interface MCPBridgeTool {
 
 ```ts
 declare function createLocalMCPBridge(): MCPBridge
+```
+
+## @vampaz/webmcp-kit/page-bridge
+
+### PAGE_BRIDGE_PROTOCOL
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/page-bridge.ts).
+
+Protocol identifier shared by every page-bridge message. Senders and receivers
+ignore messages carrying any other protocol string, so incompatible versions
+can coexist on the same page.
+
+```ts
+declare const PAGE_BRIDGE_PROTOCOL: 'webmcp-kit-bridge/v1'
+```
+
+### PageBridgeCatalog
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/page-bridge.ts).
+
+```ts
+export interface PageBridgeCatalog {
+  revision: string
+  tools: PageBridgeTool[]
+}
+```
+
+### PageBridgeHandle
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/page-bridge.ts).
+
+```ts
+export interface PageBridgeHandle {
+  uninstall(): void
+}
+```
+
+### PageBridgeMessage
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/page-bridge.ts).
+
+```ts
+export type PageBridgeMessage = PageBridgeReply | PageBridgeToolsChanged
+```
+
+### PageBridgeReply
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/page-bridge.ts).
+
+```ts
+export type PageBridgeReply =
+  | {
+      protocol: typeof PAGE_BRIDGE_PROTOCOL
+      kind: 'catalog-reply'
+      requestId: string
+      catalog: PageBridgeCatalog
+    }
+  | {
+      protocol: typeof PAGE_BRIDGE_PROTOCOL
+      kind: 'invoke-reply'
+      requestId: string
+      status: 'result'
+      output: unknown
+    }
+  | {
+      protocol: typeof PAGE_BRIDGE_PROTOCOL
+      kind: 'invoke-reply'
+      requestId: string
+      status: 'error'
+      error: string
+    }
+  | { protocol: typeof PAGE_BRIDGE_PROTOCOL; kind: 'cancel-reply'; requestId: string }
+```
+
+### PageBridgeRequest
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/page-bridge.ts).
+
+```ts
+export type PageBridgeRequest =
+  | { protocol: typeof PAGE_BRIDGE_PROTOCOL; kind: 'discover'; requestId: string }
+  | {
+      protocol: typeof PAGE_BRIDGE_PROTOCOL
+      kind: 'invoke'
+      requestId: string
+      name: string
+      input: Record<string, unknown>
+    }
+  | { protocol: typeof PAGE_BRIDGE_PROTOCOL; kind: 'cancel'; requestId: string }
+```
+
+### PageBridgeTool
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/page-bridge.ts).
+
+```ts
+export interface PageBridgeTool {
+  name: string
+  description: string
+  inputSchema: JsonSchema
+  annotations?: ToolAnnotations
+}
+```
+
+### PageBridgeToolsChanged
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/page-bridge.ts).
+
+Unsolicited notice that the registry changed; carries the new catalog revision.
+
+```ts
+export interface PageBridgeToolsChanged {
+  protocol: typeof PAGE_BRIDGE_PROTOCOL
+  kind: 'tools-changed'
+  revision: string
+}
+```
+
+### installPageBridge
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/page-bridge.ts).
+
+Any script running in the page can message this bridge. That carries no extra
+trust: such a script could already call the page's own code directly. Sites
+that do not want this surface simply never call `installPageBridge`.
+
+```ts
+declare function installPageBridge(): PageBridgeHandle
 ```
 
 ## @vampaz/webmcp-kit/react
@@ -2313,6 +2443,10 @@ export interface WebMCPChatElement extends HTMLElement {
   toggle(): void
   focusComposer(): void
   setDraft(text: string): void
+  /** Opens the settings view. No effect without `settings`. */
+  openSettings(): void
+  /** Opens the composer model picker. No effect without `settings`. */
+  openModelPicker(): void
 }
 ```
 
@@ -2328,8 +2462,11 @@ export interface WebMCPChatLabels {
   closeSettings: string
   /** @deprecated Unused; settings show labeled controls without an introduction. */
   settingsIntro: string
+  /** @deprecated Unused; models are chosen from the composer model picker. */
   conversationModel: string
+  /** @deprecated Unused; models are chosen from the composer model picker. */
   provider: string
+  /** Accessible name of the model list. */
   model: string
   confirmations: string
   confirmationsHint: string
@@ -2361,8 +2498,22 @@ export interface WebMCPChatLabels {
   toolResult: string
   responseFailedDetails: string
   responseFailedExplanation: string
+  /** Copy button under assistant replies. */
+  copyReply: string
+  copied: string
+  copyFailed: string
+  /** Visible outcome beside a failed tool call. */
+  toolStatusFailed: string
+  /** Visible outcome beside a tool call whose result is unknown. */
+  toolStatusUnknown: string
+  searchModels: string
+  noModelsMatch: string
   status: WebMCPChatStatusLabels
   openChat(title: string): string
+  /** Heading of a block of consecutive tool calls. */
+  toolsUsed(count: number): string
+  /** Accessible name of the composer model button; must contain the visible model label. */
+  chooseModel(model: string): string
   characterCount(count: number, max: number): string
   tooLong(count: number, max: number): string
   toolFailed(name: string): string
@@ -2370,6 +2521,21 @@ export interface WebMCPChatLabels {
   runningTool(name: string): string
   awaitingApproval(name: string): string
   responseFailed(assistantLabel: string): string
+}
+```
+
+### WebMCPChatModelOption
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/chat/src/interfaces/settings.ts).
+
+```ts
+export interface WebMCPChatModelOption {
+  model: string
+  label: string
+  /** Secondary line in the model picker, such as the context size. */
+  detail?: string
+  /** Short tag beside the option, such as `Experimental`. */
+  badge?: string
 }
 ```
 
@@ -2407,23 +2573,49 @@ export interface WebMCPChatOptions {
 }
 ```
 
+### WebMCPChatProvider
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/chat/src/interfaces/settings.ts).
+
+```ts
+export interface WebMCPChatProvider {
+  id: string
+  label: string
+  /** Short note beside the provider heading in the model picker. */
+  description?: string
+  /** Secondary line for a provider offered without models. */
+  detail?: string
+  /** Short tag for a provider offered without models. */
+  badge?: string
+  icon?: WebMCPChatProviderIcon
+  models: readonly WebMCPChatModelOption[]
+}
+```
+
+### WebMCPChatProviderIcon
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/chat/src/interfaces/settings.ts).
+
+```ts
+export type WebMCPChatProviderIcon = 'cloud' | 'route' | 'server' | 'chip'
+```
+
 ### WebMCPChatSettings
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/chat/src/interfaces/settings.ts).
 
 ```ts
 export interface WebMCPChatSettings {
-  providers: readonly {
-    id: string
-    label: string
-    models: readonly { model: string; label: string }[]
-  }[]
+  providers: readonly WebMCPChatProvider[]
   providerId: string
   model?: string
   detail?: string
   error?: string
   /** Disable changes while the application is switching providers or running a turn. */
   disabled?: boolean
+  /**
+   * Called when the user picks a model. `model` is absent for a provider offered without models.
+   */
   onChange(providerId: string, model?: string): void
   /** Omit when the application does not offer an approval preference. */
   confirmations?: {

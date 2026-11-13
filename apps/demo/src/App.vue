@@ -193,6 +193,7 @@ import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, shallowRef
 import { getSupportLabel, invokeTool, type ToolResolver } from '@vampaz/webmcp-kit'
 import type { PiController, PiSnapshot } from '@vampaz/webmcp-kit/pi'
 import type { WebMCPChatElement } from '@vampaz/webmcp-kit/chat'
+import { installPageBridge, type PageBridgeHandle } from '@vampaz/webmcp-kit/page-bridge'
 import { installApprovalDialog, registerCounterTools } from '@/tools'
 import { createDemoProviders } from '@/providers'
 import type { DemoProvider } from '@/interfaces/provider'
@@ -250,6 +251,7 @@ const busy = computed(function isBusy() {
 let controller: PiController | undefined
 let tools: ReturnType<typeof registerCounterTools> | undefined
 let removeApproval: (() => void) | undefined
+let pageBridge: PageBridgeHandle | undefined
 let unsubscribe: (() => void) | undefined
 let closed = false
 watch([busy, confirmationsEnabled, providerDetail, providerError, switching], configureChats)
@@ -448,6 +450,7 @@ function cleanup() {
   })
   tools?.destroy()
   removeApproval?.()
+  pageBridge?.uninstall()
 }
 
 function pagehide(event: PageTransitionEvent) {
@@ -455,6 +458,7 @@ function pagehide(event: PageTransitionEvent) {
 }
 
 onMounted(function mount() {
+  pageBridge = installPageBridge()
   tools = registerCounterTools(function changed(value) {
     counter.value = value
   })

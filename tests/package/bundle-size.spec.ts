@@ -26,6 +26,8 @@ const budgets: Record<string, { eager: number; total: number }> = {
   './command-input': { eager: 32_900, total: 32_900 },
   './devtools': { eager: 33_300, total: 33_300 },
   './hosted': { eager: 10_600, total: 10_600 },
+  // 0.9.0 page bridge shares the registry and invocation pipeline: 11,264 bytes.
+  './page-bridge': { eager: 12_400, total: 12_400 },
   './mcp-bridge': { eager: 29_000, total: 29_000 },
   './pi': { eager: 32_400, total: 152_300 },
   './react': { eager: 28_800, total: 28_800 },

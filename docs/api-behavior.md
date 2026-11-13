@@ -19,6 +19,7 @@ This guide explains runtime behavior. The generated reference lists all public e
 | `/testing`                  | Resolver evaluations and Playwright helpers                   | None; supply a resolver or compatible browser page |
 | `/testing/playwright`       | Page bridge helpers without evaluation imports                | None; supply a compatible browser page             |
 | `/mcp-bridge`               | `createLocalMCPBridge`                                        | None                                               |
+| `/page-bridge`              | `installPageBridge`                                           | None                                               |
 
 The package is ESM-only. Importing core, `/pi`, or `/chat` is safe during SSR. Browser initialization and DOM registration belong in client lifecycle code. See the [dependency model](./getting-started.md#dependency-model) for exact peer package names and development-only tooling.
 

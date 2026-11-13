@@ -17,6 +17,7 @@ import { mountDevtoolsOverlay } from '@vampaz/webmcp-kit/devtools'
 import { installWebMCPKitTestBridge } from '@vampaz/webmcp-kit/testing'
 import { runNativeWebMCPAgent, waitForWebMCPTool } from '@vampaz/webmcp-kit/testing/playwright'
 import { createLocalMCPBridge } from '@vampaz/webmcp-kit/mcp-bridge'
+import { installPageBridge } from '@vampaz/webmcp-kit/page-bridge'
 import { readable } from 'svelte/store'
 import { ref } from 'vue'
 import { z } from 'zod'
@@ -57,5 +58,6 @@ void [
   mountDevtoolsOverlay,
   installWebMCPKitTestBridge,
   waitForWebMCPTool,
-  createLocalMCPBridge
+  createLocalMCPBridge,
+  installPageBridge
 ]

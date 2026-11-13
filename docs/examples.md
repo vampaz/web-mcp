@@ -223,6 +223,22 @@ const called = await bridge.handleRequest({
 
 The bridge lists currently available tools and routes calls through the normal approval path with `source: 'mcp-bridge'`. It is an in-process adapter; connect it to a transport yourself.
 
+## Page Bridge
+
+```ts
+import { installPageBridge } from '@vampaz/webmcp-kit/page-bridge'
+
+const bridge = installPageBridge()
+// Later, if the host page is torn down:
+bridge.uninstall()
+```
+
+`installPageBridge()` exposes the fallback registry to embedded agents over a versioned `window.postMessage` protocol (`webmcp-kit-bridge/v1`), for browsers without native WebMCP. Discover replies list the currently available tools with a catalog revision; invocations run through `invokeTool` with `source: 'page-bridge'`, so website confirmation handlers and validation apply unchanged; cancel aborts an in-flight call. Registry changes announce themselves with a bumped revision. Install once at client startup; the bridge is idempotent, and `uninstall()` removes its listeners.
+
+Replies carry JSON data. `window.postMessage` structured-clones its message and rejects Proxy objects — which framework-reactive values are — so the bridge unwraps payloads through a JSON round-trip before posting: reactive state arrives as plain data, members JSON cannot represent are dropped, and an output that cannot be serialized at all produces an error reply instead of silence.
+
+Any script running in the page can message the bridge. That adds no trust beyond that script running in the page, and sites that do not want this surface simply never call `installPageBridge()`. Messages from other windows or origins are ignored.
+
 ## Eval Fixtures
 
 ```ts

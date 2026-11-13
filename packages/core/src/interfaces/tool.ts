@@ -64,7 +64,7 @@ export interface ToolAnnotations {
 }
 
 export interface ToolContext {
-  source: 'native' | 'fallback' | 'devtools' | 'resolver' | 'pi' | 'mcp-bridge'
+  source: 'native' | 'fallback' | 'devtools' | 'resolver' | 'pi' | 'mcp-bridge' | 'page-bridge'
   signal?: AbortSignal
 }
 

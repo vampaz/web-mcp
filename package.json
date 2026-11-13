@@ -1,6 +1,6 @@
 {
   "name": "@vampaz/webmcp-kit",
-  "version": "0.8.5",
+  "version": "0.9.0",
   "type": "module",
   "description": "WebMCP tool registration, resolvers, framework helpers, devtools, and testing helpers for web apps.",
   "homepage": "https://github.com/vampaz/web-mcp#readme",
@@ -42,6 +42,10 @@
     "./mcp-bridge": {
       "types": "./dist/packages/mcp-bridge/src/index.d.ts",
       "default": "./dist/mcp-bridge.js"
+    },
+    "./page-bridge": {
+      "types": "./dist/packages/page-bridge/src/index.d.ts",
+      "default": "./dist/page-bridge.js"
     },
     "./react": {
       "types": "./dist/packages/react/src/index.d.ts",
