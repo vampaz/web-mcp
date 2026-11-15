@@ -22,7 +22,9 @@ export function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unknow
   tool: WebMCPTool<TInput, TOutput>,
   options: UseWebMCPToolOptions = {}
 ): UseWebMCPToolResult<TInput, TOutput> {
-  return bindRegistration(createToolRegistrationHandle(tool), options)
+  return bindRegistration(createToolRegistrationHandle(tool), options, function getTools() {
+    return [tool]
+  })
 }
 
 /** Registers the tools as one atomic set for the current component or effect scope. */
@@ -30,12 +32,14 @@ export function useWebMCPTools(
   tools: readonly WebMCPTool[],
   options: UseWebMCPToolOptions = {}
 ): UseWebMCPToolsResult {
-  return bindRegistration(createToolsRegistrationHandle(tools), options)
+  return bindRegistration(createToolsRegistrationHandle(tools), options, function getTools() {
+    return tools
+  })
 }
 
 function bindRegistration<
   THandle extends { sync: (available: boolean) => void; unregister: () => void }
->(handle: THandle, options: UseWebMCPToolOptions): THandle {
+>(handle: THandle, options: UseWebMCPToolOptions, getTools: () => readonly unknown[]): THandle {
   const component = getCurrentInstance()
   let mounted = component ? component.isMounted : typeof window !== 'undefined'
 
@@ -47,6 +51,15 @@ function bindRegistration<
     handle.sync(mounted && available())
   }
 
+  const stopTools = watch(
+    () => JSON.stringify(getTools()),
+    function resync() {
+      handle.unregister()
+      sync()
+    },
+    { immediate: true }
+  )
+
   if (component && !mounted)
     onMounted(function mount() {
       mounted = true
@@ -55,6 +68,7 @@ function bindRegistration<
   const stop = watch(available, sync, { immediate: true })
   onScopeDispose(function disposeWebMCPTool() {
     stop()
+    stopTools()
     handle.unregister()
   })
   return handle

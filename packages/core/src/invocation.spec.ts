@@ -84,6 +84,27 @@ it('cancels a pending approval even when the handler ignores cancellation', asyn
   expect(fixture.execute).not.toHaveBeenCalled()
 })
 
+it('tags every invocation outcome with an invocationId', async function test() {
+  const missing = await invokeTool({ toolName: 'missing_tool', input: {} })
+  expect(missing.invocationId).toBeTypeOf('string')
+
+  const fixture = setup()
+  const pending = invokeTool({ toolName: 'set_counter', input: {} })
+  fixture.approve(true)
+  expect(await pending).toMatchObject({ status: 'success' })
+})
+
+it('tags confirmation failures with an invocationId', async function test() {
+  const fixture = setup()
+  setConfirmationHandler(function confirm() {
+    throw new Error('handler exploded')
+  })
+  const result = await invokeTool({ toolName: 'set_counter', input: {} })
+  expect(result).toMatchObject({ status: 'error', code: 'confirmation_failed' })
+  expect(result.invocationId).toBeTypeOf('string')
+  expect(fixture.execute).not.toHaveBeenCalled()
+})
+
 it('checks cancellation before asking for approval', async function test() {
   const fixture = setup()
   const confirm = vi.fn()

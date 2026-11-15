@@ -9,7 +9,7 @@ import type {
   ToolInvocationResult,
   WebMCPTool
 } from './interfaces/tool'
-import { createInvocationResult, invokeToolPipeline } from './invocation'
+import { createInvocationId, createInvocationResult, invokeToolPipeline } from './invocation'
 import { registerNativeTool } from './native-adapter'
 import { getToolWarnings } from './quality'
 import { getSupportLabel, isWebMCPSupported } from './support'
@@ -140,6 +140,7 @@ export async function invokeTool<TOutput = unknown>(
   invocation: ToolInvocation
 ): Promise<ToolInvocationResult<TOutput>> {
   const startedAt = performance.now()
+  const invocationId = invocation.id ?? createInvocationId()
   const registration = registeredTools.get(invocation.toolName)
 
   if (!registration) {
@@ -149,12 +150,13 @@ export async function invokeTool<TOutput = unknown>(
       startedAt,
       undefined,
       `Tool "${invocation.toolName}" is not registered.`,
-      'not_registered'
+      'not_registered',
+      invocationId
     )
   }
 
   const result = (await invokeToolPipeline(registration.tool, {
-    invocationId: invocation.id,
+    invocationId,
     isCurrent() {
       return registeredTools.get(invocation.toolName) === registration
     },

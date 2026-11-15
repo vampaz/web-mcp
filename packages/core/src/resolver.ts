@@ -93,7 +93,9 @@ export function createHeuristicResolver(): ToolResolver {
       options?: ResolverRunOptions
     ) {
       throwIfAborted(options?.signal)
-      return resolveWithHeuristics(message, tools, context)
+      const resolution = await resolveWithHeuristics(message, tools, context)
+      validateToolResolution(resolution, tools, options)
+      return resolution
     }
   }
 }
@@ -115,7 +117,9 @@ export async function createChromeAIResolver(strict = false): Promise<ToolResolv
       ) {
         throwIfAborted(options?.signal)
         if (strict) throw new Error('Chrome built-in AI is unavailable.')
-        return resolveWithHeuristics(message, tools, context)
+        const resolution = await resolveWithHeuristics(message, tools, context)
+        validateToolResolution(resolution, tools, options)
+        return resolution
       }
     }
   }
@@ -657,10 +661,13 @@ function createActiveChromeResolver(
         if (strict)
           throw wrapResolverError('Chrome built-in AI could not resolve this command', error)
 
-        return {
-          ...resolveWithHeuristics(message, tools, context),
+        const fallback = await resolveWithHeuristics(message, tools, context)
+        const resolution = {
+          ...fallback,
           reason: `Chrome built-in AI could not resolve this command (${getErrorMessage(error)}). Used deterministic fallback.`
         }
+        validateToolResolution(resolution, tools, options)
+        return resolution
       }
     },
     dispose() {
@@ -732,7 +739,9 @@ function createUnavailableChromeResolver(detail: string, strict = false): ToolRe
     ) {
       throwIfAborted(options?.signal)
       if (strict) throw new Error(detail)
-      return resolveWithHeuristics(message, tools, context)
+      const resolution = await resolveWithHeuristics(message, tools, context)
+      validateToolResolution(resolution, tools, options)
+      return resolution
     }
   }
 }

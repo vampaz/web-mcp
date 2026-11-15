@@ -1,4 +1,5 @@
 import { defineTool, type SchemaTypedWebMCPTool } from './define-tool'
+import { ToolExecutionError } from './tool-execution-error'
 import type { InferToolInput } from './interfaces/schema-inference'
 import type { JsonSchema, ToolContext, WebMCPTool } from './interfaces/tool'
 
@@ -59,7 +60,8 @@ async function callServerTool<TInput, TOutput>(
   })
 
   if (!response.ok) {
-    throw new Error(await getServerToolError(options.name, response))
+    const message = await getServerToolError(options.name, response)
+    throw new ToolExecutionError('execution_failed', message, { status: response.status })
   }
 
   if (response.status === 204) return undefined as TOutput

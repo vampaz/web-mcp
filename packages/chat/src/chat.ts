@@ -353,7 +353,6 @@ export function defineWebMCPChat(): void {
       this.empty.hidden = snapshot.messages.length > 0 || working
       if (this.working.hidden === working) {
         this.working.hidden = !working
-        changed = true
       }
       const activity = working ? activityText(snapshot.activity, this.labels) : ''
       const kind = working ? (snapshot.activity?.kind ?? 'resolving') : ''
@@ -362,7 +361,6 @@ export function defineWebMCPChat(): void {
         this.activity = activity
         this.workingText.textContent = activity
         this.announcer.textContent = activity
-        changed = true
       }
       const busy = String(this.isBusy())
       if (this.list.getAttribute('aria-busy') !== busy) this.list.setAttribute('aria-busy', busy)

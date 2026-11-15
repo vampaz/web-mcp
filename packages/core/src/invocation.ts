@@ -20,12 +20,15 @@ export interface ToolInvocationPipelineOptions {
   startedAt?: number
 }
 
+export function createInvocationId(): string {
+  return `invocation_${Date.now()}_${Math.random().toString(16).slice(2)}`
+}
+
 export async function invokeToolPipeline<TInput, TOutput>(
   tool: WebMCPTool<TInput, TOutput>,
   options: ToolInvocationPipelineOptions
 ): Promise<ToolInvocationResult<TOutput>> {
-  const id =
-    options.invocationId ?? `invocation_${Date.now()}_${Math.random().toString(16).slice(2)}`
+  const id = options.invocationId ?? createInvocationId()
   // Copy before any subscriber runs, so neither listeners nor the caller can change the invocation.
   const input = copyJsonInput(options.input)
   emitWebMCPKitEvent({
@@ -40,7 +43,6 @@ export async function invokeToolPipeline<TInput, TOutput>(
     }
   })
   const result = await executePipeline(tool, options, id, input)
-  result.invocationId = id
   emitWebMCPKitEvent({
     type:
       result.status === 'success'
@@ -82,7 +84,8 @@ async function executePipeline<TInput, TOutput>(
       startedAt,
       undefined,
       'Tool input must be JSON data: plain objects, arrays, strings, finite numbers, booleans, or null.',
-      'invalid_input'
+      'invalid_input',
+      id
     )
   }
   let input: unknown = copied.value
@@ -94,14 +97,15 @@ async function executePipeline<TInput, TOutput>(
       startedAt,
       undefined,
       formatJsonValueValidationError(inputValidationErrors),
-      'invalid_input'
+      'invalid_input',
+      id
     )
   }
 
   const schema = JSON.stringify(tool.inputSchema)
 
   // Rechecks run after each asynchronous boundary; the first check runs before any await.
-  function checkAvailability(): ToolInvocationResult<TOutput> | undefined {
+  function checkAvailability(id: string): ToolInvocationResult<TOutput> | undefined {
     if (options.signal?.aborted) {
       return createInvocationResult<TOutput>(
         tool.name,
@@ -109,7 +113,8 @@ async function executePipeline<TInput, TOutput>(
         startedAt,
         undefined,
         'Tool invocation was cancelled.',
-        'cancelled'
+        'cancelled',
+        id
       )
     }
     if (options.isCurrent?.() === false || JSON.stringify(tool.inputSchema) !== schema) {
@@ -119,7 +124,8 @@ async function executePipeline<TInput, TOutput>(
         startedAt,
         undefined,
         'The tool changed. Start a new request.',
-        'tool_changed'
+        'tool_changed',
+        id
       )
     }
     const availability = getToolAvailability(tool)
@@ -130,29 +136,31 @@ async function executePipeline<TInput, TOutput>(
         startedAt,
         undefined,
         availability.reason ?? 'Tool is not available in the current state.',
-        availability.failed ? 'scope_failed' : 'scope_unavailable'
+        availability.failed ? 'scope_failed' : 'scope_unavailable',
+        id
       )
     }
   }
 
-  const initialFailure = checkAvailability()
+  const initialFailure = checkAvailability(id)
   if (initialFailure) return initialFailure
 
   if (tool.parseInput) {
     try {
       input = await waitForInvocation(Promise.resolve(tool.parseInput(input)), options.signal)
     } catch (error) {
-      if (options.signal?.aborted) return checkAvailability()!
+      if (options.signal?.aborted) return checkAvailability(id)!
       return createInvocationResult<TOutput>(
         tool.name,
         'error',
         startedAt,
         undefined,
         error instanceof Error ? error.message : 'Tool input parsing failed.',
-        'invalid_input'
+        'invalid_input',
+        id
       )
     }
-    const parsingFailure = checkAvailability()
+    const parsingFailure = checkAvailability(id)
     if (parsingFailure) return parsingFailure
   }
 
@@ -175,14 +183,15 @@ async function executePipeline<TInput, TOutput>(
         options.signal
       )
     } catch (error) {
-      if (options.signal?.aborted) return checkAvailability()!
+      if (options.signal?.aborted) return checkAvailability(id)!
       return createInvocationResult<TOutput>(
         tool.name,
         'error',
         startedAt,
         undefined,
         error instanceof Error ? error.message : 'Confirmation handler failed.',
-        'confirmation_failed'
+        'confirmation_failed',
+        id
       )
     } finally {
       emitWebMCPKitEvent({
@@ -193,7 +202,7 @@ async function executePipeline<TInput, TOutput>(
       })
     }
 
-    const approvalFailure = checkAvailability()
+    const approvalFailure = checkAvailability(id)
     if (approvalFailure) return approvalFailure
 
     if (!approved) {
@@ -203,7 +212,8 @@ async function executePipeline<TInput, TOutput>(
         startedAt,
         undefined,
         tool.confirmation.reason,
-        'confirmation_denied'
+        'confirmation_denied',
+        id
       )
     }
   }
@@ -215,29 +225,31 @@ async function executePipeline<TInput, TOutput>(
         Promise.resolve(tool.guard(typedInput)),
         options.signal
       )
-      if (typeof guardResult === 'string' || guardResult === false) {
+      if (guardResult !== true) {
         return createInvocationResult<TOutput>(
           tool.name,
           'blocked',
           startedAt,
           undefined,
           typeof guardResult === 'string' ? guardResult : 'Tool guard blocked invocation.',
-          'guard_blocked'
+          'guard_blocked',
+          id
         )
       }
     } catch (error) {
-      if (options.signal?.aborted) return checkAvailability()!
+      if (options.signal?.aborted) return checkAvailability(id)!
       return createInvocationResult<TOutput>(
         tool.name,
         'error',
         startedAt,
         undefined,
         error instanceof Error ? error.message : 'Tool guard failed.',
-        'guard_failed'
+        'guard_failed',
+        id
       )
     }
 
-    const executionFailure = checkAvailability()
+    const executionFailure = checkAvailability(id)
     if (executionFailure) return executionFailure
   }
 
@@ -254,7 +266,8 @@ async function executePipeline<TInput, TOutput>(
       startedAt,
       undefined,
       error instanceof Error ? error.message : 'Tool invocation failed.',
-      error instanceof ToolExecutionError ? error.code : 'execution_failed'
+      error instanceof ToolExecutionError ? error.code : 'execution_failed',
+      id
     )
     if (error instanceof ToolExecutionError && error.details) {
       const details = copyJsonInput(error.details)
@@ -276,11 +289,20 @@ async function executePipeline<TInput, TOutput>(
         startedAt,
         undefined,
         formatJsonValueValidationError(outputValidationErrors, 'output'),
-        'invalid_output'
+        'invalid_output',
+        id
       )
     }
   }
-  return createInvocationResult<TOutput>(tool.name, 'success', startedAt, output)
+  return createInvocationResult<TOutput>(
+    tool.name,
+    'success',
+    startedAt,
+    output,
+    undefined,
+    undefined,
+    id
+  )
 }
 
 type JsonInputCopy = { valid: true; value: unknown } | { valid: false }
@@ -333,7 +355,8 @@ export function createInvocationResult<TOutput>(
   startedAt: number,
   output?: TOutput,
   error?: string,
-  code?: ToolInvocationErrorCode
+  code?: ToolInvocationErrorCode,
+  invocationId?: string
 ): ToolInvocationResult<TOutput> {
   return {
     toolName,
@@ -341,7 +364,8 @@ export function createInvocationResult<TOutput>(
     code,
     output,
     error,
-    durationMs: Math.round(performance.now() - startedAt)
+    durationMs: Math.round(performance.now() - startedAt),
+    ...(invocationId === undefined ? {} : { invocationId })
   }
 }
 
