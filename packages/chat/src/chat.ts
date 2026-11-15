@@ -340,22 +340,23 @@ export function defineWebMCPChat(): void {
         this.unread = true
       this.latestId = latest?.id
       this.latestText = latest?.text
-      let changed = updateTranscript(
+      const changed = updateTranscript(
         this.list,
         snapshot.messages,
         this.options?.assistantLabel ?? 'Assistant',
         this.labels,
         this.options?.renderMessage
       )
-      // Operation notices describe the conversation they followed; drop them once it changes.
-      if (stateChanged || changed) this.notice = undefined
       const working = this.isWorking()
+      const activity = working ? activityText(snapshot.activity, this.labels) : ''
+      const kind = working ? (snapshot.activity?.kind ?? 'resolving') : ''
+      const indicatorChanged = this.working.hidden === working || activity !== this.activity
+      // Operation notices describe the conversation they followed; drop them once it changes.
+      if (stateChanged || changed || indicatorChanged) this.notice = undefined
       this.empty.hidden = snapshot.messages.length > 0 || working
       if (this.working.hidden === working) {
         this.working.hidden = !working
       }
-      const activity = working ? activityText(snapshot.activity, this.labels) : ''
-      const kind = working ? (snapshot.activity?.kind ?? 'resolving') : ''
       if (this.working.dataset.kind !== kind) this.working.dataset.kind = kind
       if (activity !== this.activity) {
         this.activity = activity
@@ -367,7 +368,10 @@ export function defineWebMCPChat(): void {
       this.updateStatus()
       this.updateComposer()
       if (cleared) this.transcript.scrollTop = 0
-      if (this.isConnected && (!this.initiallyScrolled || (changed && nearEnd))) {
+      if (
+        this.isConnected &&
+        (!this.initiallyScrolled || ((changed || indicatorChanged) && nearEnd))
+      ) {
         if (snapshot.messages.length > 0) this.scrollToEnd()
         this.initiallyScrolled = snapshot.state !== 'loading' && this.transcript.clientHeight > 0
       }

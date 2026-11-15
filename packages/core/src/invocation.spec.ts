@@ -91,7 +91,32 @@ it('tags every invocation outcome with an invocationId', async function test() {
   const fixture = setup()
   const pending = invokeTool({ toolName: 'set_counter', input: {} })
   fixture.approve(true)
-  expect(await pending).toMatchObject({ status: 'success' })
+  expect(await pending).toMatchObject({ status: 'success', invocationId: expect.any(String) })
+})
+
+it('reuses caller-supplied invocation ids for missing tools', async function test() {
+  const result = await invokeTool({ id: 'call_1', toolName: 'missing_tool', input: {} })
+  expect(result.invocationId).toBe('call_1')
+})
+
+it('fails guarded tool calls closed when the guard does not approve', async function test() {
+  const execute = vi.fn(function execute() {
+    return 'executed'
+  })
+  registerTool(
+    defineTool({
+      name: 'set_counter',
+      description: 'Set the visible counter after the user approves this change.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      guard(_input) {
+        return undefined as unknown as boolean | string
+      },
+      execute
+    })
+  )
+  const result = await invokeTool({ toolName: 'set_counter', input: {} })
+  expect(result).toMatchObject({ status: 'blocked', code: 'guard_blocked' })
+  expect(execute).not.toHaveBeenCalled()
 })
 
 it('tags confirmation failures with an invocationId', async function test() {

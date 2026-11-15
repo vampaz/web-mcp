@@ -89,7 +89,9 @@ describe('server tools', () => {
 
     expect(result).toMatchObject({
       status: 'error',
-      error: 'send_invoice server endpoint returned 409: Invoice is already paid.'
+      error: 'send_invoice server endpoint returned 409: Invoice is already paid.',
+      code: 'execution_failed',
+      details: { status: 409 }
     })
   })
 
