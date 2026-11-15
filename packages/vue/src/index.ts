@@ -61,7 +61,7 @@ function bindRegistration<
       handle.unregister()
       sync()
     },
-    { immediate: true }
+    { immediate: true, deep: true }
   )
 
   if (component && !mounted)

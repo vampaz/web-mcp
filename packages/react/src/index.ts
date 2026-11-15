@@ -146,8 +146,8 @@ function createCommittedTool<TInput, TOutput>(
       return getTool().scope?.() ?? { available: true }
     },
     guard(input) {
-      const guardFn = getTool().guard
-      return guardFn ? guardFn(input) : true
+      const committed = getTool()
+      return committed.guard ? committed.guard(input) : true
     },
     ...(tool.parseInput
       ? {

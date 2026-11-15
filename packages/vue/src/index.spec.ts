@@ -285,6 +285,14 @@ describe('useWebMCPTools', () => {
     tools[0].name = 'read_new'
     await nextTick()
     expect(getToolNames()).toEqual(['read_new'])
+    await expect(invokeTool({ toolName: 'read_old', input: {} })).resolves.toMatchObject({
+      status: 'error',
+      code: 'not_registered'
+    })
+    await expect(invokeTool({ toolName: 'read_new', input: {} })).resolves.toMatchObject({
+      status: 'success',
+      output: 'read_old'
+    })
 
     wrapper.unmount()
     expect(listTools()).toEqual([])
@@ -321,6 +329,39 @@ describe('useWebMCPTools', () => {
     await expect(invokeTool({ toolName: 'read_cart', input: {} })).resolves.toMatchObject({
       status: 'blocked',
       code: 'guard_blocked'
+    })
+
+    wrapper.unmount()
+    expect(listTools()).toEqual([])
+  })
+
+  it('unregisters stale single tool registrations when the tool is renamed', async () => {
+    const tool = reactive<WebMCPTool>({
+      name: 'read_single',
+      description: 'Read the screen state.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      execute() {
+        return 'read_single'
+      }
+    })
+    const component = defineComponent({
+      setup() {
+        useWebMCPTool(tool)
+        return function render() {
+          return null
+        }
+      }
+    })
+
+    const wrapper = mountWithDeps(component)
+    expect(getToolNames()).toEqual(['read_single'])
+
+    tool.name = 'read_single_new'
+    await nextTick()
+    expect(getToolNames()).toEqual(['read_single_new'])
+    await expect(invokeTool({ toolName: 'read_single_new', input: {} })).resolves.toMatchObject({
+      status: 'success',
+      output: 'read_single'
     })
 
     wrapper.unmount()
