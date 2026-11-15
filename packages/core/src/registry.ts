@@ -41,6 +41,7 @@ export function registerToolWithCleanup<TInput = Record<string, unknown>, TOutpu
   const hasNativeRegistration =
     nativeRegistrationKind === 'declarative' ? isWebMCPSupported() : Boolean(nativeRegistration)
   const warnings = [...getToolWarnings(tool), ...(nativeRegistration?.warnings ?? [])]
+  const registeredName = tool.name
 
   const registration: RegisteredTool<TInput, TOutput> = {
     tool,
@@ -49,14 +50,14 @@ export function registerToolWithCleanup<TInput = Record<string, unknown>, TOutpu
     ready: Promise.resolve(),
     unregister() {
       // Stale handles must not remove a newer registration for the same name.
-      if (registeredTools.get(tool.name) !== (registration as RegisteredTool)) return
+      if (registeredTools.get(registeredName) !== (registration as RegisteredTool)) return
 
       nativeRegistration?.unregister?.()
-      registeredTools.delete(tool.name)
+      registeredTools.delete(registeredName)
       onUnregister?.()
       emitWebMCPKitEvent({
         type: 'unregistered',
-        toolName: tool.name,
+        toolName: registeredName,
         timestamp: Date.now()
       })
     }

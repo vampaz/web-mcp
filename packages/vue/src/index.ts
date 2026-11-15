@@ -52,7 +52,11 @@ function bindRegistration<
   }
 
   const stopTools = watch(
-    () => JSON.stringify(getTools()),
+    function readTools() {
+      return getTools().map(function mapTool(tool) {
+        return tool as WebMCPTool
+      })
+    },
     function resync() {
       handle.unregister()
       sync()

@@ -1,8 +1,14 @@
-import { createSSRApp, defineComponent, nextTick, onMounted, ref } from 'vue'
+import { createSSRApp, defineComponent, nextTick, onMounted, reactive, ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { clearToolsForTest } from '@vampaz/webmcp-kit/testing'
-import { defineTool, invokeTool, listTools, registerTool } from '@vampaz/webmcp-kit'
+import {
+  defineTool,
+  invokeTool,
+  listTools,
+  registerTool,
+  type WebMCPTool
+} from '@vampaz/webmcp-kit'
 
 import { useWebMCPTool, useWebMCPTools } from './index'
 import { renderToString } from 'vue/server-renderer'
@@ -251,6 +257,74 @@ describe('useWebMCPTools', () => {
     await nextTick()
     expect(listTools()).toEqual([])
     wrapper.unmount()
+  })
+
+  it('unregisters stale tool registrations when a watched tool is renamed', async () => {
+    const tools = reactive<WebMCPTool[]>([
+      {
+        name: 'read_old',
+        description: 'Read the screen state before the rename.',
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        execute() {
+          return 'read_old'
+        }
+      }
+    ])
+    const component = defineComponent({
+      setup() {
+        useWebMCPTools(tools)
+        return function render() {
+          return null
+        }
+      }
+    })
+
+    const wrapper = mountWithDeps(component)
+    expect(getToolNames()).toEqual(['read_old'])
+
+    tools[0].name = 'read_new'
+    await nextTick()
+    expect(getToolNames()).toEqual(['read_new'])
+
+    wrapper.unmount()
+    expect(listTools()).toEqual([])
+  })
+
+  it('re-registers watched tools when a tool callback changes', async () => {
+    const tools = reactive<WebMCPTool[]>([
+      {
+        name: 'read_cart',
+        description: 'Read the current cart.',
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        execute() {
+          return 'first'
+        }
+      }
+    ])
+    const component = defineComponent({
+      setup() {
+        useWebMCPTools(tools)
+        return function render() {
+          return null
+        }
+      }
+    })
+
+    const wrapper = mountWithDeps(component)
+    await expect(invokeTool({ toolName: 'read_cart', input: {} })).resolves.toMatchObject({
+      status: 'success',
+      output: 'first'
+    })
+
+    tools[0] = { ...tools[0], guard: () => false }
+    await nextTick()
+    await expect(invokeTool({ toolName: 'read_cart', input: {} })).resolves.toMatchObject({
+      status: 'blocked',
+      code: 'guard_blocked'
+    })
+
+    wrapper.unmount()
+    expect(listTools()).toEqual([])
   })
 
   it('registers no tool from the set when one name is already registered', async () => {

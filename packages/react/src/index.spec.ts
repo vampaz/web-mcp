@@ -51,6 +51,36 @@ describe('React useWebMCPTool', () => {
     expect(listTools()).toEqual([])
   })
 
+  it('fails guarded react tool calls closed when the guard does not approve', async () => {
+    const runtime = createReactHookRuntime()
+    vi.doMock('react', function mockReact() {
+      return runtime
+    })
+
+    const { useWebMCPTool } = await import('./index')
+    const { defineTool, invokeTool } = await import('@vampaz/webmcp-kit')
+    const tool = defineTool({
+      name: 'refund_refund',
+      description: 'Refund a payment from the current React screen.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      guard(_input) {
+        return undefined as unknown as boolean | string
+      },
+      execute() {
+        return 'executed'
+      }
+    })
+
+    runtime.render(function renderHook() {
+      useWebMCPTool(tool)
+    })
+
+    const result = await invokeTool({ toolName: 'refund_refund', input: {} })
+    expect(result).toMatchObject({ status: 'blocked', code: 'guard_blocked' })
+
+    runtime.cleanup()
+  })
+
   it('registers and unregisters as the when option toggles across renders', async () => {
     const runtime = createReactHookRuntime()
     vi.doMock('react', function mockReact() {
