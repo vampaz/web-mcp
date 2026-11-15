@@ -63,8 +63,10 @@ describe('React useWebMCPTool', () => {
       name: 'refund_refund',
       description: 'Refund a payment from the current React screen.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
-      guard(_input) {
-        return undefined as unknown as boolean | string
+      guard(this: { name: string }, _input) {
+        return this.name === 'refund_refund'
+          ? true
+          : 'Refund is not visible in the current workspace.'
       },
       execute() {
         return 'executed'
@@ -76,7 +78,7 @@ describe('React useWebMCPTool', () => {
     })
 
     const result = await invokeTool({ toolName: 'refund_refund', input: {} })
-    expect(result).toMatchObject({ status: 'blocked', code: 'guard_blocked' })
+    expect(result).toMatchObject({ status: 'success', output: 'executed' })
 
     runtime.cleanup()
   })
