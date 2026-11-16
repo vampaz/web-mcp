@@ -15,6 +15,10 @@
 - **Forms:** warn when a native WebMCP form declares `confirmation`, because declarative submission does not run the kit approval pipeline; warn again when that form also uses `toolautosubmit`.
 - **Resolvers:** direct `user-key` and `none` requests follow no redirects and omit credentials on cross-origin calls. User-key mode rejects an effective `http:` destination unless the host is loopback, including relative and protocol-relative base URLs resolved against the page.
 - **Resolvers:** redact `Bearer` tokens and `sk-` keys from provider error messages before shortening them.
+- **Core:** pass `source` and `invocationId` to confirmation handlers, and let `invokeTool()` add `requireConfirmation` for one invocation without changing a tool's own confirmation.
+- **Pi:** after a successful call to a tool with `untrustedContentHint`, require approval for later non-read-only calls in the same turn. The requirement resets each user turn.
+- **Command input:** apply the same untrusted-content approval rule across resolved sequences, resetting for each command.
+- **Demo:** scope the chat approval preference to `source === 'pi'` so page-bridge, native, devtools, resolver, and MCP-bridge calls still open the approval dialog.
 
 ## 0.9.1 — 2026-11-16
 

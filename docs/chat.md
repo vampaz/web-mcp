@@ -104,6 +104,8 @@ element.configure({ controller, settings })
 
 The callbacks above are application functions. The module does not create resolvers, fetch model lists, persist preferences, or grant approval. It reports the chosen option through `onChange(providerId, model)`; `model` is `undefined` for a provider offered without models. Choosing the current option does not call `onChange`. Reconfigure with the selected values and the complete options after a change. Use `settings.disabled` during active turns or provider changes, `detail` for status, and `error` for a visible failure. Omit `confirmations` if users must not change your approval policy. Never put credentials in provider labels, model IDs, status text, or slotted content.
 
+Scope an approval preference by caller. `ConfirmationRequest` includes `source` and `invocationId`; only skip the dialog for the source the preference belongs to, for example `source === 'pi'`. A handler that returns `true` whenever the chat preference is off also auto-approves page-bridge, native, devtools, resolver, and MCP-bridge calls.
+
 Settings replace the visible conversation while open, preserving its transcript, draft, and running turn. In inline mode they also replace the header. The back button or Escape returns focus to the icon; Escape closes settings before closing a popup. The module keeps controls mounted and focused across configuration updates. Omit `settings` on reconfiguration to remove it. `focusComposer()` returns to the conversation. Keep a disabled, application-owned controller/view available during initialization or provider failure if users need settings to recover.
 
 Use the `settings` slot for app-specific diagnostics or additional controls:

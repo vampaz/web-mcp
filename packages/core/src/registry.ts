@@ -169,7 +169,10 @@ export async function invokeTool<TOutput = unknown>(
     input: invocation.input,
     signal: invocation.signal,
     source: invocation.source ?? 'fallback',
-    startedAt
+    startedAt,
+    ...(invocation.requireConfirmation
+      ? { requireConfirmation: invocation.requireConfirmation }
+      : {})
   })) as ToolInvocationResult<TOutput>
   return result
 }

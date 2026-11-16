@@ -83,6 +83,36 @@ test('the page bridge serves tools and invocations without native WebMCP', async
   await expect(page.locator('#counter')).toHaveText('7')
 })
 
+test('the page bridge still asks for approval when the chat preference is off', async function testScopedPreference({
+  page
+}) {
+  await page.goto('/?mode=chat')
+  const chat = page.locator('webmcp-chat')
+  const input = chat.getByRole('textbox', { name: 'Message', exact: true })
+  await expect(input).toBeEnabled()
+  await chat.getByRole('button', { name: 'Settings', exact: true }).click()
+  await chat.getByLabel('Ask before making changes', { exact: false }).uncheck()
+  await chat.getByRole('button', { name: 'Close settings', exact: true }).click()
+
+  const written = page.evaluate(async function writeCounter() {
+    const reply = await window.sendBridgeMessage({
+      protocol: 'webmcp-kit-bridge/v1',
+      kind: 'invoke',
+      requestId: 'invoke-write-scoped',
+      name: 'set_counter',
+      input: { value: 9 }
+    })
+    if (reply?.kind !== 'invoke-reply' || reply.status !== 'result')
+      throw new Error(`Unexpected invoke reply: ${reply}`)
+    return reply.output
+  })
+
+  await expect(page.locator('#approval-action')).toContainText('New value: 9')
+  await page.getByRole('button', { name: 'Approve', exact: true }).click()
+  expect(await written).toEqual({ value: 9 })
+  await expect(page.locator('#counter')).toHaveText('9')
+})
+
 test('an unknown tool reports an error without touching the page', async function testUnknownTool({
   page
 }) {

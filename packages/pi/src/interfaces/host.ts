@@ -30,7 +30,13 @@ export interface PiToolHost {
   discover(signal: AbortSignal): Promise<PiToolCatalog>
   context(signal: AbortSignal): Promise<ResolverContext>
   invoke(
-    call: { name: string; input: Record<string, unknown>; revision: string },
+    call: {
+      name: string
+      input: Record<string, unknown>
+      revision: string
+      /** Adds approval for this call after untrusted content entered the turn. */
+      requireApproval?: boolean
+    },
     signal: AbortSignal,
     /** Optional progress for UI activity; hosts without approval phases may ignore it. */
     progress?: (phase: PiToolPhase) => void

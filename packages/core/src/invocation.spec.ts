@@ -73,6 +73,233 @@ it('executes the input shown for approval even if the caller changes it', async 
   expect(await pending).toMatchObject({ status: 'success', output: 10 })
 })
 
+it('passes source and invocation id to the confirmation handler', async function test() {
+  registerTool(
+    defineTool({
+      name: 'set_counter',
+      description: 'Set the visible counter after the user approves this change.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      confirmation: { reason: 'Change the counter?' },
+      execute() {
+        return 'executed'
+      }
+    })
+  )
+  const confirm = vi.fn<ConfirmationHandler>(function confirm() {
+    return true
+  })
+  setConfirmationHandler(confirm)
+
+  const result = await invokeTool({
+    id: 'call_7',
+    toolName: 'set_counter',
+    input: {},
+    source: 'pi'
+  })
+
+  expect(result.status).toBe('success')
+  expect(confirm).toHaveBeenCalledWith(
+    expect.objectContaining({ source: 'pi', invocationId: 'call_7' })
+  )
+})
+
+it('requires confirmation for one invocation without a tool confirmation', async function test() {
+  const execute = vi.fn(function execute() {
+    return 'executed'
+  })
+  registerTool(
+    defineTool({
+      name: 'set_counter',
+      description: 'Set the visible counter after the user approves this change.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      execute
+    })
+  )
+  const confirm = vi.fn<ConfirmationHandler>(function confirm() {
+    return false
+  })
+  setConfirmationHandler(confirm)
+
+  const result = await invokeTool({
+    toolName: 'set_counter',
+    input: {},
+    requireConfirmation: { reason: 'This action follows content from an untrusted source.' }
+  })
+
+  expect(result).toMatchObject({
+    status: 'blocked',
+    code: 'confirmation_denied',
+    error: 'This action follows content from an untrusted source.'
+  })
+  expect(confirm).toHaveBeenCalledWith(
+    expect.objectContaining({ reason: 'This action follows content from an untrusted source.' })
+  )
+  expect(execute).not.toHaveBeenCalled()
+})
+
+it('keeps a tool confirmation when an invocation also requires approval', async function test() {
+  registerTool(
+    defineTool({
+      name: 'set_counter',
+      description: 'Set the visible counter after the user approves this change.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      confirmation: { reason: 'Change the counter?' },
+      execute() {
+        return 'executed'
+      }
+    })
+  )
+  const confirm = vi.fn<ConfirmationHandler>(function confirm() {
+    return true
+  })
+  setConfirmationHandler(confirm)
+
+  await invokeTool({
+    toolName: 'set_counter',
+    input: {},
+    requireConfirmation: { reason: 'This action follows content from an untrusted source.' }
+  })
+
+  expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ reason: 'Change the counter?' }))
+})
+
+it('validates input before an invocation-level confirmation', async function test() {
+  const execute = vi.fn()
+  registerTool(
+    defineTool({
+      name: 'set_counter',
+      description: 'Set the visible counter after the user approves this change.',
+      inputSchema: {
+        type: 'object',
+        properties: { value: { type: 'integer' } },
+        required: ['value'],
+        additionalProperties: false
+      },
+      execute
+    })
+  )
+  const confirm = vi.fn<ConfirmationHandler>(function confirm() {
+    return true
+  })
+  setConfirmationHandler(confirm)
+
+  const result = await invokeTool({
+    toolName: 'set_counter',
+    input: { value: 'wrong' },
+    requireConfirmation: { reason: 'This action follows content from an untrusted source.' }
+  })
+
+  expect(result).toMatchObject({ status: 'error', code: 'invalid_input' })
+  expect(confirm).not.toHaveBeenCalled()
+  expect(execute).not.toHaveBeenCalled()
+})
+
+it('keeps a tool confirmation that declares an empty reason', async function test() {
+  const execute = vi.fn()
+  registerTool(
+    defineTool({
+      name: 'set_counter',
+      description: 'Set the visible counter after the user approves this change.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      confirmation: { reason: '' },
+      execute
+    })
+  )
+  const confirm = vi.fn<ConfirmationHandler>(function confirm() {
+    return false
+  })
+  setConfirmationHandler(confirm)
+  const events: WebMCPKitEvent[] = []
+  const unsubscribe = subscribeWebMCPKitEvents(function record(event) {
+    events.push(event)
+  })
+
+  const result = await invokeTool({
+    toolName: 'set_counter',
+    input: {},
+    requireConfirmation: { reason: 'This action follows content from an untrusted source.' }
+  })
+  unsubscribe()
+
+  expect(result).toMatchObject({
+    status: 'blocked',
+    code: 'confirmation_denied',
+    error: ''
+  })
+  expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ reason: '' }))
+  expect(events.map((event) => event.type)).toEqual([
+    'invoked',
+    'confirmation-requested',
+    'confirmation-settled',
+    'blocked'
+  ])
+  expect(execute).not.toHaveBeenCalled()
+})
+
+it('adds an invocation-level confirmation that declares an empty reason', async function test() {
+  const execute = vi.fn()
+  registerTool(
+    defineTool({
+      name: 'set_counter',
+      description: 'Set the visible counter after the user approves this change.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      execute
+    })
+  )
+  const confirm = vi.fn<ConfirmationHandler>(function confirm() {
+    return false
+  })
+  setConfirmationHandler(confirm)
+  const events: WebMCPKitEvent[] = []
+  const unsubscribe = subscribeWebMCPKitEvents(function record(event) {
+    events.push(event)
+  })
+
+  const result = await invokeTool({
+    toolName: 'set_counter',
+    input: {},
+    requireConfirmation: { reason: '' }
+  })
+  unsubscribe()
+
+  expect(result).toMatchObject({
+    status: 'blocked',
+    code: 'confirmation_denied',
+    error: ''
+  })
+  expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ reason: '' }))
+  expect(events.map((event) => event.type)).toEqual([
+    'invoked',
+    'confirmation-requested',
+    'confirmation-settled',
+    'blocked'
+  ])
+  expect(execute).not.toHaveBeenCalled()
+})
+
+it('passes an empty caller-supplied invocation id to the confirmation handler', async function test() {
+  registerTool(
+    defineTool({
+      name: 'set_counter',
+      description: 'Set the visible counter after the user approves this change.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      confirmation: { reason: 'Change the counter?' },
+      execute() {
+        return 'executed'
+      }
+    })
+  )
+  const confirm = vi.fn<ConfirmationHandler>(function confirm() {
+    return true
+  })
+  setConfirmationHandler(confirm)
+
+  const result = await invokeTool({ id: '', toolName: 'set_counter', input: {} })
+
+  expect(result).toMatchObject({ status: 'success', invocationId: '' })
+  expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ invocationId: '' }))
+})
+
 it('gives approval and the guard their own copies of the parsed input', async function test() {
   const execute = vi.fn(function execute(input: { tags: string[] }) {
     return input.tags

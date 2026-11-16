@@ -1,7 +1,7 @@
 import type { ToolInvocationResult, ToolResolution, ToolResolutionStep } from './interfaces/tool'
 import type { WebMCPCommandStepEventDetail } from './interfaces/command-input'
 import { isResolverOutcomeToolName } from './resolution-validation'
-import { invokeTool } from './registry'
+import { getTool, invokeTool } from './registry'
 import { raceAbort } from './abort'
 
 export async function invokeResolvedSteps(
@@ -21,9 +21,15 @@ export async function invokeResolvedSteps(
 
   const steps = getResolutionSteps(resolution)
   let result: ToolInvocationResult | undefined
+  let untrustedContentSeen = false
 
   for (const [index, step] of steps.entries()) {
     throwIfAborted(signal)
+    const registration = getTool(step.toolName)
+    const requireConfirmation =
+      untrustedContentSeen && registration?.tool.annotations?.readOnlyHint !== true
+        ? { reason: 'This action follows content from an untrusted source.' }
+        : undefined
     const toolName =
       steps.length > 1 ? `${step.toolName} (${index + 1}/${steps.length})` : step.toolName
     setActiveToolName(toolName)
@@ -38,8 +44,14 @@ export async function invokeResolvedSteps(
       toolName: step.toolName,
       input: step.input,
       signal,
-      source: 'resolver'
+      source: 'resolver',
+      ...(requireConfirmation ? { requireConfirmation } : {})
     })
+    if (
+      result.status === 'success' &&
+      registration?.tool.annotations?.untrustedContentHint === true
+    )
+      untrustedContentSeen = true
     dispatchStepEvent({
       phase: 'completed',
       resolution,

@@ -18,6 +18,7 @@ export interface ToolInvocationPipelineOptions {
   signal?: AbortSignal
   source: ToolContext['source']
   startedAt?: number
+  requireConfirmation?: { reason: string }
 }
 
 export function createInvocationId(): string {
@@ -164,7 +165,9 @@ async function executePipeline<TInput, TOutput>(
     if (parsingFailure) return parsingFailure
   }
 
-  if (tool.confirmation) {
+  const requiresConfirmation = Boolean(tool.confirmation || options.requireConfirmation)
+  const confirmationReason = tool.confirmation?.reason ?? options.requireConfirmation?.reason
+  if (requiresConfirmation) {
     const confirmation: ConfirmationEventDetail = {
       id,
       toolName: tool.name,
@@ -179,7 +182,12 @@ async function executePipeline<TInput, TOutput>(
     let approved = false
     try {
       approved = await waitForInvocation(
-        requestToolConfirmation(tool, copyForObserver(input), options.signal),
+        requestToolConfirmation(tool, copyForObserver(input), {
+          signal: options.signal,
+          source: options.source,
+          invocationId: id,
+          reason: confirmationReason
+        }),
         options.signal
       )
     } catch (error) {
@@ -211,7 +219,7 @@ async function executePipeline<TInput, TOutput>(
         'blocked',
         startedAt,
         undefined,
-        tool.confirmation.reason,
+        confirmationReason,
         'confirmation_denied',
         id
       )

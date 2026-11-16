@@ -65,7 +65,14 @@ export function createRegistryToolHost(
           toolName: call.name,
           input: call.input,
           source: 'pi',
-          signal
+          signal,
+          ...(call.requireApproval
+            ? {
+                requireConfirmation: {
+                  reason: 'This action follows content from an untrusted source.'
+                }
+              }
+            : {})
         })
       } finally {
         unsubscribe()

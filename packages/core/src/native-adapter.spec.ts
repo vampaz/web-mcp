@@ -452,11 +452,15 @@ describe('native WebMCP adapter', () => {
     )
 
     await expect(nativeExecute?.({ invoiceId: 'inv_1' })).resolves.toEqual({ invoiceId: 'inv_1' })
-    expect(confirm).toHaveBeenCalledWith({
-      tool: expect.objectContaining({ name: 'void_invoice' }),
-      input: { invoiceId: 'inv_1' },
-      reason: 'Voiding an invoice cannot be undone in this demo.'
-    })
+    expect(confirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tool: expect.objectContaining({ name: 'void_invoice' }),
+        input: { invoiceId: 'inv_1' },
+        reason: 'Voiding an invoice cannot be undone in this demo.',
+        source: 'native',
+        invocationId: expect.any(String)
+      })
+    )
     expect(execute).toHaveBeenCalledWith({ invoiceId: 'inv_1' }, { source: 'native' })
   })
 

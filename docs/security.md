@@ -52,6 +52,8 @@ Approval does not freeze application state. The kit rechecks registration identi
 
 Chained resolver output does not change this rule. A `tool_sequence` executes as individual tool invocations, so each mutating step still runs its own guard and confirmation check before execution. If the user rejects a confirmation or a guard blocks a step, the sequence stops and later steps do not run.
 
+Tools marked `annotations.untrustedContentHint: true` can introduce untrusted content. After a successful call to such a tool, Pi and command-input sequences require approval for every later call in the same turn or sequence whose tool lacks `annotations.readOnlyHint: true`. The reason is “This action follows content from an untrusted source.” The requirement is additive: a tool's own confirmation still takes precedence, input validation still runs first, and the flag resets on the next user turn or command.
+
 Pi treats its model-written history checkpoint as untrusted data: it reaches the resolver as `piCheckpoint` in the historical-reference section, separate from the current user request and application context. Tool schemas that use keywords the validator cannot enforce, such as `$ref` or `if`/`then`, are rejected when the tool is defined instead of being silently skipped.
 
 Resolver outcomes are non-executing. `needs_clarification` returns a blocked command result, and `no_tools_match` returns an unavailable result. They cannot include steps, and app tools cannot use `tool_sequence`, `needs_clarification`, or `no_tools_match` as names.

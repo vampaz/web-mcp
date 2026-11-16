@@ -193,6 +193,7 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
     let recoveredTurn: ReturnType<typeof lastTurnState>
     let aborting: Promise<void> | undefined
     let toolCalls = 0
+    let untrustedContentSeen = false
     const completedActions: PiActionOutcome[] = []
     const unchangedReads = new Map<string, { result: string; count: number }>()
     const progressCorrection = createStateMachine<CorrectionState, 'correct'>(
@@ -367,8 +368,15 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                         const invocation = action.act(
                           { type: 'invoke', callId: api.callId },
                           function invoke() {
+                            const requireApproval =
+                              untrustedContentSeen && tool.annotations?.readOnlyHint !== true
                             return options.host.invoke(
-                              { name: tool.name, input, revision: roundCatalog.revision },
+                              {
+                                name: tool.name,
+                                input,
+                                revision: roundCatalog.revision,
+                                ...(requireApproval ? { requireApproval: true } : {})
+                              },
                               currentSignal,
                               function progress(phase) {
                                 setActivity({ kind: 'tool', toolName: tool.name, phase })
@@ -403,6 +411,11 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                           input: actionInput,
                           status: result.status
                         })
+                        if (
+                          result.status === 'success' &&
+                          tool.annotations?.untrustedContentHint === true
+                        )
+                          untrustedContentSeen = true
                         if (
                           tool.annotations?.readOnlyHint === true &&
                           result.status === 'success'

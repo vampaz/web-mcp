@@ -52,9 +52,14 @@ export function installApprovalDialog(
   function cancel() {
     pending?.(false)
   }
-  const disposeConfirmation = setConfirmationHandler(function confirm({ input, reason, signal }) {
+  const disposeConfirmation = setConfirmationHandler(function confirm({
+    input,
+    reason,
+    signal,
+    source
+  }) {
     cancel()
-    if (!requiresApproval()) return true
+    if (source === 'pi' && !requiresApproval()) return true
     return new Promise<boolean>(function approval(resolve) {
       function finish(approved: boolean) {
         pending = undefined

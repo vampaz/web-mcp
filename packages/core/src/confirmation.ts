@@ -1,5 +1,5 @@
 import { isDevelopmentEnvironment } from './environment'
-import type { ConfirmationHandler, ConfirmationTool } from './interfaces/tool'
+import type { ConfirmationHandler, ConfirmationTool, ToolContext } from './interfaces/tool'
 
 export type { ConfirmationHandler, ConfirmationRequest, ConfirmationTool } from './interfaces/tool'
 
@@ -27,15 +27,24 @@ export function getConfirmationHandler(): ConfirmationHandler | undefined {
 export async function requestToolConfirmation(
   tool: ConfirmationTool,
   input: unknown,
-  signal?: AbortSignal
+  options: ToolConfirmationOptions = {}
 ): Promise<boolean> {
-  const reason = tool.confirmation?.reason ?? 'Confirm this action?'
+  const reason = options.reason ?? tool.confirmation?.reason ?? 'Confirm this action?'
   const handler = tool.confirmation?.handler ?? getConfirmationHandler()
 
   if (handler) {
     try {
       // Only an explicit true approves; dialog return values such as 'cancel' must not.
-      return (await handler({ tool, input, reason, ...(signal ? { signal } : {}) })) === true
+      return (
+        (await handler({
+          tool,
+          input,
+          reason,
+          ...(options.signal ? { signal: options.signal } : {}),
+          ...(options.source ? { source: options.source } : {}),
+          ...(options.invocationId === undefined ? {} : { invocationId: options.invocationId })
+        })) === true
+      )
     } catch (error) {
       throw new Error(`Confirmation handler failed: ${getErrorMessage(error)}`)
     }
@@ -51,6 +60,13 @@ export async function requestToolConfirmation(
   }
 
   return false
+}
+
+export interface ToolConfirmationOptions {
+  signal?: AbortSignal
+  source?: ToolContext['source']
+  invocationId?: string
+  reason?: string
 }
 
 const maxConfirmationDetailLength = 500

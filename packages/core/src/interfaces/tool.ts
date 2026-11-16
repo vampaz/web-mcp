@@ -48,6 +48,8 @@ export interface ConfirmationRequest {
   input: unknown
   reason: string
   signal?: AbortSignal
+  source?: ToolContext['source']
+  invocationId?: string
 }
 
 export type ConfirmationHandler = (request: ConfirmationRequest) => boolean | Promise<boolean>
@@ -121,6 +123,7 @@ export interface ToolInvocation<TInput = Record<string, unknown>> {
   input: TInput
   source?: ToolContext['source']
   signal?: AbortSignal
+  requireConfirmation?: { reason: string }
 }
 
 export type ToolInvocationErrorCode =
