@@ -81,6 +81,8 @@ interface BridgeState {
 let state: BridgeState | undefined
 
 /**
+ * Installs the versioned `window.postMessage` bridge for the fallback registry.
+ *
  * Any script running in the page can message this bridge. That carries no extra
  * trust: such a script could already call the page's own code directly. Sites
  * that do not want this surface simply never call `installPageBridge`.

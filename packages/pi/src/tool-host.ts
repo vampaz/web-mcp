@@ -4,6 +4,7 @@ import type { ConfirmationEventDetail, ResolverContext } from '@vampaz/webmcp-ki
 import type { PiToolHost, RegistryToolHostOptions } from './interfaces/host'
 import { PiFailure } from './errors'
 
+/** Creates the default Pi tool host backed by the page's tool registry. */
 export function createRegistryToolHost(
   context: () => ResolverContext | Promise<ResolverContext> = function empty() {
     return {}

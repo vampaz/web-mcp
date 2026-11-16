@@ -23,6 +23,7 @@ import { ChatModelPicker } from './model-picker'
 let instanceCount = 0
 const defaultMessageLimit = 16000
 
+/** Registers the <webmcp-chat> custom element once. Call it in browser code. */
 export function defineWebMCPChat(): void {
   if (typeof customElements === 'undefined' || customElements.get('webmcp-chat')) return
   class ChatElement extends HTMLElement implements WebMCPChatElement {

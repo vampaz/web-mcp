@@ -6,6 +6,7 @@
 - **Core:** let `defineTool()` omit `inputSchema` and default it to a strict empty object. The resulting `WebMCPTool` still requires a schema, and hand-built `registerTool()` definitions must still declare one.
 - **Core:** add `WebMCPKitError` with `duplicate_tool`, `invalid_definition`, and `invalid_configuration` codes while preserving existing messages, plus `isWebMCPKitError()` and `isToolExecutionError()` guards.
 - **Core:** export `lintTool()` with stable rule IDs, keep `RegisteredTool.warnings` as strings, and add missing-property-description plus sensitive-name `readOnlyHint` rules.
+- **Core:** warn once in development when another module instance of the kit marks the shared registry symbol, including copies bundled under one URL. Each copy keeps a separate registry; production builds write no marker and emit no warning.
 - **Core:** parse fenced JSON without a backtracking regex, so malformed model text cannot stall the main thread.
 - **Page bridge:** reject a second in-flight invocation that reuses a `requestId` with an error reply, and keep the first invocation cancellable.
 - **MCP bridge:** return a JSON-RPC `-32600` error for a request that is not an object, and report output that JSON cannot serialize as `isError: true` instead of throwing.

@@ -502,6 +502,7 @@ const overlayStyles = `
 }
 `
 
+/** Mounts the development tool inspector and returns a refresh/destroy handle. */
 export function mountDevtoolsOverlay(options: MountDevtoolsOptions = {}): DevtoolsOverlay {
   const host = document.createElement('div')
   host.className = 'wmk-devtools-host'

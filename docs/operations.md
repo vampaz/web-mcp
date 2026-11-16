@@ -108,3 +108,7 @@ connection and timeout failures with these recovery steps and preserves caller c
 | Stop returns but a server action completed   | Cancellation is cooperative after dispatch. Use application-specific idempotency and state checks; Stop is not rollback.                                                                                                                                         |
 
 Subscribe to controller snapshots for state and errors. Core events may contain input and output data; redact diagnostics before logging them. Capture the package version/artifact digest, browser features, session partition identifiers appropriate for logging, and error code when reporting a failure. Do not include credentials or private conversation contents by default.
+
+### Duplicate package copies
+
+In development, the registry marks `globalThis[Symbol.for('@vampaz/webmcp-kit/registry')]` with a per-instance token. If a different module instance already marked it, including two copies bundled into the same output URL, the second copy logs one warning. Each copy keeps its own registry, so tools registered through one copy are invisible to the other; deduplicate the package or ensure the page uses one shared copy. Production builds do not write the marker or warn.

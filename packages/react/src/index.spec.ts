@@ -2,12 +2,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 type EffectCallback = () => void | (() => void)
 
+const registryMarker = Symbol.for('@vampaz/webmcp-kit/registry')
+
+function clearRegistryMarker() {
+  delete (globalThis as Record<PropertyKey, unknown>)[registryMarker]
+}
+
 describe('React useWebMCPTool', () => {
   beforeEach(() => {
+    clearRegistryMarker()
     vi.resetModules()
   })
 
   afterEach(() => {
+    clearRegistryMarker()
     vi.resetModules()
     vi.doUnmock('react')
   })
@@ -284,10 +292,12 @@ describe('React useWebMCPTool', () => {
 
 describe('React useWebMCPTools', () => {
   beforeEach(() => {
+    clearRegistryMarker()
     vi.resetModules()
   })
 
   afterEach(() => {
+    clearRegistryMarker()
     vi.resetModules()
     vi.doUnmock('react')
   })

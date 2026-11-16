@@ -18,6 +18,7 @@ export type SchemaTypedWebMCPTool<TSchema extends JsonSchema, TOutput = unknown>
   guard?: (input: NoInfer<InferToolInput<TSchema>>) => boolean | string | Promise<boolean | string>
 }
 
+/** Defines a tool, validates its schema and handler, and infers the execute input type. Omit inputSchema for a strict empty object. */
 export function defineTool<const TSchema extends JsonSchema, TOutput = unknown>(
   tool: SchemaTypedWebMCPTool<TSchema, TOutput>
 ): WebMCPTool<InferToolInput<TSchema>, TOutput>

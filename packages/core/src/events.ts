@@ -4,6 +4,7 @@ type Listener = (event: WebMCPKitEvent) => void
 
 const listeners = new Set<Listener>()
 
+/** Subscribes to registry and invocation events and returns an unsubscribe function. */
 export function subscribeWebMCPKitEvents(listener: Listener): () => void {
   listeners.add(listener)
 

@@ -32,6 +32,7 @@ export interface WebMCPInitHandle {
   destroy: () => void
 }
 
+/** Initializes a command input, registers optional tools, and returns a teardown handle. */
 export function initWebMCP(options: InitWebMCPOptions = {}): WebMCPInitHandle {
   if (typeof document === 'undefined') {
     throw new WebMCPKitError(

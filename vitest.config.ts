@@ -1,10 +1,25 @@
 import vue from '@vitejs/plugin-vue'
+import { compile } from 'svelte/compiler'
 import { defineConfig } from 'vitest/config'
 import { sourceAliases } from './source-aliases.ts'
 
 export default defineConfig({
-  plugins: [vue()],
-  resolve: { alias: sourceAliases },
+  plugins: [
+    vue(),
+    {
+      name: 'vitest-svelte-compile',
+      enforce: 'pre',
+      transform(code, id) {
+        if (!id.endsWith('.svelte')) return
+        const result = compile(code, { filename: id, generate: 'client', css: 'injected' })
+        return { code: result.js.code, map: result.js.map }
+      }
+    }
+  ],
+  resolve: {
+    alias: sourceAliases,
+    conditions: ['browser', 'module', 'development|production']
+  },
   test: {
     environment: 'jsdom',
     include: [

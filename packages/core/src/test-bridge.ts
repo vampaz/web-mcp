@@ -35,6 +35,7 @@ interface WindowWithTestBridge extends Window {
   __webMCPKit?: WebMCPKitTestBridge
 }
 
+/** Installs the browser test bridge on the target window and returns an uninstall function. */
 export function installWebMCPKitTestBridge(target: Window = window): () => void {
   const bridge: WebMCPKitTestBridge = {
     getRegistrySnapshot() {

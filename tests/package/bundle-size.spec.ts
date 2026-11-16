@@ -69,7 +69,7 @@ it('keeps the CDN bundle within its gzip budget', async function cdnBundleSize()
     maxBuffer: 8 * 1024 * 1024
   })
   const bytes = gzipSync(Buffer.from(code)).byteLength
-  // New self-contained core + chat + Pi + assistant browser bundle: 180,618 bytes.
+  // New self-contained core + chat + Pi + assistant browser bundle: 180,810 bytes.
   // No runtime dependencies. The existing 198,300 ceiling retains its headroom.
   expect(bytes).toBeLessThanOrEqual(198_300)
 })

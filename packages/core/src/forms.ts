@@ -20,6 +20,7 @@ export interface RegisterFormToolFieldOptions {
 
 export type FormInput = Record<string, string | number | boolean | string[]>
 
+/** Registers a native form as a tool, inferring its input schema from the fields. */
 export function registerFormTool<TOutput = FormData>(
   options: RegisterFormToolOptions<TOutput>
 ): RegisteredTool<FormInput, TOutput> {

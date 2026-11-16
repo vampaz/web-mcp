@@ -173,6 +173,7 @@ export async function createBestResolver(): Promise<ToolResolver> {
   return createHeuristicResolver()
 }
 
+/** Creates a resolver for local, Chrome AI, or remote/server model access. */
 export async function createResolver(config?: ResolverProviderConfig): Promise<ToolResolver> {
   if (!config || config.provider === 'auto') return createBestResolver()
 

@@ -878,6 +878,8 @@ declare function booleanParam(description?: string): {
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/resolver.ts).
 
+Creates a resolver for local, Chrome AI, or remote/server model access.
+
 ```ts
 declare function createResolver(config?: ResolverProviderConfig): Promise<ToolResolver>
 ```
@@ -897,6 +899,8 @@ declare function createToolCatalog(
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/server-tool.ts).
 
+Defines a tool whose execute call posts to an application server endpoint.
+
 ```ts
 declare function defineServerTool<const TSchema extends JsonSchema, TOutput = unknown>(
   options: SchemaTypedServerToolOptions<TSchema, TOutput>
@@ -909,6 +913,8 @@ declare function defineServerTool<TInput = Record<string, unknown>, TOutput = un
 ### defineTool
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/define-tool.ts).
+
+Defines a tool, validates its schema and handler, and infers the execute input type. Omit inputSchema for a strict empty object.
 
 ```ts
 declare function defineTool<const TSchema extends JsonSchema, TOutput = unknown>(
@@ -1025,6 +1031,8 @@ declare function getSupportLabel(): string
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/registry.ts).
 
+Returns the current registration for a tool name, if any.
+
 ```ts
 declare function getTool(name: string): RegisteredTool | undefined
 ```
@@ -1053,6 +1061,8 @@ declare function integerParam(options?: NumberParamOptions): {
 ### invokeTool
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/registry.ts).
+
+Invokes a registered tool through validation, approval, guards, and execution. Invalid input returns a result instead of rejecting.
 
 ```ts
 declare function invokeTool<TOutput = unknown>(
@@ -1127,6 +1137,8 @@ declare function listLmStudioModels(
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/registry.ts).
 
+Returns all current registrations, including tools that are temporarily unavailable.
+
 ```ts
 declare function listTools(): RegisteredTool[]
 ```
@@ -1184,6 +1196,8 @@ declare function objectInputSchema<const TProperties extends Record<string, Json
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/forms.ts).
 
+Registers a native form as a tool, inferring its input schema from the fields.
+
 ```ts
 declare function registerFormTool<TOutput = FormData>(
   options: RegisterFormToolOptions<TOutput>
@@ -1193,6 +1207,8 @@ declare function registerFormTool<TOutput = FormData>(
 ### registerTool
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/registry.ts).
+
+Registers one tool and returns its registration handle.
 
 ```ts
 declare function registerTool<TInput = Record<string, unknown>, TOutput = unknown>(
@@ -1222,6 +1238,8 @@ declare const resolverOutcomeToolNames: readonly ['needs_clarification', 'no_too
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/confirmation.ts).
 
+Installs the application approval handler and returns a disposer. Passing undefined clears installed handlers.
+
 ```ts
 declare function setConfirmationHandler(handler: ConfirmationHandler | undefined): () => void
 ```
@@ -1243,6 +1261,8 @@ declare function stringParam(options?: StringParamOptions): {
 ### subscribeWebMCPKitEvents
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/events.ts).
+
+Subscribes to registry and invocation events and returns an unsubscribe function.
 
 ```ts
 declare function subscribeWebMCPKitEvents(listener: Listener): () => void
@@ -1284,6 +1304,8 @@ declare const toolResolutionSchema: {
 ### unregisterTool
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/registry.ts).
+
+Unregisters the named tool and reports whether it was registered.
 
 ```ts
 declare function unregisterTool(name: string): boolean
@@ -1350,6 +1372,8 @@ export interface MountDevtoolsOptions {
 ### mountDevtoolsOverlay
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/devtools/src/devtools.ts).
+
+Mounts the development tool inspector and returns a refresh/destroy handle.
 
 ```ts
 declare function mountDevtoolsOverlay(options?: MountDevtoolsOptions): DevtoolsOverlay
@@ -1540,6 +1564,8 @@ export interface PageBridgeToolsChanged {
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/page-bridge.ts).
 
+Installs the versioned `window.postMessage` bridge for the fallback registry.
+
 Any script running in the page can message this bridge. That carries no extra
 trust: such a script could already call the page's own code directly. Sites
 that do not want this surface simply never call `installPageBridge`.
@@ -1585,6 +1611,8 @@ export interface UseWebMCPToolsResult {
 ### useWebMCPTool
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/react/src/index.ts).
+
+Registers one tool for the component lifetime and returns a stable handle with unregister and getRegistration.
 
 ```ts
 declare function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unknown>(
@@ -1643,6 +1671,8 @@ export interface UseWebMCPToolsResult {
 ### useWebMCPTool
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/svelte/src/index.ts).
+
+Registers one tool while the component is mounted and returns a handle with unregister and getRegistration.
 
 ```ts
 declare function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unknown>(
@@ -1922,6 +1952,8 @@ declare function getWebMCPRegistrySnapshot(page: WebMCPTestingPage): Promise<Tes
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/test-bridge.ts).
 
+Installs the browser test bridge on the target window and returns an uninstall function.
+
 ```ts
 declare function installWebMCPKitTestBridge(target?: Window): () => void
 ```
@@ -2166,6 +2198,8 @@ export interface UseWebMCPToolsResult {
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/vue/src/index.ts).
 
+Registers one tool for the component lifetime and returns a handle with unregister and getRegistration.
+
 ```ts
 declare function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unknown>(
   tool: WebMCPTool<TInput, TOutput>,
@@ -2222,6 +2256,8 @@ export type ZodWebMCPTool<TSchema extends z.ZodType, TOutput = unknown> = WebMCP
 ### defineZodTool
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/zod/src/index.ts).
+
+Defines a tool from a Zod schema, converting it to JSON Schema for WebMCP.
 
 ```ts
 declare function defineZodTool<TSchema extends z.ZodType, TOutput = unknown>(
@@ -2548,6 +2584,8 @@ export interface RegistryToolHostOptions {
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/connection.ts).
 
+Creates a persistent Pi controller for a session and resolver. Requires a secure browser context, IndexedDB, and Web Locks.
+
 ```ts
 declare function createPiHarness(options: PiHarnessOptions): Promise<PiController>
 ```
@@ -2556,6 +2594,8 @@ declare function createPiHarness(options: PiHarnessOptions): Promise<PiControlle
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/runtime.ts).
 
+Creates a Pi controller in the current browser context with an explicit tool host.
+
 ```ts
 declare function createPiRuntime(options: PiRuntimeOptions): Promise<PiController>
 ```
@@ -2563,6 +2603,8 @@ declare function createPiRuntime(options: PiRuntimeOptions): Promise<PiControlle
 ### createRegistryToolHost
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/pi/src/tool-host.ts).
+
+Creates the default Pi tool host backed by the page's tool registry.
 
 ```ts
 declare function createRegistryToolHost(
@@ -2839,6 +2881,8 @@ export interface WebMCPChatStatusLabels {
 ### defineWebMCPChat
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/chat/src/chat.ts).
+
+Registers the <webmcp-chat> custom element once. Call it in browser code.
 
 ```ts
 declare function defineWebMCPChat(): void
@@ -3306,6 +3350,8 @@ export interface WebMCPInitHandle {
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/command-input.ts).
 
+Registers the <webmcp-command-input> custom element once.
+
 ```ts
 declare function defineWebMCPCommandInput(tagName?: string): CommandInputConstructor
 ```
@@ -3313,6 +3359,8 @@ declare function defineWebMCPCommandInput(tagName?: string): CommandInputConstru
 ### initWebMCP
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/init.ts).
+
+Initializes a command input, registers optional tools, and returns a teardown handle.
 
 ```ts
 declare function initWebMCP(options?: InitWebMCPOptions): WebMCPInitHandle

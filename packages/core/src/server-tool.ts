@@ -20,6 +20,7 @@ export type SchemaTypedServerToolOptions<TSchema extends JsonSchema, TOutput = u
 
 export type ServerToolFetch = (input: string | URL, init?: RequestInit) => Promise<Response>
 
+/** Defines a tool whose execute call posts to an application server endpoint. */
 export function defineServerTool<const TSchema extends JsonSchema, TOutput = unknown>(
   options: SchemaTypedServerToolOptions<TSchema, TOutput>
 ): WebMCPTool<InferToolInput<TSchema>, TOutput>

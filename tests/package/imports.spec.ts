@@ -30,6 +30,41 @@ it('includes a self-contained CDN module without bare imports', async function c
   expect(specifiers).toEqual([])
 })
 
+it('does not set the duplicate-copy marker in a packed production import', async function productionMarker() {
+  const fixture = await installFixture('core-only')
+  try {
+    const { stdout } = await run(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `
+          const marker = Symbol.for('@vampaz/webmcp-kit/registry')
+          const kit = await import('@vampaz/webmcp-kit')
+          kit.registerTool({
+            name: 'production_marker_tool',
+            description: 'A tool used to load the production registry.',
+            inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+            execute() { return 1 }
+          })
+          if (globalThis[marker] !== undefined) {
+            console.error('production marker present')
+            process.exit(1)
+          }
+          console.log('production marker absent')
+        `
+      ],
+      {
+        cwd: fixture.directory,
+        env: { ...process.env, NODE_ENV: 'production' }
+      }
+    )
+    expect(stdout).toContain('production marker absent')
+  } finally {
+    await fixture.cleanup()
+  }
+})
+
 it('keeps the tarball limited to published code and documentation', async function contents() {
   await verifyArtifact()
   const { stdout } = await run('tar', ['-tzf', artifact])

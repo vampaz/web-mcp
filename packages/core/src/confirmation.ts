@@ -6,6 +6,7 @@ export type { ConfirmationHandler, ConfirmationRequest, ConfirmationTool } from 
 const handlers = new Map<symbol, ConfirmationHandler>()
 let warnedAboutWindowConfirm = false
 
+/** Installs the application approval handler and returns a disposer. Passing undefined clears installed handlers. */
 export function setConfirmationHandler(handler: ConfirmationHandler | undefined): () => void {
   const owner = Symbol('confirmation')
   if (handler) handlers.set(owner, handler)
