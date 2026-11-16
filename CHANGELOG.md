@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (0.9.0)
+## 0.9.0 — 2026-11-16
 
 - **Core:** tag every tool invocation outcome with the invocation id used to correlate it, including outcomes that occur before tool execution, and fail guarded tool calls closed when a guard does not approve.
 - **Chat:** keep the working indicator driving transcript scrolling and operation-notice clearing.
