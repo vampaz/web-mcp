@@ -71,6 +71,12 @@ export function getToolWarnings<TInput = Record<string, unknown>, TOutput = unkn
     )
   }
 
+  for (const path of findPatternsWithoutMaxLength(tool.inputSchema, 'inputSchema')) {
+    warnings.push(
+      `${path} uses a pattern without maxLength; add maxLength to bound regular-expression work.`
+    )
+  }
+
   if (tool.inputSchema['x-webmcp-source'] === 'form') {
     warnings.push(...getFormToolWarnings(tool))
   }
@@ -90,6 +96,26 @@ function findUncheckedFormats(schema: JsonSchema, path: string): [string, string
     for (const [index, child] of (schema[key] ?? []).entries())
       found.push(...findUncheckedFormats(child, `${path}.${key}[${index}]`))
   }
+  return found
+}
+
+function findPatternsWithoutMaxLength(schema: JsonSchema, path: string): string[] {
+  const found: string[] =
+    schema.pattern !== undefined && schema.maxLength === undefined ? [path] : []
+  for (const [name, child] of Object.entries(schema.properties ?? {}))
+    found.push(...findPatternsWithoutMaxLength(child, `${path}.properties.${name}`))
+  if (schema.items) found.push(...findPatternsWithoutMaxLength(schema.items, `${path}.items`))
+  for (const key of ['anyOf', 'oneOf', 'allOf', 'prefixItems'] as const) {
+    for (const [index, child] of (schema[key] ?? []).entries())
+      found.push(...findPatternsWithoutMaxLength(child, `${path}.${key}[${index}]`))
+  }
+  if (schema.not) found.push(...findPatternsWithoutMaxLength(schema.not, `${path}.not`))
+  if (schema.propertyNames)
+    found.push(...findPatternsWithoutMaxLength(schema.propertyNames, `${path}.propertyNames`))
+  if (schema.additionalProperties && typeof schema.additionalProperties === 'object')
+    found.push(
+      ...findPatternsWithoutMaxLength(schema.additionalProperties, `${path}.additionalProperties`)
+    )
   return found
 }
 

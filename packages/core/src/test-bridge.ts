@@ -12,7 +12,7 @@ export interface TestBridgeTool {
   description: string
   inputSchema: RegisteredTool['tool']['inputSchema']
   outputSchema?: RegisteredTool['tool']['outputSchema']
-  confirmation?: RegisteredTool['tool']['confirmation']
+  confirmation?: { reason: string }
   mode: RegisteredTool['mode']
   warnings: string[]
   available: boolean
@@ -74,9 +74,13 @@ function createToolSummaries(): TestBridgeTool[] {
     return {
       name: registration.tool.name,
       description: registration.tool.description,
-      inputSchema: registration.tool.inputSchema,
-      outputSchema: registration.tool.outputSchema,
-      confirmation: registration.tool.confirmation,
+      inputSchema: structuredClone(registration.tool.inputSchema),
+      outputSchema: registration.tool.outputSchema
+        ? structuredClone(registration.tool.outputSchema)
+        : undefined,
+      confirmation: registration.tool.confirmation
+        ? { reason: registration.tool.confirmation.reason }
+        : undefined,
       mode: registration.mode,
       warnings: registration.warnings,
       available: availability.available,

@@ -44,6 +44,8 @@ export const checkedStringFormats = new Set([
 ])
 
 const maxFormattedValueLength = 80
+const maxValidationErrors = 20
+const omittedValidationErrorsMessage = 'More errors omitted.'
 const patternCache = new Map<string, RegExp>()
 
 export function validateJsonValue(value: unknown, schema: JsonSchema, path = ''): string[] {
@@ -51,6 +53,18 @@ export function validateJsonValue(value: unknown, schema: JsonSchema, path = '')
   validateValueNode(value, schema, path, errors)
 
   return errors
+}
+
+function pushValidationError(errors: string[], message: string): void {
+  if (errors.length < maxValidationErrors) {
+    errors.push(message)
+    return
+  }
+  if (errors[maxValidationErrors] === undefined) errors.push(omittedValidationErrorsMessage)
+}
+
+function reachedValidationErrorLimit(errors: string[]): boolean {
+  return errors.length > maxValidationErrors
 }
 
 export function formatJsonValueValidationError(
@@ -241,27 +255,36 @@ function validateValueNode(
   path: string,
   errors: string[]
 ): void {
+  if (reachedValidationErrorLimit(errors)) return
+
   if (schema.type && !matchesJsonSchemaType(value, schema.type)) {
-    errors.push(
+    pushValidationError(
+      errors,
       `${formatValuePath(path)} expected ${formatExpectedType(schema.type)}, got ${getJsonValueType(value)}.`
     )
     return
   }
 
   if (schema.anyOf && !matchesAnyOf(value, schema.anyOf)) {
-    errors.push(`${formatValuePath(path)} did not match any allowed schema.`)
+    pushValidationError(errors, `${formatValuePath(path)} did not match any allowed schema.`)
     return
   }
 
   if (schema.oneOf && countMatchingSchemas(value, schema.oneOf) !== 1) {
-    errors.push(`${formatValuePath(path)} did not match exactly one allowed schema.`)
+    pushValidationError(
+      errors,
+      `${formatValuePath(path)} did not match exactly one allowed schema.`
+    )
     return
   }
 
-  for (const allOfSchema of schema.allOf ?? []) validateValueNode(value, allOfSchema, path, errors)
+  for (const allOfSchema of schema.allOf ?? []) {
+    if (reachedValidationErrorLimit(errors)) break
+    validateValueNode(value, allOfSchema, path, errors)
+  }
 
   if (schema.not && validateJsonValue(value, schema.not).length === 0) {
-    errors.push(`${formatValuePath(path)} matched a disallowed schema.`)
+    pushValidationError(errors, `${formatValuePath(path)} matched a disallowed schema.`)
     return
   }
 
@@ -281,7 +304,8 @@ function validateConstValue(
 ): void {
   if (schema.const === undefined || areJsonValuesEqual(value, schema.const)) return
 
-  errors.push(
+  pushValidationError(
+    errors,
     `${formatValuePath(path)} expected ${formatJsonValue(schema.const)}, got ${formatJsonValue(value)}.`
   )
 }
@@ -299,7 +323,8 @@ function validateEnumValue(
       return areJsonValuesEqual(value, enumValue)
     })
   ) {
-    errors.push(
+    pushValidationError(
+      errors,
       `${formatValuePath(path)} expected one of ${schema.enum.map(formatJsonValue).join(', ')}, got ${formatJsonValue(value)}.`
     )
   }
@@ -315,19 +340,23 @@ function validateObjectValue(
 
   const propertyCount = Object.keys(value).length
   if (schema.minProperties !== undefined && propertyCount < schema.minProperties) {
-    errors.push(
+    pushValidationError(
+      errors,
       `${formatValuePath(path)} expected at least ${schema.minProperties} properties, got ${propertyCount}.`
     )
   }
   if (schema.maxProperties !== undefined && propertyCount > schema.maxProperties) {
-    errors.push(
+    pushValidationError(
+      errors,
       `${formatValuePath(path)} expected at most ${schema.maxProperties} properties, got ${propertyCount}.`
     )
   }
   if (schema.propertyNames) {
     for (const propertyName of Object.keys(value)) {
+      if (reachedValidationErrorLimit(errors)) break
       if (validateJsonValue(propertyName, schema.propertyNames).length > 0) {
-        errors.push(
+        pushValidationError(
+          errors,
           `${formatValuePath(appendValuePath(path, propertyName))} has a disallowed property name.`
         )
       }
@@ -335,13 +364,18 @@ function validateObjectValue(
   }
 
   for (const requiredName of schema.required ?? []) {
+    if (reachedValidationErrorLimit(errors)) break
     if (!Object.hasOwn(value, requiredName)) {
-      errors.push(`${formatValuePath(appendValuePath(path, requiredName))} is required.`)
+      pushValidationError(
+        errors,
+        `${formatValuePath(appendValuePath(path, requiredName))} is required.`
+      )
     }
   }
 
   const properties = schema.properties ?? {}
   for (const [propertyName, propertySchema] of Object.entries(properties)) {
+    if (reachedValidationErrorLimit(errors)) break
     if (Object.hasOwn(value, propertyName)) {
       validateValueNode(
         value[propertyName],
@@ -354,8 +388,12 @@ function validateObjectValue(
 
   if (schema.additionalProperties === false) {
     for (const propertyName of Object.keys(value)) {
+      if (reachedValidationErrorLimit(errors)) break
       if (!Object.hasOwn(properties, propertyName)) {
-        errors.push(`${formatValuePath(appendValuePath(path, propertyName))} is not allowed.`)
+        pushValidationError(
+          errors,
+          `${formatValuePath(appendValuePath(path, propertyName))} is not allowed.`
+        )
       }
     }
     return
@@ -363,6 +401,7 @@ function validateObjectValue(
 
   if (schema.additionalProperties && typeof schema.additionalProperties === 'object') {
     for (const propertyName of Object.keys(value)) {
+      if (reachedValidationErrorLimit(errors)) break
       if (!Object.hasOwn(properties, propertyName)) {
         validateValueNode(
           value[propertyName],
@@ -384,36 +423,45 @@ function validateArrayValue(
   if (!Array.isArray(value)) return
 
   if (schema.minItems !== undefined && value.length < schema.minItems) {
-    errors.push(
+    pushValidationError(
+      errors,
       `${formatValuePath(path)} expected array length >= ${schema.minItems}, got ${value.length}.`
     )
   }
 
   if (schema.maxItems !== undefined && value.length > schema.maxItems) {
-    errors.push(
+    pushValidationError(
+      errors,
       `${formatValuePath(path)} expected array length <= ${schema.maxItems}, got ${value.length}.`
     )
   }
 
   if (schema.uniqueItems === true) {
-    const duplicate = value.findIndex(function repeated(item, index) {
-      return value.slice(0, index).some(function equal(previous) {
-        return areJsonValuesEqual(previous, item)
-      })
-    })
+    const duplicate = findFirstDuplicateIndex(value)
     if (duplicate >= 0) {
-      errors.push(
+      pushValidationError(
+        errors,
         `${formatValuePath(appendValuePath(path, String(duplicate)))} is a duplicate item.`
       )
     }
   }
 
   const prefixItems = schema.prefixItems ?? []
-  value.forEach(function validateArrayItem(item, index) {
+  for (let index = 0; index < value.length; index++) {
+    if (reachedValidationErrorLimit(errors)) break
     const itemSchema = index < prefixItems.length ? prefixItems[index] : schema.items
     if (itemSchema)
-      validateValueNode(item, itemSchema, appendValuePath(path, String(index)), errors)
-  })
+      validateValueNode(value[index], itemSchema, appendValuePath(path, String(index)), errors)
+  }
+}
+
+function findFirstDuplicateIndex(value: unknown[]): number {
+  for (let index = 0; index < value.length; index++) {
+    for (let previous = 0; previous < index; previous++) {
+      if (areJsonValuesEqual(value[previous], value[index])) return index
+    }
+  }
+  return -1
 }
 
 function validateNumberValue(
@@ -424,32 +472,44 @@ function validateNumberValue(
 ): void {
   if (typeof value !== 'number') return
   if (!Number.isFinite(value)) {
-    errors.push(`${formatValuePath(path)} expected finite number, got ${getJsonValueType(value)}.`)
+    pushValidationError(
+      errors,
+      `${formatValuePath(path)} expected finite number, got ${getJsonValueType(value)}.`
+    )
     return
   }
 
   if (schema.minimum !== undefined && value < schema.minimum) {
-    errors.push(`${formatValuePath(path)} expected number >= ${schema.minimum}, got ${value}.`)
+    pushValidationError(
+      errors,
+      `${formatValuePath(path)} expected number >= ${schema.minimum}, got ${value}.`
+    )
   }
 
   if (schema.maximum !== undefined && value > schema.maximum) {
-    errors.push(`${formatValuePath(path)} expected number <= ${schema.maximum}, got ${value}.`)
+    pushValidationError(
+      errors,
+      `${formatValuePath(path)} expected number <= ${schema.maximum}, got ${value}.`
+    )
   }
 
   if (schema.exclusiveMinimum !== undefined && value <= schema.exclusiveMinimum) {
-    errors.push(
+    pushValidationError(
+      errors,
       `${formatValuePath(path)} expected number > ${schema.exclusiveMinimum}, got ${value}.`
     )
   }
 
   if (schema.exclusiveMaximum !== undefined && value >= schema.exclusiveMaximum) {
-    errors.push(
+    pushValidationError(
+      errors,
       `${formatValuePath(path)} expected number < ${schema.exclusiveMaximum}, got ${value}.`
     )
   }
 
   if (schema.multipleOf !== undefined && !isMultipleOf(value, schema.multipleOf)) {
-    errors.push(
+    pushValidationError(
+      errors,
       `${formatValuePath(path)} expected a multiple of ${schema.multipleOf}, got ${value}.`
     )
   }
@@ -473,12 +533,14 @@ function validateStringValue(
   if (schema.minLength !== undefined && value.length >= schema.minLength) {
     const length = countCodePoints(value)
     if (length < schema.minLength) {
-      errors.push(
+      pushValidationError(
+        errors,
         `${formatValuePath(path)} expected string length >= ${schema.minLength}, got ${length}.`
       )
     }
   } else if (schema.minLength !== undefined) {
-    errors.push(
+    pushValidationError(
+      errors,
       `${formatValuePath(path)} expected string length >= ${schema.minLength}, got ${countCodePoints(value)}.`
     )
   }
@@ -486,7 +548,8 @@ function validateStringValue(
   if (schema.maxLength !== undefined && value.length > schema.maxLength) {
     const length = countCodePoints(value)
     if (length > schema.maxLength) {
-      errors.push(
+      pushValidationError(
+        errors,
         `${formatValuePath(path)} expected string length <= ${schema.maxLength}, got ${length}.`
       )
     }
@@ -496,13 +559,15 @@ function validateStringValue(
   if (errors.length > errorCount) return
 
   if (schema.pattern !== undefined && !getPattern(schema.pattern).test(value)) {
-    errors.push(
+    pushValidationError(
+      errors,
       `${formatValuePath(path)} expected string matching ${schema.pattern}, got ${formatJsonValue(value)}.`
     )
   }
 
   if (schema.format !== undefined && !matchesKnownStringFormat(value, schema.format)) {
-    errors.push(
+    pushValidationError(
+      errors,
       `${formatValuePath(path)} expected ${schema.format} format, got ${formatJsonValue(value)}.`
     )
   }
@@ -675,7 +740,14 @@ function isJsonObject(value: unknown): value is Record<string, unknown> {
 }
 
 function appendValuePath(path: string, segment: string): string {
-  return `${path}/${segment.replaceAll('~', '~0').replaceAll('/', '~1')}`
+  const bounded = shortenText(segment)
+  return `${path}/${bounded.replaceAll('~', '~0').replaceAll('/', '~1')}`
+}
+
+function shortenText(text: string): string {
+  return text.length > maxFormattedValueLength
+    ? `${text.slice(0, maxFormattedValueLength - 1)}…`
+    : text
 }
 
 function formatValuePath(path: string): string {
@@ -687,9 +759,7 @@ function formatJsonValue(value: unknown): string {
   if (value === undefined) return 'undefined'
   const text = typeof value === 'string' ? `"${value}"` : (JSON.stringify(value) ?? String(value))
 
-  return text.length > maxFormattedValueLength
-    ? `${text.slice(0, maxFormattedValueLength - 1)}…`
-    : text
+  return shortenText(text)
 }
 
 function areJsonValuesEqual(left: unknown, right: unknown): boolean {

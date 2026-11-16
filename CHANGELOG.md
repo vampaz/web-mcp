@@ -6,6 +6,11 @@
 - **Core:** parse fenced JSON without a backtracking regex, so malformed model text cannot stall the main thread.
 - **Page bridge:** reject a second in-flight invocation that reuses a `requestId` with an error reply, and keep the first invocation cancellable.
 - **MCP bridge:** return a JSON-RPC `-32600` error for a request that is not an object, and report output that JSON cannot serialize as `isError: true` instead of throwing.
+- **Bridges:** return detached copies of tool schemas and annotations. The test bridge and catalog adapter also return confirmation metadata as `{ reason }` only, never the handler.
+- **Core:** give approval handlers and guards their own copy of the parsed input so they cannot change what executes. Parser outputs that cloning would change semantically or cannot copy, such as class instances or null-prototype objects, keep their original reference and remain application-owned.
+- **Core:** show the tool name and a bounded JSON argument summary in the `window.confirm()` fallback.
+- **Core:** cap validation errors at 20 plus one "More errors omitted." entry, shorten long property names in messages, and stop `uniqueItems` at the first duplicate.
+- **Core:** warn when a string property uses `pattern` without `maxLength`.
 
 ## 0.9.1 — 2026-11-16
 

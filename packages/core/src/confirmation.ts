@@ -44,13 +44,32 @@ export async function requestToolConfirmation(
   if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
     warnAboutWindowConfirmFallback()
     try {
-      return window.confirm(reason)
+      return window.confirm(formatConfirmationPrompt(reason, tool.name, input))
     } catch (error) {
       throw new Error(`Confirmation handler failed: ${getErrorMessage(error)}`)
     }
   }
 
   return false
+}
+
+const maxConfirmationDetailLength = 500
+
+function formatConfirmationPrompt(reason: string, toolName: string, input: unknown): string {
+  const detail = `${toolName}\n${summarizeConfirmationInput(input)}`
+  const bounded =
+    detail.length > maxConfirmationDetailLength
+      ? `${detail.slice(0, maxConfirmationDetailLength - 1)}…`
+      : detail
+  return `${reason}\n\n${bounded}`
+}
+
+function summarizeConfirmationInput(input: unknown): string {
+  try {
+    return JSON.stringify(input) ?? String(input)
+  } catch {
+    return '[unserializable input]'
+  }
 }
 
 function warnAboutWindowConfirmFallback(): void {

@@ -558,7 +558,7 @@ export interface ToolCatalogEntry {
   mode: RegisteredTool['mode']
   inputSchema: JsonSchema
   outputSchema?: JsonSchema
-  confirmation?: ToolConfirmation
+  confirmation?: { reason: string }
   examples: unknown[]
   warnings: string[]
   available: boolean
@@ -1607,7 +1607,7 @@ export interface TestBridgeTool {
   description: string
   inputSchema: RegisteredTool['tool']['inputSchema']
   outputSchema?: RegisteredTool['tool']['outputSchema']
-  confirmation?: RegisteredTool['tool']['confirmation']
+  confirmation?: { reason: string }
   mode: RegisteredTool['mode']
   warnings: string[]
   available: boolean

@@ -177,6 +177,72 @@ describe('local MCP bridge', () => {
     ])
   })
 
+  it('returns detached schemas and annotations', async () => {
+    const outputSchema = {
+      type: 'object',
+      properties: { count: { type: 'integer' } },
+      required: ['count']
+    }
+    registerTool(
+      defineTool({
+        name: 'read_count',
+        description: 'Read the current item count for the open workspace.',
+        inputSchema: {
+          type: 'object',
+          properties: { note: { type: 'string', maxLength: 3 } },
+          additionalProperties: false
+        },
+        outputSchema,
+        annotations: { readOnlyHint: true },
+        execute() {
+          return { count: 1 }
+        }
+      })
+    )
+    const bridge = createLocalMCPBridge()
+    const [tool] = bridge.listTools()
+    if (!tool?.inputSchema.properties || !tool.outputSchema?.properties) {
+      throw new Error('Expected the bridge to return both schemas.')
+    }
+
+    tool.inputSchema.properties.note.maxLength = 1000
+    tool.outputSchema.properties.count.type = 'string'
+    tool.annotations!.readOnlyHint = false
+
+    expect(bridge.listTools()).toEqual([
+      {
+        name: 'read_count',
+        description: 'Read the current item count for the open workspace.',
+        inputSchema: {
+          type: 'object',
+          properties: { note: { type: 'string', maxLength: 3 } },
+          additionalProperties: false
+        },
+        outputSchema,
+        annotations: { readOnlyHint: true }
+      }
+    ])
+
+    await expect(
+      bridge.handleRequest({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'read_count', arguments: { note: 'abcd' } }
+      })
+    ).resolves.toMatchObject({ result: { isError: true } })
+    await expect(
+      bridge.handleRequest({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'tools/call',
+        params: { name: 'read_count', arguments: { note: 'abc' } }
+      })
+    ).resolves.toMatchObject({
+      result: { isError: false, structuredContent: { count: 1 } }
+    })
+  })
+
   it('tags tool calls with the mcp-bridge source', async () => {
     const execute = vi.fn(function readCart() {
       return { lines: 0 }

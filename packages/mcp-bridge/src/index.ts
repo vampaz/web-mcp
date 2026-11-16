@@ -130,9 +130,9 @@ function toBridgeTool(registration: RegisteredTool): MCPBridgeTool {
   return {
     name: registration.tool.name,
     description: registration.tool.description,
-    inputSchema: registration.tool.inputSchema,
-    ...(outputSchema ? { outputSchema } : {}),
-    ...(annotations ? { annotations } : {})
+    inputSchema: structuredClone(registration.tool.inputSchema),
+    ...(outputSchema ? { outputSchema: structuredClone(outputSchema) } : {}),
+    ...(annotations ? { annotations: structuredClone(annotations) } : {})
   }
 }
 

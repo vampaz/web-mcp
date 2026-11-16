@@ -57,6 +57,65 @@ it('recognizes inflected and documented mutation verbs', () => {
   ).toEqual([])
 })
 
+it('warns about patterns without a maxLength', () => {
+  const tool = {
+    name: 'read_code',
+    description: 'Read the selected code sample from the current document.',
+    inputSchema: {
+      type: 'object',
+      properties: { code: { type: 'string', pattern: '^[a-z]+$' } }
+    },
+    execute() {
+      return {}
+    }
+  }
+
+  expect(getToolWarnings(tool)).toContain(
+    'inputSchema.properties.code uses a pattern without maxLength; add maxLength to bound regular-expression work.'
+  )
+  expect(
+    getToolWarnings({
+      ...tool,
+      inputSchema: {
+        type: 'object',
+        properties: { code: { type: 'string', pattern: '^[a-z]+$', maxLength: 20 } }
+      }
+    })
+  ).toEqual([])
+})
+
+it('warns about patterns nested in every supported schema keyword', () => {
+  const tool = {
+    name: 'read_config',
+    description: 'Read the configuration for the current workspace.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        config: {
+          type: 'object',
+          additionalProperties: { type: 'string', pattern: '^[a-z]+$' },
+          propertyNames: { type: 'string', pattern: '^[a-z]+$' }
+        },
+        blocked: { not: { type: 'string', pattern: '^x+$' } }
+      }
+    },
+    execute() {
+      return {}
+    }
+  }
+
+  const warnings = getToolWarnings(tool)
+  expect(warnings).toContain(
+    'inputSchema.properties.config.additionalProperties uses a pattern without maxLength; add maxLength to bound regular-expression work.'
+  )
+  expect(warnings).toContain(
+    'inputSchema.properties.config.propertyNames uses a pattern without maxLength; add maxLength to bound regular-expression work.'
+  )
+  expect(warnings).toContain(
+    'inputSchema.properties.blocked.not uses a pattern without maxLength; add maxLength to bound regular-expression work.'
+  )
+})
+
 it('warns about string formats the validator does not check', () => {
   expect(
     getToolWarnings({
