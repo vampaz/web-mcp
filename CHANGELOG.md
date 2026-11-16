@@ -1,11 +1,14 @@
 # Changelog
 
-## 0.9.0 — 2026-11-16
+## 0.9.1 — 2026-11-16
 
 - **Core:** tag every tool invocation outcome with the invocation id used to correlate it, including outcomes that occur before tool execution, and fail guarded tool calls closed when a guard does not approve.
 - **Chat:** keep the working indicator driving transcript scrolling and operation-notice clearing.
 - **Vue:** re-sync watched tool sets when tools change and un-register stale registrations when tools are renamed.
 - **React:** fail guarded tool calls closed while preserving the guard method receiver.
+
+## 0.9.0 — 2026-11-13
+
 - **Page bridge:** add the `@vampaz/webmcp-kit/page-bridge` entry with `installPageBridge()`. It exposes the fallback registry over a versioned `window.postMessage` protocol (`webmcp-kit-bridge/v1`) so embedded agents such as browser extensions can discover tools and invoke them through the normal pipeline, including website confirmation handlers, when the browser has no native WebMCP. Registry changes announce themselves with a bumped catalog revision. Invocations report the `page-bridge` source. Replies are JSON: framework-reactive (Proxy) outputs are unwrapped before posting, and unserializable outputs produce an error reply. Any script in the page can message the bridge, which adds no trust beyond that script running in the page; sites opt in by calling `installPageBridge()`.
 - **Chat:** refine the default look. User messages are bubbles, assistant replies are plain text with a Copy button, and role labels are visually hidden but still announced. Consecutive tool calls form one “Used N tools” block with status icons and argument previews. Stop replaces Send while a turn runs, and errors replace the send hint under the composer.
 - **Chat:** move provider and model choice from the settings selects to a composer model picker (listbox with groups, details, badges and search). Settings open as a full view with a back button. `WebMCPChatSettings` providers accept `description`, `detail`, `badge` and `icon`; models accept `detail` and `badge`. `onChange` now reports the chosen model across providers.
