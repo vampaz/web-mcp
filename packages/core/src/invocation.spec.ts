@@ -166,6 +166,35 @@ it.each(['removed', 'replaced', 'schema', 'scope'] as const)(
   }
 )
 
+it.each([undefined, null, {}, { available: 'yes' }] as unknown[])(
+  'fails a tool closed when scope returns %j',
+  async function test(scopeResult) {
+    const execute = vi.fn(function execute() {
+      return 'executed'
+    })
+    registerTool(
+      defineTool({
+        name: 'set_counter',
+        description: 'Set the visible counter after the user approves this change.',
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        scope() {
+          return scopeResult as { available: boolean }
+        },
+        execute
+      })
+    )
+
+    const result = await invokeTool({ toolName: 'set_counter', input: {} })
+
+    expect(result).toMatchObject({
+      status: 'error',
+      code: 'scope_failed',
+      error: 'Tool scope returned an invalid result.'
+    })
+    expect(execute).not.toHaveBeenCalled()
+  }
+)
+
 it('checks scope and cancellation after an asynchronous guard', async function test() {
   const fixture = setup()
   fixture.tool.guard = async function guard() {

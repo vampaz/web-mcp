@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Core:** fail closed when `scope()` returns `undefined`, `null`, or an object without a boolean `available`. The invocation now ends with `scope_failed` instead of running the tool; tools without `scope` stay available.
+- **Core:** parse fenced JSON without a backtracking regex, so malformed model text cannot stall the main thread.
+- **Page bridge:** reject a second in-flight invocation that reuses a `requestId` with an error reply, and keep the first invocation cancellable.
+- **MCP bridge:** return a JSON-RPC `-32600` error for a request that is not an object, and report output that JSON cannot serialize as `isError: true` instead of throwing.
+
 ## 0.9.1 — 2026-11-16
 
 - **Core:** tag every tool invocation outcome with the invocation id used to correlate it, including outcomes that occur before tool execution, and fail guarded tool calls closed when a guard does not approve.

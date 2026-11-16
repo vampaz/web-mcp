@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearToolsForTest } from '@vampaz/webmcp-kit/testing'
 import { defineTool, registerTool, setConfirmationHandler } from '@vampaz/webmcp-kit'
 
-import { createLocalMCPBridge } from './index'
+import { createLocalMCPBridge, type MCPBridgeRequest } from './index'
 
 describe('local MCP bridge', () => {
   beforeEach(() => {
@@ -334,4 +334,62 @@ it('returns structured content for any schema-valid output, even if the tool unr
     isError: false
   })
   clearToolsForTest()
+})
+
+it.each([null, undefined, 'tools/list', 1, []])(
+  'returns an invalid request error for %j',
+  async function test(request) {
+    const response = await createLocalMCPBridge().handleRequest(
+      request as unknown as MCPBridgeRequest
+    )
+
+    expect(response).toEqual({
+      jsonrpc: '2.0',
+      id: null,
+      error: { code: -32600, message: 'Expected a JSON-RPC request object.' }
+    })
+  }
+)
+
+async function expectUnserializableOutput(execute: () => unknown): Promise<void> {
+  clearToolsForTest()
+  registerTool(
+    defineTool({
+      name: 'unserializable_output',
+      description: 'Return a value JSON cannot carry.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      execute
+    })
+  )
+
+  const response = await createLocalMCPBridge().handleRequest({
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'tools/call',
+    params: { name: 'unserializable_output', arguments: {} }
+  })
+
+  expect(response).toEqual({
+    jsonrpc: '2.0',
+    id: 1,
+    result: {
+      content: [{ type: 'text', text: 'Tool result could not be serialized.' }],
+      isError: true
+    }
+  })
+  clearToolsForTest()
+}
+
+it('reports output that JSON cannot serialize: a BigInt', async function test() {
+  await expectUnserializableOutput(function bigintOutput() {
+    return 1n
+  })
+})
+
+it('reports output that JSON cannot serialize: a cyclic value', async function test() {
+  await expectUnserializableOutput(function cyclicOutput() {
+    const cyclic: Record<string, unknown> = {}
+    cyclic.self = cyclic
+    return cyclic
+  })
 })

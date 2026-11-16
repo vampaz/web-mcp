@@ -4,7 +4,8 @@ import {
   createBestResolver,
   createChromeAIResolver,
   createResolver,
-  createHeuristicResolver
+  createHeuristicResolver,
+  normalizeJsonText
 } from './resolver'
 import type { JsonSchema, WebMCPTool } from './interfaces/tool'
 import { ResolverError } from './resolver-error'
@@ -1619,6 +1620,25 @@ describe('resolver', () => {
     expect(resolver.available).toBe(false)
     expect(resolver.status).toBe('unavailable')
     expect(resolver.detail).toContain('server endpoint mode')
+  })
+})
+
+describe('normalizeJsonText', () => {
+  it.each([
+    ['{"toolName":"set_counter","input":{}}', '{"toolName":"set_counter","input":{}}'],
+    ['```json\n{"a":1}\n```', '{"a":1}'],
+    ['```\n{"a":1}\n```', '{"a":1}'],
+    ['```JSON {"a":1} ```', '{"a":1}'],
+    ['```json{"a":1}```', '{"a":1}'],
+    ['Use {"a":1} now', '{"a":1}']
+  ])('normalizes %j without changing well-formed results', function test(input, expected) {
+    expect(normalizeJsonText(input)).toBe(expected)
+  })
+
+  it('handles an unterminated fence without backtracking', function test() {
+    const started = performance.now()
+    expect(() => normalizeJsonText(`\`\`\`${' '.repeat(50_000)}a`)).toThrow('non-JSON text')
+    expect(performance.now() - started).toBeLessThan(1000)
   })
 })
 

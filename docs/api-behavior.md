@@ -27,18 +27,18 @@ The package is ESM-only. Importing core, `/pi`, or `/chat` is safe during SSR. B
 
 `defineTool()` validates the definition and preserves it. It does not register or execute the tool. Literal JSON Schema infers the input type through `InferToolInput`; an explicit generic can supply a type for a separately defined schema. Inference does not replace runtime validation.
 
-| `WebMCPTool` field        | Contract                                                                                                                 |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `name`, `description`     | Required nonempty strings. Use stable names and descriptions that state the action and its limits.                       |
-| `inputSchema`             | Required schema, checked at definition and before invocation. Prefer strict object schemas.                              |
-| `outputSchema`            | Optional schema checked after execution. An invalid output does not roll back an action.                                 |
-| `annotations`             | Browser/tooling hints such as `readOnlyHint`; hints are not authorization.                                               |
-| `confirmation`            | Presence requires approval; user-facing `reason` and optional per-tool `handler`.                                        |
-| `scope()`                 | Synchronous current-state availability. Throwing fails the invocation.                                                   |
-| `parseInput(input)`       | Optional parser before approval; invalid input stops invocation.                                                         |
-| `guard(input)`            | Input-specific check, optionally async. `false` or any string blocks execution. Return `true` to allow.                  |
-| `execute(input, context)` | Returns output or a promise. `context.source` identifies the caller; `context.signal` supports cooperative cancellation. |
-| `examples`                | Example raw inputs for documentation and resolvers; not executable tests.                                                |
+| `WebMCPTool` field        | Contract                                                                                                                                       |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`, `description`     | Required nonempty strings. Use stable names and descriptions that state the action and its limits.                                             |
+| `inputSchema`             | Required schema, checked at definition and before invocation. Prefer strict object schemas.                                                    |
+| `outputSchema`            | Optional schema checked after execution. An invalid output does not roll back an action.                                                       |
+| `annotations`             | Browser/tooling hints such as `readOnlyHint`; hints are not authorization.                                                                     |
+| `confirmation`            | Presence requires approval; user-facing `reason` and optional per-tool `handler`.                                                              |
+| `scope()`                 | Synchronous current-state availability. Throwing, or returning anything other than an object with a boolean `available`, fails the invocation. |
+| `parseInput(input)`       | Optional parser before approval; invalid input stops invocation.                                                                               |
+| `guard(input)`            | Input-specific check, optionally async. `false` or any string blocks execution. Return `true` to allow.                                        |
+| `execute(input, context)` | Returns output or a promise. `context.source` identifies the caller; `context.signal` supports cooperative cancellation.                       |
+| `examples`                | Example raw inputs for documentation and resolvers; not executable tests.                                                                      |
 
 `registerTool()` adds the tool to the shared fallback registry and attempts native registration when supported. The returned `RegisteredTool` contains `tool`, `mode`, `warnings`, `ready`, and `unregister()`. Await `ready` before asserting native registration has settled. Native failure preserves fallback registration and records a warning.
 
@@ -56,21 +56,21 @@ The reserved core names are `tool_sequence`, `needs_clarification`, and `no_tool
 
 There is no approval bypass on `invokeTool()`. Code that already approved an action inside the application should call the application's action function directly. The test bridge accepts only `id`, `toolName`, `input`, and `signal`, and always reports `source: 'fallback'`.
 
-| `code`                | `status`      | Meaning and response                                                 |
-| --------------------- | ------------- | -------------------------------------------------------------------- |
-| `invalid_input`       | `error`       | Reject invalid input before approval or execution.                   |
-| `cancelled`           | `error`       | Cancellation observed before execution.                              |
-| `tool_changed`        | `unavailable` | Registration or schema changed; rediscover before a new request.     |
-| `scope_unavailable`   | `unavailable` | Current application state does not permit this tool.                 |
-| `scope_failed`        | `error`       | Scope callback threw; repair the application callback.               |
-| `confirmation_denied` | `blocked`     | User denied the action. Do not retry automatically.                  |
-| `confirmation_failed` | `error`       | Approval UI failed.                                                  |
-| `guard_blocked`       | `blocked`     | Input-specific business rule rejected the action.                    |
-| `guard_failed`        | `error`       | Guard callback threw.                                                |
-| `execution_failed`    | `error`       | Execution threw; check application state before retrying.            |
-| `invalid_output`      | `error`       | Output failed validation after execution; action may have completed. |
-| `not_registered`      | `error`       | Tool no longer exists or the name is wrong.                          |
-| `resolver_failed`     | `error`       | Command input only: the resolver failed before any tool ran.         |
+| `code`                | `status`      | Meaning and response                                                                 |
+| --------------------- | ------------- | ------------------------------------------------------------------------------------ |
+| `invalid_input`       | `error`       | Reject invalid input before approval or execution.                                   |
+| `cancelled`           | `error`       | Cancellation observed before execution.                                              |
+| `tool_changed`        | `unavailable` | Registration or schema changed; rediscover before a new request.                     |
+| `scope_unavailable`   | `unavailable` | Current application state does not permit this tool.                                 |
+| `scope_failed`        | `error`       | Scope callback threw or returned an invalid result; repair the application callback. |
+| `confirmation_denied` | `blocked`     | User denied the action. Do not retry automatically.                                  |
+| `confirmation_failed` | `error`       | Approval UI failed.                                                                  |
+| `guard_blocked`       | `blocked`     | Input-specific business rule rejected the action.                                    |
+| `guard_failed`        | `error`       | Guard callback threw.                                                                |
+| `execution_failed`    | `error`       | Execution threw; check application state before retrying.                            |
+| `invalid_output`      | `error`       | Output failed validation after execution; action may have completed.                 |
+| `not_registered`      | `error`       | Tool no longer exists or the name is wrong.                                          |
+| `resolver_failed`     | `error`       | Command input only: the resolver failed before any tool ran.                         |
 
 Successful results contain `status: 'success'`, `toolName`, `output`, and `durationMs`. Native and registry invocations receive an `invocationId`. Missing `output` is valid. Native wrappers return non-success results as structured `isError` envelopes. The command input converts resolution outcomes into blocked/unavailable results without executing an application tool.
 
@@ -216,7 +216,7 @@ if (import.meta.env.DEV) {
 }
 ```
 
-`createLocalMCPBridge()` exposes `listTools()`, `callTool(name, input)`, and `handleRequest(request)`. The request handler accepts `tools/list` and `tools/call`, uses JSON-RPC-style results/errors, and routes calls through core approval with `source: 'mcp-bridge'`. `tools/list` returns only currently available tools, with `outputSchema` and `annotations` when defined; successful calls to tools with an output schema include `structuredContent`, which can be any JSON value the schema allows. The bridge reads the schema before the call, so a tool that unregisters itself still returns it. It is an in-process adapter, not a network MCP server, authentication system, or complete MCP transport implementation.
+`createLocalMCPBridge()` exposes `listTools()`, `callTool(name, input)`, and `handleRequest(request)`. The request handler accepts `tools/list` and `tools/call`, uses JSON-RPC-style results/errors (including `-32600` when the request is not an object), and routes calls through core approval with `source: 'mcp-bridge'`. `tools/list` returns only currently available tools, with `outputSchema` and `annotations` when defined; successful calls to tools with an output schema include `structuredContent`, which can be any JSON value the schema allows. Output that `JSON.stringify` cannot carry returns `isError: true` with a fixed message. The bridge reads the schema before the call, so a tool that unregisters itself still returns it. It is an in-process adapter, not a network MCP server, authentication system, or complete MCP transport implementation.
 
 ## Testing and evaluations
 

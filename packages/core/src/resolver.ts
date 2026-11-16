@@ -711,8 +711,14 @@ export function normalizeJsonText(value: string, source = 'AI'): string {
   const trimmedValue = value.trim()
   if (!trimmedValue) throw new ToolResolutionValidationError(`${source} returned empty text`)
 
-  const fencedMatch = trimmedValue.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
-  if (fencedMatch?.[1]) return fencedMatch[1].trim()
+  // Slice fences instead of matching them: an unterminated fence made the previous
+  // regex backtrack quadratically over untrusted model text.
+  if (trimmedValue.startsWith('```') && trimmedValue.endsWith('```') && trimmedValue.length >= 6) {
+    let inner = trimmedValue.slice(3, -3)
+    if (inner.slice(0, 4).toLowerCase() === 'json') inner = inner.slice(4)
+    const fenced = inner.trim()
+    if (fenced) return fenced
+  }
 
   const firstBraceIndex = trimmedValue.indexOf('{')
   const lastBraceIndex = trimmedValue.lastIndexOf('}')

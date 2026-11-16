@@ -88,6 +88,33 @@ describe('test bridge', () => {
     ])
   })
 
+  it('reports an invalid scope result without hiding other tools', () => {
+    for (const name of ['invalid', 'working'])
+      registerTool(
+        defineTool({
+          name,
+          description: 'Read the current state.',
+          inputSchema: { type: 'object', properties: {} },
+          scope() {
+            if (name === 'invalid') return undefined as unknown as { available: boolean }
+            return { available: true }
+          },
+          execute() {
+            return {}
+          }
+        })
+      )
+    installWebMCPKitTestBridge()
+    expect(window.__webMCPKit?.listTools()).toEqual([
+      expect.objectContaining({
+        name: 'invalid',
+        available: false,
+        unavailableReason: 'Tool scope returned an invalid result.'
+      }),
+      expect.objectContaining({ name: 'working', available: true })
+    ])
+  })
+
   it('does not let test callers bypass confirmation', async () => {
     setConfirmationHandler(function rejectConfirmation() {
       return false

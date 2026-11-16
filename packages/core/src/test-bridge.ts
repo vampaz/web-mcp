@@ -79,8 +79,8 @@ function createToolSummaries(): TestBridgeTool[] {
       confirmation: registration.tool.confirmation,
       mode: registration.mode,
       warnings: registration.warnings,
-      available: availability?.available ?? true,
-      unavailableReason: availability?.reason
+      available: availability.available,
+      unavailableReason: availability.reason
     }
   })
 }

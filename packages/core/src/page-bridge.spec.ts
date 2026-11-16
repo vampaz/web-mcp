@@ -80,6 +80,27 @@ function dispatchAsSameWindow(data: unknown): void {
   )
 }
 
+function collectInvokeReplies(requestId: string, count: number): Promise<PageBridgeReply[]> {
+  return new Promise(function awaitReplies(resolve, reject) {
+    const replies: PageBridgeReply[] = []
+    const timer = setTimeout(function timeout() {
+      window.removeEventListener('message', onReply)
+      reject(new Error(`Expected ${count} bridge replies; received ${replies.length}.`))
+    }, 1000)
+    function onReply(event: MessageEvent) {
+      const data = event.data as PageBridgeMessage
+      if (data?.protocol !== PAGE_BRIDGE_PROTOCOL || data.kind !== 'invoke-reply') return
+      if (data.requestId !== requestId) return
+      replies.push(data)
+      if (replies.length < count) return
+      clearTimeout(timer)
+      window.removeEventListener('message', onReply)
+      resolve(replies)
+    }
+    window.addEventListener('message', onReply)
+  })
+}
+
 function countingTool(name: string, output: Record<string, unknown> = { done: true }) {
   let calls = 0
   const tool: WebMCPTool & { calls: () => number } = Object.assign(
@@ -383,6 +404,117 @@ describe('installPageBridge', () => {
     expect(reply.kind).toBe('invoke-reply')
     if (reply.kind !== 'invoke-reply' || reply.status !== 'error') return
     expect(reply.error).toBeDefined()
+    expect(aborted).toBe(true)
+    bridge.uninstall()
+  })
+
+  it('rejects a duplicate in-flight requestId while the first call completes normally', async () => {
+    const bridge = installPageBridge()
+    let release!: () => void
+    const gate = new Promise<void>(function waitForRelease(resolve) {
+      release = resolve
+    })
+    registerTool(
+      defineTool({
+        name: 'gated_tool',
+        description: 'A tool that finishes when the test releases it.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          required: [],
+          additionalProperties: false
+        },
+        async execute() {
+          await gate
+          return { done: true }
+        }
+      })
+    )
+
+    const repliesPromise = collectInvokeReplies('invoke-overlap', 2)
+    const request = {
+      protocol: PAGE_BRIDGE_PROTOCOL,
+      kind: 'invoke',
+      requestId: 'invoke-overlap',
+      name: 'gated_tool',
+      input: {}
+    }
+    dispatchAsSameWindow(request)
+    dispatchAsSameWindow(request)
+    release()
+
+    const replies = await repliesPromise
+    expect(replies).toHaveLength(2)
+    expect(replies).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ status: 'result', output: { done: true } }),
+        expect.objectContaining({
+          status: 'error',
+          error: 'An invocation with this request ID is already in progress.'
+        })
+      ])
+    )
+    bridge.uninstall()
+  })
+
+  it('rejects a duplicate in-flight requestId and keeps the first call cancellable', async () => {
+    const bridge = installPageBridge()
+    let aborted = false
+    registerTool(
+      defineTool({
+        name: 'slow_tool',
+        description: 'A tool that waits for cancellation.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          required: [],
+          additionalProperties: false
+        },
+        async execute(_input, context) {
+          await new Promise<void>(function waitForever(resolve, reject) {
+            context.signal?.addEventListener('abort', function onAbort() {
+              aborted = true
+              reject(new Error('cancelled'))
+            })
+          })
+          return {}
+        }
+      })
+    )
+
+    const repliesPromise = collectInvokeReplies('invoke-duplicate', 2)
+    const request = {
+      protocol: PAGE_BRIDGE_PROTOCOL,
+      kind: 'invoke',
+      requestId: 'invoke-duplicate',
+      name: 'slow_tool',
+      input: {}
+    }
+    dispatchAsSameWindow(request)
+    dispatchAsSameWindow(request)
+
+    const cancelReply = await sendRequest(
+      {
+        protocol: PAGE_BRIDGE_PROTOCOL,
+        kind: 'cancel',
+        requestId: 'invoke-duplicate'
+      },
+      'cancel-reply'
+    )
+    expect(cancelReply.kind).toBe('cancel-reply')
+
+    const replies = await repliesPromise
+    expect(replies).toHaveLength(2)
+    expect(
+      replies.map((reply) =>
+        reply.kind === 'invoke-reply' && reply.status === 'error' ? reply.error : undefined
+      )
+    ).toEqual(
+      expect.arrayContaining([
+        'An invocation with this request ID is already in progress.',
+        'cancelled'
+      ])
+    )
     expect(aborted).toBe(true)
     bridge.uninstall()
   })
