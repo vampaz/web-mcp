@@ -7,6 +7,29 @@ import localTls, { resolveLocalTlsUrl } from '@vampaz/vite-plugin-local-tls'
 import { artifact, checkTypes, installFixture, run, verifyArtifact } from './fixtures'
 import '../../scripts/playwright-trust'
 
+it('includes a self-contained CDN module without bare imports', async function cdnBundle() {
+  await verifyArtifact()
+  const { stdout: listing } = await run('tar', ['-tzf', artifact])
+  const cdnFiles = listing
+    .split('\n')
+    .filter(function cdnFile(path) {
+      return path.startsWith('package/dist/cdn/') && path.endsWith('.js')
+    })
+    .sort()
+  expect(cdnFiles).toEqual(['package/dist/cdn/webmcp-kit.js'])
+
+  const { stdout: code } = await run('tar', ['-xOf', artifact, 'package/dist/cdn/webmcp-kit.js'])
+  const specifiers = Array.from(
+    code.matchAll(
+      /\bfrom\s*['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]|\bimport\s*['"]([^'"]+)['"]/g
+    ),
+    function specifier(match) {
+      return match[1] ?? match[2] ?? match[3]
+    }
+  )
+  expect(specifiers).toEqual([])
+})
+
 it('keeps the tarball limited to published code and documentation', async function contents() {
   await verifyArtifact()
   const { stdout } = await run('tar', ['-tzf', artifact])

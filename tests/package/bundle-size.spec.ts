@@ -60,6 +60,17 @@ const budgets: Record<string, { eager: number; total: number }> = {
   './zod': { eager: 28_400, total: 28_400 }
 }
 
+it('keeps the CDN bundle within its gzip budget', async function cdnBundleSize() {
+  await verifyArtifact()
+  const { stdout: code } = await run('tar', ['-xOf', artifact, 'package/dist/cdn/webmcp-kit.js'], {
+    maxBuffer: 8 * 1024 * 1024
+  })
+  const bytes = gzipSync(Buffer.from(code)).byteLength
+  // New self-contained core + chat + Pi + assistant browser bundle: 180,210 bytes.
+  // No runtime dependencies. The ceiling adds 10%, rounded up to 100.
+  expect(bytes).toBeLessThanOrEqual(198_300)
+})
+
 it('keeps each entry chunk graph within its gzip budget', async function bundleSize() {
   await verifyArtifact()
   const directory = await mkdtemp(join(tmpdir(), 'webmcp-bundle-size-'))

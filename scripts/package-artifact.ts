@@ -10,6 +10,8 @@ export async function sourceDigest(root: string): Promise<string> {
     'package.json',
     'package-lock.json',
     'vite.config.ts',
+    'vite.cdn.config.ts',
+    'scripts/cdn-entry.ts',
     'source-aliases.ts',
     'tsconfig.base.json',
     'tsconfig.json',

@@ -17,7 +17,7 @@ import { useWebMCPTool as useReactTool } from '@vampaz/webmcp-kit/react'
 import { useWebMCPTool as useSvelteTool } from '@vampaz/webmcp-kit/svelte'
 import { defineZodTool } from '@vampaz/webmcp-kit/zod'
 import { mountDevtoolsOverlay } from '@vampaz/webmcp-kit/devtools'
-import { installWebMCPKitTestBridge } from '@vampaz/webmcp-kit/testing'
+import { createScriptedResolver, installWebMCPKitTestBridge } from '@vampaz/webmcp-kit/testing'
 import { runNativeWebMCPAgent, waitForWebMCPTool } from '@vampaz/webmcp-kit/testing/playwright'
 import { createLocalMCPBridge } from '@vampaz/webmcp-kit/mcp-bridge'
 import { installPageBridge } from '@vampaz/webmcp-kit/page-bridge'
@@ -68,5 +68,6 @@ void [
   installPageBridge,
   mountAssistant,
   createDialogApproval,
-  createResolverHandler
+  createResolverHandler,
+  createScriptedResolver
 ]

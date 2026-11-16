@@ -4,6 +4,7 @@
     "packages/**/*.ts",
     "tests/integration/**/*.ts",
     "vite.config.ts",
+    "vite.cdn.config.ts",
     "vitest.config.ts",
     "scripts/**/*.ts",
     "tests/package/**/*.ts",

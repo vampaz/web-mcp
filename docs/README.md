@@ -30,7 +30,7 @@ This checkout targets 0.6.0. Omit the optional chat settings configuration to ke
 - [Framework extensions](./framework-extensions.md) describes tool registration helpers and reactive availability.
 - [Examples](./examples.md) covers common tool definitions and form integration.
 - The [local lab](https://github.com/vampaz/web-mcp/blob/master/apps/demo/README.md) opens in Chat, with tabs ordered Chat, Harness, Core, Toolkit, on the TLS plugin's HTTPS domain.
-- The [isolated Vite + Vue consumer](https://github.com/vampaz/web-mcp/tree/master/tests/fixtures/pi-chat) installs the package artifact and runs below a nested path. Its deterministic resolver makes the fixture reproducible without a model service. These repository-only links use GitHub URLs so they also work from the installed package docs.
+- The [isolated Vite + Vue consumer](https://github.com/vampaz/web-mcp/tree/master/tests/fixtures/pi-chat) installs the package artifact and runs below a nested path. It is the minimal `mountAssistant()` reference and uses `createScriptedResolver()` for deterministic turns. These repository-only links use GitHub URLs so they also work from the installed package docs.
 
 ## Keep documentation current
 

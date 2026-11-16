@@ -1596,6 +1596,81 @@ declare function useWebMCPTools(
 
 ## @vampaz/webmcp-kit/testing
 
+### ScriptedResolverCall
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/scripted-resolver.ts).
+
+```ts
+export interface ScriptedResolverCall {
+  message: string
+  context: ResolverContext
+  options?: ResolverRunOptions
+}
+```
+
+### ScriptedResolverError
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/scripted-resolver.ts).
+
+A deterministic scripted response, cancellation, or exhaustion failure.
+
+```ts
+declare class ScriptedResolverError extends Error {
+  constructor(message: string)
+}
+```
+
+### ScriptedResolverMatch
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/scripted-resolver.ts).
+
+```ts
+export type ScriptedResolverMatch = string | RegExp | ((call: ScriptedResolverCall) => boolean)
+```
+
+### ScriptedResolverOptions
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/scripted-resolver.ts).
+
+```ts
+export interface ScriptedResolverOptions {
+  name?: string
+  detail?: string
+  steps?: readonly ScriptedResolverStep[]
+  /** Handles calls after no scripted step matches. Without it, exhaustion throws. */
+  fallback?: (call: ScriptedResolverCall) => ToolResolution | Promise<ToolResolution>
+}
+```
+
+### ScriptedResolverResolution
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/scripted-resolver.ts).
+
+```ts
+export type ScriptedResolverResolution =
+  | ToolResolution
+  | ((call: ScriptedResolverCall) => ToolResolution | Promise<ToolResolution>)
+```
+
+### ScriptedResolverStep
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/scripted-resolver.ts).
+
+```ts
+export interface ScriptedResolverStep {
+  /** Defaults to every message. A string matches the full message exactly. */
+  match?: ScriptedResolverMatch
+  /** Calls this step handles before it is exhausted. Defaults to 1. */
+  times?: number
+  /** Keep this step available for every matching call. Do not combine with times. */
+  repeat?: boolean
+  resolution?: ScriptedResolverResolution
+  error?: Error | string
+  /** Wait for the call's AbortSignal, then reject with a cancellation error. */
+  waitForAbort?: boolean
+}
+```
+
 ### TestBridgeSnapshot
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/test-bridge.ts).
@@ -1752,6 +1827,17 @@ export type WebMCPResolverOutcome = 'needs_clarification' | 'no_tools_match'
 
 ```ts
 declare function clearToolsForTest(): void
+```
+
+### createScriptedResolver
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/testing/src/scripted-resolver.ts).
+
+Builds a deterministic resolver for tests and local fixtures. Scripts are consumed in order.
+The helper does not validate resolutions; the normal Pi or command-input path still does.
+
+```ts
+declare function createScriptedResolver(options?: ScriptedResolverOptions): ToolResolver
 ```
 
 ### getWebMCPRegistrySnapshot

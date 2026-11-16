@@ -55,6 +55,38 @@ disposeApproval()
 
 A module that registers at top level should also unregister in `import.meta.hot?.dispose()` so hot reload does not hit the duplicate-name check.
 
+## Script tag without an import map
+
+The package also ships a self-contained ES module at `dist/cdn/webmcp-kit.js`. It bundles core, chat, Pi, and `mountAssistant()` with no bare imports or extra chunks, so a module script can load it directly:
+
+```html
+<div id="assistant"></div>
+<script type="module">
+  import { defineTool, registerTool, mountAssistant } from '/assets/webmcp-kit.js'
+
+  registerTool(
+    defineTool({
+      name: 'read_value',
+      description: 'Read the visible value.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      execute() {
+        return { value: 7 }
+      }
+    })
+  )
+
+  const assistant = mountAssistant({
+    container: document.querySelector('#assistant'),
+    session: { namespace: 'my-app', ownerId: 'local-user', conversationId: 'one' },
+    resolver: applicationResolver, // Your resolver and tools stay application-owned.
+    chat: { mode: 'inline', title: 'Application assistant' }
+  })
+  await assistant.ready
+</script>
+```
+
+Copy the file into a served asset path or reference the installed package path. The script still needs a secure browser context, IndexedDB, and your resolver. Use the normal package entries when a bundler or import map is available.
+
 ## Dependency model
 
 WebMCP Kit is one ESM package. Core, command input, Pi, chat, assistant, server, devtools, testing, and the local bridge require no framework. Pi's implementation libraries are bundled into the distribution and remain isolated from core/chat imports.

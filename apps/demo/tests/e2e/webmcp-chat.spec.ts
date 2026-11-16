@@ -1,6 +1,10 @@
-import { expect, test, type Locator } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import type { PiSnapshot, PiTurnOutcome } from '@vampaz/webmcp-kit/pi'
 import type { WebMCPChatElement } from '@vampaz/webmcp-kit/chat'
+
+async function waitForDemoProvider(page: Page) {
+  await expect(page.locator('#model-status')).toContainText('Test responses')
+}
 
 test('sends, confirms, re-resolves, and restores dialogue without replay', async function conversation({
   page
@@ -873,6 +877,7 @@ test('shows a launcher dot for a reply that arrives while the popup is closed', 
   page
 }) {
   await page.goto('/?mode=chat&presentation=popup')
+  await waitForDemoProvider(page)
   const chat = page.locator('webmcp-chat')
   const launcher = chat.locator('.launcher')
   await chat.evaluate(function configure(element) {
@@ -1034,6 +1039,7 @@ test('shows approval over settings and the model picker without losing the page'
   page
 }) {
   await page.goto('/?mode=chat&approval=inline')
+  await waitForDemoProvider(page)
   const chat = page.locator('webmcp-chat')
   await chat.getByRole('button', { name: 'Settings', exact: true }).click()
   await expect(chat.locator('.settings-panel')).toBeVisible()

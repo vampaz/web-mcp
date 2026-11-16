@@ -1,78 +1,105 @@
+import { createScriptedResolver } from '@vampaz/webmcp-kit/testing'
 import type { ToolResolution, ToolResolver } from '@vampaz/webmcp-kit'
 
+const markdown = [
+  'Here is **bold**, *italic*, and `inline code`.',
+  '',
+  '- one',
+  '- two',
+  '',
+  '1. first',
+  '2. second',
+  '',
+  '[safe link](https://example.com/docs) [bad link](javascript:alert(1))',
+  '',
+  '<img src=x onerror=alert(1)>',
+  '',
+  '```js',
+  'const safe = "<b>code</b>"',
+  '```'
+].join('\n')
+
 export function createFixtureResolver(): ToolResolver {
-  let flakyAttempts = 0
-  return {
+  return createScriptedResolver({
     name: 'Deterministic test fixture (not model evidence)',
-    capabilities: { conversation: true },
-    available: true,
-    status: 'ready',
     detail: 'Automated test responses. No AI model is connected.',
-    async resolve(message, _tools, context, options): Promise<ToolResolution> {
-      message = message.split('\n\nCurrent user request: ').at(-1)!.split('\n\n')[0]
-      if (message === 'wait')
-        await new Promise<void>(function wait(_resolve, reject) {
-          options?.signal?.addEventListener(
-            'abort',
-            function stop() {
-              reject(new Error('cancelled'))
-            },
-            { once: true }
-          )
-        })
-      const history = JSON.stringify(context?.piConversation ?? [])
-      if (message === 'markdown')
-        return {
+    steps: [
+      {
+        match(call) {
+          return requestText(call.message) === 'wait'
+        },
+        repeat: true,
+        waitForAbort: true
+      },
+      {
+        match(call) {
+          return requestText(call.message) === 'markdown'
+        },
+        resolution: {
           toolName: 'pi_reply',
-          input: {
-            text: [
-              'Here is **bold**, *italic*, and `inline code`.',
-              '',
-              '- one',
-              '- two',
-              '',
-              '1. first',
-              '2. second',
-              '',
-              '[safe link](https://example.com/docs) [bad link](javascript:alert(1))',
-              '',
-              '<img src=x onerror=alert(1)>',
-              '',
-              '```js',
-              'const safe = "<b>code</b>"',
-              '```'
-            ].join('\n')
-          },
+          input: { text: markdown },
           confidence: 1,
           reason: 'Markdown fixture'
-        }
-      if (message === 'fail') throw new Error('Fixture provider failed')
-      if (message === 'flaky' && flakyAttempts++ === 0)
-        throw new Error('Fixture provider failed once')
-      if (message === 'invalid')
-        return { toolName: 'not_a_tool', input: {}, confidence: 1, reason: 'Invalid fixture' }
-      if (/set|increment/i.test(message) && !history.includes('"role":"toolResult"'))
+        },
+        repeat: true
+      },
+      {
+        match(call) {
+          return requestText(call.message) === 'fail'
+        },
+        error: 'Fixture provider failed',
+        repeat: true
+      },
+      {
+        match(call) {
+          return requestText(call.message) === 'flaky'
+        },
+        error: 'Fixture provider failed once'
+      },
+      {
+        match(call) {
+          return requestText(call.message) === 'invalid'
+        },
+        resolution: {
+          toolName: 'not_a_tool',
+          input: {},
+          confidence: 1,
+          reason: 'Invalid fixture'
+        },
+        repeat: true
+      }
+    ],
+    fallback(call): ToolResolution {
+      const message = requestText(call.message)
+      const history = JSON.stringify(call.context.piConversation ?? [])
+      if (/set|increment/i.test(message) && !history.includes('"role":"toolResult"')) {
         return {
           toolName: 'set_counter',
           input: { value: Number(message.match(/\d+/)?.[0] ?? 1) },
           confidence: 1,
           reason: 'Requested fixture write'
         }
-      if (/read/i.test(message) && !history.includes('"role":"toolResult"'))
+      }
+      if (/read/i.test(message) && !history.includes('"role":"toolResult"')) {
         return {
           toolName: 'read_counter',
           input: {},
           confidence: 1,
           reason: 'Requested fixture read'
         }
+      }
       return {
         toolName: 'pi_reply',
         input: {
-          text: '<img src=x onerror=alert(1)> Fixture answer. Counter: ' + context?.counter
+          text: '<img src=x onerror=alert(1)> Fixture answer. Counter: ' + call.context.counter
         },
         confidence: 1,
         reason: 'Completed fixture turn'
       }
     }
-  }
+  })
+}
+
+function requestText(message: string): string {
+  return message.split('\n\nCurrent user request: ').at(-1)!.split('\n\n')[0]!
 }

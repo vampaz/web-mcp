@@ -51,16 +51,22 @@ it('runs a packed Vite + Vue consumer under a nested path and one page registry'
       )
       .toBe(200)
     const page = await browser.newPage()
+    await page.setViewportSize({ width: 1000, height: 800 })
     await page.goto(url)
+    await page.getByRole('button', { name: 'Open Assistant', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Assistant', exact: true })
+    expect(await dialog.isVisible()).toBe(true)
     await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Read')
     await page.getByRole('button', { name: 'Send', exact: true }).click()
     await page.getByText('Packed Pi read 7', { exact: true }).waitFor()
-    await page.getByRole('button', { name: 'Use popup', exact: true }).click()
-    await page.getByRole('button', { name: 'Open Assistant', exact: true }).click()
-    expect(await page.getByRole('dialog', { name: 'Assistant', exact: true }).isVisible()).toBe(
-      true
-    )
     expect(await page.getByText('Packed Pi read 7', { exact: true }).isVisible()).toBe(true)
+    await page.setViewportSize({ width: 375, height: 812 })
+    expect(await dialog.isVisible()).toBe(true)
+    expect(
+      await page.evaluate(function noOverflow() {
+        return document.documentElement.scrollWidth <= innerWidth
+      })
+    ).toBe(true)
     expect(await page.locator('#registry-count').textContent()).toBe('1')
     expect(
       await page.evaluate(async function registrations() {
