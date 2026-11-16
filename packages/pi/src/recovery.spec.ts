@@ -97,6 +97,54 @@ it('keeps assistant prose, tool results, and failures without displaying raw act
   ])
 })
 
+it('keeps a denied outcome code on recovered tool messages', function test() {
+  const view = {
+    entries: [
+      {
+        id: 'a',
+        kind: 'pi.assistant',
+        model: [
+          {
+            role: 'assistant',
+            content: [
+              { type: 'toolCall', id: 'call-1', name: 'set_counter', arguments: { value: 3 } }
+            ]
+          }
+        ]
+      },
+      {
+        id: 'b',
+        kind: 'pi.tool',
+        model: [
+          {
+            role: 'toolResult',
+            toolCallId: 'call-1',
+            toolName: 'set_counter',
+            isError: true,
+            content: [
+              {
+                type: 'text',
+                text: '{"status":"blocked","code":"confirmation_denied","error":"Denied"}'
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  } as unknown as ConversationView
+
+  expect(normalizeMessages(view)).toContainEqual({
+    id: 'b:0',
+    role: 'tool',
+    toolName: 'set_counter',
+    input: { value: 3 },
+    text: 'Denied',
+    status: 'blocked',
+    code: 'confirmation_denied',
+    failed: true
+  })
+})
+
 it('shows structured outcomes and marks interrupted invoked actions as unknown', () => {
   const view = {
     entries: [

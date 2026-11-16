@@ -19,6 +19,11 @@
 - **Pi:** after a successful call to a tool with `untrustedContentHint`, require approval for later non-read-only calls in the same turn. The requirement resets each user turn.
 - **Command input:** apply the same untrusted-content approval rule across resolved sequences, resetting for each command.
 - **Demo:** scope the chat approval preference to `source === 'pi'` so page-bridge, native, devtools, resolver, and MCP-bridge calls still open the approval dialog.
+- **Pi:** keep the stable tool outcome `code` on persisted messages, including `confirmation_denied` after reopening.
+- **Chat:** show a declined action as “Declined” with neutral styling and a “You declined this action. Nothing was changed.” status, before and after reload.
+- **Chat:** map provider failures to a retryable message and add a safe “Try again” action that resends the last user message once. It stays hidden after denials, unknown outcomes, and actions that may have run.
+- **Chat:** keep inline height stable at the minimum by default while preserving host `block-size` overrides.
+- **Chat:** add `suggestionAction: 'draft' | 'send'` and raise small text and coarse-pointer touch targets to readable and 44px minimum sizes.
 
 ## 0.9.1 — 2026-11-16
 

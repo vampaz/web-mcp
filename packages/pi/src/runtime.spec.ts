@@ -692,6 +692,19 @@ it('ends a denied action without another model round', async function test() {
     error: { code: 'action_denied' }
   })
   expect(config.resolver.resolve).toHaveBeenCalledTimes(1)
+  expect(
+    runtime.getSnapshot().messages.find(function denied(message) {
+      return message.role === 'tool'
+    })
+  ).toMatchObject({ status: 'blocked', code: 'confirmation_denied', failed: true })
+
+  await runtime.destroy()
+  runtime = await createPiRuntime(config)
+  expect(
+    runtime.getSnapshot().messages.find(function denied(message) {
+      return message.role === 'tool'
+    })
+  ).toMatchObject({ status: 'blocked', code: 'confirmation_denied', failed: true })
 })
 
 it('discards a stale choice and resolves again when tools change during inference', async function test() {

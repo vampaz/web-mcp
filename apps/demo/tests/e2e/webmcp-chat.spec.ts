@@ -29,11 +29,24 @@ test('denies without a follow-up model call and keeps the page unchanged', async
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('set 12')
   await page.getByRole('button', { name: 'Send', exact: true }).click()
   await page.getByRole('button', { name: 'Deny', exact: true }).click()
-  await expect(page.locator('webmcp-chat').getByRole('status')).toContainText(
-    'Change the application counter?'
+  const chat = page.locator('webmcp-chat')
+  await expect(chat.getByRole('status')).toContainText(
+    'You declined this action. Nothing was changed.'
   )
+  await expect(chat.getByRole('status')).not.toHaveAttribute('data-tone', 'error')
+  await expect(chat.locator('.tool-call')).toHaveAttribute('data-status', 'declined')
+  await expect(chat.locator('.tool-outcome')).toHaveText('Declined')
   await expect(page.locator('#counter')).toHaveText('0')
-  await expect(page.locator('webmcp-chat')).not.toContainText('Fixture answer')
+  await expect(chat).not.toContainText('Fixture answer')
+
+  await page.reload()
+  await expect(chat.getByRole('status')).toContainText(
+    'You declined this action. Nothing was changed.'
+  )
+  await expect(chat.getByRole('status')).not.toHaveAttribute('data-tone', 'error')
+  await expect(chat.locator('.tool-call')).toHaveAttribute('data-status', 'declined')
+  await expect(chat.locator('.tool-outcome')).toHaveText('Declined')
+  await expect(chat.getByRole('button', { name: 'Try again', exact: true })).toBeHidden()
 })
 
 test('supports keyboard, narrow layouts, and distinct controls in two instances', async function accessibility({
@@ -90,7 +103,7 @@ test('stops resolving and reports a failed provider without a fallback', async f
   await input.fill('fail')
   await input.press('Enter')
   await expect(page.locator('webmcp-chat').getByRole('status')).toContainText(
-    'Fixture provider failed'
+    'The model could not be reached. Try again.'
   )
   await page.reload()
   await expect(page.locator('webmcp-chat').getByRole('status')).toContainText(
@@ -98,6 +111,133 @@ test('stops resolving and reports a failed provider without a fallback', async f
   )
   await expect(page.locator('webmcp-chat li').last()).toContainText('Assistant — response failed')
   await expect(page.locator('webmcp-chat li').last().locator('details')).not.toHaveAttribute('open')
+})
+
+test('retries a failed provider turn from the composer exactly once', async function retry({
+  page
+}) {
+  await page.goto('/?mode=chat')
+  const chat = page.locator('webmcp-chat')
+  const input = page.getByRole('textbox', { name: 'Message', exact: true })
+  await input.fill('flaky')
+  await input.press('Enter')
+  await expect(chat.getByRole('status')).toContainText('The model could not be reached. Try again.')
+  const retry = chat.getByRole('button', { name: 'Try again', exact: true })
+  await expect(retry).toBeVisible()
+  await retry.click()
+  await expect(chat).toContainText('Fixture answer')
+  await expect(retry).toBeHidden()
+  await expect(chat.locator('li[data-role=user]').filter({ hasText: 'flaky' })).toHaveCount(2)
+})
+
+test('focuses the composer for keyboard retry and immediate suggestions', async function shortcutFocus({
+  page
+}) {
+  await page.goto('/?mode=chat')
+  const chat = page.locator('webmcp-chat')
+  const input = chat.getByRole('textbox', { name: 'Message', exact: true })
+  await input.fill('flaky')
+  await input.press('Enter')
+  await expect(chat.getByRole('status')).toContainText('The model could not be reached. Try again.')
+  const retry = chat.getByRole('button', { name: 'Try again', exact: true })
+  await retry.focus()
+  await retry.press('Enter')
+  await expect(input).toBeFocused()
+  await expect(chat).toContainText('Fixture answer')
+  await expect(input).toBeFocused()
+
+  await chat.getByRole('button', { name: 'New chat', exact: true }).click()
+  await chat.evaluate(function sendSuggestions(element) {
+    const target = element as WebMCPChatElement
+    target.configure({
+      controller: target.controller!,
+      suggestedPrompts: ['Read the counter'],
+      suggestionAction: 'send'
+    })
+  })
+  const suggestion = chat.getByRole('button', { name: 'Read the counter', exact: true })
+  await suggestion.focus()
+  await suggestion.press('Enter')
+  await expect(input).toBeFocused()
+  await expect(chat).toContainText('Fixture answer')
+  await expect(input).toBeFocused()
+})
+
+test('does not offer retry after an unknown outcome', async function unknown({ page }) {
+  await page.goto('/?mode=chat')
+  const chat = page.locator('webmcp-chat')
+  await expect(chat).toBeVisible()
+  await page.evaluate(function configure() {
+    const element = document.querySelector('webmcp-chat') as WebMCPChatElement
+    const snapshot: PiSnapshot = {
+      state: 'idle',
+      messages: [
+        { id: 'q', role: 'user', text: 'Set the counter to 9' },
+        {
+          id: 't',
+          role: 'tool',
+          toolName: 'set_counter',
+          text: 'Outcome unknown',
+          status: 'unknown',
+          failed: true
+        }
+      ],
+      error: { code: 'tool_failed', message: 'The action may have run. Check application state.' }
+    }
+    element.configure({
+      controller: {
+        getSnapshot() {
+          return snapshot
+        },
+        subscribe(listener) {
+          listener(snapshot)
+          return function remove() {}
+        },
+        async send() {
+          return { status: 'error' }
+        },
+        async stop() {},
+        async clear() {},
+        async refresh() {},
+        async destroy() {}
+      }
+    })
+  })
+  await expect(chat.getByRole('button', { name: 'Try again', exact: true })).toBeHidden()
+})
+
+test('keeps the inline composer stable and honors a host block size', async function stable({
+  page
+}) {
+  await page.setViewportSize({ width: 1280, height: 1000 })
+  await page.goto('/?mode=chat')
+  const chat = page.locator('webmcp-chat')
+  const input = page.getByRole('textbox', { name: 'Message', exact: true })
+  const composer = chat.locator('.composer')
+  await expectIdle(chat)
+  const chatBefore = await chat.boundingBox()
+  const before = await composer.boundingBox()
+  for (const message of ['read', 'read', 'read']) {
+    await input.fill(message)
+    await input.press('Enter')
+    await expectIdle(chat)
+  }
+  const chatAfter = await chat.boundingBox()
+  const after = await composer.boundingBox()
+  expect(
+    Math.abs((after?.y ?? 0) - (chatAfter?.y ?? 0) - ((before?.y ?? 0) - (chatBefore?.y ?? 0)))
+  ).toBeLessThan(2)
+
+  const defaultHeight = (await chat.boundingBox())?.height ?? 0
+  expect(defaultHeight).toBeLessThan(600)
+  await page.evaluate(function override() {
+    const host = document.querySelector<HTMLElement>('.chat-host')!
+    host.style.blockSize = '640px'
+    const element = host.querySelector<HTMLElement>('webmcp-chat')!
+    element.style.blockSize = '100%'
+  })
+  await expect.poll(async () => (await chat.boundingBox())?.height ?? 0).toBeGreaterThan(600)
+  expect((await chat.boundingBox())?.height ?? 0).toBeCloseTo(640, 0)
 })
 
 test('keeps focus outside chat when a pending response arrives', async function focus({ page }) {

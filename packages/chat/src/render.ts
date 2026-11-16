@@ -24,6 +24,7 @@ type TranscriptItem =
 const toolIcons = {
   success: 'M20 6 9 17l-5-5',
   failed: 'M18 6 6 18M6 6l12 12',
+  declined: 'M5 12h14',
   unknown: 'M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01'
 }
 const chevron = 'm9 18 6-6-6-6'
@@ -232,7 +233,13 @@ function renderTool(row: HTMLElement, message: PiMessage, labels: WebMCPChatLabe
   const name = message.toolName ?? labels.tool
   const label = messageLabel(message, '', labels)
   const outcome =
-    tone === 'unknown' ? labels.toolStatusUnknown : tone === 'failed' ? labels.toolStatusFailed : ''
+    tone === 'unknown'
+      ? labels.toolStatusUnknown
+      : tone === 'declined'
+        ? labels.toolStatusDeclined
+        : tone === 'failed'
+          ? labels.toolStatusFailed
+          : ''
   const preview = argumentPreview(message.input)
   const sections = JSON.stringify([
     labels.toolInput,
@@ -279,6 +286,7 @@ function renderTool(row: HTMLElement, message: PiMessage, labels: WebMCPChatLabe
 
 function toolTone(message: PiMessage): keyof typeof toolIcons {
   if (message.status === 'unknown') return 'unknown'
+  if (message.code === 'confirmation_denied') return 'declined'
   return message.failed || (message.status !== undefined && message.status !== 'success')
     ? 'failed'
     : 'success'
@@ -307,6 +315,7 @@ function messageLabel(message: PiMessage, assistantLabel: string, labels: WebMCP
     return message.failed ? labels.responseFailed(assistantLabel) : assistantLabel
   const name = message.toolName ?? labels.tool
   if (message.status === 'unknown') return labels.toolUnknown(name)
+  if (message.code === 'confirmation_denied') return labels.toolDeclined(name)
   return message.failed || (message.status !== undefined && message.status !== 'success')
     ? labels.toolFailed(name)
     : name
@@ -341,8 +350,16 @@ function setText(node: Element, text: string) {
 }
 
 export function statusText(snapshot: PiSnapshot, labels: WebMCPChatLabels): ChatStatus {
-  if (snapshot.error) return { text: snapshot.error.message, tone: 'error' }
-  if (snapshot.state === 'idle' && snapshot.messages.at(-1)?.failed)
+  if (snapshot.error) {
+    if (snapshot.error.code === 'action_denied') return { text: labels.status.declined }
+    if (snapshot.error.code === 'provider_failed' && !snapshot.error.actionMayHaveRun)
+      return { text: labels.status.providerFailed, tone: 'error' }
+    return { text: snapshot.error.message, tone: 'error' }
+  }
+  const last = snapshot.messages.at(-1)
+  if (snapshot.state === 'idle' && last?.role === 'tool' && last.code === 'confirmation_denied')
+    return { text: labels.status.declined }
+  if (snapshot.state === 'idle' && last?.failed)
     return { text: labels.status.lastFailed, tone: 'error' }
   if (snapshot.state === 'error') return { text: labels.status.error, tone: 'error' }
   // Idle needs no announcement; active turns are reported by the working indicator.

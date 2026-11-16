@@ -17,6 +17,7 @@ element.configure({
   placeholder: 'Ask about this page',
   emptyState: 'Ask a question to start.',
   suggestedPrompts: ['What actions are available?'],
+  suggestionAction: 'draft', // Or 'send' to submit a suggestion immediately.
   disabled: false
 })
 container.append(element)
@@ -26,7 +27,7 @@ The host supplies `controller` and `container`, owns account UI, and destroys th
 
 ## Presentation
 
-`mode: 'inline'` renders in the host's layout and fills the height the host gives it (`webmcp-chat { block-size: 100% }`), down to `--webmcp-chat-min-height`. `mode: 'popup'` supplies a floating launcher and a resizable, nonmodal conversation panel. Changing modes keeps the same controller, history, and draft.
+`mode: 'inline'` renders in the host's layout with a default block size equal to `--webmcp-chat-min-height`, so the composer does not move as messages arrive. A host rule such as `webmcp-chat { block-size: 100% }` overrides that default. `mode: 'popup'` supplies a floating launcher and a resizable, nonmodal conversation panel. Changing modes keeps the same controller, history, and draft.
 
 ```ts
 element.configure({ controller, mode: 'popup', title: 'Ask this page', placement: 'start' })
@@ -56,9 +57,9 @@ While a turn runs, the working row shows the controller's `activity`: “Thinkin
 
 User messages appear as bubbles and assistant replies as plain text. The “You” and assistant labels stay available to screen readers but are not shown. Each assistant reply has a Copy button that announces the result in the status region.
 
-Consecutive tool calls form one activity block headed “Used N tools”. Each call is a collapsed row with a status icon, the tool name and a one-line argument preview; expanding it shows the input and output in monospace. A failed call shows “Failed” and a call whose outcome is unknown after an interruption shows “Outcome unknown”; screen readers hear “name — failed” or “name — outcome unknown”. While a tool runs, the working row shows a spinner. Raw tool requests do not appear as assistant replies. Failed replies keep a visible failure label and collapsed diagnostic details after reopening.
+Consecutive tool calls form one activity block headed “Used N tools”. Each call is a collapsed row with a status icon, the tool name and a one-line argument preview; expanding it shows the input and output in monospace. A failed call shows “Failed”, a declined call shows “Declined” with a neutral icon and colour, and a call whose outcome is unknown after an interruption shows “Outcome unknown”; screen readers hear “name — failed”, “name — declined”, or “name — outcome unknown”. While a tool runs, the working row shows a spinner. Raw tool requests do not appear as assistant replies. Failed replies keep a visible failure label and collapsed diagnostic details after reopening.
 
-Errors appear in the status region under the composer with an error colour and icon, in place of the send hint. The region is empty while idle. Stop replaces Send while a turn runs. After a failed or interrupted turn, “Edit last message” puts the last user message back in the composer without sending it; it is hidden while the composer has text.
+Errors appear in the status region under the composer, in place of the send hint. Provider failures use “The model could not be reached. Try again.”; other errors keep their message, including the check-application-state warning when an action may have run. A declined action shows “You declined this action. Nothing was changed.” in neutral text, before and after reopening. The region is empty while idle. Stop replaces Send while a turn runs. After a failed or interrupted turn, “Edit last message” puts the last user message back in the composer without sending it. “Try again” resends the last user message once when the composer is empty, the action was not declined, the action cannot have run, and no tool outcome after that message is unknown. Both actions hide while the composer has text.
 
 Enter sends and Shift+Enter adds a line on devices with a fine pointer. On touch devices Enter adds a line and the Send button sends. IME composition is preserved. Suggestions appear only with an empty conversation and composer. The composer stays editable during a turn, so users can draft a follow-up while Stop replaces Send. `maxMessageLength` (default 16,000) shows feedback near the limit and blocks oversized sends without truncating the draft; match it to the controller's `maxMessageChars` limit.
 

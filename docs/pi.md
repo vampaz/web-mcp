@@ -50,7 +50,7 @@ Both `createPiHarness()` and `createPiRuntime()` return `PiController`. Both run
 | `refresh()`           | Reloads saved history; runs automatically when another controller finishes a turn.         |
 | `destroy()`           | Cancels work, closes local resources and subscriptions, and preserves history.             |
 
-Snapshots contain user messages, assistant prose, and tool results. Tool messages carry the chosen `input`, the outcome `status`, and successful `output`; their `text` is the output or the error message. Tool-call-only assistant entries stay in the durable log and are omitted from the display snapshot. Failed assistant messages retain `failed: true` after reopening.
+Snapshots contain user messages, assistant prose, and tool results. Tool messages carry the chosen `input`, the outcome `status`, the stable outcome `code` (including `confirmation_denied`), and successful `output`; their `text` is the output or the error message. Tool-call-only assistant entries stay in the durable log and are omitted from the display snapshot. Failed assistant messages retain `failed: true` after reopening.
 
 While a turn runs, `activity` says what it is doing: `resolving`, `compacting`, or `tool` with `phase: 'approval'` while the application asks the user and `phase: 'running'` otherwise. The registry host reports the approval phase from core confirmation events; a custom host calls the `progress` callback of `invoke()`. `usage` reports the durable log size against `maxHistoryBytes`, so a UI can warn before the limit.
 

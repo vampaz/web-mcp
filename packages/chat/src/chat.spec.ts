@@ -455,6 +455,26 @@ it('keeps the composer usable without submitting a second turn while waiting', a
   )
 })
 
+it('sends a suggestion immediately when configured', function test() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.configure({
+    controller: fixture.api,
+    suggestedPrompts: ['Read the counter'],
+    suggestionAction: 'send'
+  })
+  const root = element.shadowRoot!
+  const input = root.querySelector('textarea')!
+  const suggestion = root.querySelector<HTMLButtonElement>('.suggestions button')!
+  suggestion.focus()
+  suggestion.click()
+
+  expect(fixture.api.send).toHaveBeenCalledTimes(1)
+  expect(fixture.api.send).toHaveBeenCalledWith('Read the counter')
+  expect(input.value).toBe('')
+  expect(root.activeElement).toBe(input)
+})
+
 it('keeps suggestions outside message announcements when the draft is cleared', function announcements() {
   const fixture = controller()
   const element = mount(fixture.api)
@@ -638,7 +658,7 @@ it('shows errors with an error tone and stays quiet after a successful turn', fu
     messages: [],
     error: { code: 'provider_failed', message: 'Provider failed' }
   })
-  expect(status.textContent).toBe('Provider failed')
+  expect(status.textContent).toBe('The model could not be reached. Try again.')
   expect(status.dataset.tone).toBe('error')
   fixture.publish({ state: 'interrupted', messages: [] })
   expect(status.textContent).toContain('interrupted')
@@ -682,6 +702,150 @@ it.each([{ state: 'interrupted' as const }, { state: 'idle' as const, failed: tr
     expect(fixture.api.send).not.toHaveBeenCalled()
   }
 )
+
+it('offers retry after a failed turn and resends the last message once', async function retry() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  const root = element.shadowRoot!
+  const input = root.querySelector('textarea')!
+  const retry = root.querySelector<HTMLButtonElement>('[data-retry-last]')!
+  fixture.publish({
+    state: 'idle',
+    messages: [
+      { id: 'q', role: 'user', text: 'Set the counter to 9' },
+      { id: 'a', role: 'assistant', text: 'HTTP 503', failed: true }
+    ],
+    error: { code: 'provider_failed', message: 'Provider failed' }
+  })
+
+  expect(retry.hidden).toBe(false)
+  expect(retry.textContent).toBe('Try again')
+  retry.click()
+
+  expect(fixture.api.send).toHaveBeenCalledTimes(1)
+  expect(fixture.api.send).toHaveBeenCalledWith('Set the counter to 9')
+  expect(input.value).toBe('')
+  await Promise.resolve()
+  expect(fixture.api.send).toHaveBeenCalledTimes(1)
+})
+
+it('focuses the composer for a keyboard retry and preserves outside focus while pending', async function retryFocus() {
+  const fixture = controller()
+  let complete!: (outcome: PiTurnOutcome) => void
+  vi.mocked(fixture.api.send).mockImplementationOnce(function pending() {
+    return new Promise(function wait(resolve) {
+      complete = resolve
+    })
+  })
+  const element = mount(fixture.api)
+  const root = element.shadowRoot!
+  const input = root.querySelector('textarea')!
+  const retry = root.querySelector<HTMLButtonElement>('[data-retry-last]')!
+  fixture.publish({
+    state: 'idle',
+    messages: [
+      { id: 'q', role: 'user', text: 'Set the counter to 9' },
+      { id: 'a', role: 'assistant', text: 'HTTP 503', failed: true }
+    ],
+    error: { code: 'provider_failed', message: 'Provider failed' }
+  })
+
+  retry.focus()
+  retry.click()
+  expect(root.activeElement).toBe(input)
+  expect(fixture.api.send).toHaveBeenCalledTimes(1)
+  expect(fixture.api.send).toHaveBeenCalledWith('Set the counter to 9')
+
+  const outside = document.createElement('input')
+  document.body.append(outside)
+  outside.focus()
+  complete({ status: 'completed' })
+  await Promise.resolve()
+  expect(document.activeElement).toBe(outside)
+})
+
+it.each([
+  [
+    'a declined action',
+    {
+      state: 'idle' as const,
+      messages: [
+        { id: 'q', role: 'user' as const, text: 'Set the counter to 9' },
+        {
+          id: 't',
+          role: 'tool' as const,
+          toolName: 'set_counter',
+          text: 'Change the counter?',
+          status: 'blocked' as const,
+          code: 'confirmation_denied' as const,
+          failed: true
+        }
+      ],
+      error: { code: 'action_denied' as const, message: 'Change the counter?' }
+    }
+  ],
+  [
+    'an unknown outcome',
+    {
+      state: 'idle' as const,
+      messages: [
+        { id: 'q', role: 'user' as const, text: 'Set the counter to 9' },
+        {
+          id: 't',
+          role: 'tool' as const,
+          toolName: 'set_counter',
+          text: 'Outcome unknown',
+          status: 'unknown' as const,
+          failed: true
+        }
+      ],
+      error: { code: 'tool_failed' as const, message: 'The action may have run.' }
+    }
+  ],
+  [
+    'an action that may have run',
+    {
+      state: 'idle' as const,
+      messages: [
+        { id: 'q', role: 'user' as const, text: 'Set the counter to 9' },
+        { id: 'a', role: 'assistant' as const, text: 'HTTP 503', failed: true }
+      ],
+      error: {
+        code: 'tool_failed' as const,
+        message: 'The action may have run. Check application state.',
+        actionMayHaveRun: true
+      }
+    }
+  ]
+])('does not offer retry after %s', function noRetry(_label, snapshot) {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  const retry = element.shadowRoot!.querySelector<HTMLButtonElement>('[data-retry-last]')!
+
+  fixture.publish(snapshot)
+
+  expect(retry.hidden).toBe(true)
+})
+
+it('hides retry while the composer holds a draft', function retryDraft() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  const root = element.shadowRoot!
+  const input = root.querySelector('textarea')!
+  const retry = root.querySelector<HTMLButtonElement>('[data-retry-last]')!
+  input.value = 'Keep this draft'
+  input.dispatchEvent(new Event('input'))
+  fixture.publish({
+    state: 'idle',
+    messages: [
+      { id: 'q', role: 'user', text: 'Set the counter to 9' },
+      { id: 'a', role: 'assistant', text: 'HTTP 503', failed: true }
+    ],
+    error: { code: 'provider_failed', message: 'Provider failed' }
+  })
+
+  expect(retry.hidden).toBe(true)
+})
 
 it('renders and announces activity changes once', function activity() {
   const fixture = controller()

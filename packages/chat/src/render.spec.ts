@@ -60,6 +60,58 @@ it('explains interrupted work, stays quiet when idle, and marks errors', functio
   expect(statusText({ state: 'error', messages: [] }, labels).tone).toBe('error')
 })
 
+it('maps provider failures and keeps action-risk warnings', function providerErrors() {
+  expect(
+    statusText(
+      {
+        state: 'error',
+        messages: [],
+        error: { code: 'provider_failed', message: 'Provider failed' }
+      },
+      labels
+    )
+  ).toEqual({ text: 'The model could not be reached. Try again.', tone: 'error' })
+  expect(
+    statusText(
+      {
+        state: 'error',
+        messages: [],
+        error: {
+          code: 'provider_failed',
+          message: 'The action may have run. Check application state.',
+          actionMayHaveRun: true
+        }
+      },
+      labels
+    )
+  ).toEqual({ text: 'The action may have run. Check application state.', tone: 'error' })
+})
+
+it('reports a declined action neutrally before and after recovery', function declined() {
+  const message = {
+    id: 'tool',
+    role: 'tool' as const,
+    toolName: 'set_counter',
+    text: 'Change the application counter?',
+    status: 'blocked' as const,
+    code: 'confirmation_denied' as const,
+    failed: true
+  }
+  expect(statusText({ state: 'idle', messages: [message] }, labels)).toEqual({
+    text: 'You declined this action. Nothing was changed.'
+  })
+  expect(
+    statusText(
+      {
+        state: 'idle',
+        messages: [message],
+        error: { code: 'action_denied', message: 'Change the application counter?' }
+      },
+      labels
+    )
+  ).toEqual({ text: 'You declined this action. Nothing was changed.' })
+})
+
 it('keeps tool results collapsed and marks failed answers after recovery', function test() {
   const list = document.createElement('ol')
   const messages = [
@@ -148,6 +200,30 @@ it('labels tool outcomes and shows structured input and output as inert code', f
   expect(done.querySelector('b')).toBeNull()
   expect(failed.querySelector('.tool-heading')!.textContent).toBe('Result')
   expect(failed.querySelector('.tool-section code')!.textContent).toBe('Denied')
+})
+
+it('shows a declined tool call with neutral status', function declinedTool() {
+  const list = document.createElement('ol')
+  updateTranscript(
+    list,
+    [
+      {
+        id: 'declined',
+        role: 'tool',
+        toolName: 'set_counter',
+        text: 'Change the application counter?',
+        status: 'blocked',
+        code: 'confirmation_denied',
+        failed: true
+      }
+    ],
+    'Assistant',
+    labels
+  )
+  const row = list.querySelector<HTMLElement>('.tool-call')!
+  expect(row.dataset.status).toBe('declined')
+  expect(row.querySelector('.tool-outcome')!.textContent).toBe('Declined')
+  expect(row.querySelector('summary .visually-hidden')!.textContent).toBe('set_counter — declined')
 })
 
 it('groups only consecutive tool calls and keeps rows when a group grows', function grouping() {

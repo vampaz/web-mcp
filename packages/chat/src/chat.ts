@@ -72,6 +72,7 @@ export function defineWebMCPChat(): void {
     private readonly stopText: HTMLSpanElement
     private readonly clearButton: HTMLButtonElement
     private readonly editButton: HTMLButtonElement
+    private readonly retryButton: HTMLButtonElement
     private readonly suggestions: HTMLDivElement
     private readonly hint: HTMLParagraphElement
     private readonly limit: HTMLParagraphElement
@@ -102,7 +103,7 @@ export function defineWebMCPChat(): void {
               <textarea id="${id}-message" part="textarea" rows="2" enterkeyhint="send"></textarea>
               <div class="composer-bar"><div class="composer-tools"></div><div class="actions"><button type="button" class="icon-button" data-stop part="stop">${icon('M7 7h10v10H7z')}<span class="visually-hidden"></span></button><button class="send icon-button" type="submit" part="send">${icon('M12 19V5M6 11l6-6 6 6')}</button></div></div>
             </div>
-            <div class="composer-meta"><slot name="composer-meta"></slot><p class="status" part="status" role="status" aria-live="polite">${icon('M12 8v5M12 16h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0')}<span></span></p><button type="button" data-edit-last hidden></button><p class="hint" id="${id}-hint"></p></div>
+            <div class="composer-meta"><slot name="composer-meta"></slot><p class="status" part="status" role="status" aria-live="polite">${icon('M12 8v5M12 16h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0')}<span></span></p><button type="button" data-edit-last hidden></button><button type="button" data-retry-last hidden></button><p class="hint" id="${id}-hint"></p></div>
             <p class="limit" id="${id}-limit" hidden></p>
             <slot name="footer"></slot>
           </form>
@@ -126,6 +127,7 @@ export function defineWebMCPChat(): void {
       this.stopText = this.root.querySelector('[data-stop] span')!
       this.clearButton = this.root.querySelector('[data-clear]')!
       this.editButton = this.root.querySelector('[data-edit-last]')!
+      this.retryButton = this.root.querySelector('[data-retry-last]')!
       this.suggestions = this.root.querySelector('.suggestions')!
       this.hint = this.root.querySelector('.hint')!
       this.limit = this.root.querySelector('.limit')!
@@ -184,6 +186,14 @@ export function defineWebMCPChat(): void {
         this.setDraft(text)
         this.input.focus()
         this.input.setSelectionRange(text.length, text.length)
+      })
+      this.retryButton.addEventListener('click', () => {
+        const text = this.lastUserText()
+        if (text === undefined) return
+        this.input.value = text
+        this.input.focus()
+        this.updateComposer()
+        void this.send()
       })
       this.transcript.addEventListener('scroll', () => this.updateJump())
       this.jumpButton.addEventListener('click', () => {
@@ -301,6 +311,13 @@ export function defineWebMCPChat(): void {
         button.setAttribute('part', 'suggestion')
         button.textContent = prompt
         button.addEventListener('click', () => {
+          if (this.options?.suggestionAction === 'send') {
+            this.input.value = prompt
+            this.input.focus()
+            this.updateComposer()
+            void this.send()
+            return
+          }
           this.setDraft(prompt)
           this.input.focus()
         })
@@ -322,6 +339,7 @@ export function defineWebMCPChat(): void {
       this.messageLabel.textContent = labels.message
       this.hint.textContent = labels.hint
       this.editButton.textContent = labels.editLastMessage
+      this.retryButton.textContent = labels.retry
     }
 
     private connect() {
@@ -445,6 +463,8 @@ export function defineWebMCPChat(): void {
       )
       this.editButton.hidden = !this.turnFailed() || length > 0 || this.lastUserText() === undefined
       this.editButton.disabled = Boolean(disabled || this.clearing)
+      this.retryButton.hidden = !this.canRetry()
+      this.retryButton.disabled = Boolean(disabled || this.clearing)
       for (const button of this.suggestions.querySelectorAll('button'))
         button.disabled = Boolean(disabled || busy)
     }
@@ -472,6 +492,25 @@ export function defineWebMCPChat(): void {
         state === 'error' ||
         (state === 'idle' && Boolean(error || messages.at(-1)?.failed))
       )
+    }
+
+    private canRetry() {
+      const { error, messages } = this.snapshot
+      if (!this.turnFailed() || this.input.value.length > 0) return false
+      if (error?.actionMayHaveRun || error?.code === 'action_denied') return false
+      let lastUser = -1
+      for (let index = messages.length - 1; index >= 0; index--)
+        if (messages[index].role === 'user') {
+          lastUser = index
+          break
+        }
+      if (lastUser < 0) return false
+      for (let index = lastUser + 1; index < messages.length; index++) {
+        const message = messages[index]!
+        if (message.role !== 'tool') continue
+        if (message.code === 'confirmation_denied' || message.status === 'unknown') return false
+      }
+      return true
     }
 
     private lastUserText() {
@@ -555,7 +594,7 @@ export function defineWebMCPChat(): void {
           })
           if (failed && !recorded && !this.input.value) this.input.value = draft
           this.update()
-          if (errorText) this.showNotice(errorText, 'error')
+          if (errorText && !this.snapshot.error) this.showNotice(errorText, 'error')
           if (restoreFocus && this.isConnected) this.input.focus()
         }
       }

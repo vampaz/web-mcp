@@ -2233,6 +2233,8 @@ export interface PiMessage {
   input?: Record<string, unknown>
   /** Tool messages: `unknown` when an interruption hid whether the action ran. */
   status?: PiToolStatus
+  /** Tool messages: stable invocation outcome code, including `confirmation_denied`. */
+  code?: ToolInvocationErrorCode
   /** Tool messages: application output, or a structured failure when partial-result details exist. */
   output?: unknown
 }
@@ -2513,8 +2515,12 @@ export interface WebMCPChatLabels {
   copyFailed: string
   /** Visible outcome beside a failed tool call. */
   toolStatusFailed: string
+  /** Visible outcome beside a declined tool call. */
+  toolStatusDeclined: string
   /** Visible outcome beside a tool call whose result is unknown. */
   toolStatusUnknown: string
+  /** Resends the last user message after a failed turn. */
+  retry: string
   searchModels: string
   noModelsMatch: string
   status: WebMCPChatStatusLabels
@@ -2526,6 +2532,7 @@ export interface WebMCPChatLabels {
   characterCount(count: number, max: number): string
   tooLong(count: number, max: number): string
   toolFailed(name: string): string
+  toolDeclined(name: string): string
   toolUnknown(name: string): string
   runningTool(name: string): string
   awaitingApproval(name: string): string
@@ -2565,6 +2572,8 @@ export interface WebMCPChatOptions {
   placeholder?: string
   emptyState?: string
   suggestedPrompts?: readonly string[]
+  /** Defaults to `draft`; `send` submits a suggestion as soon as it is clicked. */
+  suggestionAction?: 'draft' | 'send'
   disabled?: boolean
   /** Optional provider, model and approval controls. The application owns their behavior. */
   settings?: WebMCPChatSettings
@@ -2643,6 +2652,8 @@ export interface WebMCPChatStatusLabels {
   loading: string
   interrupted: string
   error: string
+  providerFailed: string
+  declined: string
   closed: string
   lastFailed: string
   newChatStarted: string

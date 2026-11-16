@@ -1,6 +1,7 @@
 import type { ToolResolution, ToolResolver } from '@vampaz/webmcp-kit'
 
 export function createFixtureResolver(): ToolResolver {
+  let flakyAttempts = 0
   return {
     name: 'Deterministic test fixture (not model evidence)',
     capabilities: { conversation: true },
@@ -21,6 +22,8 @@ export function createFixtureResolver(): ToolResolver {
         })
       const history = JSON.stringify(context?.piConversation ?? [])
       if (message === 'fail') throw new Error('Fixture provider failed')
+      if (message === 'flaky' && flakyAttempts++ === 0)
+        throw new Error('Fixture provider failed once')
       if (message === 'invalid')
         return { toolName: 'not_a_tool', input: {}, confidence: 1, reason: 'Invalid fixture' }
       if (/set|increment/i.test(message) && !history.includes('"role":"toolResult"'))
