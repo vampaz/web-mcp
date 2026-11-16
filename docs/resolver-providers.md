@@ -103,9 +103,11 @@ export default {
 }
 ```
 
-`provider`, `baseUrl`, `apiKey`, and `allowedModels` are server-owned; the browser cannot change them. `authorize` is required and only a literal `true` result allows the request. It receives the original `Request` and the validated payload, so it can check a session, account, origin, or rate limit. A throw or any other result is denied.
+`provider`, `baseUrl`, `apiKey`, and `allowedModels` are server-owned; the browser cannot change them. `authorize` is required and only a literal `true` result allows the request. It receives the original `Request` and the validated payload, so it can check a session, account, origin, or rate limit. A throw or any other result is denied. Authorization runs before the model allowlist check, so an unauthorized caller receives the same denial whether or not the requested model is allowed.
 
 The handler accepts only `POST`, reads the body as a bounded stream (the default limit is 1 MiB and `Content-Length` is not trusted), rejects invalid shapes, and returns `{ error }` with a non-2xx status. It honors `singleStep` and `purpose: 'summary'`, reuses the same prompt and schema construction as the browser resolver, and validates the upstream result before returning it. The incoming `responseSchema` is validated as wire metadata but is not used to constrain the upstream request; the handler rebuilds the schema from the tools and request flags. Upstream failures and malformed results do not expose the provider key or request body.
+
+The handler rejects `pattern` anywhere in a caller-supplied tool `inputSchema`, including nested properties, items, combinators, `not`, `propertyNames`, and `additionalProperties`, with an explicit `400` before authorization or any upstream request. The server would otherwise evaluate that caller-controlled expression with the backtracking regular-expression engine, where a short input can stall the request indefinitely. Keep pattern validation in the application's authoritative tool definition at invocation time, and send a pattern-free schema to the resolver; do not strip or skip that application validation. `outputSchema` and the incoming `responseSchema` are not evaluated by the handler, so they may still carry `pattern` metadata.
 
 The provider key stays in the server environment. Never send it to the browser, include it in logs, or return it from a handler. Cross-origin browser endpoints still need deliberate CORS and authentication configuration; `authorize` is the application's authorization boundary.
 

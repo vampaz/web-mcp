@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { extractReleaseNotes } from './release-notes.ts'
 
 const root = process.cwd()
 const packageJson = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')) as {
@@ -19,14 +20,10 @@ try {
   process.exit(1)
 }
 
-const escapedVersion = version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-const heading = new RegExp(
-  `^##[ \\t]+${escapedVersion}(?:[ \\t]+—[ \\t]+\\d{4}-\\d{2}-\\d{2})?[ \\t]*$`,
-  'm'
-)
-if (!heading.test(changelog)) {
-  console.error(`CHANGELOG.md needs a "## ${version}" heading for the package version.`)
+const result = extractReleaseNotes(changelog, version)
+if ('error' in result) {
+  console.error(result.error)
   process.exit(1)
 }
 
-console.log(`CHANGELOG.md has a heading for ${version}.`)
+console.log(`CHANGELOG.md has release notes for ${version}.`)

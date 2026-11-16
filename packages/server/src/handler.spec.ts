@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createResolver, type WebMCPTool } from '@vampaz/webmcp-kit'
+import { createResolver, type JsonSchema, type WebMCPTool } from '@vampaz/webmcp-kit'
 import { createResolverHandler } from './handler'
 import type { ResolverEndpointRequest, ResolverHandlerOptions } from './interfaces/handler'
 
@@ -361,14 +361,33 @@ describe('authorization and model policy', function authorization() {
     expect(body.reasoning_effort).toBe('low')
   })
 
-  it('rejects models outside the allowlist before authorization', async function allowlist() {
+  it('authorizes before checking the model allowlist', async function authorizeFirst() {
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    const authorize = vi.fn(() => false)
+    const response = await handler({ authorize })(post(payload({ model: 'model-b' })))
+    expect(authorize).toHaveBeenCalledOnce()
+    expect(response.status).toBe(403)
+    expect((await responseBody(response)).error).toBe('The request is not authorized.')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('uses one denial for unauthorized and disallowed models', async function indistinguishable() {
+    const authorize = vi.fn(() => false)
+    const unauthorized = await handler({ authorize })(post(payload({ model: 'model-a' })))
+    const disallowed = await handler({ authorize })(post(payload({ model: 'model-b' })))
+    expect(unauthorized.status).toBe(disallowed.status)
+    await expect(unauthorized.text()).resolves.toBe(await disallowed.text())
+  })
+
+  it('rejects an allowed caller model outside the allowlist', async function allowlist() {
     const fetch = vi.fn()
     vi.stubGlobal('fetch', fetch)
     const authorize = vi.fn(() => true)
     const response = await handler({ authorize })(post(payload({ model: 'model-b' })))
+    expect(authorize).toHaveBeenCalledOnce()
     expect(response.status).toBe(403)
     expect((await responseBody(response)).error).toBe('The requested model is not allowed.')
-    expect(authorize).not.toHaveBeenCalled()
     expect(fetch).not.toHaveBeenCalled()
   })
 
@@ -412,6 +431,98 @@ describe('authorization and model policy', function authorization() {
     stubProvider()
     const response = await handler({ authorize: async () => true })(post(payload()))
     expect(response.status).toBe(200)
+  })
+})
+
+describe('server input schema patterns', function patterns() {
+  const positions: Array<[string, JsonSchema, string]> = [
+    ['root', { type: 'string', pattern: '^a$' }, 'inputSchema'],
+    [
+      'properties',
+      {
+        type: 'object',
+        properties: { note: { type: 'string', pattern: '^a$' } },
+        additionalProperties: false
+      },
+      'inputSchema.properties.note'
+    ],
+    ['items', { type: 'array', items: { type: 'string', pattern: '^a$' } }, 'inputSchema.items'],
+    [
+      'prefixItems',
+      { type: 'array', prefixItems: [{ type: 'string', pattern: '^a$' }] },
+      'inputSchema.prefixItems[0]'
+    ],
+    ['anyOf', { anyOf: [{ type: 'string', pattern: '^a$' }] }, 'inputSchema.anyOf[0]'],
+    ['oneOf', { oneOf: [{ type: 'string', pattern: '^a$' }] }, 'inputSchema.oneOf[0]'],
+    ['allOf', { allOf: [{ type: 'string', pattern: '^a$' }] }, 'inputSchema.allOf[0]'],
+    ['not', { not: { type: 'string', pattern: '^a$' } }, 'inputSchema.not'],
+    [
+      'propertyNames',
+      { type: 'object', propertyNames: { pattern: '^a$' } },
+      'inputSchema.propertyNames'
+    ],
+    [
+      'additionalProperties',
+      {
+        type: 'object',
+        additionalProperties: { type: 'string', pattern: '^a$' }
+      },
+      'inputSchema.additionalProperties'
+    ]
+  ]
+
+  it.each(positions)(
+    'rejects a pattern in %s before authorization',
+    async function rejects(_label, inputSchema, path) {
+      const fetch = vi.fn()
+      vi.stubGlobal('fetch', fetch)
+      const authorize = vi.fn(() => true)
+      const response = await handler({ authorize })(
+        post(payload({ tools: [{ ...readTool, inputSchema }] }))
+      )
+      expect(response.status).toBe(400)
+      const message = (await responseBody(response)).error
+      expect(message).toContain(`${path}.pattern`)
+      expect(message).toContain('authoritative tool definition')
+      expect(authorize).not.toHaveBeenCalled()
+      expect(fetch).not.toHaveBeenCalled()
+    }
+  )
+
+  it('accepts pattern as a property name or data value', async function harmless() {
+    const fetch = stubProvider({
+      toolName: 'read_counter',
+      input: { pattern: '(a+)+$', note: 'pattern', tag: 'pattern', text: 'pattern' },
+      confidence: 1,
+      reason: 'Read.'
+    })
+    const inputSchema: JsonSchema = {
+      type: 'object',
+      properties: {
+        pattern: { type: 'string' },
+        note: { type: 'string', enum: ['pattern'] },
+        tag: { type: 'string', const: 'pattern' },
+        text: { type: 'string', default: 'pattern', examples: ['pattern'] }
+      },
+      required: ['pattern', 'note', 'tag', 'text'],
+      additionalProperties: false
+    }
+    const response = await handler()(post(payload({ tools: [{ ...readTool, inputSchema }] })))
+    expect(response.status).toBe(200)
+    expect(fetch).toHaveBeenCalledOnce()
+  })
+
+  it('accepts a pattern in outputSchema because it is not evaluated', async function output() {
+    const fetch = stubProvider()
+    const response = await handler()(
+      post(
+        payload({
+          tools: [{ ...readTool, outputSchema: { type: 'string', pattern: '^a$' } }]
+        })
+      )
+    )
+    expect(response.status).toBe(200)
+    expect(fetch).toHaveBeenCalledOnce()
   })
 })
 

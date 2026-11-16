@@ -40,11 +40,12 @@ export function createResolverHandler(options: ResolverHandlerOptions): Resolver
       if (request.method !== 'POST') return errorResponse('Method not allowed.', 405, 'POST')
       const payload = await readResolverRequest(request, config.maxBodyBytes)
       if (request.signal.aborted) return cancelled()
-      if (!config.models.has(payload.model))
-        return errorResponse('The requested model is not allowed.', 403)
       const decision = await authorize(config, request, payload)
       if (decision === 'cancelled' || request.signal.aborted) return cancelled()
       if (decision !== 'allowed') return errorResponse('The request is not authorized.', 403)
+      // Only authorized callers learn whether a model is outside the allowlist.
+      if (!config.models.has(payload.model))
+        return errorResponse('The requested model is not allowed.', 403)
       return await resolveUpstream(config, payload, request.signal)
     } catch (error) {
       if (error instanceof ResolverRequestError) return errorResponse(error.message, error.status)

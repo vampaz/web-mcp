@@ -62,7 +62,7 @@ Resolver outcomes are non-executing. `needs_clarification` returns a blocked com
 
 Use `defineServerTool()` for actions that need app-owned secrets, private APIs, payments, email, or database writes. The browser-visible tool still validates input and enforces scope, confirmation, and guards before it posts to the endpoint.
 
-Server endpoints must validate authorization and input again. Treat the browser request as untrusted even when WebMCP Kit already validated it client-side.
+Server endpoints must validate authorization and input again. Treat the browser request as untrusted even when WebMCP Kit already validated it client-side. The `/server` resolver also rejects `pattern` in caller-supplied tool `inputSchema` schemas because it would evaluate that expression with the backtracking RegExp engine; keep pattern validation in the authoritative tool definition at invocation and send a pattern-free schema to the resolver.
 
 Invocation cancellation is passed to server-backed tools as an `AbortSignal`. Forward it through downstream fetches so a cancelled command does not continue unnecessary work.
 

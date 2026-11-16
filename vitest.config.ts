@@ -24,6 +24,7 @@ export default defineConfig({
     environment: 'jsdom',
     include: [
       'packages/**/*.spec.ts',
+      'scripts/**/*.spec.ts',
       'tests/integration/**/*.spec.ts',
       'apps/demo/src/**/*.spec.ts'
     ],

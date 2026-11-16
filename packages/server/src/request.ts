@@ -135,6 +135,11 @@ function parseTool(value: unknown): ResolverEndpointTool {
   assertOnlyFields(value, toolFields)
   if (!isNonEmptyString(value.name)) throw invalid()
   if (typeof value.description !== 'string') throw invalid()
+  const patternPath = findPattern(value.inputSchema, 'inputSchema')
+  if (patternPath)
+    throw new ResolverRequestError(
+      `Tool input schemas for the server resolver must not use "pattern" (${patternPath}). Keep pattern validation in the application's authoritative tool definition and send a pattern-free schema to the resolver.`
+    )
   if (!isRecord(value.inputSchema) || validateJsonSchema(value.inputSchema).length > 0)
     throw invalid()
   if (value.outputSchema !== undefined) {
@@ -158,6 +163,34 @@ function parseAnnotations(value: unknown): ToolAnnotations {
   if (value.untrustedContentHint !== undefined && typeof value.untrustedContentHint !== 'boolean')
     throw invalid()
   return value as ToolAnnotations
+}
+
+// The schema validator compiles `pattern` but execution uses the main-thread RegExp engine.
+// Server request schemas come from the browser, so reject the keyword before compilation or evaluation.
+function findPattern(value: unknown, path: string): string | undefined {
+  if (!isRecord(value)) return undefined
+  if (Object.hasOwn(value, 'pattern')) return `${path}.pattern`
+  if (isRecord(value.properties)) {
+    for (const [name, child] of Object.entries(value.properties)) {
+      const found = findPattern(child, `${path}.properties.${name}`)
+      if (found) return found
+    }
+  }
+  for (const key of ['items', 'not', 'propertyNames'] as const) {
+    const found = findPattern(value[key], `${path}.${key}`)
+    if (found) return found
+  }
+  const found = findPattern(value.additionalProperties, `${path}.additionalProperties`)
+  if (found) return found
+  for (const key of ['prefixItems', 'anyOf', 'oneOf', 'allOf'] as const) {
+    const list = value[key]
+    if (!Array.isArray(list)) continue
+    for (const [index, child] of list.entries()) {
+      const match = findPattern(child, `${path}.${key}[${index}]`)
+      if (match) return match
+    }
+  }
+  return undefined
 }
 
 function cancelledRequest(): ResolverRequestError {

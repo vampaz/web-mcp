@@ -49,7 +49,8 @@
 ### Server
 
 - **New entry:** add `/server` with `createResolverHandler(options): (request: Request) => Promise<Response>` for `createResolver({ auth: { mode: 'server' } })`. It validates the resolver wire format, bounds the body stream without trusting `Content-Length`, enforces the server-owned provider, model, key, and base URL policy, and requires an `authorize` hook that must return literal `true`.
-- **Request handling:** forward cancellation, honor `singleStep` and `purpose: 'summary'`, validate upstream results with the existing resolution validator, and return `{ error }` with a non-2xx status without exposing the provider key or request body.
+- **Request handling:** authorize before checking the model allowlist, so an unauthorized caller receives the same denial for allowed and disallowed models. Forward cancellation, honor `singleStep` and `purpose: 'summary'`, validate upstream results with the existing resolution validator, and return `{ error }` with a non-2xx status without exposing the provider key or request body.
+- **Input schema patterns:** reject `pattern` anywhere in a caller-supplied tool `inputSchema` with an explicit `400` before authorization or any upstream request, because the server would evaluate it with the backtracking RegExp engine. Nested properties, items, prefix items, combinators, `not`, `propertyNames`, and `additionalProperties` are included. Keep pattern validation in the authoritative tool definition at invocation and send a pattern-free schema to the resolver; `outputSchema` and the incoming `responseSchema` are not evaluated and may still carry `pattern` metadata.
 
 ### Testing
 
@@ -61,7 +62,7 @@
 
 - **CDN bundle:** add the self-contained `dist/cdn/webmcp-kit.js` ES module with core, chat, Pi, and assistant bundled, no bare imports, and no extra chunks for script-tag use.
 - **Coverage:** enforce whole-percent coverage floors (statements 90, branches 84, functions 93, lines 93) and run `npm run test:coverage` in the validation workflow.
-- **Changelog checks:** add `scripts/check-changelog.ts` and wire it into `npm run check`. Release notes extract the exact version section from `CHANGELOG.md`, pass it with `--notes-file`, and fail on a missing or whitespace-only section.
+- **Changelog checks:** add `scripts/check-changelog.ts` and wire it into `npm run check`. `scripts/release-notes.ts` shares the heading and next-section rules, extracts the exact version section, and fails on a missing, malformed, or whitespace-only section. The publish job runs that extraction before any registry publish and passes the validated file with `--notes-file`.
 - **Package job:** split the validation workflow into a minimal `package` job that builds, packs, and uploads `webmcp-kit-package`, and a validate job that downloads the built artifact and tests those bytes with `npm run test:package`.
 - **Artifact lint:** run strict `publint` and `attw --profile esm-only` against the packed tarball in the package suite.
 - **Dependabot:** give bundled `@earendil-works/*` dependencies their own update group and keep the general npm group separate. No cooldown override is configured because Dependabot applies its documented default to version updates.
