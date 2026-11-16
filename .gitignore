@@ -1,12 +1,10 @@
 node_modules
 dist
 .claude
-.astro
 .env
 .env.local
 .env.*.local
 .dev.vars
-.wrangler
 .DS_Store
 coverage
 test-results

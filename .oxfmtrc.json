@@ -1,6 +1,6 @@
 {
   "endOfLine": "lf",
-  "ignorePatterns": [".wrangler/**", "test-results/**", "package-lock.json"],
+  "ignorePatterns": ["test-results/**", "package-lock.json"],
   "printWidth": 100,
   "semi": false,
   "singleQuote": true,

@@ -52,7 +52,7 @@ npm run test:e2e
 
 `npm run test:coverage` reports unit coverage. `npm run docs:links` checks relative links and anchors in the documentation. `npm run dev:demo:fixtures` starts the separate test server at `https://webmcp-kit-tests.localtest.me` with deterministic responses and isolated test conversations. The normal demo never substitutes test responses for an unavailable model.
 
-The ordinary browser suite uses deterministic fixtures; it needs no model inference. The configured matrix includes Chromium, Firefox, WebKit, and native Chromium. On macOS, Firefox uses isolated app data under `test-results/firefox-home` through `CFFIXED_USER_HOME`; this avoids accessing the personal Firefox directory protected by macOS 27. Remove this workaround when Playwright includes the [Firefox 158 fix](https://github.com/microsoft/playwright/issues/42768). Certificate validation stays enabled. A configured project is not evidence that its tests passed.
+The ordinary browser suite uses deterministic fixtures; it needs no model inference. The configured matrix includes Chromium, Firefox, WebKit, native Chromium, and a touch-phone Chromium project. On macOS, Firefox uses isolated app data under `test-results/firefox-home` through `CFFIXED_USER_HOME`; this avoids accessing the personal Firefox directory protected by macOS 27. Remove this workaround when Playwright includes the [Firefox 158 fix](https://github.com/microsoft/playwright/issues/42768). Certificate validation stays enabled. A configured project is not evidence that its tests passed.
 
 For a packaging change or a release candidate, build once after the source and documentation are ready:
 
@@ -64,7 +64,7 @@ npm run test:package
 
 `pack:package` writes `artifacts/webmcp-kit.tgz` and adjacent JSON metadata. The source digest includes package sources, declarations' configuration, package manifests, README, and documentation. Consumer checks reject an artifact whose digest or bytes differ. `test:package` never rebuilds the library; it runs isolated consumers of the installed tarball.
 
-The package suite checks distribution contents, strict consumer declarations, core/chat imports without framework peers, SSR imports, one shared registry, and Pi/chat under a nested base path on trusted HTTPS. The Pi consumer installs the kit without declaring its internal runtime libraries. The suite also typechecks the shipped [integration example](./examples/counter-assistant.ts). Source aliases are disabled in these consumers.
+The package suite checks distribution contents, strict consumer declarations, core/chat imports without framework peers, SSR imports, one shared registry, and Pi/chat under a nested base path on trusted HTTPS. The Pi consumer installs the kit without declaring its internal runtime libraries. The suite also typechecks the shipped [integration example](./examples/counter-assistant.ts). Source aliases are disabled in these consumers. It lints the packed tarball with strict `publint` and validates type resolutions with `attw --profile esm-only`; that profile is the package's ESM-only policy, not a blanket diagnostic ignore.
 
 Run `npm audit` for advisories and `npm audit signatures` for registry verification after dependency changes. These checks answer different questions from runtime tests. The checks workflow validates and tests a tarball before uploading it. The release workflow validates a fresh artifact and publishes those tested bytes. Neither local checks nor a build prove publication or deployment.
 

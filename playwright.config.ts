@@ -14,7 +14,7 @@ const firefoxPolicy =
     ? join(process.env.RUNNER_TEMP, 'webmcp-firefox-policies.json')
     : undefined
 // Browser projects run every spec except these, so a new spec cannot fall outside all projects.
-const separateSuites = ['**/lmstudio.spec.ts', '**/webmcp-native.spec.ts']
+const separateSuites = ['**/lmstudio.spec.ts', '**/webmcp-native.spec.ts', '**/chat-mobile.spec.ts']
 const chromiumOnly = ['**/pi-assistant.spec.ts']
 
 export default defineConfig({
@@ -67,6 +67,14 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         launchOptions: { args: ['--enable-blink-features=WebMCP'] }
+      }
+    },
+    {
+      name: 'mobile-chromium',
+      testMatch: '**/chat-mobile.spec.ts',
+      use: {
+        ...devices['Pixel 7'],
+        launchOptions: { args: ['--disable-blink-features=WebMCP'] }
       }
     }
   ]
