@@ -93,7 +93,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          sparse-checkout: /.nvmrc
+          sparse-checkout: |
+            /.nvmrc
+            /CHANGELOG.md
           sparse-checkout-cone-mode: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -129,10 +131,26 @@ jobs:
       - name: Create GitHub release
         if: needs.prepare.outputs.github-release != 'true'
         run: |
+          notes="$RUNNER_TEMP/release-notes.md"
+          awk -v version="$VERSION" '
+            index($0, "## " version) == 1 {
+              rest = substr($0, length("## " version) + 1)
+              if (rest ~ /^[ \t]*$/ || rest ~ /^[ \t]+—[ \t]+[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9][ \t]*$/) {
+                capture=1
+                next
+              }
+            }
+            capture && /^## / { exit }
+            capture { print }
+          ' CHANGELOG.md > "$notes"
+          if ! grep -q '[^[:space:]]' "$notes"; then
+            echo "CHANGELOG.md section for v$VERSION is empty." >&2
+            exit 1
+          fi
           gh release create "v$VERSION" \
             --target "$GITHUB_SHA" \
             --title "@vampaz/webmcp-kit v$VERSION" \
-            --generate-notes
+            --notes-file "$notes"
         env:
           GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

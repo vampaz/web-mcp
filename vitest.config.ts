@@ -31,7 +31,13 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['packages/*/src/**/*.ts'],
-      exclude: ['**/test-utils/**']
+      exclude: ['**/test-utils/**'],
+      thresholds: {
+        statements: 90,
+        branches: 84,
+        functions: 93,
+        lines: 93
+      }
     }
   }
 })

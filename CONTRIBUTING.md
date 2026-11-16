@@ -8,7 +8,7 @@ npm run dev:demo
 npm run check
 ```
 
-`npm run check` runs `lint`, `format:check`, `typecheck`, `typecheck:demo`, `docs:api:check`, and `test`. `docs:api:check` also runs `docs:links`, which rejects broken relative links and anchors in the README, this file, and `docs/`. Run `npm run dev:demo:fixtures` to use the lab with deterministic fixture responses instead of LM Studio. `npm run test:coverage` writes a V8 coverage report to `coverage/` without thresholds.
+`npm run check` runs `lint`, `format:check`, `typecheck`, `typecheck:demo`, `docs:api:check`, `check:changelog`, and `test`. `docs:api:check` also runs `docs:links`, which rejects broken relative links and anchors in the README, this file, and `docs/`. Run `npm run dev:demo:fixtures` to use the lab with deterministic fixture responses instead of LM Studio. `npm run test:coverage` writes a V8 coverage report to `coverage/` and enforces whole-percent floors for statements, branches, functions, and lines.
 
 ## First run
 

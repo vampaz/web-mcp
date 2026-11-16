@@ -66,8 +66,8 @@ WebMCP Kit is one ESM-only TypeScript npm package with multiple public entry poi
 
 ## Verification
 
-- All routine checks: `npm run check` (lint, format check, both typechecks, API reference and docs link checks, unit tests)
-- Unit/integration tests: `npm run test`; coverage report without thresholds: `npm run test:coverage`
+- All routine checks: `npm run check` (lint, format check, both typechecks, API reference and docs link checks, changelog version heading, unit tests)
+- Unit/integration tests: `npm run test`; coverage with whole-percent statement, branch, function, and line floors: `npm run test:coverage`
 - Single test file: `npm run test -- path/to/file.spec.ts`
 - Typecheck: `npm run typecheck`; lab: `npm run typecheck:demo`
 - Browser tests: `npm run test:e2e`; real-model checks are separate: `npm run test:lmstudio`
