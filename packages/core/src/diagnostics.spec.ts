@@ -38,7 +38,7 @@ describe('integration diagnostics', () => {
         inputSchema: {
           type: 'object',
           properties: {
-            invoiceId: { type: 'string' }
+            invoiceId: { type: 'string', description: 'The invoice identifier.' }
           },
           required: ['invoiceId']
         },
@@ -81,7 +81,7 @@ describe('integration diagnostics', () => {
         inputSchema: {
           type: 'object',
           properties: {
-            invoiceId: { type: 'string' }
+            invoiceId: { type: 'string', description: 'The invoice identifier.' }
           },
           required: ['invoiceId'],
           additionalProperties: false
@@ -110,6 +110,7 @@ describe('integration diagnostics', () => {
           properties: {
             ids: {
               type: 'array',
+              description: 'The selected item identifiers.',
               items: { type: 'string' }
             }
           },
@@ -147,6 +148,7 @@ describe('integration diagnostics', () => {
           properties: {
             ids: {
               type: 'array',
+              description: 'The selected item identifiers.',
               items: { type: 'string' }
             }
           },

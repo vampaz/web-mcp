@@ -673,6 +673,17 @@ export interface ToolInvocationResult<TOutput = unknown> {
 }
 ```
 
+### ToolLintIssue
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/quality.ts).
+
+```ts
+export interface ToolLintIssue {
+  id: string
+  message: string
+}
+```
+
 ### ToolResolution
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/interfaces/tool.ts).
@@ -767,6 +778,27 @@ export interface ToolScopeResult {
   available: boolean
   reason?: string
 }
+```
+
+### WebMCPKitError
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/kit-error.ts).
+
+A definition, registration, or configuration failure with a stable code.
+
+```ts
+declare class WebMCPKitError extends Error {
+  readonly code: WebMCPKitErrorCode
+  constructor(code: WebMCPKitErrorCode, message: string)
+}
+```
+
+### WebMCPKitErrorCode
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/kit-error.ts).
+
+```ts
+export type WebMCPKitErrorCode = 'duplicate_tool' | 'invalid_definition' | 'invalid_configuration'
 ```
 
 ### WebMCPKitEvent
@@ -882,6 +914,18 @@ declare function defineServerTool<TInput = Record<string, unknown>, TOutput = un
 declare function defineTool<const TSchema extends JsonSchema, TOutput = unknown>(
   tool: SchemaTypedWebMCPTool<TSchema, TOutput>
 ): WebMCPTool<InferToolInput<TSchema>, TOutput>
+declare function defineTool<TOutput = unknown>(
+  tool: Omit<WebMCPTool<Record<string, unknown>, TOutput>, 'inputSchema' | 'execute' | 'guard'> & {
+    inputSchema?: never
+    execute: (
+      input: NoInfer<Record<string, unknown>>,
+      context: import('./interfaces/tool').ToolContext
+    ) => TOutput | Promise<TOutput>
+    guard?: (
+      input: NoInfer<Record<string, unknown>>
+    ) => boolean | string | Promise<boolean | string>
+  }
+): WebMCPTool<Record<string, unknown>, TOutput>
 declare function defineTool<TInput = Record<string, unknown>, TOutput = unknown>(
   tool: Omit<WebMCPTool<NoInfer<TInput>, TOutput>, 'execute' | 'guard'> & {
     execute: (
@@ -1032,12 +1076,38 @@ declare function isResolverError(value: unknown): value is ResolverError
 declare function isResolverOutcomeToolName(toolName: string): toolName is ResolverOutcomeToolName
 ```
 
+### isToolExecutionError
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/tool-execution-error.ts).
+
+```ts
+declare function isToolExecutionError(value: unknown): value is ToolExecutionError
+```
+
+### isWebMCPKitError
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/kit-error.ts).
+
+```ts
+declare function isWebMCPKitError(value: unknown): value is WebMCPKitError
+```
+
 ### isWebMCPSupported
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/support.ts).
 
 ```ts
 declare function isWebMCPSupported(): boolean
+```
+
+### lintTool
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/quality.ts).
+
+```ts
+declare function lintTool<TInput = Record<string, unknown>, TOutput = unknown>(
+  tool: WebMCPTool<TInput, TOutput>
+): ToolLintIssue[]
 ```
 
 ### listLmStudioModels

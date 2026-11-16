@@ -110,8 +110,8 @@ describe('devtools overlay', () => {
         inputSchema: {
           type: 'object',
           properties: {
-            customerName: { type: 'string' },
-            amount: { type: 'number', minimum: 1 }
+            customerName: { type: 'string', description: 'The customer display name.' },
+            amount: { type: 'number', description: 'The invoice amount.', minimum: 1 }
           },
           required: ['customerName', 'amount'],
           additionalProperties: false

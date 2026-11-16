@@ -1,6 +1,7 @@
 import { getToolAvailability } from './availability'
 import { assertValidTool } from './define-tool'
 import { emitWebMCPKitEvent } from './events'
+import { WebMCPKitError } from './kit-error'
 import type {
   RegisteredTool,
   RegisteredTools,
@@ -32,7 +33,8 @@ export function registerToolWithCleanup<TInput = Record<string, unknown>, TOutpu
   assertValidTool(tool)
 
   if (registeredTools.has(tool.name)) {
-    throw new Error(
+    throw new WebMCPKitError(
+      'duplicate_tool',
       `Tool "${tool.name}" is already registered. Unregister it before registering another tool with the same name.`
     )
   }

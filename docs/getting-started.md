@@ -15,7 +15,6 @@ const tools = registerTools([
   defineTool({
     name: 'read_counter',
     description: 'Read the current application counter.',
-    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true },
     execute() {
       return { value: counter }
@@ -51,7 +50,7 @@ tools.unregister()
 disposeApproval()
 ```
 
-`registerTools()` registers the set atomically and returns one disposer. Input is validated against the schema before approval, so `{ value: 'seven' }` returns `invalid_input` without asking the user. With native browser WebMCP, agents discover the same tools; without it, the fallback registry serves the command input, Pi, devtools, and tests. During development, `mountDevtoolsOverlay()` from `/devtools` lists and invokes registered tools.
+`registerTools()` registers the set atomically and returns one disposer. `defineTool()` supplies a strict empty-object `inputSchema` when one is omitted; tools that take fields still declare one. Input is validated against the schema before approval, so `{ value: 'seven' }` returns `invalid_input` without asking the user. With native browser WebMCP, agents discover the same tools; without it, the fallback registry serves the command input, Pi, devtools, and tests. During development, `mountDevtoolsOverlay()` from `/devtools` lists and invokes registered tools.
 
 A module that registers at top level should also unregister in `import.meta.hot?.dispose()` so hot reload does not hit the duplicate-name check.
 

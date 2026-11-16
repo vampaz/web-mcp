@@ -23,7 +23,6 @@ const registration = registerTool(
   defineTool({
     name: 'read_counter',
     description: 'Read the current application counter.',
-    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true },
     execute() {
       return { value: 7 }
@@ -36,7 +35,7 @@ console.log(result.output)
 registration.unregister()
 ```
 
-Replace the example handler with an action your normal interface already uses. Keep schemas narrow. Add `confirmation: { reason }` for important mutations and install your application's approval UI with `setConfirmationHandler()`.
+Replace the example handler with an action your normal interface already uses. Keep schemas narrow; `defineTool()` supplies a strict empty-object `inputSchema` when it is omitted. Add `confirmation: { reason }` for important mutations and install your application's approval UI with `setConfirmationHandler()`.
 
 ## Choose the surfaces you need
 

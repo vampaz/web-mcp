@@ -1,6 +1,8 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
 import { defineTool } from './define-tool'
+import { invokeTool, registerTool } from './registry'
+import type { WebMCPTool } from './interfaces/tool'
 
 describe('defineTool', () => {
   it.each(['needs_clarification', 'no_tools_match', 'tool_sequence'])(
@@ -136,6 +138,79 @@ describe('defineTool', () => {
         return input
       }
     })
+  })
+  it('defaults an omitted inputSchema and types input as a record', () => {
+    const tool = defineTool({
+      name: 'read_value',
+      description: 'Read the current visible application value without a model.',
+      annotations: { readOnlyHint: true },
+      guard(input) {
+        expectTypeOf(input).toEqualTypeOf<Record<string, unknown>>()
+        return true
+      },
+      execute(input) {
+        expectTypeOf(input).toEqualTypeOf<Record<string, unknown>>()
+        return input
+      }
+    })
+
+    expect(tool.inputSchema).toEqual({
+      type: 'object',
+      properties: {},
+      additionalProperties: false
+    })
+    expectTypeOf(tool).toMatchTypeOf<WebMCPTool<Record<string, unknown>>>()
+  })
+
+  it('keeps hand-built registerTool definitions requiring a schema', () => {
+    if (false) {
+      // @ts-expect-error registerTool() still requires inputSchema when no defineTool() default applies.
+      registerTool({
+        name: 'hand_built',
+        description: 'A hand-built tool must still declare its input schema.',
+        execute() {
+          return {}
+        }
+      })
+    }
+  })
+
+  it('enforces the default schema through the public invocation pipeline', async () => {
+    const registration = registerTool(
+      defineTool({
+        name: 'refresh_defaults',
+        description: 'Refresh the visible application data without additional input.',
+        execute() {
+          return { ok: true }
+        }
+      })
+    )
+    try {
+      await expect(
+        invokeTool({ toolName: 'refresh_defaults', input: {}, source: 'fallback' })
+      ).resolves.toMatchObject({ status: 'success', output: { ok: true } })
+      await expect(
+        invokeTool({
+          toolName: 'refresh_defaults',
+          input: { unexpected: true },
+          source: 'fallback'
+        })
+      ).resolves.toMatchObject({ status: 'error', code: 'invalid_input' })
+    } finally {
+      registration.unregister()
+    }
+  })
+
+  it('rejects a hand-built registration without a schema at runtime', () => {
+    expect(function registerWithoutSchema() {
+      registerTool({
+        name: 'hand_built_runtime',
+        description: 'A hand-built tool without an input schema.',
+        execute() {
+          return {}
+        }
+      } as unknown as WebMCPTool)
+    }).toThrow('must include an input schema')
   })
 })
 

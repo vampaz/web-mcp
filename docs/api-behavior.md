@@ -27,12 +27,12 @@ The package is ESM-only. Importing core, `/pi`, `/chat`, `/assistant`, or `/serv
 
 ## Define and register tools
 
-`defineTool()` validates the definition and preserves it. It does not register or execute the tool. Literal JSON Schema infers the input type through `InferToolInput`; an explicit generic can supply a type for a separately defined schema. Inference does not replace runtime validation.
+`defineTool()` validates the definition and preserves it. It does not register or execute the tool. Omit `inputSchema` for a tool with no inputs; `defineTool()` supplies `{ type: 'object', properties: {}, additionalProperties: false }`. `registerTool()` still requires a complete `WebMCPTool` and does not apply that default. Literal JSON Schema infers the input type through `InferToolInput`; an explicit generic can supply a type for a separately defined schema. Inference does not replace runtime validation.
 
 | `WebMCPTool` field        | Contract                                                                                                                                       |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | `name`, `description`     | Required nonempty strings. Use stable names and descriptions that state the action and its limits.                                             |
-| `inputSchema`             | Required schema, checked at definition and before invocation. Prefer strict object schemas.                                                    |
+| `inputSchema`             | Optional in `defineTool()` and defaulted to a strict empty object; required by `registerTool()` and checked before invocation.                 |
 | `outputSchema`            | Optional schema checked after execution. An invalid output does not roll back an action.                                                       |
 | `annotations`             | Browser/tooling hints such as `readOnlyHint`; hints are not authorization.                                                                     |
 | `confirmation`            | Presence requires approval; user-facing `reason` and optional per-tool `handler`.                                                              |
@@ -42,13 +42,17 @@ The package is ESM-only. Importing core, `/pi`, `/chat`, `/assistant`, or `/serv
 | `execute(input, context)` | Returns output or a promise. `context.source` identifies the caller; `context.signal` supports cooperative cancellation.                       |
 | `examples`                | Example raw inputs for documentation and resolvers; not executable tests.                                                                      |
 
-`registerTool()` adds the tool to the shared fallback registry and attempts native registration when supported. The returned `RegisteredTool` contains `tool`, `mode`, `warnings`, `ready`, and `unregister()`. Await `ready` before asserting native registration has settled. Native failure preserves fallback registration and records a warning.
+`registerTool()` adds the tool to the shared fallback registry and attempts native registration when supported. The returned `RegisteredTool` contains `tool`, `mode`, `warnings`, `ready`, and `unregister()`. `warnings` stays a string array; `lintTool(tool)` returns `{ id, message }` issues with a stable `id` per rule for tests and CI. Await `ready` before asserting native registration has settled. Native failure preserves fallback registration and records a warning.
 
 `registerTools(tools)` registers a set atomically: if one definition fails, the ones already registered are removed and the error is rethrown. It returns `{ registrations, unregister }`.
 
 Re-registering an existing name throws; unregister it explicitly first. An old handle cannot unregister its replacement. Prefer unregistering on component or route teardown. A module that registers at top level must also unregister in `import.meta.hot?.dispose()`, or hot module replacement re-runs it against the existing name. `unregisterTool(name)` returns whether it found a registration. `getTool(name)` returns a registration or `undefined`; `listTools()` and `getRegistrySnapshot()` expose current registrations. Treat those definitions as application-owned objects, not detached serialized snapshots.
 
 The reserved core names are `tool_sequence`, `needs_clarification`, and `no_tools_match`. Pi additionally rejects a catalog containing `pi_reply` or `pi_refresh_catalog`; the runtime owns those names.
+
+Definition, registration, and initialization failures throw `WebMCPKitError` with a stable `code`: `invalid_definition` for a rejected tool definition, `duplicate_tool` for a name already in use, and `invalid_configuration` for browser/init setup errors. Existing messages are unchanged. Use `isWebMCPKitError()` to narrow the error. `ToolExecutionError` has a matching `isToolExecutionError()` guard.
+
+The main quality rules cover stable snake_case names, actionable descriptions, strict object schemas, sensitive-action confirmation, unchecked formats, patterns without `maxLength`, missing property descriptions, suspicious `readOnlyHint` on sensitive names, and form-field constraints. `lintTool(tool)` returns stable IDs: `name-format`, `description-too-short`, `description-vague`, `input-schema-not-object`, `sensitive-action-without-confirmation`, `sensitive-read-only`, `unchecked-string-format`, `pattern-without-max-length`, `missing-property-description`, `form-field-description`, `form-field-unconstrained`, and `form-field-sensitive`. `RegisteredTool.warnings` exposes the same messages as strings.
 
 ## Invocation, approval, and results
 
@@ -80,7 +84,7 @@ Successful results contain `status: 'success'`, `toolName`, `output`, and `durat
 
 Throw `new ToolExecutionError('execution_failed', 'Some saves failed.', { accepted: 2, remaining: 1 })`
 from an application handler to preserve a meaningful error code and JSON-safe partial results.
-The shared invocation result carries `details`; Pi records it with the failed outcome. A Pi tool message with partial-result details exposes the structured failure in `output`, including after reopening the conversation. Details are
+`isToolExecutionError()` narrows the class for host code. The shared invocation result carries `details`; Pi records it with the failed outcome. A Pi tool message with partial-result details exposes the structured failure in `output`, including after reopening the conversation. Details are
 copied before subscribers receive events. Invalid/non-JSON details are omitted, not exposed.
 
 Native WebMCP success still returns the tool's raw output. Application failures now return

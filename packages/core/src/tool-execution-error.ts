@@ -11,3 +11,7 @@ export class ToolExecutionError extends Error {
     this.name = 'ToolExecutionError'
   }
 }
+
+export function isToolExecutionError(value: unknown): value is ToolExecutionError {
+  return value instanceof ToolExecutionError
+}
