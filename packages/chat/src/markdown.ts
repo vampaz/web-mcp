@@ -132,10 +132,13 @@ function appendInline(document: Document, parent: HTMLElement, text: string): vo
       }
     }
 
-    const pair = char === '*' || char === '_' ? char + char : ''
-    if (pair && text.startsWith(pair, index)) {
-      const end = text.indexOf(pair, index + 2)
-      if (end > index + 1) {
+    if (
+      (char === '*' || char === '_') &&
+      text.startsWith(char + char, index) &&
+      canOpenDelimiter(text, index, char, 2)
+    ) {
+      const end = findClosingDelimiter(text, index + 2, char, 2)
+      if (end > index + 2) {
         flush()
         const strong = document.createElement('strong')
         appendInline(document, strong, text.slice(index + 2, end))
@@ -145,8 +148,8 @@ function appendInline(document: Document, parent: HTMLElement, text: string): vo
       }
     }
 
-    if (char === '*' || char === '_') {
-      const end = text.indexOf(char, index + 1)
+    if ((char === '*' || char === '_') && canOpenDelimiter(text, index, char, 1)) {
+      const end = findClosingDelimiter(text, index + 1, char, 1)
       if (end > index + 1) {
         flush()
         const emphasis = document.createElement('em')
@@ -161,6 +164,40 @@ function appendInline(document: Document, parent: HTMLElement, text: string): vo
   }
 
   flush()
+}
+
+function canOpenDelimiter(text: string, index: number, marker: '*' | '_', length: 1 | 2): boolean {
+  const next = text[index + length]
+  if (next === undefined || /\s/u.test(next)) return false
+  // CommonMark keeps underscores inside words literal; asterisks may emphasize intraword text.
+  if (marker === '_' && index > 0 && isWordCharacter(text[index - 1]!)) return false
+  return true
+}
+
+function canCloseDelimiter(text: string, index: number, marker: '*' | '_', length: 1 | 2): boolean {
+  const previous = text[index - 1]
+  if (previous === undefined || /\s/u.test(previous)) return false
+  if (marker === '_' && index + length < text.length && isWordCharacter(text[index + length]!))
+    return false
+  return true
+}
+
+function findClosingDelimiter(
+  text: string,
+  from: number,
+  marker: '*' | '_',
+  length: 1 | 2
+): number {
+  const delimiter = marker.repeat(length)
+  for (let index = from; index <= text.length - length; index++) {
+    if (text.startsWith(delimiter, index) && canCloseDelimiter(text, index, marker, length))
+      return index
+  }
+  return -1
+}
+
+function isWordCharacter(char: string): boolean {
+  return /[\p{L}\p{N}_]/u.test(char)
 }
 
 function delimiterPairs(text: string, open: string, close: string): Map<number, number> {

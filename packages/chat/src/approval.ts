@@ -26,6 +26,7 @@ export class ChatApproval {
   private resolve?: (approved: boolean) => void
   private signal?: AbortSignal
   private readonly abort = () => this.finish(false, false)
+  private static count = 0
 
   constructor(
     private readonly container: HTMLElement,
@@ -56,15 +57,22 @@ export class ChatApproval {
     const input = document.createElement('pre')
     input.className = 'approval-input'
     input.textContent = summarize(request.input)
+    const descriptionId = `webmcp-approval-${++ChatApproval.count}`
+    reason.id = `${descriptionId}-reason`
+    tool.id = `${descriptionId}-tool`
+    input.id = `${descriptionId}-input`
+    const describedBy = `${reason.id} ${tool.id} ${input.id}`
     const actions = document.createElement('div')
     actions.className = 'approval-actions'
     const deny = document.createElement('button')
     deny.type = 'button'
     deny.textContent = labels.deny
+    deny.setAttribute('aria-describedby', describedBy)
     const approve = document.createElement('button')
     approve.type = 'button'
     approve.className = 'approval-approve'
     approve.textContent = labels.approve
+    approve.setAttribute('aria-describedby', describedBy)
     actions.append(deny, approve)
     card.append(reason, tool, input, actions)
     this.card = card

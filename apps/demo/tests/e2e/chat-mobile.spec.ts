@@ -54,6 +54,35 @@ test('opens as a bottom sheet with 44px touch targets', async function bottomShe
   await expectTouchTarget(stop)
   await stop.tap()
   await expect(chat.getByRole('status')).toContainText('interrupted')
+
+  await input.fill('flaky')
+  await chat.getByRole('button', { name: 'Send', exact: true }).tap()
+  const retry = chat.getByRole('button', { name: 'Try again', exact: true })
+  const edit = chat.getByRole('button', { name: 'Edit last message', exact: true })
+  await expect(retry).toBeVisible()
+  await expectTouchTarget(retry)
+  await expectTouchTarget(edit)
+  await retry.tap()
+  await expect(chat).toContainText('Fixture answer')
+})
+
+test('keeps retry, edit, and in-chat approval actions at 44px', async function actions({ page }) {
+  await page.goto('/?mode=chat&presentation=popup&approval=inline')
+  const chat = page.locator('webmcp-chat')
+  await waitForDemoProvider(page)
+  await chat.getByRole('button', { name: 'Open Assistant', exact: true }).tap()
+  const input = chat.getByRole('textbox', { name: 'Message', exact: true })
+  await input.fill('set 7')
+  await chat.getByRole('button', { name: 'Send', exact: true }).tap()
+
+  const deny = chat.getByRole('button', { name: 'Deny', exact: true })
+  const approve = chat.getByRole('button', { name: 'Approve', exact: true })
+  await expect(deny).toBeVisible()
+  await expectTouchTarget(deny)
+  await expectTouchTarget(approve)
+  await expect(deny).toBeFocused()
+  await approve.tap()
+  await expect(page.locator('#counter')).toHaveText('7')
 })
 
 test('keeps Enter for new lines and sends only from the button', async function composer({ page }) {

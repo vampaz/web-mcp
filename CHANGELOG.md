@@ -31,14 +31,15 @@
 - **Provider failures:** map `provider_failed` to a retryable message and add a safe "Try again" action that resends the last user message once. It stays hidden after denials, unknown outcomes, actions that may have run, and any tool call that completed or failed, so a retry cannot repeat a write. When a completed action precedes the provider failure, the status asks the user to check application state instead of suggesting a retry.
 - **Height:** default the inline panel to a stable block size at its previous minimum while preserving host `block-size` overrides.
 - **Suggestions:** add `suggestionAction: 'draft' | 'send'`; the default remains `'draft'`.
-- **Readability and touch:** raise small text to at least `.86em` and make icon, send, stop, and copy targets at least 44px under coarse pointers.
+- **Readability and touch:** raise small text to at least `.86em` and make icon, send, stop, copy, Retry, Edit, Approve, and Deny targets at least 44px under coarse pointers.
 - **Tool rows:** add `toolLabel()` display names and `toolDetails: 'hidden'` for non-expanding rows without argument previews; screen-reader labels use the display name.
 - **Unread replies:** show a launcher dot and an `openChatUnread(title)` accessible label when a reply arrives while the popup is closed; clear it when the popup opens.
-- **Popup persistence:** add opt-in `persistKey` storage for open state, launcher position, and panel size only, ignoring malformed or blocked storage and never storing messages or drafts.
+- **Popup persistence:** add opt-in `persistKey` storage for open state, launcher position, and panel size only, ignoring malformed or blocked storage and never storing messages or drafts. Default corner anchoring is preserved after a viewport change; only user-moved coordinates are stored and clamped to the current viewport.
 - **History warning:** show a neutral "This conversation is almost full. Start a new chat soon." status at 90% of the history limit, with errors taking priority.
 - **Attributes:** accept `mode`, `theme`, `placement`, `heading`, and `placeholder` attributes as defaults below `configure()` options.
-- **In-chat approval:** add `requestApproval()` with a state-machine-backed approval card. It opens a closed popup, focuses Deny, and resolves false on abort, disconnect, controller replacement, or replacement requests; the application still owns the confirmation handler.
-- **Markdown:** add the `/chat/markdown` entry with a dependency-free `renderMarkdown()` that builds DOM and text only, limits links to `http:`, `https:`, and `mailto:`, and adds the required styles inside `.body[data-custom]`.
+- **In-chat approval:** add `requestApproval()` with a state-machine-backed approval card. It opens a closed popup, focuses Deny, and resolves false on abort, disconnect, controller replacement, or replacement requests; the application still owns the confirmation handler. Both actions carry an accessible description built from the reason, tool label, and argument summary.
+- **Public types:** export `WebMCPChatApprovalRequest` from the `/chat` entry.
+- **Markdown:** add the `/chat/markdown` entry with a dependency-free `renderMarkdown()` that builds DOM and text only, limits links to `http:`, `https:`, and `mailto:`, and adds the required styles inside `.body[data-custom]`. Intraword underscores and whitespace-separated asterisks stay literal.
 - **Lab approval:** scope the demo approval preference to `source === 'pi'` so page-bridge, native, devtools, resolver, and MCP-bridge calls still open the approval dialog.
 
 ### Assistant
@@ -56,7 +57,8 @@
 
 - **Scripted resolver:** add `createScriptedResolver()` to `/testing` with ordered `match`, `times`, and `repeat` steps, fallback handling, configured errors, exhaustion failures, and abort-based cancellation.
 - **Framework runtimes:** add real React StrictMode and Svelte mount tests that prove one registration remains across re-renders, in-flight calls survive, and unmount unregisters.
-- **Mobile browser:** add the `mobile-chromium` Playwright project and `chat-mobile.spec.ts`, covering the touch bottom sheet, Enter adding a newline instead of sending, Send-button submission, and 44px New chat, Send, Stop, and Copy targets.
+- **Mobile browser:** add the `mobile-chromium` Playwright project and `chat-mobile.spec.ts`, covering the touch bottom sheet, Enter adding a newline instead of sending, Send-button submission, 44px New chat, Send, Stop, Copy, Retry, Edit, Approve, and Deny targets, and Deny focus.
+- **CDN runtime:** execute the packed `dist/cdn/webmcp-kit.js` from a script-tag page over local TLS, registering and invoking a tool without bare imports.
 
 ### Tooling
 

@@ -10,6 +10,8 @@ const markdown = [
   '1. first',
   '2. second',
   '',
+  'set_counter_value and 2 * 3 * 4 stay literal.',
+  '',
   '[safe link](https://example.com/docs) [bad link](javascript:alert(1))',
   '',
   '<img src=x onerror=alert(1)>',

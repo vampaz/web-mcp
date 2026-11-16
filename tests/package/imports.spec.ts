@@ -1,8 +1,9 @@
-import { readFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
-import { chromium } from '@playwright/test'
-import { createServer } from 'vite'
+import { chromium, type Browser } from '@playwright/test'
+import { createServer, type ViteDevServer } from 'vite'
 import localTls, { resolveLocalTlsUrl } from '@vampaz/vite-plugin-local-tls'
 import { artifact, checkTypes, installFixture, run, verifyArtifact } from './fixtures'
 import '../../scripts/playwright-trust'
@@ -28,6 +29,91 @@ it('includes a self-contained CDN module without bare imports', async function c
     }
   )
   expect(specifiers).toEqual([])
+})
+
+it('executes the packed CDN module in a browser', async function cdnRuntime() {
+  await verifyArtifact()
+  const { stdout: code } = await run('tar', ['-xOf', artifact, 'package/dist/cdn/webmcp-kit.js'], {
+    maxBuffer: 8 * 1024 * 1024
+  })
+  const directory = await mkdtemp(join(tmpdir(), 'webmcp-cdn-'))
+  try {
+    const tls = { domain: 'webmcp-kit-cdn.localtest.me' }
+    const url = resolveLocalTlsUrl(tls)!
+    await writeFile(join(directory, 'webmcp-kit.js'), code)
+    await writeFile(
+      join(directory, 'index.html'),
+      `<!doctype html>
+<html lang="en">
+  <title>Packed CDN</title>
+  <body>
+    <pre id="result">pending</pre>
+    <script type="module">
+      import * as kit from '/webmcp-kit.js'
+      try {
+        kit.registerTool({
+          name: 'cdn_probe',
+          description: 'Double a number through the packed CDN module.',
+          inputSchema: {
+            type: 'object',
+            properties: { value: { type: 'integer' } },
+            required: ['value'],
+            additionalProperties: false
+          },
+          execute({ value }) {
+            return { doubled: value * 2 }
+          }
+        })
+        const result = await kit.invokeTool({ toolName: 'cdn_probe', input: { value: 2 } })
+        document.getElementById('result').textContent = JSON.stringify({
+          status: result.status,
+          output: result.output
+        })
+      } catch (error) {
+        document.getElementById('result').textContent = JSON.stringify({ error: String(error) })
+      }
+    </script>
+  </body>
+</html>`
+    )
+    let server: ViteDevServer | undefined
+    try {
+      server = await createServer({
+        configFile: false,
+        plugins: [localTls(tls)],
+        root: directory,
+        server: { host: '127.0.0.1', port: 0, allowedHosts: [new URL(url).hostname] },
+        logLevel: 'error'
+      })
+      let browser: Browser | undefined
+      try {
+        browser = await chromium.launch()
+        await server.listen()
+        await expect
+          .poll(async function ready() {
+            try {
+              return (await fetch(url)).status
+            } catch {
+              return 0
+            }
+          })
+          .toBe(200)
+        const page = await browser.newPage()
+        await page.goto(url)
+        await expect
+          .poll(async function result() {
+            return page.locator('#result').textContent()
+          })
+          .toBe(JSON.stringify({ status: 'success', output: { doubled: 4 } }))
+      } finally {
+        await browser?.close()
+      }
+    } finally {
+      await server?.close()
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true, maxRetries: 3 })
+  }
 })
 
 it('does not set the duplicate-copy marker in a packed production import', async function productionMarker() {

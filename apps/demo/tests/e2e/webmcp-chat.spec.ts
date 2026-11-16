@@ -968,6 +968,9 @@ test('uses application-owned in-chat approval with keyboard, denial, and Stop', 
   await expect(card).toBeVisible()
   await expect(card).toContainText('Change the application counter?')
   await expect(card.getByRole('button', { name: 'Deny', exact: true })).toBeFocused()
+  await expect(card.getByRole('button', { name: 'Deny', exact: true })).toHaveAccessibleDescription(
+    /Change the application counter\? set_counter \{"value":6\}/
+  )
   await card.getByRole('button', { name: 'Approve', exact: true }).click()
   await expect(page.locator('#counter')).toHaveText('6')
   await expect(card).toBeHidden()
@@ -1036,6 +1039,11 @@ test('renders safe Markdown and keeps injection inert', async function markdown(
   await input.press('Enter')
   await expect(chat.locator('.body strong')).toHaveText('bold')
   await expect(chat.locator('.body em')).toHaveText('italic')
+  const literal = chat.locator('.body p').filter({
+    hasText: 'set_counter_value and 2 * 3 * 4 stay literal.'
+  })
+  await expect(literal).toHaveCount(1)
+  await expect(literal.locator('em')).toHaveCount(0)
   await expect(chat.locator('.body p code')).toHaveText('inline code')
   await expect(chat.locator('.body ul li')).toHaveCount(2)
   await expect(chat.locator('.body ol li')).toHaveCount(2)
@@ -1161,6 +1169,38 @@ test('persists opt-in popup position, size, and open state without drafts', asyn
       )
     })
     .toBe(true)
+})
+
+test('keeps default popup corner anchoring when persistence restores at a wider viewport', async function defaultAnchor({
+  page
+}) {
+  await page.setViewportSize({ width: 700, height: 700 })
+  await page.goto('/?mode=chat&presentation=popup&persist=anchor-review')
+  const chat = page.locator('webmcp-chat')
+  const launcher = chat.getByRole('button', { name: 'Open Assistant', exact: true })
+  await launcher.click()
+  const panel = chat.getByRole('dialog', { name: 'Assistant', exact: true })
+  await expect(panel).toBeVisible()
+  await expect
+    .poll(function stored() {
+      return page.evaluate(function read() {
+        return localStorage.getItem('webmcp-chat:anchor-review')
+      })
+    })
+    .not.toBeNull()
+  const stored = JSON.parse(
+    (await page.evaluate(function read() {
+      return localStorage.getItem('webmcp-chat:anchor-review')
+    }))!
+  ) as Record<string, unknown>
+  expect(stored).not.toHaveProperty('position')
+
+  await page.setViewportSize({ width: 1200, height: 800 })
+  await page.reload()
+  await expect(panel).toBeVisible()
+  const box = (await launcher.boundingBox())!
+  expect(1200 - (box.x + box.width)).toBeLessThan(12)
+  expect(800 - (box.y + box.height)).toBeLessThan(12)
 })
 
 test('drags the popup launcher and panel, resizes by keyboard, and stays within the viewport', async function geometry({

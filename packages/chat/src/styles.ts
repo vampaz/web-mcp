@@ -213,7 +213,7 @@ li[data-layout=failed] { border-inline-start:.23em solid currentColor; padding-i
 .visually-hidden { position:absolute; inline-size:1px; block-size:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0 }
 .suggestions:empty,[hidden] { display:none!important }
 @media(max-height:36rem) { header,.composer { padding-block:.5em; gap:.45em } textarea { min-block-size:2.4em } }
-@media(pointer:coarse) { textarea { font-size:max(1rem,16px) } .hint { display:none } .icon-button,.send,[data-stop],.message-actions .icon-button { min-inline-size:44px; min-block-size:44px } }
+@media(pointer:coarse) { textarea { font-size:max(1rem,16px) } .hint { display:none } .icon-button,.send,[data-stop],.message-actions .icon-button,[data-edit-last],[data-retry-last],.approval-actions button { min-inline-size:44px; min-block-size:44px } }
 @media(prefers-reduced-motion:reduce) { * { scroll-behavior:auto!important; transition:none!important } .working-dots span { animation:none; opacity:.6 } .working[data-kind=tool] .working-dots { animation:none } }
 @media(forced-colors:active) { .working-dots span { background:CanvasText; forced-color-adjust:none } :host button { border:1px solid ButtonText } .model-option[aria-selected=true],.model-option[data-active] { outline:2px solid Highlight } .message-box,.model-picker,li[data-layout=tools] { border:1px solid CanvasText } }
 `

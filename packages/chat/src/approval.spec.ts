@@ -39,6 +39,17 @@ it('renders the request with Deny focused and resolves the decision', async func
   expect(card.querySelector('.approval-input')!.textContent).toBe('{"value":7}')
   const [deny] = Array.from(card.querySelectorAll('button'))
   expect(container.ownerDocument.activeElement).toBe(deny)
+  const describedBy = deny!.getAttribute('aria-describedby')!
+  expect(describedBy.split(' ')).toHaveLength(3)
+  expect(
+    describedBy
+      .split(' ')
+      .map(function text(id) {
+        return card.querySelector(`#${id}`)!.textContent
+      })
+      .join(' ')
+  ).toContain('Change the application counter? Set counter {"value":7}')
+  expect(card.querySelectorAll('button')[1]!.getAttribute('aria-describedby')).toBe(describedBy)
   deny!.click()
   await expect(pending).resolves.toBe(false)
   expect(container.childElementCount).toBe(0)

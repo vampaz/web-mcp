@@ -2646,6 +2646,19 @@ declare function listPiConversations(owner: PiConversationOwner): Promise<string
 
 ## @vampaz/webmcp-kit/chat
 
+### WebMCPChatApprovalRequest
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/chat/src/interfaces/chat.ts).
+
+```ts
+export interface WebMCPChatApprovalRequest {
+  toolName: string
+  input: unknown
+  reason: string
+  signal?: AbortSignal
+}
+```
+
 ### WebMCPChatElement
 
 [Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/chat/src/interfaces/chat.ts).
@@ -3480,19 +3493,6 @@ interface CatalogRegistration {
 
 ```ts
 type Listener = (event: WebMCPKitEvent) => void
-```
-
-### WebMCPChatApprovalRequest
-
-[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/chat/src/interfaces/chat.ts).
-
-```ts
-export interface WebMCPChatApprovalRequest {
-  toolName: string
-  input: unknown
-  reason: string
-  signal?: AbortSignal
-}
 ```
 
 ### WebMCPCommandInputRunOptions

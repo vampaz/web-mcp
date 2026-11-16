@@ -43,7 +43,7 @@ document.body.append(element)
 
 The popup starts closed. Its launcher opens it and focuses the composer. Close, Escape, or the launcher returns focus to the launcher, even in browsers that do not focus a clicked button. `close()` from code moves focus only if it was inside the chat. Closing keeps the draft and any running turn; use Stop to cancel. The page remains interactive. Drag the launcher or the Move chat handle; arrow keys move either control, with Shift for larger steps. Resize chat cycles compact and expanded sizes; its arrow keys adjust the size, and the inline-end lower corner supports pointer resizing. The launcher sits on the inline-end side by default, which is the left in right-to-left pages; `placement: 'start'` uses the other side. Positions and sizes stay inside the viewport. Below about 30rem the popup becomes a full-width bottom sheet. Moving the element in the DOM keeps an open popup open. Popup mode uses the browser's Popover API to avoid ancestor clipping and does not trap focus.
 
-When a reply arrives or a turn ends while the popup is closed, the launcher shows a dot and uses the “Open … new reply” accessible name. Opening the popup clears it. Restored history does not mark the launcher unread. Set `persistKey` to remember the open state, launcher position and panel size in `localStorage` under `webmcp-chat:<persistKey>`; it stores no messages, drafts or other content, ignores malformed or blocked storage, and keeps the popup inside the viewport after a resize.
+When a reply arrives or a turn ends while the popup is closed, the launcher shows a dot and uses the “Open … new reply” accessible name. Opening the popup clears it. Restored history does not mark the launcher unread. Set `persistKey` to remember the open state, launcher position and panel size in `localStorage` under `webmcp-chat:<persistKey>`; it stores no messages, drafts or other content, ignores malformed or blocked storage, and keeps the popup inside the viewport after a resize. The default bottom-end launcher anchor is preserved across viewport changes; only user-moved coordinates are stored and clamped to the current viewport.
 
 Static `mode`, `theme`, `placement`, `heading` and `placeholder` attributes are defaults for a controller-only mount. Values passed to `configure()` win, and the controller still comes from `configure()` or the `controller` property. Use the `heading` attribute for the visible title; the global `title` attribute is not used and would only add a browser tooltip.
 
@@ -94,7 +94,7 @@ setConfirmationHandler(function approve(request) {
 })
 ```
 
-`requestApproval()` shows the reason, friendly tool label and argument summary at the end of the transcript, opens a closed popup, and focuses Deny first. Approve and Deny resolve the promise. Abort, controller replacement, or disconnect resolves `false`; a newer request replaces and denies the pending card. The kit never installs a handler itself and never grants approval. Keep `source` checks so page-bridge, native, devtools, resolver and MCP-bridge calls still use the application's dialog.
+`requestApproval()` shows the reason, friendly tool label and argument summary at the end of the transcript, opens a closed popup, and focuses Deny first. Approve and Deny resolve the promise and both carry an accessible description built from the reason, tool label, and argument summary. Abort, controller replacement, or disconnect resolves `false`; a newer request replaces and denies the pending card. The kit never installs a handler itself and never grants approval. Keep `source` checks so page-bridge, native, devtools, resolver and MCP-bridge calls still use the application's dialog. `WebMCPChatApprovalRequest` is exported from the `/chat` entry.
 
 ## Optional settings module
 
@@ -165,7 +165,7 @@ element.configure({
 })
 ```
 
-`renderMarkdown()` builds DOM nodes and text only. It supports paragraphs, line breaks, bold, italic, inline code, fenced code, ordered and unordered lists, and links using `http:`, `https:` or `mailto:`. Other links and raw HTML render as text. Links open with `rel="noopener noreferrer"` in a new tab.
+`renderMarkdown()` builds DOM nodes and text only. It supports paragraphs, line breaks, bold, italic, inline code, fenced code, ordered and unordered lists, and links using `http:`, `https:` or `mailto:`. Other links and raw HTML render as text. Links open with `rel="noopener noreferrer"` in a new tab. Intraword underscores such as `set_counter_value` and asterisks separated by spaces such as `2 * 3 * 4` stay literal.
 
 ## Labels and localization
 

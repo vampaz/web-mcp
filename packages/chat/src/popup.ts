@@ -45,6 +45,7 @@ export class ChatPopup {
   private pinnedBottom = true
   private position?: PopupPosition
   private panelPosition?: PopupPosition
+  private userPositioned = false
   private labels?: WebMCPChatLabels
   private title = ''
   private unread = false
@@ -252,6 +253,7 @@ export class ChatPopup {
         this.placement = placement
         this.pinnedInline = true
         this.position = this.panelPosition = undefined
+        this.userPositioned = false
       }
       this.moveHelp.hidden = this.resizeHelp.hidden = !this.enabled
       this.launcher.hidden =
@@ -356,6 +358,7 @@ export class ChatPopup {
     this.restoring = true
     try {
       if (data.position) {
+        this.userPositioned = true
         this.position = this.place(this.launcher, data.position)
         const rect = this.launcher.getBoundingClientRect()
         const offset = this.offset()
@@ -364,6 +367,10 @@ export class ChatPopup {
           : Math.abs(rect.left - offset) < 2
         this.pinnedBottom = Math.abs(rect.bottom - innerHeight + offset) < 2
         this.panelPosition = undefined
+      } else {
+        this.userPositioned = false
+        this.position = this.panelPosition = undefined
+        this.pinnedInline = this.pinnedBottom = true
       }
       if (data.panel) {
         if ((this.size.state === 'expanded') !== data.panel.expanded) this.size.send('toggle')
@@ -429,7 +436,7 @@ export class ChatPopup {
     const rect = this.launcher.getBoundingClientRect()
     const data: StoredPopupState = {
       open: this.opened,
-      position: this.position ?? { x: rect.left, y: rect.top },
+      ...(this.userPositioned ? { position: this.position ?? { x: rect.left, y: rect.top } } : {}),
       panel: {
         width: this.panel.style.width,
         height: this.panel.style.height,
@@ -516,6 +523,7 @@ export class ChatPopup {
   private moveTo(control: HTMLElement, position: PopupPosition) {
     if (control === this.launcher) {
       this.position = this.place(this.launcher, position)
+      this.userPositioned = true
       const rect = this.launcher.getBoundingClientRect()
       const offset = this.offset()
       this.pinnedInline = this.pinRight()

@@ -1163,6 +1163,70 @@ it('persists and restores only popup open state, position and size', async funct
   expect(panel.style.width).toBe((JSON.parse(raw!).panel as { width: string }).width)
 })
 
+it('restores default popup corner anchoring after a wider viewport', async function anchored() {
+  vi.stubGlobal('innerWidth', 600)
+  vi.stubGlobal('innerHeight', 600)
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.configure({
+    controller: fixture.api,
+    mode: 'popup',
+    title: 'Helper',
+    persistKey: 'anchor'
+  })
+  element.open()
+  await Promise.resolve()
+  await Promise.resolve()
+  const raw = localStorage.getItem('webmcp-chat:anchor')
+  expect(raw).toBeTruthy()
+  expect(JSON.parse(raw!)).not.toHaveProperty('position')
+  element.remove()
+
+  vi.stubGlobal('innerWidth', 1200)
+  vi.stubGlobal('innerHeight', 900)
+  const next = document.createElement('webmcp-chat') as WebMCPChatElement
+  next.configure({
+    controller: controller().api,
+    mode: 'popup',
+    title: 'Helper',
+    persistKey: 'anchor'
+  })
+  const presentation = next.shadowRoot!.querySelector<HTMLElement>('.presentation')!
+  presentation.showPopover = vi.fn()
+  presentation.hidePopover = vi.fn()
+  document.body.append(next)
+  await Promise.resolve()
+
+  const launcher = next.shadowRoot!.querySelector<HTMLButtonElement>('.launcher')!
+  expect(parseFloat(launcher.style.left)).toBeGreaterThan(1199)
+  expect(parseFloat(launcher.style.top)).toBeGreaterThan(899)
+})
+
+it('clamps a restored dragged popup position to the current viewport', async function clamped() {
+  vi.stubGlobal('innerWidth', 800)
+  vi.stubGlobal('innerHeight', 600)
+  localStorage.setItem(
+    'webmcp-chat:drag',
+    JSON.stringify({ open: false, position: { x: 5000, y: 5000 } })
+  )
+  const next = document.createElement('webmcp-chat') as WebMCPChatElement
+  next.configure({
+    controller: controller().api,
+    mode: 'popup',
+    title: 'Helper',
+    persistKey: 'drag'
+  })
+  const presentation = next.shadowRoot!.querySelector<HTMLElement>('.presentation')!
+  presentation.showPopover = vi.fn()
+  presentation.hidePopover = vi.fn()
+  document.body.append(next)
+  await Promise.resolve()
+
+  const launcher = next.shadowRoot!.querySelector<HTMLButtonElement>('.launcher')!
+  expect(parseFloat(launcher.style.left)).toBeGreaterThan(799)
+  expect(parseFloat(launcher.style.top)).toBeGreaterThan(599)
+})
+
 it('ignores malformed or blocked popup storage', async function blockedStorage() {
   localStorage.setItem('webmcp-chat:bad', '{not json')
   const fixture = controller()

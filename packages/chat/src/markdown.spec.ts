@@ -109,3 +109,20 @@ it('leaves malformed markers as text', function malformed() {
   expect(target.querySelector('a')).toBeNull()
   expect(target.textContent).toContain('**unclosed')
 })
+
+it('keeps intraword underscores and spaced asterisks literal', function delimiters() {
+  const target = render('set_counter_value and 2 * 3 * 4, foo__bar__baz, 2 ** 3 ** 4')
+  expect(target.querySelector('em')).toBeNull()
+  expect(target.querySelector('strong')).toBeNull()
+  expect(target.textContent).toBe('set_counter_value and 2 * 3 * 4, foo__bar__baz, 2 ** 3 ** 4')
+})
+
+it('keeps delimiter boundaries around punctuation and ordinary emphasis', function boundaries() {
+  const target = render('a_b_c _one_ (*two*) a*b*c')
+  expect(Array.from(target.querySelectorAll('em'), (element) => element.textContent)).toEqual([
+    'one',
+    'two',
+    'b'
+  ])
+  expect(target.textContent).toBe('a_b_c one (two) abc')
+})
