@@ -21,6 +21,7 @@ WebMCP Kit is one ESM-only TypeScript npm package with multiple public entry poi
 - `packages/devtools`: in-page tool inspection/invocation overlay.
 - `packages/testing`: resolver evaluations and Playwright bridge helpers.
 - `packages/mcp-bridge`: local MCP-style bridge over registered tools.
+- `packages/page-bridge`: `/page-bridge` entry with `installPageBridge()`; same-window registry discovery and invocation.
 - `packages/zod`: Zod-to-WebMCP tool helper.
 - `packages/vue`, `packages/react`, `packages/svelte`: thin lifecycle helpers around core `registerTool()`.
 - `tests/integration`: cross-package integration coverage.

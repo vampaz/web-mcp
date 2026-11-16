@@ -2,13 +2,14 @@
 
 WebMCP Kit exposes application actions through one registry and invocation pipeline. Add a model provider adapter (the kit calls it a `resolver`) for commands, a Pi controller for persistent conversations, and the chat component when you want a supplied interface.
 
-This checkout targets 0.6.0. Omit the optional chat settings configuration to keep the conversation-only UI. Apply the [0.5 migration guide](./migration-0.5.md) when upgrading from 0.4, after the [0.4 guide](./migration-0.4.md) for older versions. Pi runs in the page; its implementation libraries are bundled.
+See the [changelog](../CHANGELOG.md) and migration guides below for version-specific changes. Omit the optional chat settings configuration to keep the conversation-only UI. Pi runs in the page; its implementation libraries are bundled.
 
 ## Start here
 
 | Task                                                                   | Guide                                                                      |
 | ---------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | Upgrade from 0.4                                                       | [Upgrading to 0.5.0](./migration-0.5.md)                                   |
+| Upgrade from 0.5 through 0.9                                           | [Consumer upgrade guide](./upgrading.md)                                   |
 | Upgrade from 0.3                                                       | [Upgrading to 0.4.0](./migration-0.4.md), then [0.5.0](./migration-0.5.md) |
 | Upgrade an application that used the planner API                       | [Upgrading to 0.3.0](./migration-0.3.md)                                   |
 | Integrate tools and optional chat into an application                  | [Integration walkthrough](./integration.md)                                |
@@ -21,6 +22,7 @@ This checkout targets 0.6.0. Omit the optional chat settings configuration to ke
 | Choose a resolver and implement a server endpoint                      | [Resolver providers](./resolver-providers.md)                              |
 | Run a headless persistent conversation                                 | [Pi harness](./pi.md)                                                      |
 | Configure inline or popup chat and its styles                          | [Chat UI](./chat.md)                                                       |
+| Expose fallback tools to same-window scripts                           | [Page bridge](./page-bridge.md)                                            |
 | Set approval and authorization boundaries                              | [Security](./security.md)                                                  |
 | Evaluate resolver behavior                                             | [Resolver evaluations](./evals.md)                                         |
 

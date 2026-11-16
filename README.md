@@ -4,7 +4,7 @@ Expose application actions as typed tools. WebMCP Kit connects those actions to 
 
 The core, command input, Pi controller, and chat custom element work without a framework. Optional Vue, React, and Svelte helpers manage tool registration in their component lifecycles.
 
-Version **0.5.0** introduces breaking API changes. See the [0.5 migration guide](./docs/migration-0.5.md) when upgrading from 0.4.
+See the [changelog](./CHANGELOG.md) and [migration guides](./docs/README.md#start-here) for version-specific changes.
 
 ## Quick start
 
@@ -54,6 +54,7 @@ Replace the example handler with an action your normal interface already uses. K
 | `/devtools`                       | Tool inspection and invocation overlay                               |
 | `/testing`, `/testing/playwright` | Test bridge, evaluations, browser helpers                            |
 | `/mcp-bridge`                     | Local message adapter for `tools/list` and `tools/call`              |
+| `/page-bridge`                    | Same-window registry bridge for embedded agents                      |
 
 The package bundles its Pi implementation libraries. Consumers do not install them separately. Framework and Zod peers are optional and needed only for their own entry points. Core and chat imports do not load Pi. All entry points are ESM and support Bundler and NodeNext declaration resolution.
 
@@ -73,6 +74,8 @@ Chat is independent: configure `<webmcp-chat>` with a Pi controller or your own 
 - [Documentation index](./docs/README.md): framework guides, examples, and API contracts.
 - [Resolver providers](./docs/resolver-providers.md): local, browser, remote, and hosted inference.
 - [Pi](./docs/pi.md) and [chat](./docs/chat.md): storage, cancellation, ownership, and UI.
+- [Page bridge](./docs/page-bridge.md): same-window discovery and invocation for embedded agents.
+- [Upgrading](./docs/upgrading.md): consumer behavior changes from 0.5 through 0.9.
 - [Security](./docs/security.md): validation, approval, and server authorization.
 - [Operations](./docs/operations.md): HTTPS, package checks, release, and troubleshooting.
 - [API reference](./docs/api-reference.md): generated public declarations with source links.

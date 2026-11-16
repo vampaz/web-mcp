@@ -19,7 +19,7 @@ This guide explains runtime behavior. The generated reference lists all public e
 | `/zod`                      | `defineZodTool`                                               | Zod 4                                              |
 | `/devtools`                 | `mountDevtoolsOverlay`                                        | None                                               |
 | `/testing`                  | Resolver evaluations and Playwright helpers                   | None; supply a resolver or compatible browser page |
-| `/testing/playwright`       | Page bridge helpers without evaluation imports                | None; supply a compatible browser page             |
+| `/testing/playwright`       | Test bridge helpers without evaluation imports                | None; supply a compatible browser page             |
 | `/mcp-bridge`               | `createLocalMCPBridge`                                        | None                                               |
 | `/page-bridge`              | `installPageBridge`                                           | None                                               |
 
@@ -237,6 +237,8 @@ if (import.meta.env.DEV) {
 ```
 
 `createLocalMCPBridge()` exposes `listTools()`, `callTool(name, input)`, and `handleRequest(request)`. The request handler accepts `tools/list` and `tools/call`, uses JSON-RPC-style results/errors (including `-32600` when the request is not an object), and routes calls through core approval with `source: 'mcp-bridge'`. `tools/list` returns only currently available tools, with `outputSchema` and `annotations` when defined; successful calls to tools with an output schema include `structuredContent`, which can be any JSON value the schema allows. Output that `JSON.stringify` cannot carry returns `isError: true` with a fixed message. The bridge reads the schema before the call, so a tool that unregisters itself still returns it. It is an in-process adapter, not a network MCP server, authentication system, or complete MCP transport implementation.
+
+`installPageBridge()` exposes available fallback-registry tools to same-window scripts over the `webmcp-kit-bridge/v1` `window.postMessage` protocol. It supports discovery, invocation, cancellation, and registry-change notices; duplicate in-flight request IDs are rejected without replacing the first call. It is same-window only and adds no trust beyond a script already running in the page. See the [page bridge guide](./page-bridge.md) for message fields, replies, and trust boundaries.
 
 ## Testing and evaluations
 
