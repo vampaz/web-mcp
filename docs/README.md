@@ -9,7 +9,7 @@ See the [changelog](../CHANGELOG.md) and migration guides below for version-spec
 | Task                                                                   | Guide                                                                      |
 | ---------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | Upgrade from 0.4                                                       | [Upgrading to 0.5.0](./migration-0.5.md)                                   |
-| Upgrade from 0.5 through 0.9                                           | [Consumer upgrade guide](./upgrading.md)                                   |
+| Upgrade from 0.5 through 0.10                                          | [Consumer upgrade guide](./upgrading.md)                                   |
 | Upgrade from 0.3                                                       | [Upgrading to 0.4.0](./migration-0.4.md), then [0.5.0](./migration-0.5.md) |
 | Upgrade an application that used the planner API                       | [Upgrading to 0.3.0](./migration-0.3.md)                                   |
 | Integrate tools and optional chat into an application                  | [Integration walkthrough](./integration.md)                                |

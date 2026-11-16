@@ -75,7 +75,7 @@ Chat is independent: configure `<webmcp-chat>` with a Pi controller or your own 
 - [Resolver providers](./docs/resolver-providers.md): local, browser, remote, and hosted inference.
 - [Pi](./docs/pi.md) and [chat](./docs/chat.md): storage, cancellation, ownership, and UI.
 - [Page bridge](./docs/page-bridge.md): same-window discovery and invocation for embedded agents.
-- [Upgrading](./docs/upgrading.md): consumer behavior changes from 0.5 through 0.9.
+- [Upgrading](./docs/upgrading.md): consumer behavior changes from 0.5 through 0.10.
 - [Security](./docs/security.md): validation, approval, and server authorization.
 - [Operations](./docs/operations.md): HTTPS, package checks, release, and troubleshooting.
 - [API reference](./docs/api-reference.md): generated public declarations with source links.

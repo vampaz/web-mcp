@@ -1,8 +1,8 @@
-# Upgrading from 0.5 through 0.9
+# Upgrading from 0.5 through 0.10
 
 [Documentation index](./README.md) · [Changelog](../CHANGELOG.md) · [API reference](./api-reference.md)
 
-This guide covers consumer-visible behavior from 0.5.0 through 0.9.1. Read the linked migration and API guides for the full contracts. For releases after 0.9.1, use the [changelog](../CHANGELOG.md) as the source of truth.
+This guide covers consumer-visible behavior from 0.5.0 through 0.10.0. Read the linked migration and API guides for the full contracts. For releases after 0.10.0, use the [changelog](../CHANGELOG.md) as the source of truth.
 
 ## 0.5 baseline
 
@@ -56,6 +56,18 @@ Chat changes in 0.9.0 are visible to hosts and users:
 - The `conversationModel` and `provider` labels are unused.
 
 0.9.1 makes guarded calls fail closed when a guard does not approve. Invocation outcomes carry the invocation ID, including pre-execution outcomes. Vue watched tool sets re-sync and retire stale registrations; React preserves the guard receiver and also fails closed.
+
+## 0.10
+
+0.10.0 adds the `/assistant`, `/server`, `/chat/markdown`, and CDN script-tag integrations. Existing entry points keep their exports. Review these consumer-visible changes before upgrading:
+
+- `scope()` now fails closed. A scope that returns `undefined`, `null`, or an object without a boolean `available` marks the tool unavailable and returns `scope_failed`. Tools without `scope` stay available. Fix any scope that relied on a nullish result meaning available.
+- The inline chat now defaults to a stable block size at its previous minimum instead of growing with the conversation. A host `block-size` still wins; set one when the panel should fill its container.
+- Confirmation handlers receive `callerRequired`. It is true when the caller added the requirement, such as Pi's untrusted-content rule. A source-scoped preference can use it to preserve the approval; the handler still decides. Do not skip a caller-required prompt just because the chat preference is off.
+- The new `/server` entry rejects `pattern` in caller-supplied tool `inputSchema`, including nested positions, with an explicit `400` before authorization or any upstream request. Keep pattern validation in the authoritative tool definition at invocation and send a pattern-free schema to the server resolver. This policy applies to the server entry; browser and core schemas keep their existing `pattern` support.
+- Chat hides “Try again” after an action completes or fails, and shows a declined action with neutral text. Update UI tests that expected a retry after a mutating call.
+
+See the [server resolver provider contract](./resolver-providers.md), [chat guide](./chat.md), and [integration guide](./integration.md) for the new entries.
 
 ## Upgrade checklist
 
