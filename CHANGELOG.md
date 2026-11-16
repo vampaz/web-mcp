@@ -30,6 +30,7 @@
 - **Chat:** accept `mode`, `theme`, `placement`, `heading` and `placeholder` attributes as defaults below `configure()` options.
 - **Chat:** add `requestApproval()` with an application-controlled in-chat approval card. It opens a closed popup, focuses Deny, and denies pending cards on abort, disconnect, controller replacement or replacement requests.
 - **Chat:** add the `/chat/markdown` entry with a dependency-free `renderMarkdown()` that builds DOM and text only and limits links to `http:`, `https:` and `mailto:`.
+- **Assistant:** add the `/assistant` entry with `mountAssistant()` and `createDialogApproval()`. `mountAssistant()` creates the Pi harness and chat element, resolves `ready` after mounting or a late teardown, rejects it after cleanup on initialization failure, and waits for pending initialization and a controller that finishes after `destroy()` before teardown settles. Repeated `destroy()` calls return the same promise, cleanup failure rejects it, and the borrowed resolver and application tools stay application-owned. `createDialogApproval()` extracts the documented dialog approval flow with abort and replacement handling, a bounded input summary, and an unreadable-input fallback.
 
 ## 0.9.1 — 2026-11-16
 

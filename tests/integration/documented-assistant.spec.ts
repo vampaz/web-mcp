@@ -1,17 +1,42 @@
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { clearToolsForTest } from '@vampaz/webmcp-kit/testing'
 import { listTools, type ToolResolver } from '@vampaz/webmcp-kit'
 import { createPiHarness, type PiController } from '@vampaz/webmcp-kit/pi'
-import { createDialogApproval, mountCounterAssistant } from '../../docs/examples/counter-assistant'
+import { createDialogApproval } from '@vampaz/webmcp-kit/assistant'
+import { mountCounterAssistant } from '../../docs/examples/counter-assistant'
 
 vi.mock('@vampaz/webmcp-kit/pi', function mock() {
   return { createPiHarness: vi.fn() }
+})
+
+beforeEach(function layout() {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class ResizeObserverStub {
+      observe() {}
+      disconnect() {}
+    }
+  )
+  vi.stubGlobal('matchMedia', function matchMedia() {
+    return { matches: false }
+  })
+  Object.defineProperty(HTMLElement.prototype, 'showPopover', {
+    configurable: true,
+    value() {}
+  })
+  Object.defineProperty(HTMLElement.prototype, 'hidePopover', {
+    configurable: true,
+    value() {}
+  })
 })
 
 afterEach(function cleanup() {
   clearToolsForTest()
   document.body.replaceChildren()
   vi.resetAllMocks()
+  vi.unstubAllGlobals()
+  delete (HTMLElement.prototype as { showPopover?: unknown }).showPopover
+  delete (HTMLElement.prototype as { hidePopover?: unknown }).hidePopover
 })
 
 const resolver: ToolResolver = {
@@ -36,7 +61,39 @@ function mount() {
   })
 }
 
-it('destroys a late controller without mounting chat after the host unmounts', async function late() {
+it('mounts the documented chat and unregisters its tools on teardown', async function mounted() {
+  const destroy = vi.fn(async function destroy() {})
+  const api: PiController = {
+    getSnapshot() {
+      return { state: 'idle', messages: [] }
+    },
+    subscribe() {
+      return function remove() {}
+    },
+    async send() {
+      return { status: 'completed' }
+    },
+    async stop() {},
+    async clear() {},
+    async refresh() {},
+    destroy
+  }
+  vi.mocked(createPiHarness).mockResolvedValue(api)
+  const assistant = mount()
+  await assistant.ready
+
+  expect(listTools()).toHaveLength(2)
+  const chat = document.querySelector('webmcp-chat')
+  expect(chat).not.toBeNull()
+  expect(chat!.shadowRoot!.querySelector('h2')!.textContent).toBe('Counter assistant')
+
+  await assistant.destroy()
+  expect(listTools()).toHaveLength(0)
+  expect(document.querySelector('webmcp-chat')).toBeNull()
+  expect(destroy).toHaveBeenCalledOnce()
+})
+
+it('waits for a late controller and its cleanup before destroy settles', async function late() {
   let resolve!: (controller: PiController) => void
   const pending = new Promise<PiController>(function wait(complete) {
     resolve = complete
@@ -44,12 +101,32 @@ it('destroys a late controller without mounting chat after the host unmounts', a
   vi.mocked(createPiHarness).mockReturnValue(pending)
   const assistant = mount()
   expect(listTools()).toHaveLength(2)
-  await assistant.destroy()
-  expect(listTools()).toHaveLength(0)
-  const destroy = vi.fn(async function destroy() {})
+  let releaseCleanup!: () => void
+  const destroy = vi.fn(function destroy() {
+    return new Promise<void>(function wait(complete) {
+      releaseCleanup = complete
+    })
+  })
+  const teardown = assistant.destroy()
+  let settled = false
+  void teardown.then(function done() {
+    settled = true
+  })
+  await Promise.resolve()
+  expect(settled).toBe(false)
+
   resolve({ destroy } as unknown as PiController)
+  await vi.waitFor(function called() {
+    expect(destroy).toHaveBeenCalledOnce()
+  })
+  expect(settled).toBe(false)
+  expect(document.querySelector('webmcp-chat')).toBeNull()
+
+  releaseCleanup()
+  await teardown
   await assistant.ready
-  expect(destroy).toHaveBeenCalledOnce()
+  expect(settled).toBe(true)
+  expect(listTools()).toHaveLength(0)
   expect(document.querySelector('webmcp-chat')).toBeNull()
 })
 

@@ -33,12 +33,13 @@ flowchart TB
   Registry -->|Validate, approve, guard, execute| App
 ```
 
-| Surface           | Responsibility                                                                                    | Starts work on import?                                     |
-| ----------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Core              | Definitions, registry, native adapter, invocation, resolvers, diagnostics                         | No automatic tool registration or inference                |
-| `/pi`             | `createPiHarness`, current-context `createPiRuntime`, registry tool host, public controller types | No worker, storage, or model request                       |
-| `/chat`           | Text-only transcript and controls bound to a supplied controller                                  | Only after defining, mounting, and configuring the element |
-| Framework helpers | Register tools in a framework lifecycle                                                           | When the helper runs in its documented lifecycle           |
+| Surface           | Responsibility                                                                                    | Starts work on import?                                        |
+| ----------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Core              | Definitions, registry, native adapter, invocation, resolvers, diagnostics                         | No automatic tool registration or inference                   |
+| `/pi`             | `createPiHarness`, current-context `createPiRuntime`, registry tool host, public controller types | No worker, storage, or model request                          |
+| `/chat`           | Text-only transcript and controls bound to a supplied controller                                  | Only after defining, mounting, and configuring the element    |
+| `/assistant`      | Managed Pi harness plus chat element for application-owned tools and resolvers                    | When `mountAssistant()` is called; `ready` reports completion |
+| Framework helpers | Register tools in a framework lifecycle                                                           | When the helper runs in its documented lifecycle              |
 
 Core and chat do not load the Pi runtime. The distribution bundles Pi implementation dependencies, while `/chat` imports controller types only. A fake or application-owned controller can drive the same component. The page's default tool host uses the existing core registry; it does not create a second registry inside a worker.
 

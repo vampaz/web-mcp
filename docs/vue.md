@@ -48,9 +48,9 @@ supportTool.unregister() // unregister before scope disposal when needed
 
 ## Independent conversation UI
 
-Use the shared [Pi controller](./pi.md) and [chat custom element](./chat.md) for persistent conversations. Configure model access in application code, mount the element in the browser, and call `harness.destroy()` during teardown. If initialization finishes after unmount, destroy that late controller instead of attaching it. Core framework helpers still own tool registration and cleanup.
+Use `mountAssistant()` from `/assistant` for persistent conversations. It creates the shared [Pi controller](./pi.md) and [chat custom element](./chat.md), reports initialization through `ready`, and tears down a controller that finishes after unmount. The application still registers its own tools and owns the resolver. Core framework helpers still own tool registration and cleanup.
 
-`harnessOptions` is application-owned configuration from the Pi setup guide. Show initialization errors in the host's error UI.
+`harnessOptions` is application-owned configuration from the Pi setup guide and supplies `session`, `resolver`, and any `context`, `limits`, or `onCancel` callbacks; a custom `host` needs `/pi` with `/chat` instead. Show initialization errors in the host's error UI.
 
 ```vue
 <template>
@@ -60,26 +60,18 @@ Use the shared [Pi controller](./pi.md) and [chat custom element](./chat.md) for
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
-import { createPiHarness, type PiController } from '@vampaz/webmcp-kit/pi'
-import { defineWebMCPChat, type WebMCPChatElement } from '@vampaz/webmcp-kit/chat'
+import { mountAssistant, type MountedAssistant } from '@vampaz/webmcp-kit/assistant'
 import { harnessOptions } from './assistant-config'
 
 const container = ref<HTMLDivElement | null>(null)
 const error = ref('')
-let harness: PiController | undefined
+let assistant: MountedAssistant | undefined
 let closed = false
 onMounted(async function mount() {
-  defineWebMCPChat()
+  if (!container.value) return
+  assistant = mountAssistant({ container: container.value, ...harnessOptions })
   try {
-    const next = await createPiHarness(harnessOptions)
-    if (closed) {
-      await next.destroy()
-      return
-    }
-    harness = next
-    const chat = document.createElement('webmcp-chat') as WebMCPChatElement
-    chat.configure({ controller: harness })
-    container.value?.append(chat)
+    await assistant.ready
   } catch (cause) {
     if (!closed)
       error.value = cause instanceof Error ? cause.message : 'The assistant could not start.'
@@ -87,7 +79,7 @@ onMounted(async function mount() {
 })
 onUnmounted(function cleanup() {
   closed = true
-  void harness?.destroy()
+  void assistant?.destroy()
 })
 </script>
 ```

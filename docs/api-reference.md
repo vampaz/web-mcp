@@ -30,6 +30,8 @@ Start with the [integration guide](./integration.md) for a working application, 
 
 - [`@vampaz/webmcp-kit/chat/markdown`](#vampazwebmcp-kitchatmarkdown)
 
+- [`@vampaz/webmcp-kit/assistant`](#vampazwebmcp-kitassistant)
+
 - [`@vampaz/webmcp-kit/command-input`](#vampazwebmcp-kitcommand-input)
 
 - [`@vampaz/webmcp-kit/hosted`](#vampazwebmcp-kithosted)
@@ -2694,6 +2696,77 @@ Safe, dependency-free Markdown for `renderMessage`. Inserts DOM nodes and text o
 
 ```ts
 declare function renderMarkdown(text: string, target: HTMLElement): void
+```
+
+## @vampaz/webmcp-kit/assistant
+
+### DialogApproval
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/assistant/src/interfaces/assistant.ts).
+
+```ts
+export interface DialogApproval {
+  confirm(request: ConfirmationRequest): Promise<boolean>
+  cancel(): void
+}
+```
+
+### MountAssistantOptions
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/assistant/src/interfaces/assistant.ts).
+
+```ts
+export interface MountAssistantOptions {
+  container: HTMLElement
+  session: PiSession
+  resolver: ToolResolver
+  context?: () => ResolverContext | Promise<ResolverContext>
+  limits?: PiLimits
+  onCancel?: () => void
+  /** Chat options except the controller, which the assistant creates. */
+  chat?: Omit<WebMCPChatOptions, 'controller'>
+}
+```
+
+### MountedAssistant
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/assistant/src/interfaces/assistant.ts).
+
+```ts
+export interface MountedAssistant {
+  /** Resolves after mounting or a late teardown; rejects after cleanup if initialization fails. */
+  ready: Promise<void>
+  /**
+   * Removes the element and destroys the controller. Waits for pending initialization and
+   * any late controller cleanup. Repeated calls return the same promise; cleanup failure rejects it.
+   */
+  destroy(): Promise<void>
+  readonly element: WebMCPChatElement | undefined
+  readonly controller: PiController | undefined
+}
+```
+
+### createDialogApproval
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/assistant/src/dialog-approval.ts).
+
+Builds the approval callback for the dialog markup in the integration guide.
+The dialog needs `[data-approval-text]` and a method="dialog" form whose buttons
+use value="deny" and value="approve".
+
+```ts
+declare function createDialogApproval(dialog: HTMLDialogElement): DialogApproval
+```
+
+### mountAssistant
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/assistant/src/mount.ts).
+
+Creates the Pi harness and chat element for an application that owns its tools and resolver.
+The returned controller and element are undefined until `ready` resolves.
+
+```ts
+declare function mountAssistant(options: MountAssistantOptions): MountedAssistant
 ```
 
 ## @vampaz/webmcp-kit/command-input

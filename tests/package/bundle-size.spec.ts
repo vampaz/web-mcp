@@ -27,6 +27,10 @@ const budgets: Record<string, { eager: number; total: number }> = {
   './chat': { eager: 25_900, total: 25_900 },
   // Dependency-free Markdown entry: reviewed graph 1,154 bytes after the linear inline parser.
   './chat/markdown': { eager: 1_300, total: 1_300 },
+  // New /assistant entry composes the reviewed chat and Pi graphs and the explicit lifecycle
+  // machine: 55,974 eager / 176,324 total, with no additional runtime dependency.
+  // New ceiling adds 10%, rounded up to 100.
+  './assistant': { eager: 60_900, total: 193_200 },
   './command-input': { eager: 32_900, total: 32_900 },
   // Phase 1–2 shared core invocation, validation and security growth raises the reviewed
   // devtools graph to 34,690; 10% policy applies.

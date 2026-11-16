@@ -13,6 +13,7 @@ This guide explains runtime behavior. The generated reference lists all public e
 | `/command-input`            | Command element and initializer                               | None                                               |
 | `/hosted`                   | Hosted session resolver                                       | None                                               |
 | `/chat`                     | `defineWebMCPChat`, `WebMCPChatElement`, `WebMCPChatOptions`  | None when supplied a controller                    |
+| `/assistant`                | `mountAssistant`, `createDialogApproval`                      | None; Pi libraries are bundled                     |
 | `/vue`, `/react`, `/svelte` | `useWebMCPTool`, `useWebMCPTools`                             | The selected framework                             |
 | `/zod`                      | `defineZodTool`                                               | Zod 4                                              |
 | `/devtools`                 | `mountDevtoolsOverlay`                                        | None                                               |
@@ -21,7 +22,7 @@ This guide explains runtime behavior. The generated reference lists all public e
 | `/mcp-bridge`               | `createLocalMCPBridge`                                        | None                                               |
 | `/page-bridge`              | `installPageBridge`                                           | None                                               |
 
-The package is ESM-only. Importing core, `/pi`, or `/chat` is safe during SSR. Browser initialization and DOM registration belong in client lifecycle code. See the [dependency model](./getting-started.md#dependency-model) for exact peer package names and development-only tooling.
+The package is ESM-only. Importing core, `/pi`, `/chat`, or `/assistant` is safe during SSR. Browser initialization and DOM registration belong in client lifecycle code. See the [dependency model](./getting-started.md#dependency-model) for exact peer package names and development-only tooling.
 
 ## Define and register tools
 
@@ -188,6 +189,14 @@ See [Pi](./pi.md#persistence-and-limits) for exact budget defaults and bounds. S
 Defaults: inline mode, light theme, “Assistant” title/assistant label, “Ask the assistant” placeholder, a 16,000-character message limit, and an empty-state invitation. Changing presentation with the same controller preserves history and the draft. Replacing the controller clears that view's draft and subscription; destroy the old controller yourself when its owner ends. `disabled` disables controls but does not cancel an active turn.
 
 `open()`, `close()`, `toggle()`, `focusComposer()`, and `setDraft(text)` control the element; the popup methods do nothing in inline mode. The element dispatches `webmcp-chat-toggle` and `webmcp-chat-send`, which bubble and are composed. Optional `settings` adds the shared provider/model/approval controls and an in-chat icon. The host owns resolver changes, persistence, and the approval policy; the `settings` slot supplies additional content. Omit the option to remove the module. Use `controller.send()` for headless work. New chat immediately calls `controller.clear()` without confirmation. `renderMessage` receives untrusted text; sanitize anything inserted as HTML. See [chat behavior, keyboard controls, labels, parts, slots, and CSS properties](./chat.md).
+
+## Managed assistant mount
+
+`mountAssistant({ container, session, resolver, context?, limits?, onCancel?, chat? })` creates the Pi harness and appends a configured `<webmcp-chat>` to `container`. Call it from browser lifecycle code. `chat` accepts every `WebMCPChatOptions` field except `controller`, and popup mode is the default. It does not register or unregister tools and does not dispose the supplied resolver. A custom `PiToolHost` is not an option; use `/pi` and `/chat` directly when you supply one.
+
+`ready` resolves after the element is mounted, or after a controller that finishes after `destroy()` is destroyed. It rejects with the initialization error after cleanup when the harness, chat configuration, or append fails. Calling `destroy()` before `ready` resolves waits for pending initialization, destroys a controller that finishes later, and settles only after that cleanup. Repeated calls return the same promise, and a controller cleanup failure rejects it. `destroy()` removes the element and destroys the controller; the application keeps its tool registrations and resolver.
+
+`createDialogApproval(dialog)` wires the documented `method="dialog"` approval dialog. The dialog needs `[data-approval-text]`; its buttons use `value="deny"` and `value="approve"`. The input summary is bounded and falls back to `[unserializable input]` for values that JSON cannot serialize. `confirm()` denies on abort, replacement, or dialog cancel and never leaves an earlier request pending. Call `cancel()` during application teardown.
 
 ## Framework lifecycle helpers
 

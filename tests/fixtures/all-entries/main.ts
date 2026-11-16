@@ -9,6 +9,7 @@ import { defineWebMCPCommandInput } from '@vampaz/webmcp-kit/command-input'
 import { createPiRuntime, type PiController } from '@vampaz/webmcp-kit/pi'
 import { defineWebMCPChat, type WebMCPChatElement } from '@vampaz/webmcp-kit/chat'
 import { renderMarkdown } from '@vampaz/webmcp-kit/chat/markdown'
+import { createDialogApproval, mountAssistant } from '@vampaz/webmcp-kit/assistant'
 import { createHostedOpenAIResolver } from '@vampaz/webmcp-kit/hosted'
 import { useWebMCPTool as useVueTool } from '@vampaz/webmcp-kit/vue'
 import { useWebMCPTool as useReactTool } from '@vampaz/webmcp-kit/react'
@@ -63,5 +64,7 @@ void [
   installWebMCPKitTestBridge,
   waitForWebMCPTool,
   createLocalMCPBridge,
-  installPageBridge
+  installPageBridge,
+  mountAssistant,
+  createDialogApproval
 ]

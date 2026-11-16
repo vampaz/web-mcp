@@ -46,42 +46,29 @@ cartTool.unregister() // unregister before unmount when needed
 
 ## Independent conversation UI
 
-Use the shared [Pi controller](./pi.md) and [chat custom element](./chat.md) for persistent conversations. Configure model access in application code, mount the element in the browser, and call `harness.destroy()` during teardown. If initialization finishes after unmount, destroy that late controller instead of attaching it. Core framework helpers still own tool registration and cleanup.
+Use `mountAssistant()` from `/assistant` for persistent conversations. It creates the shared [Pi controller](./pi.md) and [chat custom element](./chat.md), reports initialization through `ready`, and tears down a controller that finishes after unmount. The application still registers its own tools and owns the resolver. Core framework helpers still own tool registration and cleanup.
 
-`harnessOptions` is application-owned configuration from the Pi setup guide. Show initialization errors in the host's error UI.
+`harnessOptions` is application-owned configuration from the Pi setup guide and supplies `session`, `resolver`, and any `context`, `limits`, or `onCancel` callbacks; a custom `host` needs `/pi` with `/chat` instead. Show initialization errors in the host's error UI.
 
 ```tsx
 import { useEffect, useRef, useState } from 'react'
-import { createPiHarness, type PiController } from '@vampaz/webmcp-kit/pi'
-import { defineWebMCPChat, type WebMCPChatElement } from '@vampaz/webmcp-kit/chat'
+import { mountAssistant } from '@vampaz/webmcp-kit/assistant'
 import { harnessOptions } from './assistant-config'
 
 export function Assistant() {
   const container = useRef<HTMLDivElement>(null)
   const [error, setError] = useState('')
   useEffect(function mount() {
-    let closed = false
-    let harness: PiController | undefined
-    defineWebMCPChat()
-    void createPiHarness(harnessOptions)
-      .then(async function connected(next) {
-        if (closed) {
-          await next.destroy()
-          return
-        }
-        harness = next
-        const chat = document.createElement('webmcp-chat') as WebMCPChatElement
-        chat.configure({ controller: harness })
-        container.current?.append(chat)
-      })
-      .catch(function failed(cause) {
-        if (!closed)
-          setError(cause instanceof Error ? cause.message : 'The assistant could not start.')
-      })
+    if (!container.current) return
+    let active = true
+    const assistant = mountAssistant({ container: container.current, ...harnessOptions })
+    void assistant.ready.catch(function failed(cause) {
+      if (active)
+        setError(cause instanceof Error ? cause.message : 'The assistant could not start.')
+    })
     return function cleanup() {
-      closed = true
-      container.current?.replaceChildren()
-      void harness?.destroy()
+      active = false
+      void assistant.destroy()
     }
   }, [])
   return (

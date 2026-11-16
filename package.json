@@ -83,6 +83,10 @@
       "types": "./dist/packages/chat/src/markdown.d.ts",
       "default": "./dist/chat/markdown.js"
     },
+    "./assistant": {
+      "types": "./dist/packages/assistant/src/index.d.ts",
+      "default": "./dist/assistant.js"
+    },
     "./command-input": {
       "types": "./dist/packages/command-input/src/index.d.ts",
       "default": "./dist/command-input.js"

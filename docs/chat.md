@@ -4,6 +4,8 @@
 
 `@vampaz/webmcp-kit/chat` defines `<webmcp-chat>` explicitly. It imports controller types only. It can render a fake or application-owned `PiController` without loading the Pi runtime or installing a UI framework. Imports are safe during server rendering; call `defineWebMCPChat()` in the browser.
 
+Use `/assistant` and `mountAssistant()` when the page should also create the Pi controller and manage its startup and teardown. This entry remains for application-owned controllers, custom tool hosts, and UI-only use.
+
 ```ts
 import { defineWebMCPChat, type WebMCPChatElement } from '@vampaz/webmcp-kit/chat'
 

@@ -1,6 +1,6 @@
 # Contributing
 
-Use the Node version in `.nvmrc` and npm. The `packages/` directories organize one package; they are not npm workspaces. Each public entry point has a source directory: `core`, `command-input`, `hosted`, `pi`, `chat`, `devtools`, `testing`, `mcp-bridge`, `zod`, `vue`, `react`, and `svelte`.
+Use the Node version in `.nvmrc` and npm. The `packages/` directories organize one package; they are not npm workspaces. Each public entry point has a source directory: `core`, `command-input`, `hosted`, `pi`, `chat`, `assistant`, `devtools`, `testing`, `mcp-bridge`, `zod`, `vue`, `react`, and `svelte`.
 
 ```sh
 npm ci

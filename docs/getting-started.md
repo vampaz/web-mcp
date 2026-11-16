@@ -57,7 +57,7 @@ A module that registers at top level should also unregister in `import.meta.hot?
 
 ## Dependency model
 
-WebMCP Kit is one ESM package. Core, command input, Pi, chat, devtools, testing, and the local bridge require no framework. Pi's implementation libraries are bundled into the distribution and remain isolated from core/chat imports.
+WebMCP Kit is one ESM package. Core, command input, Pi, chat, assistant, devtools, testing, and the local bridge require no framework. Pi's implementation libraries are bundled into the distribution and remain isolated from core/chat imports.
 
 Install `vue` for `/vue`, `react` for `/react`, `svelte` for `/svelte`, or `zod` for `/zod`. The accepted peer ranges are Vue 3.3+, React 18+, Svelte 4+, and Zod 4+. A declared range is not evidence that every version has been tested. The package requires Node 24 or newer for tooling, matching this repository's development version in `.nvmrc`.
 
