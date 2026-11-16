@@ -226,6 +226,46 @@ it('shows a declined tool call with neutral status', function declinedTool() {
   expect(row.querySelector('summary .visually-hidden')!.textContent).toBe('set_counter — declined')
 })
 
+it('uses friendly tool labels and hides row details on request', function friendlyTools() {
+  const list = document.createElement('ol')
+  const messages = [
+    {
+      id: 'tool',
+      role: 'tool' as const,
+      toolName: 'set_counter',
+      text: 'Counter: 7',
+      status: 'success' as const,
+      input: { value: 7 },
+      output: { value: 7 }
+    }
+  ]
+  updateTranscript(list, messages, 'Assistant', labels, undefined, {
+    toolLabel: function label(name) {
+      return name === 'set_counter' ? 'Counter' : name
+    },
+    toolDetails: 'hidden'
+  })
+  let row = list.querySelector<HTMLElement>('.tool-call')!
+  expect(row.dataset.details).toBe('hidden')
+  expect(row.querySelector('.tool-name')!.textContent).toBe('Counter')
+  expect(row.querySelector<HTMLElement>('.tool-args')!.hidden).toBe(true)
+  expect(row.querySelector('summary')!.getAttribute('tabindex')).toBe('-1')
+  expect(row.querySelector('summary')!.getAttribute('aria-disabled')).toBe('true')
+  expect(row.querySelector('summary .visually-hidden')!.textContent).toBe('Counter')
+
+  updateTranscript(list, messages, 'Assistant', labels, undefined, {
+    toolLabel: function label(name) {
+      return name === 'set_counter' ? 'Counter' : name
+    },
+    toolDetails: 'full'
+  })
+  row = list.querySelector<HTMLElement>('.tool-call')!
+  expect(row.dataset.details).toBe('full')
+  expect(row.querySelector<HTMLElement>('.tool-args')!.hidden).toBe(false)
+  expect(row.querySelector('summary')!.getAttribute('tabindex')).toBe('0')
+  expect(row.querySelector('summary')!.getAttribute('aria-disabled')).toBe('false')
+})
+
 it('groups only consecutive tool calls and keeps rows when a group grows', function grouping() {
   const list = document.createElement('ol')
   const first = { id: 'a', role: 'tool' as const, toolName: 'read', text: 'one' }
@@ -315,6 +355,30 @@ it('calls a custom message renderer only when message text changes', function cu
   expect(renderMessage).toHaveBeenCalledTimes(3)
 })
 
+it('warns when history is nearly full without overriding errors', function history() {
+  const usage = { historyBytes: 90, maxHistoryBytes: 100 }
+  expect(statusText({ state: 'idle', messages: [], usage }, labels)).toEqual({
+    text: 'This conversation is almost full. Start a new chat soon.'
+  })
+  expect(
+    statusText(
+      { state: 'idle', messages: [], usage: { historyBytes: 89, maxHistoryBytes: 100 } },
+      labels
+    )
+  ).toEqual({ text: '' })
+  expect(
+    statusText(
+      {
+        state: 'error',
+        messages: [],
+        usage,
+        error: { code: 'provider_failed', message: 'Provider failed' }
+      },
+      labels
+    )
+  ).toEqual({ text: 'The model could not be reached. Try again.', tone: 'error' })
+})
+
 it('describes the current activity', function activity() {
   expect(activityText(undefined, labels)).toBe('Working…')
   expect(activityText({ kind: 'resolving' }, labels)).toBe('Thinking…')
@@ -325,6 +389,11 @@ it('describes the current activity', function activity() {
   expect(activityText({ kind: 'tool', toolName: 'save', phase: 'approval' }, labels)).toBe(
     'Waiting for your approval: save'
   )
+  expect(
+    activityText({ kind: 'tool', toolName: 'save', phase: 'approval' }, labels, function label() {
+      return 'Save note'
+    })
+  ).toBe('Waiting for your approval: Save note')
 })
 
 it('formats limits with the configured locale and keeps unspecified labels', function locale() {

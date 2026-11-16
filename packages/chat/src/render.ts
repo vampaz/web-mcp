@@ -15,6 +15,12 @@ interface RenderedTool {
   outcome: string
   preview: string
   sections: string
+  details: ToolRenderOptions['toolDetails']
+}
+
+export interface ToolRenderOptions {
+  toolLabel?: (toolName: string) => string
+  toolDetails?: 'full' | 'hidden'
 }
 
 type TranscriptItem =
@@ -43,7 +49,8 @@ export function updateTranscript(
   messages: readonly PiMessage[],
   assistantLabel: string,
   labels: WebMCPChatLabels,
-  renderMessage?: WebMCPChatOptions['renderMessage']
+  renderMessage?: WebMCPChatOptions['renderMessage'],
+  toolOptions: ToolRenderOptions = {}
 ): boolean {
   let changed = false
   const existing = new Map(
@@ -60,7 +67,7 @@ export function updateTranscript(
     }
     if (!node) node = createNode(id, item.layout)
     if (item.layout === 'tools') {
-      if (renderTools(node, item.messages, labels)) changed = true
+      if (renderTools(node, item.messages, labels, toolOptions)) changed = true
     } else if (renderText(node, item.message, item.layout, assistantLabel, labels, renderMessage))
       changed = true
     if (list.children.item(index) !== node) {
@@ -155,7 +162,12 @@ function renderText(
   return true
 }
 
-function renderTools(node: HTMLElement, messages: readonly PiMessage[], labels: WebMCPChatLabels) {
+function renderTools(
+  node: HTMLElement,
+  messages: readonly PiMessage[],
+  labels: WebMCPChatLabels,
+  toolOptions: ToolRenderOptions
+) {
   let changed = false
   if (node.dataset.role !== 'tool') {
     node.dataset.role = 'tool'
@@ -177,7 +189,7 @@ function renderTools(node: HTMLElement, messages: readonly PiMessage[], labels: 
   )
   for (const [index, message] of messages.entries()) {
     const row = existing.get(message.id) ?? createToolRow(message.id)
-    if (renderTool(row, message, labels)) changed = true
+    if (renderTool(row, message, labels, toolOptions)) changed = true
     if (calls.children.item(index) !== row) {
       calls.insertBefore(row, calls.children.item(index))
       changed = true
@@ -225,13 +237,29 @@ function createToolRow(id: string): HTMLElement {
   const sections = document.createElement('div')
   sections.className = 'tool-sections'
   row.append(summary, sections)
+  summary.addEventListener('click', function blockHiddenToggle(event) {
+    if (row.dataset.details === 'hidden') event.preventDefault()
+  })
+  summary.addEventListener('keydown', function blockHiddenKey(event) {
+    if (row.dataset.details === 'hidden' && (event.key === 'Enter' || event.key === ' '))
+      event.preventDefault()
+  })
+  row.addEventListener('toggle', function keepHiddenClosed() {
+    if (row.dataset.details === 'hidden' && row.open) row.open = false
+  })
   return row
 }
 
-function renderTool(row: HTMLElement, message: PiMessage, labels: WebMCPChatLabels) {
+function renderTool(
+  row: HTMLElement,
+  message: PiMessage,
+  labels: WebMCPChatLabels,
+  toolOptions: ToolRenderOptions
+) {
   const tone = toolTone(message)
-  const name = message.toolName ?? labels.tool
-  const label = messageLabel(message, '', labels)
+  const name = toolNameLabel(message, labels, toolOptions.toolLabel)
+  const details = toolOptions.toolDetails ?? 'full'
+  const label = messageLabel(message, '', labels, toolOptions.toolLabel)
   const outcome =
     tone === 'unknown'
       ? labels.toolStatusUnknown
@@ -255,17 +283,24 @@ function renderTool(row: HTMLElement, message: PiMessage, labels: WebMCPChatLabe
     previous.label === label &&
     previous.outcome === outcome &&
     previous.preview === preview &&
-    previous.sections === sections
+    previous.sections === sections &&
+    previous.details === details
   )
     return false
   if (row.dataset.status !== tone) {
     row.dataset.status = tone
     row.querySelector('.tool-state')!.innerHTML = icon(toolIcons[tone])
   }
+  if (row.dataset.details !== details) {
+    row.dataset.details = details
+    row.toggleAttribute('open', false)
+    row.querySelector('summary')!.tabIndex = details === 'hidden' ? -1 : 0
+    row.querySelector('summary')!.setAttribute('aria-disabled', String(details === 'hidden'))
+  }
   setText(row.querySelector('.tool-name')!, name)
   const args = row.querySelector<HTMLElement>('.tool-args')!
   setText(args, preview)
-  args.hidden = !preview
+  args.hidden = !preview || details === 'hidden'
   const status = row.querySelector<HTMLElement>('.tool-outcome')!
   setText(status, outcome)
   status.hidden = !outcome
@@ -280,7 +315,7 @@ function renderTool(row: HTMLElement, message: PiMessage, labels: WebMCPChatLabe
     )
     row.querySelector('.tool-sections')!.replaceChildren(...parts)
   }
-  renderedTools.set(row, { label, outcome, preview, sections })
+  renderedTools.set(row, { label, outcome, preview, sections, details })
   return true
 }
 
@@ -309,11 +344,25 @@ function argumentPreview(input: Record<string, unknown> | undefined): string {
   return text.length > previewLength ? `${text.slice(0, previewLength - 1)}…` : text
 }
 
-function messageLabel(message: PiMessage, assistantLabel: string, labels: WebMCPChatLabels) {
+function toolNameLabel(
+  message: PiMessage,
+  labels: WebMCPChatLabels,
+  toolLabel?: ToolRenderOptions['toolLabel']
+) {
+  if (!message.toolName) return labels.tool
+  return toolLabel?.(message.toolName) ?? message.toolName
+}
+
+function messageLabel(
+  message: PiMessage,
+  assistantLabel: string,
+  labels: WebMCPChatLabels,
+  toolLabel?: ToolRenderOptions['toolLabel']
+) {
   if (message.role === 'user') return labels.user
   if (message.role === 'assistant')
     return message.failed ? labels.responseFailed(assistantLabel) : assistantLabel
-  const name = message.toolName ?? labels.tool
+  const name = toolNameLabel(message, labels, toolLabel)
   if (message.status === 'unknown') return labels.toolUnknown(name)
   if (message.code === 'confirmation_denied') return labels.toolDeclined(name)
   return message.failed || (message.status !== undefined && message.status !== 'success')
@@ -366,14 +415,20 @@ export function statusText(snapshot: PiSnapshot, labels: WebMCPChatLabels): Chat
   if (snapshot.state === 'loading') return { text: labels.status.loading }
   if (snapshot.state === 'interrupted') return { text: labels.status.interrupted }
   if (snapshot.state === 'closed') return { text: labels.status.closed }
+  const usage = snapshot.usage
+  if (usage && usage.maxHistoryBytes > 0 && usage.historyBytes >= usage.maxHistoryBytes * 0.9)
+    return { text: labels.status.historyNearlyFull }
   return { text: '' }
 }
 
-export function activityText(activity: PiActivity | undefined, labels: WebMCPChatLabels): string {
+export function activityText(
+  activity: PiActivity | undefined,
+  labels: WebMCPChatLabels,
+  toolLabel?: ToolRenderOptions['toolLabel']
+): string {
   if (!activity) return labels.working
   if (activity.kind === 'resolving') return labels.thinking
   if (activity.kind === 'compacting') return labels.compacting
-  return activity.phase === 'approval'
-    ? labels.awaitingApproval(activity.toolName)
-    : labels.runningTool(activity.toolName)
+  const name = toolLabel?.(activity.toolName) ?? activity.toolName
+  return activity.phase === 'approval' ? labels.awaitingApproval(name) : labels.runningTool(name)
 }

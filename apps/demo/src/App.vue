@@ -204,6 +204,7 @@ const ToolkitExamples = defineAsyncComponent(function load() {
 
 const parameters = new URLSearchParams(location.search)
 const requestedMode = parameters.get('mode') ?? 'chat'
+const persistPopup = parameters.get('persist') || undefined
 const mode = ['core', 'harness', 'chat', 'toolkit', 'storage'].includes(requestedMode)
   ? requestedMode
   : 'chat'
@@ -304,6 +305,7 @@ function configureChats() {
         }
       },
       assistantLabel: 'Assistant',
+      persistKey: persistPopup,
       suggestedPrompts: ['Read the counter', 'Set the counter to 7'],
       emptyState: 'Ask a question or request an action to get started.'
     })

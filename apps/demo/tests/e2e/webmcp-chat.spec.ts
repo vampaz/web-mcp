@@ -869,6 +869,141 @@ test('opens the popup as a full-width bottom sheet on a phone', async function s
   await expect(chat.getByRole('button', { name: 'Close chat', exact: true })).toBeVisible()
 })
 
+test('shows a launcher dot for a reply that arrives while the popup is closed', async function unread({
+  page
+}) {
+  await page.goto('/?mode=chat&presentation=popup')
+  const chat = page.locator('webmcp-chat')
+  const launcher = chat.locator('.launcher')
+  await chat.evaluate(function configure(element) {
+    const target = element as WebMCPChatElement & {
+      publishReview(snapshot: PiSnapshot): void
+    }
+    let listener: ((value: PiSnapshot) => void) | undefined
+    let snapshot: PiSnapshot = { state: 'idle', messages: [] }
+    target.publishReview = function publish(next) {
+      snapshot = next
+      listener?.(next)
+    }
+    target.controller = {
+      getSnapshot() {
+        return snapshot
+      },
+      subscribe(next) {
+        listener = next
+        next(snapshot)
+        return function remove() {}
+      },
+      async send() {
+        return { status: 'completed' }
+      },
+      async stop() {},
+      async clear() {},
+      async refresh() {},
+      async destroy() {}
+    }
+  })
+  await launcher.click()
+  await chat.evaluate(function running(element) {
+    const target = element as WebMCPChatElement & {
+      publishReview(snapshot: PiSnapshot): void
+    }
+    target.publishReview({
+      state: 'running',
+      messages: [{ id: 'q', role: 'user', text: 'New question' }]
+    })
+  })
+  await chat.getByRole('button', { name: 'Close chat', exact: true }).click()
+  await chat.evaluate(function completed(element) {
+    const target = element as WebMCPChatElement & {
+      publishReview(snapshot: PiSnapshot): void
+    }
+    target.publishReview({
+      state: 'idle',
+      messages: [
+        { id: 'q', role: 'user', text: 'New question' },
+        { id: 'a', role: 'assistant', text: 'New answer' }
+      ]
+    })
+  })
+  await expect(launcher).toHaveAttribute('data-unread', '')
+  await expect(launcher).toHaveAttribute('aria-label', 'Open Assistant, new reply')
+  await launcher.click()
+  await expect(launcher).not.toHaveAttribute('data-unread', '')
+  await expect(launcher).toHaveAttribute('aria-label', 'Open Assistant')
+  await expect(chat).toContainText('New answer')
+})
+
+test('persists opt-in popup position, size, and open state without drafts', async function persistence({
+  page
+}) {
+  await page.setViewportSize({ width: 1100, height: 800 })
+  await page.goto('/?mode=chat&presentation=popup&persist=review')
+  const chat = page.locator('webmcp-chat')
+  const launcher = chat.locator('.launcher')
+  await expect(launcher).toBeVisible()
+  const start = (await launcher.boundingBox())!
+  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(start.x - 160, start.y - 120, { steps: 5 })
+  await page.mouse.up()
+  const movedLauncher = (await launcher.boundingBox())!
+
+  await launcher.click()
+  const panel = chat.getByRole('dialog', { name: 'Assistant', exact: true })
+  await expect(panel).toBeVisible()
+  const resize = chat.getByRole('button', { name: 'Resize chat', exact: true })
+  await resize.click()
+  await resize.press('ArrowLeft')
+  await resize.press('ArrowUp')
+  const panelBefore = (await panel.boundingBox())!
+  await chat.getByRole('textbox', { name: 'Message', exact: true }).fill('Private draft')
+
+  await expect
+    .poll(function stored() {
+      return page.evaluate(function read() {
+        return localStorage.getItem('webmcp-chat:review')
+      })
+    })
+    .not.toBeNull()
+  const raw = (await page.evaluate(function read() {
+    return localStorage.getItem('webmcp-chat:review')
+  }))!
+  const stored = JSON.parse(raw) as Record<string, unknown>
+  expect(Object.keys(stored).sort()).toEqual(['open', 'panel', 'position'])
+  expect(stored.open).toBe(true)
+  expect(raw).not.toContain('Private draft')
+  expect(raw).not.toContain('Fixture answer')
+
+  await page.reload()
+  await expect(panel).toBeVisible()
+  const restoredLauncher = (await launcher.boundingBox())!
+  const restoredPanel = (await panel.boundingBox())!
+  expect(Math.abs(restoredLauncher.x - movedLauncher.x)).toBeLessThan(2)
+  expect(Math.abs(restoredLauncher.y - movedLauncher.y)).toBeLessThan(2)
+  expect(Math.abs(restoredPanel.width - panelBefore.width)).toBeLessThan(2)
+  expect(Math.abs(restoredPanel.height - panelBefore.height)).toBeLessThan(2)
+  await expect(chat.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('')
+
+  await page.setViewportSize({ width: 700, height: 600 })
+  await expect
+    .poll(async function contained() {
+      const launcherBox = (await launcher.boundingBox())!
+      const panelBox = (await panel.boundingBox())!
+      return (
+        launcherBox.x >= 0 &&
+        launcherBox.y >= 0 &&
+        launcherBox.x + launcherBox.width <= 700 &&
+        launcherBox.y + launcherBox.height <= 600 &&
+        panelBox.x >= 0 &&
+        panelBox.y >= 0 &&
+        panelBox.x + panelBox.width <= 700 &&
+        panelBox.y + panelBox.height <= 600
+      )
+    })
+    .toBe(true)
+})
+
 test('drags the popup launcher and panel, resizes by keyboard, and stays within the viewport', async function geometry({
   page
 }) {

@@ -24,6 +24,10 @@
 - **Chat:** map provider failures to a retryable message and add a safe “Try again” action that resends the last user message once. It stays hidden after denials, unknown outcomes, and actions that may have run.
 - **Chat:** keep inline height stable at the minimum by default while preserving host `block-size` overrides.
 - **Chat:** add `suggestionAction: 'draft' | 'send'` and raise small text and coarse-pointer touch targets to readable and 44px minimum sizes.
+- **Chat:** add `toolLabel()` display names, `toolDetails: 'hidden'` for non-expanding tool rows, and launcher unread state for replies that arrive while the popup is closed.
+- **Chat:** add opt-in `persistKey` popup persistence for open state, launcher position and panel size, ignoring malformed or blocked storage and excluding messages and drafts.
+- **Chat:** warn neutrally when conversation history reaches 90% of its limit, with errors taking priority.
+- **Chat:** accept `mode`, `theme`, `placement`, `heading` and `placeholder` attributes as defaults below `configure()` options.
 
 ## 0.9.1 — 2026-11-16
 

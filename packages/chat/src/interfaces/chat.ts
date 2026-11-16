@@ -7,6 +7,7 @@ export interface WebMCPChatStatusLabels {
   error: string
   providerFailed: string
   declined: string
+  historyNearlyFull: string
   closed: string
   lastFailed: string
   newChatStarted: string
@@ -72,6 +73,7 @@ export interface WebMCPChatLabels {
   noModelsMatch: string
   status: WebMCPChatStatusLabels
   openChat(title: string): string
+  openChatUnread(title: string): string
   /** Heading of a block of consecutive tool calls. */
   toolsUsed(count: number): string
   /** Accessible name of the composer model button; must contain the visible model label. */
@@ -100,6 +102,12 @@ export interface WebMCPChatOptions {
   suggestedPrompts?: readonly string[]
   /** Defaults to `draft`; `send` submits a suggestion as soon as it is clicked. */
   suggestionAction?: 'draft' | 'send'
+  /** Opt-in localStorage key suffix for popup open state, launcher position and panel size. */
+  persistKey?: string
+  /** Display name for a tool in rows and activity text. */
+  toolLabel?: (toolName: string) => string
+  /** Defaults to `full`; `hidden` removes the argument preview and row expansion. */
+  toolDetails?: 'full' | 'hidden'
   disabled?: boolean
   /** Optional provider, model and approval controls. The application owns their behavior. */
   settings?: WebMCPChatSettings

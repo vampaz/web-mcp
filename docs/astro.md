@@ -61,4 +61,4 @@ Use the shared [Pi controller](./pi.md) and [chat custom element](./chat.md) for
 </script>
 ```
 
-The application-owned host handles ordinary navigation and Astro ClientRouter DOM replacement through custom-element lifecycle callbacks. It also destroys a controller that finishes initializing after the element was removed.
+The application-owned host handles ordinary navigation and Astro ClientRouter DOM replacement through custom-element lifecycle callbacks. It also destroys a controller that finishes initializing after the element was removed. Static `mode`, `theme`, `placement`, `heading` and `placeholder` attributes can describe the element before the controller exists; set `chat.controller` or call `configure()` when it is ready, and explicit options win over those defaults.

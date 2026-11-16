@@ -1,6 +1,8 @@
 import { createStateMachine } from '../../core/src/state-machine'
 import type { ChatOperationState, ChatOperationEvent } from './interfaces/chat-state'
 import { transitionChatOperation } from './chat-state'
+import type { LauncherUnreadEvent, LauncherUnreadState } from './unread-state'
+import { transitionLauncherUnread } from './unread-state'
 import type { PiController, PiSnapshot } from '@vampaz/webmcp-kit/pi'
 import type {
   ChatStatus,
@@ -22,6 +24,9 @@ const defaultMessageLimit = 16000
 export function defineWebMCPChat(): void {
   if (typeof customElements === 'undefined' || customElements.get('webmcp-chat')) return
   class ChatElement extends HTMLElement implements WebMCPChatElement {
+    static get observedAttributes() {
+      return ['mode', 'theme', 'placement', 'heading', 'placeholder']
+    }
     private options?: WebMCPChatOptions
     private labels: WebMCPChatLabels = createLabels()
     private unsubscribe?: () => void
@@ -43,6 +48,10 @@ export function defineWebMCPChat(): void {
     private activity = ''
     private notice?: ChatStatus
     private unread = false
+    private readonly launcherUnread = createStateMachine<LauncherUnreadState, LauncherUnreadEvent>(
+      'initial',
+      transitionLauncherUnread
+    )
     private readonly focusTrackers = new Set<() => boolean>()
     private readonly coarsePointer = matchMedia('(pointer: coarse)')
     private readonly root = this.attachShadow({ mode: 'open' })
@@ -195,6 +204,11 @@ export function defineWebMCPChat(): void {
         this.updateComposer()
         void this.send()
       })
+      this.addEventListener('webmcp-chat-toggle', (event) => {
+        if (!(event as CustomEvent<{ open: boolean }>).detail.open) return
+        this.launcherUnread.send('opened')
+        this.popup.setUnread(false)
+      })
       this.transcript.addEventListener('scroll', () => this.updateJump())
       this.jumpButton.addEventListener('click', () => {
         this.scrollToEnd()
@@ -209,6 +223,9 @@ export function defineWebMCPChat(): void {
       this.popup.connect()
       this.resizeObserver.observe(this.transcript)
       this.connect()
+    }
+    attributeChangedCallback() {
+      this.applyStaticOptions()
     }
     disconnectedCallback() {
       this.popup.disconnect()
@@ -273,6 +290,8 @@ export function defineWebMCPChat(): void {
         this.latestId = this.latestText = undefined
         this.notice = undefined
         this.unread = false
+        this.launcherUnread.send('reset')
+        this.popup.setUnread(false)
         this.operation.send({ type: 'reset' })
         for (const finish of this.focusTrackers) finish()
       }
@@ -280,14 +299,7 @@ export function defineWebMCPChat(): void {
       this.unsubscribe = undefined
       this.options = { ...options }
       this.labels = createLabels(options.labels, options.locale)
-      this.dataset.theme = options.theme ?? 'light'
-      this.heading.textContent = options.title ?? 'Assistant'
-      this.popup.configure(
-        options.mode ?? 'inline',
-        this.heading.textContent,
-        this.labels,
-        options.placement ?? 'end'
-      )
+      this.applyStaticOptions()
       this.applyLabels()
       if (options.settings) {
         const panel = this.root.querySelector<HTMLElement>('.panel')!
@@ -301,7 +313,6 @@ export function defineWebMCPChat(): void {
         this.settings?.destroy()
         this.settings = undefined
       }
-      this.input.placeholder = options.placeholder ?? 'Ask the assistant'
       this.emptyText.textContent =
         options.emptyState ?? 'Ask a question or choose a suggestion to start.'
       this.suggestions.replaceChildren()
@@ -342,6 +353,33 @@ export function defineWebMCPChat(): void {
       this.retryButton.textContent = labels.retry
     }
 
+    private applyStaticOptions() {
+      if (!this.options) return
+      const mode = this.options.mode ?? this.attributeValue('mode')
+      const theme = this.options.theme ?? this.attributeValue('theme')
+      const placement = this.options.placement ?? this.attributeValue('placement')
+      this.dataset.theme =
+        theme === 'dark' || theme === 'auto' ? theme : theme === 'light' ? 'light' : 'light'
+      const heading = this.options.title ?? this.attributeValue('heading') ?? 'Assistant'
+      this.heading.textContent = heading
+      this.input.placeholder =
+        this.options.placeholder ?? this.attributeValue('placeholder') ?? 'Ask the assistant'
+      this.popup.configure(
+        mode === 'popup' ? 'popup' : 'inline',
+        heading,
+        this.labels,
+        placement === 'start' ? 'start' : 'end',
+        this.options.persistKey
+      )
+      this.popup.setUnread(
+        this.launcherUnread.state === 'unread' && this.popup.isPopup && !this.popup.isOpen
+      )
+    }
+
+    private attributeValue(name: string): string | undefined {
+      return this.getAttribute(name)?.trim() || undefined
+    }
+
     private connect() {
       this.unsubscribe?.()
       if (this.options)
@@ -349,10 +387,12 @@ export function defineWebMCPChat(): void {
     }
 
     private update(snapshot = this.snapshot) {
+      const previousSnapshot = this.snapshot
       const stateChanged = snapshot.state !== this.snapshot.state
       const cleared = this.snapshot.messages.length > 0 && snapshot.messages.length === 0
       const nearEnd = this.snapshot.messages.length === 0 || this.nearEnd()
       this.snapshot = snapshot
+      this.updateLauncherUnread(previousSnapshot, snapshot)
       const latest = snapshot.messages.at(-1)
       if ((latest?.id !== this.latestId || latest?.text !== this.latestText) && !nearEnd)
         this.unread = true
@@ -363,10 +403,16 @@ export function defineWebMCPChat(): void {
         snapshot.messages,
         this.options?.assistantLabel ?? 'Assistant',
         this.labels,
-        this.options?.renderMessage
+        this.options?.renderMessage,
+        {
+          toolLabel: this.options?.toolLabel,
+          toolDetails: this.options?.toolDetails
+        }
       )
       const working = this.isWorking()
-      const activity = working ? activityText(snapshot.activity, this.labels) : ''
+      const activity = working
+        ? activityText(snapshot.activity, this.labels, this.options?.toolLabel)
+        : ''
       const kind = working ? (snapshot.activity?.kind ?? 'resolving') : ''
       const indicatorChanged = this.working.hidden === working || activity !== this.activity
       // Operation notices describe the conversation they followed; drop them once it changes.
@@ -467,6 +513,31 @@ export function defineWebMCPChat(): void {
       this.retryButton.disabled = Boolean(disabled || this.clearing)
       for (const button of this.suggestions.querySelectorAll('button'))
         button.disabled = Boolean(disabled || busy)
+    }
+
+    private updateLauncherUnread(previous: PiSnapshot, next: PiSnapshot) {
+      if (this.launcherUnread.state === 'initial' && next.state !== 'loading')
+        this.launcherUnread.send('baseline')
+      else if (this.launcherUnread.state === 'read' && this.popup.isPopup && !this.popup.isOpen) {
+        const previousAssistant = new Set(
+          previous.messages
+            .filter(function assistant(message) {
+              return message.role === 'assistant'
+            })
+            .map(function id(message) {
+              return message.id
+            })
+        )
+        const newAssistant = next.messages.some(function assistant(message) {
+          return message.role === 'assistant' && !previousAssistant.has(message.id)
+        })
+        const wasWorking = previous.state === 'running' || previous.state === 'stopping'
+        const ended = wasWorking && !['running', 'stopping'].includes(next.state)
+        if (newAssistant || ended) this.launcherUnread.send('arrived')
+      }
+      this.popup.setUnread(
+        this.launcherUnread.state === 'unread' && this.popup.isPopup && !this.popup.isOpen
+      )
     }
 
     private isWorking() {

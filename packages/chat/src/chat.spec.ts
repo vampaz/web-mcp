@@ -24,6 +24,7 @@ beforeEach(function layout() {
 })
 afterEach(function cleanup() {
   document.body.replaceChildren()
+  localStorage.clear()
   vi.unstubAllGlobals()
 })
 
@@ -962,6 +963,256 @@ it('keeps an open popup open when the element moves in the document', async func
   expect(element.shadowRoot!.querySelector('section')!.hidden).toBe(false)
   expect(element.shadowRoot!.querySelector('.launcher')!.getAttribute('aria-expanded')).toBe('true')
   expect(fixture.listeners.size).toBe(1)
+})
+
+it('marks the launcher unread for a reply while closed and clears it on open', function unread() {
+  const fixture = controller()
+  const history = [{ id: 'a', role: 'assistant' as const, text: 'Saved answer' }]
+  fixture.publish({ state: 'idle', messages: history })
+  const element = mount(fixture.api)
+  element.configure({ controller: fixture.api, mode: 'popup', title: 'Helper' })
+  const launcher = element.shadowRoot!.querySelector<HTMLButtonElement>('.launcher')!
+
+  expect(launcher.hasAttribute('data-unread')).toBe(false)
+  expect(launcher.getAttribute('aria-label')).toBe('Open Helper')
+
+  fixture.publish({
+    state: 'running',
+    messages: [...history, { id: 'q', role: 'user', text: 'New question' }]
+  })
+  fixture.publish({
+    state: 'idle',
+    messages: [
+      ...history,
+      { id: 'q', role: 'user', text: 'New question' },
+      { id: 'a2', role: 'assistant', text: 'New answer' }
+    ]
+  })
+  expect(launcher.hasAttribute('data-unread')).toBe(true)
+  expect(launcher.getAttribute('aria-label')).toBe('Open Helper, new reply')
+
+  fixture.publish({ state: 'idle', messages: [...history] })
+  expect(launcher.hasAttribute('data-unread')).toBe(true)
+
+  launcher.click()
+  expect(launcher.hasAttribute('data-unread')).toBe(false)
+  expect(launcher.getAttribute('aria-label')).toBe('Open Helper')
+})
+
+it('marks a new closed assistant message after an empty baseline', function emptyBaseline() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.configure({ controller: fixture.api, mode: 'popup', title: 'Helper' })
+  const launcher = element.shadowRoot!.querySelector<HTMLButtonElement>('.launcher')!
+
+  fixture.publish({
+    state: 'idle',
+    messages: [{ id: 'a', role: 'assistant', text: 'Unexpected reply' }]
+  })
+
+  expect(launcher.hasAttribute('data-unread')).toBe(true)
+})
+
+it('acknowledges unread when persistence restores an open popup without stealing focus', function restored() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.configure({ controller: fixture.api, mode: 'popup', title: 'Helper' })
+  const launcher = element.shadowRoot!.querySelector<HTMLButtonElement>('.launcher')!
+  fixture.publish({ state: 'running', messages: [{ id: 'q', role: 'user', text: 'Hi' }] })
+  fixture.publish({
+    state: 'idle',
+    messages: [
+      { id: 'q', role: 'user', text: 'Hi' },
+      { id: 'a', role: 'assistant', text: 'Hello' }
+    ]
+  })
+  expect(launcher.hasAttribute('data-unread')).toBe(true)
+
+  const outside = document.createElement('input')
+  document.body.append(outside)
+  outside.focus()
+  localStorage.setItem('webmcp-chat:restore', JSON.stringify({ open: true }))
+  element.configure({
+    controller: fixture.api,
+    mode: 'popup',
+    title: 'Helper',
+    persistKey: 'restore'
+  })
+  expect(element.shadowRoot!.querySelector('section')!.hidden).toBe(false)
+  expect(launcher.hasAttribute('data-unread')).toBe(false)
+  expect(document.activeElement).toBe(outside)
+
+  launcher.click()
+  expect(launcher.hasAttribute('data-unread')).toBe(false)
+})
+
+it('marks the launcher unread when a closed turn ends without an assistant reply', function ended() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.configure({ controller: fixture.api, mode: 'popup', title: 'Helper' })
+  const launcher = element.shadowRoot!.querySelector<HTMLButtonElement>('.launcher')!
+  const messages = [{ id: 'q', role: 'user' as const, text: 'Act now' }]
+
+  fixture.publish({ state: 'running', messages })
+  fixture.publish({ state: 'interrupted', messages })
+
+  expect(launcher.hasAttribute('data-unread')).toBe(true)
+})
+
+it('shows no launcher unread state in inline mode', function inlineUnread() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  const launcher = element.shadowRoot!.querySelector<HTMLButtonElement>('.launcher')!
+  fixture.publish({ state: 'running', messages: [{ id: 'q', role: 'user', text: 'Hi' }] })
+  fixture.publish({
+    state: 'idle',
+    messages: [{ id: 'a', role: 'assistant', text: 'Hello' }]
+  })
+  expect(launcher.hasAttribute('data-unread')).toBe(false)
+})
+
+it('persists and restores only popup open state, position and size', async function persisted() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.configure({
+    controller: fixture.api,
+    mode: 'popup',
+    title: 'Helper',
+    persistKey: 'demo'
+  })
+  const root = element.shadowRoot!
+  const launcher = root.querySelector<HTMLButtonElement>('.launcher')!
+  const resize = root.querySelector<HTMLButtonElement>('[data-resize]')!
+  const input = root.querySelector('textarea')!
+  input.value = 'Private draft'
+  input.dispatchEvent(new Event('input'))
+
+  launcher.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', cancelable: true }))
+  resize.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', cancelable: true }))
+  launcher.click()
+  await Promise.resolve()
+  await Promise.resolve()
+
+  const raw = localStorage.getItem('webmcp-chat:demo')
+  expect(raw).toBeTruthy()
+  const stored = JSON.parse(raw!) as Record<string, unknown>
+  expect(Object.keys(stored).sort()).toEqual(['open', 'panel', 'position'])
+  expect(stored.open).toBe(true)
+  expect(stored.position).toEqual({ x: expect.any(Number), y: expect.any(Number) })
+  expect(stored.panel).toMatchObject({
+    width: expect.any(String),
+    height: expect.any(String),
+    expanded: false
+  })
+  expect(raw).not.toContain('Private draft')
+
+  element.remove()
+  const nextFixture = controller()
+  const next = document.createElement('webmcp-chat') as WebMCPChatElement
+  next.configure({
+    controller: nextFixture.api,
+    mode: 'popup',
+    title: 'Helper',
+    persistKey: 'demo'
+  })
+  const presentation = next.shadowRoot!.querySelector<HTMLElement>('.presentation')!
+  presentation.showPopover = vi.fn()
+  presentation.hidePopover = vi.fn()
+  document.body.append(next)
+  await Promise.resolve()
+  const panel = next.shadowRoot!.querySelector<HTMLElement>('section')!
+  expect(panel.hidden).toBe(false)
+  expect(next.shadowRoot!.querySelector('.launcher')!.getAttribute('aria-expanded')).toBe('true')
+  expect(panel.style.width).toBe((JSON.parse(raw!).panel as { width: string }).width)
+})
+
+it('ignores malformed or blocked popup storage', async function blockedStorage() {
+  localStorage.setItem('webmcp-chat:bad', '{not json')
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.configure({
+    controller: fixture.api,
+    mode: 'popup',
+    title: 'Helper',
+    persistKey: 'bad'
+  })
+  expect(element.shadowRoot!.querySelector('section')!.hidden).toBe(true)
+
+  const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function deny() {
+    throw new Error('blocked')
+  })
+  const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function deny() {
+    throw new Error('blocked')
+  })
+  try {
+    const next = document.createElement('webmcp-chat') as WebMCPChatElement
+    next.configure({
+      controller: controller().api,
+      mode: 'popup',
+      title: 'Helper',
+      persistKey: 'blocked'
+    })
+    const presentation = next.shadowRoot!.querySelector<HTMLElement>('.presentation')!
+    presentation.showPopover = vi.fn()
+    presentation.hidePopover = vi.fn()
+    document.body.append(next)
+    next.shadowRoot!.querySelector<HTMLButtonElement>('.launcher')!.click()
+    await Promise.resolve()
+    expect(next.shadowRoot!.querySelector('section')!.hidden).toBe(false)
+  } finally {
+    setItem.mockRestore()
+    getItem.mockRestore()
+  }
+})
+
+it('uses observed attributes as defaults and configure overrides them', function attributes() {
+  const element = document.createElement('webmcp-chat') as WebMCPChatElement
+  element.setAttribute('mode', 'popup')
+  element.setAttribute('theme', 'dark')
+  element.setAttribute('placement', 'start')
+  element.setAttribute('heading', 'Helper')
+  element.setAttribute('placeholder', 'Ask helper')
+  element.setAttribute('title', 'Tooltip only')
+  const fixture = controller()
+  element.controller = fixture.api
+  const presentation = element.shadowRoot!.querySelector<HTMLElement>('.presentation')!
+  presentation.showPopover = vi.fn()
+  presentation.hidePopover = vi.fn()
+  document.body.append(element)
+
+  const root = element.shadowRoot!
+  expect(element.dataset.mode).toBe('popup')
+  expect(element.dataset.theme).toBe('dark')
+  expect(root.querySelector('h2')!.textContent).toBe('Helper')
+  expect(root.querySelector('textarea')!.placeholder).toBe('Ask helper')
+  expect(root.querySelector('.launcher')!.getAttribute('aria-label')).toBe('Open Helper')
+
+  element.setAttribute('heading', 'Page helper')
+  element.setAttribute('theme', 'light')
+  expect(root.querySelector('h2')!.textContent).toBe('Page helper')
+  expect(element.dataset.theme).toBe('light')
+
+  element.configure({
+    controller: fixture.api,
+    mode: 'inline',
+    theme: 'auto',
+    placement: 'end',
+    title: 'Configured',
+    placeholder: 'Configured ask'
+  })
+  element.setAttribute('heading', 'Ignored')
+  element.setAttribute('theme', 'dark')
+  element.setAttribute('mode', 'popup')
+  element.setAttribute('placeholder', 'Ignored ask')
+  expect(element.dataset.mode).toBe('inline')
+  expect(element.dataset.theme).toBe('auto')
+  expect(root.querySelector('h2')!.textContent).toBe('Configured')
+  expect(root.querySelector('textarea')!.placeholder).toBe('Configured ask')
+
+  element.remove()
+  document.body.append(element)
+  expect(element.dataset.mode).toBe('inline')
+  expect(root.querySelector('h2')!.textContent).toBe('Configured')
 })
 
 it('inserts new lines with Enter on touch pointers and describes only visible help', function touch() {

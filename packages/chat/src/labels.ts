@@ -62,6 +62,7 @@ export function createLabels(
       error: 'The turn failed. Check the application and try a new request.',
       providerFailed: 'The model could not be reached. Try again.',
       declined: 'You declined this action. Nothing was changed.',
+      historyNearlyFull: 'This conversation is almost full. Start a new chat soon.',
       closed: 'Conversation closed.',
       lastFailed: 'The last response failed. Check application state before sending a new request.',
       newChatStarted: 'New chat started.',
@@ -69,6 +70,9 @@ export function createLabels(
     },
     openChat(title) {
       return `Open ${title}`
+    },
+    openChatUnread(title) {
+      return `Open ${title}, new reply`
     },
     toolsUsed(value) {
       return `Used ${numbers.format(value)} tools`
