@@ -33,6 +33,12 @@ it.each(['core-only', 'chat-only'])(
       await checkTypes(fixture.directory, 'tsconfig.nodenext.json')
       const { stdout } = await run(process.execPath, ['check.mjs'], { cwd: fixture.directory })
       expect(stdout).toContain('passed')
+      if (name === 'core-only') {
+        const { stdout: server } = await run(process.execPath, ['server-check.mjs'], {
+          cwd: fixture.directory
+        })
+        expect(server).toContain('server passed')
+      }
       const manifest = JSON.parse(await readFile(join(fixture.directory, 'package.json'), 'utf8'))
       expect(manifest.dependencies).toBeUndefined()
       if (name === 'chat-only') {

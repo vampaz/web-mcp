@@ -32,6 +32,8 @@ Start with the [integration guide](./integration.md) for a working application, 
 
 - [`@vampaz/webmcp-kit/assistant`](#vampazwebmcp-kitassistant)
 
+- [`@vampaz/webmcp-kit/server`](#vampazwebmcp-kitserver)
+
 - [`@vampaz/webmcp-kit/command-input`](#vampazwebmcp-kitcommand-input)
 
 - [`@vampaz/webmcp-kit/hosted`](#vampazwebmcp-kithosted)
@@ -1061,7 +1063,7 @@ declare function listTools(): RegisteredTool[]
 
 ### normalizeJsonText
 
-[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/resolver.ts).
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/core/src/resolver-json.ts).
 
 ```ts
 declare function normalizeJsonText(value: string, source?: string): string
@@ -2767,6 +2769,130 @@ The returned controller and element are undefined until `ready` resolves.
 
 ```ts
 declare function mountAssistant(options: MountAssistantOptions): MountedAssistant
+```
+
+## @vampaz/webmcp-kit/server
+
+### ResolverAuthorize
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/server/src/interfaces/handler.ts).
+
+```ts
+export type ResolverAuthorize = (
+  request: Request,
+  payload: ResolverEndpointRequest
+) => boolean | Promise<boolean>
+```
+
+### ResolverEndpointRequest
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/server/src/interfaces/handler.ts).
+
+Request body sent by `createResolver({ auth: { mode: 'server' } })`.
+
+```ts
+export interface ResolverEndpointRequest {
+  provider: ResolverProviderKind
+  model: string
+  message: string
+  tools: ResolverEndpointTool[]
+  context: ResolverContext
+  /**
+   * Wire metadata from the browser. The handler validates its shape but rebuilds the upstream
+   * response schema from the tools, `singleStep`, and `purpose`; it never applies client constraints.
+   */
+  responseSchema: JsonSchema
+  singleStep?: true
+  purpose?: 'summary'
+}
+```
+
+### ResolverEndpointTool
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/server/src/interfaces/handler.ts).
+
+Tool fields in the existing browser-to-server resolver wire format.
+
+```ts
+export interface ResolverEndpointTool {
+  name: string
+  description: string
+  inputSchema: JsonSchema
+  outputSchema?: JsonSchema
+  annotations?: ToolAnnotations
+}
+```
+
+### ResolverHandler
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/server/src/interfaces/handler.ts).
+
+Web-standard resolver endpoint handler.
+
+```ts
+export type ResolverHandler = (request: Request) => Promise<Response>
+```
+
+### ResolverHandlerOptions
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/server/src/interfaces/handler.ts).
+
+```ts
+export interface ResolverHandlerOptions {
+  provider: ServerResolverProvider
+  /** Application-owned upstream base URL. The handler appends `/chat/completions`. */
+  baseUrl: string
+  /** Server-side provider key. It is never returned or logged by the handler. */
+  apiKey: string
+  allowedModels: readonly string[]
+  /** Defaults to 1 MiB. Enforced by reading the stream, not `Content-Length`. */
+  maxBodyBytes?: number
+  /** Required. Only a literal `true` result allows the request. */
+  authorize: ResolverAuthorize
+  responseFormat?: 'json_object' | 'json_schema' | 'text'
+  maxTokens?: number
+  temperature?: number
+  reasoningEffort?: 'none' | 'low' | 'medium' | 'high'
+}
+```
+
+### ResolverHandlerResult
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/server/src/interfaces/handler.ts).
+
+```ts
+export type ResolverHandlerResult = ToolResolution | ResolverResponseError
+```
+
+### ResolverResponseError
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/server/src/interfaces/handler.ts).
+
+```ts
+export interface ResolverResponseError {
+  error: string
+}
+```
+
+### ServerResolverProvider
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/server/src/interfaces/handler.ts).
+
+Providers that the server handler can forward to an OpenAI-compatible endpoint.
+
+```ts
+export type ServerResolverProvider = 'openai' | 'openrouter' | 'openai-compatible'
+```
+
+### createResolverHandler
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/server/src/handler.ts).
+
+Creates a web-standard resolver endpoint for `createResolver({ auth: { mode: 'server' } })`.
+The application owns the upstream URL, key, provider, model allowlist, and authorization.
+
+```ts
+declare function createResolverHandler(options: ResolverHandlerOptions): ResolverHandler
 ```
 
 ## @vampaz/webmcp-kit/command-input

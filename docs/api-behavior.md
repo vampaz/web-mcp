@@ -14,6 +14,7 @@ This guide explains runtime behavior. The generated reference lists all public e
 | `/hosted`                   | Hosted session resolver                                       | None                                               |
 | `/chat`                     | `defineWebMCPChat`, `WebMCPChatElement`, `WebMCPChatOptions`  | None when supplied a controller                    |
 | `/assistant`                | `mountAssistant`, `createDialogApproval`                      | None; Pi libraries are bundled                     |
+| `/server`                   | `createResolverHandler`                                       | None; web-standard, no DOM access                  |
 | `/vue`, `/react`, `/svelte` | `useWebMCPTool`, `useWebMCPTools`                             | The selected framework                             |
 | `/zod`                      | `defineZodTool`                                               | Zod 4                                              |
 | `/devtools`                 | `mountDevtoolsOverlay`                                        | None                                               |
@@ -22,7 +23,7 @@ This guide explains runtime behavior. The generated reference lists all public e
 | `/mcp-bridge`               | `createLocalMCPBridge`                                        | None                                               |
 | `/page-bridge`              | `installPageBridge`                                           | None                                               |
 
-The package is ESM-only. Importing core, `/pi`, `/chat`, or `/assistant` is safe during SSR. Browser initialization and DOM registration belong in client lifecycle code. See the [dependency model](./getting-started.md#dependency-model) for exact peer package names and development-only tooling.
+The package is ESM-only. Importing core, `/pi`, `/chat`, `/assistant`, or `/server` is safe during SSR. Browser initialization and DOM registration belong in client lifecycle code. See the [dependency model](./getting-started.md#dependency-model) for exact peer package names and development-only tooling.
 
 ## Define and register tools
 
@@ -197,6 +198,12 @@ Defaults: inline mode, light theme, “Assistant” title/assistant label, “As
 `ready` resolves after the element is mounted, or after a controller that finishes after `destroy()` is destroyed. It rejects with the initialization error after cleanup when the harness, chat configuration, or append fails. Calling `destroy()` before `ready` resolves waits for pending initialization, destroys a controller that finishes later, and settles only after that cleanup. Repeated calls return the same promise, and a controller cleanup failure rejects it. `destroy()` removes the element and destroys the controller; the application keeps its tool registrations and resolver.
 
 `createDialogApproval(dialog)` wires the documented `method="dialog"` approval dialog. The dialog needs `[data-approval-text]`; its buttons use `value="deny"` and `value="approve"`. The input summary is bounded and falls back to `[unserializable input]` for values that JSON cannot serialize. `confirm()` denies on abort, replacement, or dialog cancel and never leaves an earlier request pending. Call `cancel()` during application teardown.
+
+## Server resolver endpoint
+
+`createResolverHandler({ provider, baseUrl, apiKey, allowedModels, authorize, maxBodyBytes?, responseFormat?, maxTokens?, temperature?, reasoningEffort? })` returns a web-standard `(request: Request) => Promise<Response>` handler for `createResolver({ auth: { mode: 'server' } })`. The handler owns the provider, upstream URL, key, and model allowlist. `authorize` is required, receives the original request and validated payload, and allows only a literal `true` result.
+
+The handler accepts `POST` only, reads a bounded body stream (default 1 MiB; `Content-Length` is not trusted), validates the existing resolver wire format, enforces the model allowlist, forwards cancellation, and honors `singleStep` and `purpose: 'summary'`. It reuses the browser prompt and schema construction and validates the upstream result with `validateToolResolution()`. It validates the incoming wire `responseSchema` but rebuilds the upstream schema from the tools and request flags. Responses use `{ error }` with a non-2xx status on failure; provider failures do not expose the key or request body.
 
 ## Framework lifecycle helpers
 

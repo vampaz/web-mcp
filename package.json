@@ -87,6 +87,10 @@
       "types": "./dist/packages/assistant/src/index.d.ts",
       "default": "./dist/assistant.js"
     },
+    "./server": {
+      "types": "./dist/packages/server/src/index.d.ts",
+      "default": "./dist/server.js"
+    },
     "./command-input": {
       "types": "./dist/packages/command-input/src/index.d.ts",
       "default": "./dist/command-input.js"

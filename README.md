@@ -48,6 +48,7 @@ Replace the example handler with an action your normal interface already uses. K
 | `/chat`                           | Chat custom element driven by a supplied controller                  |
 | `/chat/markdown`                  | Safe Markdown rendering for `renderMessage`                          |
 | `/assistant`                      | Managed Pi harness and chat mount for application-owned tools        |
+| `/server`                         | Web-standard resolver endpoint with a server-owned key               |
 | `/hosted`                         | Optional hosted session and resolver integration                     |
 | `/vue`, `/react`, `/svelte`       | Component lifecycle helpers                                          |
 | `/zod`                            | Zod schemas and parsing before approval                              |

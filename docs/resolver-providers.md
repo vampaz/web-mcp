@@ -76,6 +76,39 @@ Validate the request, restrict provider/model selection, and treat tool descript
 
 For `purpose: 'summary'`, summarize the supplied history through the offered `pi_reply` tool. Do not select application actions, answer the original request, or offer `needs_clarification` or `no_tools_match`. The supplied response schema excludes these outcomes. Preserve this purpose when forwarding requests to another resolver, and validate the response against the summary contract. Hosted endpoint integrations receive the same field.
 
+### Managed server handler
+
+`@vampaz/webmcp-kit/server` supplies a web-standard handler for this contract when the upstream is OpenAI-compatible:
+
+```ts
+import { createResolverHandler } from '@vampaz/webmcp-kit/server'
+
+const resolve = createResolverHandler({
+  provider: 'openai',
+  baseUrl: 'https://api.openai.com/v1',
+  apiKey: process.env.OPENAI_API_KEY!,
+  allowedModels: ['your-approved-model'],
+  maxBodyBytes: 1024 * 1024,
+  responseFormat: 'json_schema',
+  async authorize(request, payload) {
+    return isAllowedAccount(request, payload.model)
+  }
+})
+
+// Cloudflare Workers, Node, or another web-standard runtime:
+export default {
+  fetch(request: Request) {
+    return resolve(request)
+  }
+}
+```
+
+`provider`, `baseUrl`, `apiKey`, and `allowedModels` are server-owned; the browser cannot change them. `authorize` is required and only a literal `true` result allows the request. It receives the original `Request` and the validated payload, so it can check a session, account, origin, or rate limit. A throw or any other result is denied.
+
+The handler accepts only `POST`, reads the body as a bounded stream (the default limit is 1 MiB and `Content-Length` is not trusted), rejects invalid shapes, and returns `{ error }` with a non-2xx status. It honors `singleStep` and `purpose: 'summary'`, reuses the same prompt and schema construction as the browser resolver, and validates the upstream result before returning it. The incoming `responseSchema` is validated as wire metadata but is not used to constrain the upstream request; the handler rebuilds the schema from the tools and request flags. Upstream failures and malformed results do not expose the provider key or request body.
+
+The provider key stays in the server environment. Never send it to the browser, include it in logs, or return it from a handler. Cross-origin browser endpoints still need deliberate CORS and authentication configuration; `authorize` is the application's authorization boundary.
+
 ## OpenAI-compatible endpoint
 
 ```ts

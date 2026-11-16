@@ -27,9 +27,15 @@ import {
 } from './resolution-validation'
 import { formatJsonValueValidationError, validateJsonValue } from './schema'
 import { ResolverRequestLimitError, serializeResolverRequest } from './resolver-request'
+import {
+  createResolverMessages,
+  createResolverPrompt,
+  createResolverToolCatalog
+} from './resolver-prompt'
 import { createResponseError, isContextOverflowText, ResolverError } from './resolver-error'
 import { validateModelLimits } from './resolver-model-limits'
 import { remoteModelLimits } from './remote-model-limits'
+import { parseToolResolutionJson } from './resolver-json'
 
 interface LanguageModelApi {
   availability: (options?: ChromeAIOptions) => Promise<ChromeAIAvailability>
@@ -78,6 +84,8 @@ const chromeAITextOptions = {
     }
   ]
 } satisfies ChromeAIOptions
+
+export { normalizeJsonText } from './resolver-json'
 
 export function createHeuristicResolver(): ToolResolver {
   return {
@@ -356,7 +364,7 @@ async function resolveWithServerEndpoint(
         provider: config.provider,
         model,
         message,
-        tools: createToolCatalog(tools),
+        tools: createResolverToolCatalog(tools),
         context,
         responseSchema: createToolResolutionSchema(tools, options?.singleStep, options?.purpose),
         ...(options?.singleStep || options?.purpose === 'summary' ? { singleStep: true } : {}),
@@ -467,88 +475,6 @@ async function resolveWithOpenAICompatible(
       `provider returned invalid structured resolution: ${formatJsonValueValidationError(errors)}`
     )
   return action as ToolResolution
-}
-
-function createResolverMessages(
-  message: string,
-  tools: WebMCPTool[],
-  context: ResolverContext,
-  singleStep = false,
-  structured = false,
-  purpose?: ResolverRunOptions['purpose']
-) {
-  return [
-    {
-      role: 'system',
-      content:
-        purpose === 'summary'
-          ? 'Summarize the supplied conversation through the offered tool. Do not select application actions, ask for clarification, or answer the original request. ' +
-            (structured
-              ? 'Return only JSON with an action object containing toolName, input, confidence, and reason.'
-              : 'Return only JSON with toolName, input, confidence, and reason.')
-          : singleStep
-            ? 'Choose exactly one next app tool, needs_clarification, or no_tools_match. Never return tool_sequence or steps. ' +
-              (structured
-                ? 'Return only JSON with an action object containing toolName, input, confidence, and reason.'
-                : 'Return only JSON with toolName, input, confidence, and reason.')
-            : 'Choose one app tool, a short ordered tool_sequence, needs_clarification, or no_tools_match. Return only JSON with toolName, input, confidence, reason, and optional steps.'
-    },
-    {
-      role: 'user',
-      content: createResolverPrompt(message, tools, context, singleStep, structured, purpose)
-    }
-  ]
-}
-
-function createResolverPrompt(
-  message: string,
-  tools: WebMCPTool[],
-  context: ResolverContext,
-  singleStep = false,
-  structured = false,
-  purpose?: ResolverRunOptions['purpose'],
-  schemaSupplied = structured
-): string {
-  singleStep ||= purpose === 'summary'
-  function outcomeExample(toolName: string, reason: string) {
-    const resolution = { toolName, input: {}, confidence: 0, reason }
-    return JSON.stringify(structured && singleStep ? { action: resolution } : resolution)
-  }
-  return [
-    `User request: ${message}`,
-    `Current app context:\n${JSON.stringify(context)}`,
-    `Available tools:\n${JSON.stringify(createToolCatalog(tools))}`,
-    'Put only the selected tool arguments inside input. confidence and reason are siblings of toolName, never inside input unless the tool explicitly defines them.',
-    ...(purpose === 'summary'
-      ? []
-      : [
-          'Choose the best tool and exact parameters from the current app context. Prefer stable IDs from context over labels.',
-          singleStep
-            ? 'Choose only the next unfinished action. Return one tool invocation, never a sequence or steps. Wait for the actual result before choosing another action. Never invent future tool results or placeholders.'
-            : 'If the request requires multiple app actions, return a chained resolution with toolName "tool_sequence", input {}, and steps ordered by dependency. Use at most 5 steps. Each step must use one available tool and must be executable after the previous step updates app state.',
-          `If the request is missing required information that is not present in context, return ${outcomeExample('needs_clarification', 'Ask for the missing information.')}.`,
-          `If none of the available tools can satisfy the request, return ${outcomeExample('no_tools_match', 'Explain what kind of app action is available instead.')}.`
-        ]),
-    ...(schemaSupplied
-      ? [
-          'Follow the response schema supplied by the model API.' +
-            (structured && singleStep ? ' Wrap the single resolution in action.' : '')
-        ]
-      : [
-          'Return only valid JSON matching this schema:',
-          JSON.stringify(createToolResolutionSchema(tools, singleStep, purpose))
-        ])
-  ].join('\n\n')
-}
-
-function createToolCatalog(tools: WebMCPTool[]) {
-  return tools.map((tool) => ({
-    name: tool.name,
-    description: tool.description,
-    inputSchema: tool.inputSchema,
-    ...(tool.outputSchema ? { outputSchema: tool.outputSchema } : {}),
-    ...(tool.annotations ? { annotations: tool.annotations } : {})
-  }))
 }
 
 function getLanguageModel(): LanguageModelApi | undefined {
@@ -700,39 +626,6 @@ function disposeChromeAISession(session: LanguageModelSession | undefined): void
   }
 
   session?.dispose?.()
-}
-
-// Unusable model text is an invalid resolution, so callers such as Pi can ask the model again.
-function parseToolResolutionJson(value: string, source: string): ToolResolution {
-  try {
-    return JSON.parse(normalizeJsonText(value, source)) as ToolResolution
-  } catch {
-    throw new ToolResolutionValidationError(`${source} returned unparseable JSON`)
-  }
-}
-
-export function normalizeJsonText(value: string, source = 'AI'): string {
-  const trimmedValue = value.trim()
-  if (!trimmedValue) throw new ToolResolutionValidationError(`${source} returned empty text`)
-
-  // Slice fences instead of matching them: an unterminated fence made the previous
-  // regex backtrack quadratically over untrusted model text.
-  if (trimmedValue.startsWith('```') && trimmedValue.endsWith('```') && trimmedValue.length >= 6) {
-    let inner = trimmedValue.slice(3, -3)
-    if (inner.slice(0, 4).toLowerCase() === 'json') inner = inner.slice(4)
-    const fenced = inner.trim()
-    if (fenced) return fenced
-  }
-
-  const firstBraceIndex = trimmedValue.indexOf('{')
-  const lastBraceIndex = trimmedValue.lastIndexOf('}')
-  if (firstBraceIndex !== -1 && lastBraceIndex > firstBraceIndex) {
-    return trimmedValue.slice(firstBraceIndex, lastBraceIndex + 1)
-  }
-
-  throw new ToolResolutionValidationError(
-    `${source} returned non-JSON text: ${trimmedValue.slice(0, 120)}`
-  )
 }
 
 function createUnavailableChromeResolver(detail: string, strict = false): ToolResolver {

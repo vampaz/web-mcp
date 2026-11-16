@@ -17,6 +17,7 @@ WebMCP Kit is one ESM-only TypeScript npm package with multiple public entry poi
 - `packages/pi`: persistent conversation runtime, page controller, and registry tool host running in the page.
 - `packages/chat`: framework-neutral chat custom element driven by a supplied controller.
 - `packages/assistant`: `/assistant` entry with `mountAssistant()` and `createDialogApproval()`; it mounts Pi and chat for application-owned tools and resolvers.
+- `packages/server`: `/server` entry with `createResolverHandler()`; a web-standard, server-owned OpenAI-compatible resolver endpoint.
 - `packages/devtools`: in-page tool inspection/invocation overlay.
 - `packages/testing`: resolver evaluations and Playwright bridge helpers.
 - `packages/mcp-bridge`: local MCP-style bridge over registered tools.
