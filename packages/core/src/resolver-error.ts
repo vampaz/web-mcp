@@ -25,6 +25,12 @@ export function isContextOverflowText(text: string): boolean {
 }
 
 const maxProviderMessageLength = 300
+const keyLikeTextPattern = /\bBearer\s+[^\s]+|\bsk-[^\s]+/gi
+
+// Redact before shortening so a key cannot survive as a truncated fragment.
+function redactProviderSecrets(text: string): string {
+  return text.replace(keyLikeTextPattern, '[redacted]')
+}
 
 /** Builds an error from a failed HTTP response, keeping a bounded provider message. */
 export async function createResponseError(
@@ -53,7 +59,7 @@ export async function createResponseError(
   } catch {
     detail = ''
   }
-  detail = detail.trim().replace(/\s+/g, ' ')
+  detail = redactProviderSecrets(detail.trim().replace(/\s+/g, ' '))
   if (detail.length > maxProviderMessageLength)
     detail = `${detail.slice(0, maxProviderMessageLength - 1)}…`
   return new ResolverError(

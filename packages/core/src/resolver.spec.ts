@@ -552,6 +552,35 @@ describe('resolver', () => {
     expect(body).not.toHaveProperty('temperature')
   })
 
+  it('redacts key-like provider error text before shortening', async function test() {
+    const key = 'sk-live-abcdefghijklmnopqrstuvwxyz'
+    const bearer = 'Bearer bearer-secret-1234567890'
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async function respond() {
+        return Response.json(
+          { error: `${'x'.repeat(260)} ${bearer} ${key} ${'y'.repeat(80)}` },
+          { status: 401 }
+        )
+      })
+    )
+    const resolver = await createResolver({
+      provider: 'openai-compatible',
+      baseUrl: 'https://models.example.test/v1',
+      auth: { mode: 'none' }
+    })
+
+    const failure = await resolver
+      .resolve('Read', [], {}, { singleStep: true })
+      .catch((error: unknown) => error)
+
+    expect(failure).toBeInstanceOf(ResolverError)
+    expect((failure as Error).message).toContain('returned 401')
+    expect((failure as Error).message).toContain('[redacted]')
+    expect((failure as Error).message).not.toContain('bearer-secret')
+    expect((failure as Error).message).not.toContain('sk-live')
+  })
+
   it('shares pending Chrome sessions and destroys sessions that finish after disposal', async function test() {
     let activate!: (session: { prompt: () => Promise<string>; destroy: () => void }) => void
     const create = vi.fn(function create() {
@@ -1407,6 +1436,139 @@ describe('resolver', () => {
     )
   })
 
+  it('hardens direct provider requests and omits credentials cross-origin', async function test() {
+    const fetch = vi.fn(async function respond() {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    })
+    vi.stubGlobal('fetch', fetch)
+    const resolver = await createResolver({
+      provider: 'openai',
+      model: 'gpt-5.4-mini',
+      auth: { mode: 'user-key', apiKey: 'test-key' }
+    })
+
+    await expect(resolver.resolve('Read', [], {}, { singleStep: true })).rejects.toBeInstanceOf(
+      ResolverError
+    )
+
+    const [url, options] = (fetch.mock.calls as unknown as Array<[string, RequestInit]>)[0] ?? []
+    expect(url).toBe('https://api.openai.com/v1/chat/completions')
+    expect(options?.redirect).toBe('error')
+    expect(options?.credentials).toBe('omit')
+  })
+
+  it('keeps same-origin direct request credentials unchanged', async function test() {
+    const fetch = vi.fn(async function respond() {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    })
+    vi.stubGlobal('fetch', fetch)
+    const resolver = await createResolver({
+      provider: 'openai-compatible',
+      baseUrl: '/local/v1',
+      auth: { mode: 'none' }
+    })
+
+    await expect(resolver.resolve('Read', [], {}, { singleStep: true })).rejects.toBeInstanceOf(
+      ResolverError
+    )
+
+    const [, options] = (fetch.mock.calls as unknown as Array<[string, RequestInit]>)[0] ?? []
+    expect(options?.redirect).toBe('error')
+    expect(options?.credentials).toBeUndefined()
+  })
+
+  it.each(['http://localhost.evil.test/v1', 'http://127.0.0.1.evil.test/v1'])(
+    'rejects an insecure non-loopback user-key baseUrl %s',
+    async function test(baseUrl) {
+      await expect(
+        createResolver({
+          provider: 'openai-compatible',
+          baseUrl,
+          auth: { mode: 'user-key', apiKey: 'test-key' }
+        })
+      ).rejects.toThrow('loopback')
+    }
+  )
+
+  it.each(['http://localhost:1234/v1', 'http://127.0.0.1:1234/v1', 'http://[::1]:1234/v1'])(
+    'allows a loopback http user-key baseUrl %s',
+    async function test(baseUrl) {
+      const resolver = await createResolver({
+        provider: 'openai-compatible',
+        baseUrl,
+        auth: { mode: 'user-key', apiKey: 'test-key' }
+      })
+
+      expect(resolver.status).toBe('ready')
+    }
+  )
+
+  it.each(['/proxy/v1', '//models.example.test/v1'])(
+    'rejects user-key baseUrl %s when an HTTP page makes it non-loopback',
+    async function test(baseUrl) {
+      vi.stubGlobal('location', {
+        href: 'http://app.example.test/workspace',
+        origin: 'http://app.example.test'
+      })
+
+      await expect(
+        createResolver({
+          provider: 'openai-compatible',
+          baseUrl,
+          auth: { mode: 'user-key', apiKey: 'test-key' }
+        })
+      ).rejects.toThrow('loopback')
+    }
+  )
+
+  it.each(['/proxy/v1', '//models.example.test/v1', 'https://models.example.test/v1'])(
+    'accepts user-key baseUrl %s when it resolves over HTTPS',
+    async function test(baseUrl) {
+      vi.stubGlobal('location', {
+        href: 'https://app.example.test/workspace',
+        origin: 'https://app.example.test'
+      })
+
+      const resolver = await createResolver({
+        provider: 'openai-compatible',
+        baseUrl,
+        auth: { mode: 'user-key', apiKey: 'test-key' }
+      })
+
+      expect(resolver.status).toBe('ready')
+    }
+  )
+
+  it.each(['/proxy/v1', '//127.0.0.1:1234/v1'])(
+    'accepts user-key baseUrl %s when an HTTP page resolves it to loopback',
+    async function test(baseUrl) {
+      vi.stubGlobal('location', {
+        href: 'http://localhost:5173/workspace',
+        origin: 'http://localhost:5173'
+      })
+
+      const resolver = await createResolver({
+        provider: 'openai-compatible',
+        baseUrl,
+        auth: { mode: 'user-key', apiKey: 'test-key' }
+      })
+
+      expect(resolver.status).toBe('ready')
+    }
+  )
+
+  it('does not invent a browser base for relative user-key URLs without a location', async function test() {
+    vi.stubGlobal('location', undefined)
+
+    const resolver = await createResolver({
+      provider: 'openai-compatible',
+      baseUrl: '/proxy/v1',
+      auth: { mode: 'user-key', apiKey: 'test-key' }
+    })
+
+    expect(resolver.status).toBe('ready')
+  })
+
   it('rejects remote resolver input that does not match the selected tool schema', async () => {
     vi.stubGlobal(
       'fetch',
@@ -1492,6 +1654,8 @@ describe('resolver', () => {
     )
     const fetchOptions = (fetch.mock.calls as unknown as Array<[string, RequestInit]>)[0]?.[1]
     expect(String(fetchOptions?.body)).not.toContain('test-key')
+    expect(fetchOptions?.redirect).toBeUndefined()
+    expect(fetchOptions?.credentials).toBeUndefined()
   })
 
   it('reports server endpoint error details for explicit providers', async () => {

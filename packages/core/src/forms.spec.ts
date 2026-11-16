@@ -273,6 +273,77 @@ describe('form helpers', () => {
     )
   })
 
+  it('warns when native WebMCP cannot enforce a form confirmation', () => {
+    ;(document as DocumentWithModelContext).modelContext = { registerTool: vi.fn() }
+    document.body.innerHTML = `
+      <form>
+        <label>Note <input name="note" /></label>
+      </form>
+    `
+    const form = document.querySelector('form')
+    if (!form) throw new Error('Expected test form.')
+
+    const registration = registerFormTool({
+      form,
+      name: 'save_note',
+      description: 'Save the note from the current form for the signed-in user.',
+      confirmation: { reason: 'Save this note?' }
+    })
+
+    expect(registration.warnings).toContain(
+      'Native WebMCP form tools do not run the kit confirmation pipeline; enforce approval in the form submit handler.'
+    )
+    expect(registration.warnings).not.toContain(
+      'toolautosubmit submits this form without kit approval; do not combine it with confirmation.'
+    )
+  })
+
+  it('adds a second warning when a native confirmed form uses toolautosubmit', () => {
+    ;(document as DocumentWithModelContext).modelContext = { registerTool: vi.fn() }
+    document.body.innerHTML = `
+      <form toolautosubmit>
+        <label>Note <input name="note" /></label>
+      </form>
+    `
+    const form = document.querySelector('form')
+    if (!form) throw new Error('Expected test form.')
+
+    const registration = registerFormTool({
+      form,
+      name: 'save_note',
+      description: 'Save the note from the current form for the signed-in user.',
+      confirmation: { reason: 'Save this note?' }
+    })
+
+    expect(registration.warnings).toContain(
+      'Native WebMCP form tools do not run the kit confirmation pipeline; enforce approval in the form submit handler.'
+    )
+    expect(registration.warnings).toContain(
+      'toolautosubmit submits this form without kit approval; do not combine it with confirmation.'
+    )
+  })
+
+  it('does not warn about native form confirmation without native WebMCP', () => {
+    document.body.innerHTML = `
+      <form>
+        <label>Note <input name="note" /></label>
+      </form>
+    `
+    const form = document.querySelector('form')
+    if (!form) throw new Error('Expected test form.')
+
+    const registration = registerFormTool({
+      form,
+      name: 'save_note',
+      description: 'Save the note from the current form for the signed-in user.',
+      confirmation: { reason: 'Save this note?' }
+    })
+
+    expect(registration.warnings).not.toContain(
+      'Native WebMCP form tools do not run the kit confirmation pipeline; enforce approval in the form submit handler.'
+    )
+  })
+
   it('infers checkbox fields and official tool parameter description overrides', () => {
     document.body.innerHTML = `
       <form>

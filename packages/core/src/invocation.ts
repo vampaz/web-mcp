@@ -397,7 +397,14 @@ function copyJsonInput(value: unknown): JsonInputCopy {
     if (ancestors.has(current)) throw new TypeError('cycle')
     ancestors.add(current)
     try {
-      if (Array.isArray(current)) return current.map(copy)
+      if (Array.isArray(current)) {
+        const result: unknown[] = []
+        for (let index = 0; index < current.length; index++) {
+          if (!Object.hasOwn(current, index)) throw new TypeError('sparse array')
+          result.push(copy(current[index]))
+        }
+        return result
+      }
       const prototype = Object.getPrototypeOf(current)
       if (prototype !== Object.prototype && prototype !== null)
         throw new TypeError('not a plain object')

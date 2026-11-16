@@ -198,6 +198,32 @@ it('copies cyclic parsed input for approval and the guard', async function test(
   })
 })
 
+it('rejects sparse array input before approval', async function test() {
+  const execute = vi.fn(function execute() {
+    return 'saved'
+  })
+  registerTool(
+    defineTool({
+      name: 'save_list',
+      description: 'Save the supplied list of identifiers.',
+      inputSchema: { type: 'array', items: { type: 'string' } },
+      execute
+    })
+  )
+
+  const sparse: unknown[] = []
+  sparse[0] = 'a'
+  sparse[2] = 'c'
+  const result = await invokeTool({
+    toolName: 'save_list',
+    input: sparse as unknown as Record<string, unknown>
+  })
+
+  expect(result).toMatchObject({ status: 'error', code: 'invalid_input' })
+  expect(result.error).toContain('JSON data')
+  expect(execute).not.toHaveBeenCalled()
+})
+
 it('copies parsed undefined and BigInt fields for approval and the guard', async function test() {
   interface ParsedFields {
     label: string

@@ -26,7 +26,8 @@ export function registerTool<TInput = Record<string, unknown>, TOutput = unknown
 export function registerToolWithCleanup<TInput = Record<string, unknown>, TOutput = unknown>(
   tool: WebMCPTool<TInput, TOutput>,
   onUnregister?: () => void,
-  nativeRegistrationKind: NativeRegistrationKind = 'imperative'
+  nativeRegistrationKind: NativeRegistrationKind = 'imperative',
+  extraWarnings: readonly string[] = []
 ): RegisteredTool<TInput, TOutput> {
   assertValidTool(tool)
 
@@ -40,7 +41,11 @@ export function registerToolWithCleanup<TInput = Record<string, unknown>, TOutpu
     nativeRegistrationKind === 'imperative' ? registerNativeTool(tool) : undefined
   const hasNativeRegistration =
     nativeRegistrationKind === 'declarative' ? isWebMCPSupported() : Boolean(nativeRegistration)
-  const warnings = [...getToolWarnings(tool), ...(nativeRegistration?.warnings ?? [])]
+  const warnings = [
+    ...getToolWarnings(tool),
+    ...(nativeRegistration?.warnings ?? []),
+    ...extraWarnings
+  ]
   const registeredName = tool.name
 
   const registration: RegisteredTool<TInput, TOutput> = {

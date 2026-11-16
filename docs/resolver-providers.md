@@ -14,7 +14,7 @@ const browser = await createResolver({ provider: 'chrome-built-in' })
 
 `local` uses deterministic resolution and asks for missing required inputs. It matches the request against tool names, descriptions, property names, and enum values, requires a minimum match before choosing a tool, and fills optional inputs only from evidence in the request (an enum value, a literal boolean, a matching context ID, or a search query). `auto` prefers Chrome AI and permits deterministic fallback. An explicit `chrome-built-in` selection reports provider failure and never switches to heuristics. Chrome requests clone an unprompted base session and destroy each clone, so unrelated requests do not accumulate context. While Chrome downloads its model, `status` is `downloading` and `detail` reports progress; a cancelled request stops waiting while the download continues for other requests. The host disposes the resolver when it is no longer needed.
 
-Built-in remote, server, and hosted resolvers throw `ResolverError` on HTTP failure, with `code` (`context_overflow` or `provider_failed`), `status`, and the provider's message shortened to 300 characters. Custom resolvers can throw `new ResolverError(message, 'context_overflow')` so Pi compacts history instead of failing the turn. A resolution that does not match the offered tools, and model text that is empty or not JSON, throws `ToolResolutionValidationError`; custom resolvers can throw it so Pi retries once with the error.
+Built-in remote, server, and hosted resolvers throw `ResolverError` on HTTP failure, with `code` (`context_overflow` or `provider_failed`), `status`, and the provider's message with `Bearer` tokens and `sk-` keys redacted, then shortened to 300 characters. Custom resolvers can throw `new ResolverError(message, 'context_overflow')` so Pi compacts history instead of failing the turn. A resolution that does not match the offered tools, and model text that is empty or not JSON, throws `ToolResolutionValidationError`; custom resolvers can throw it so Pi retries once with the error.
 
 Remote providers are `openai`, `openrouter`, `openai-compatible`, and `cloudflare-binding`. Choose a model that your endpoint permits; example identifiers are placeholders, not availability claims.
 
@@ -95,6 +95,8 @@ This posts to `baseUrl + '/chat/completions'` and expects an OpenAI-compatible r
 Use `responseFormat: 'text'` when the endpoint's constrained decoder cannot support your tool schemas. This explicitly requests text output containing the same JSON resolution; the kit still validates the JSON, tool name, and complete input schema before returning it. For local models, configure `maxTokens`, `temperature`, and `reasoningEffort` explicitly to keep generation bounded.
 
 User-key mode is `{ mode: 'user-key', apiKey, storageKey? }`. The key is visible to the page. Use server mode for application secrets. Command-input attributes no longer accept credentials.
+
+Direct provider requests (`user-key` and `none` modes) follow no redirects and omit credentials on cross-origin calls. In `user-key` mode, the effective request destination must use HTTPS unless its host is loopback (`localhost`, `127.0.0.0/8`, or `::1`); relative and protocol-relative `baseUrl` values are resolved against the page URL first, and a name such as `localhost.example.com` is not loopback. Without a browser page URL, a relative `baseUrl` is left unresolved and the request fails as fetch does. Server mode keeps normal fetch session behavior.
 
 ## Hosted integration
 

@@ -185,6 +185,34 @@ describe('createHostedOpenAIResolver', function describeHostedOpenAIResolver() {
     ).toHaveLength(1)
   })
 
+  it('redacts key-like text from hosted provider errors', async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ token: 'session' }))
+      .mockResolvedValueOnce(
+        Response.json(
+          { error: 'Invalid credential Bearer sk-hosted-secret-1234567890' },
+          { status: 400 }
+        )
+      )
+    vi.stubGlobal('fetch', fetch)
+    const resolver = createHostedOpenAIResolver({
+      accessKey: paidAccessKey,
+      endpoint: '/api/webmcp/resolve',
+      model: 'gpt-5.4-mini',
+      sessionEndpoint: '/api/webmcp/session'
+    })
+
+    const failure = await resolver
+      .resolve('Select', [createSelectItemsTool()])
+      .catch((error: unknown) => error)
+
+    expect(failure).toBeInstanceOf(Error)
+    expect((failure as Error).message).toContain('Hosted OpenAI returned 400')
+    expect((failure as Error).message).toContain('[redacted]')
+    expect((failure as Error).message).not.toContain('sk-hosted-secret')
+  })
+
   it('reuses sessions without expiresAt and renews after an authentication failure', async () => {
     let expired = false
     const challenge = vi.fn(async () => 'challenge')

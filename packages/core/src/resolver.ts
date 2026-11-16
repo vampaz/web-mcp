@@ -189,6 +189,7 @@ export function createRemoteResolver(config: RemoteResolverConfig): ToolResolver
   const providerLabel = getProviderLabel(config)
   const model = config.model ?? getDefaultModel(config)
   const auth = config.auth ?? { mode: 'none' }
+  if (auth.mode === 'user-key' && config.baseUrl) assertDirectBaseUrlIsSecure(config.baseUrl)
   const serverBindingRequired = requiresServerBinding(config, auth)
   const key = getResolverApiKey(config.provider, auth)
   const keyRequired = requiresBrowserKey(config, auth)
@@ -403,7 +404,8 @@ async function resolveWithOpenAICompatible(
     ? createStructuredToolResolutionSchema(tools, options?.purpose)
     : createToolResolutionSchema(tools, singleStep, options?.purpose)
 
-  const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
+  const requestUrl = `${baseUrl.replace(/\/$/, '')}/chat/completions`
+  const response = await fetch(requestUrl, {
     method: 'POST',
     headers,
     body: serializeResolverRequest(
@@ -438,7 +440,9 @@ async function resolveWithOpenAICompatible(
       },
       options?.maxRequestBytes
     ),
-    signal: options?.signal
+    signal: options?.signal,
+    redirect: 'error',
+    ...(isCrossOriginRequest(requestUrl) ? { credentials: 'omit' as const } : {})
   })
 
   if (!response.ok) {
@@ -797,6 +801,53 @@ function getRemoteResolverDetail(config: RemoteResolverConfig, auth: ResolverAut
   if (auth.mode === 'user-key')
     return `${provider} will resolve directly from the browser with a user-provided key. This is convenient but the key is visible to this page.`
   return `${provider} will resolve without an API key.`
+}
+
+function assertDirectBaseUrlIsSecure(baseUrl: string): void {
+  const target = resolveDirectBaseUrl(baseUrl)
+  if (!target) return
+
+  if (target.protocol !== 'http:' || isLoopbackHostname(target.hostname)) return
+
+  throw new Error(
+    'Direct user-key resolver requests require HTTPS unless the destination is a loopback host.'
+  )
+}
+
+function resolveDirectBaseUrl(baseUrl: string): URL | undefined {
+  try {
+    return new URL(baseUrl)
+  } catch {
+    if (typeof location === 'undefined') return undefined
+    try {
+      return new URL(baseUrl, location.href)
+    } catch {
+      return undefined
+    }
+  }
+}
+
+function isLoopbackHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '')
+  if (host === 'localhost' || host === '::1') return true
+
+  const octets = host.split('.')
+  return (
+    octets.length === 4 &&
+    octets[0] === '127' &&
+    octets.every(function isOctet(octet) {
+      return /^\d{1,3}$/.test(octet) && Number(octet) <= 255
+    })
+  )
+}
+
+function isCrossOriginRequest(url: string): boolean {
+  if (typeof location === 'undefined') return true
+  try {
+    return new URL(url, location.href).origin !== location.origin
+  } catch {
+    return true
+  }
 }
 
 function getOpenAICompatibleBaseUrl(config: RemoteResolverConfig): string {

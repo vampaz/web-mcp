@@ -11,6 +11,10 @@
 - **Core:** show the tool name and a bounded JSON argument summary in the `window.confirm()` fallback.
 - **Core:** cap validation errors at 20 plus one "More errors omitted." entry, shorten long property names in messages, and stop `uniqueItems` at the first duplicate.
 - **Core:** warn when a string property uses `pattern` without `maxLength`.
+- **Core:** reject sparse arrays in tool input instead of passing holes to the tool as `undefined`.
+- **Forms:** warn when a native WebMCP form declares `confirmation`, because declarative submission does not run the kit approval pipeline; warn again when that form also uses `toolautosubmit`.
+- **Resolvers:** direct `user-key` and `none` requests follow no redirects and omit credentials on cross-origin calls. User-key mode rejects an effective `http:` destination unless the host is loopback, including relative and protocol-relative base URLs resolved against the page.
+- **Resolvers:** redact `Bearer` tokens and `sk-` keys from provider error messages before shortening them.
 
 ## 0.9.1 — 2026-11-16
 
