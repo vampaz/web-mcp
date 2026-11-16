@@ -99,7 +99,7 @@ it('passes source and invocation id to the confirmation handler', async function
 
   expect(result.status).toBe('success')
   expect(confirm).toHaveBeenCalledWith(
-    expect.objectContaining({ source: 'pi', invocationId: 'call_7' })
+    expect.objectContaining({ source: 'pi', invocationId: 'call_7', callerRequired: false })
   )
 })
 
@@ -132,7 +132,10 @@ it('requires confirmation for one invocation without a tool confirmation', async
     error: 'This action follows content from an untrusted source.'
   })
   expect(confirm).toHaveBeenCalledWith(
-    expect.objectContaining({ reason: 'This action follows content from an untrusted source.' })
+    expect.objectContaining({
+      reason: 'This action follows content from an untrusted source.',
+      callerRequired: true
+    })
   )
   expect(execute).not.toHaveBeenCalled()
 })
@@ -160,7 +163,9 @@ it('keeps a tool confirmation when an invocation also requires approval', async 
     requireConfirmation: { reason: 'This action follows content from an untrusted source.' }
   })
 
-  expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ reason: 'Change the counter?' }))
+  expect(confirm).toHaveBeenCalledWith(
+    expect.objectContaining({ reason: 'Change the counter?', callerRequired: true })
+  )
 })
 
 it('validates input before an invocation-level confirmation', async function test() {

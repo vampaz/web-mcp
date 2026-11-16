@@ -134,6 +134,22 @@ test('retries a failed provider turn from the composer exactly once', async func
   await expect(chat.locator('li[data-role=user]').filter({ hasText: 'flaky' })).toHaveCount(2)
 })
 
+test('hides retry after a completed write when the provider then fails', async function afterWriteRetry({
+  page
+}) {
+  await page.goto('/?mode=chat')
+  const chat = page.locator('webmcp-chat')
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('set then fail')
+  await page.getByRole('button', { name: 'Send', exact: true }).click()
+  await page.getByRole('button', { name: 'Approve', exact: true }).click()
+  await expect(page.locator('#counter')).toHaveText('6')
+  await expect(chat.getByRole('status')).toContainText(
+    'The last response failed. Check application state before sending a new request.'
+  )
+  await expect(chat.getByRole('button', { name: 'Try again', exact: true })).toBeHidden()
+  await expect(chat.getByRole('button', { name: 'Edit last message', exact: true })).toBeVisible()
+})
+
 test('focuses the composer for keyboard retry and immediate suggestions', async function shortcutFocus({
   page
 }) {

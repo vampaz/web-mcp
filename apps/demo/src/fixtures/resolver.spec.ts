@@ -51,4 +51,15 @@ describe('fixture resolver scripts', function fixture() {
     await expect(resolve(resolver, 'flaky')).rejects.toThrow('Fixture provider failed once')
     await expect(resolve(resolver, 'flaky')).resolves.toMatchObject({ toolName: 'pi_reply' })
   })
+
+  it('fails after the write in the set-then-fail scenario', async function afterWrite() {
+    const resolver = createFixtureResolver()
+    await expect(resolve(resolver, 'set then fail')).resolves.toMatchObject({
+      toolName: 'set_counter',
+      input: { value: 6 }
+    })
+    await expect(
+      resolver.resolve('set then fail', [], { piConversation: [{ role: 'toolResult' }] })
+    ).rejects.toThrow('Fixture provider failed after the write')
+  })
 })

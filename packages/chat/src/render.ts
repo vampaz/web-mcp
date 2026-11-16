@@ -398,11 +398,34 @@ function setText(node: Element, text: string) {
   if (node.textContent !== text) node.textContent = text
 }
 
+/** True when retrying after this tool message could repeat an action or hide an unknown outcome. */
+export function toolMessageBlocksRetry(message: PiMessage): boolean {
+  if (message.role !== 'tool') return false
+  // A denial did not run, but a retry could repeat the declined request.
+  if (message.code === 'confirmation_denied' || message.status === 'unknown') return true
+  return message.status !== 'blocked' && message.status !== 'unavailable'
+}
+
+/** True when a tool message after the last user message makes a retry unsafe. */
+export function retryBlockedSinceLastUser(messages: readonly PiMessage[]): boolean {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]!
+    if (message.role === 'user') return false
+    if (toolMessageBlocksRetry(message)) return true
+  }
+  return false
+}
+
 export function statusText(snapshot: PiSnapshot, labels: WebMCPChatLabels): ChatStatus {
   if (snapshot.error) {
     if (snapshot.error.code === 'action_denied') return { text: labels.status.declined }
     if (snapshot.error.code === 'provider_failed' && !snapshot.error.actionMayHaveRun)
-      return { text: labels.status.providerFailed, tone: 'error' }
+      return {
+        text: retryBlockedSinceLastUser(snapshot.messages)
+          ? labels.status.lastFailed
+          : labels.status.providerFailed,
+        tone: 'error'
+      }
     return { text: snapshot.error.message, tone: 'error' }
   }
   const last = snapshot.messages.at(-1)

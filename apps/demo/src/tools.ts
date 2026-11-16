@@ -63,11 +63,12 @@ export function installApprovalDialog(
     reason,
     signal,
     source,
-    tool
+    tool,
+    callerRequired
   }) {
     cancel()
     if (source === 'pi') {
-      if (!requiresApproval()) return true
+      if (!requiresApproval() && !callerRequired) return true
       if (inlineApproval)
         return inlineApproval({
           toolName: tool.name,

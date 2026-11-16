@@ -43,7 +43,10 @@ export async function requestToolConfirmation(
           reason,
           ...(options.signal ? { signal: options.signal } : {}),
           ...(options.source ? { source: options.source } : {}),
-          ...(options.invocationId === undefined ? {} : { invocationId: options.invocationId })
+          ...(options.invocationId === undefined ? {} : { invocationId: options.invocationId }),
+          ...(options.callerRequired === undefined
+            ? {}
+            : { callerRequired: options.callerRequired })
         })) === true
       )
     } catch (error) {
@@ -68,6 +71,7 @@ export interface ToolConfirmationOptions {
   source?: ToolContext['source']
   invocationId?: string
   reason?: string
+  callerRequired?: boolean
 }
 
 const maxConfirmationDetailLength = 500

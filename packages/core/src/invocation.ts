@@ -186,7 +186,8 @@ async function executePipeline<TInput, TOutput>(
           signal: options.signal,
           source: options.source,
           invocationId: id,
-          reason: confirmationReason
+          reason: confirmationReason,
+          callerRequired: Boolean(options.requireConfirmation)
         }),
         options.signal
       )

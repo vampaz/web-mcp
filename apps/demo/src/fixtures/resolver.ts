@@ -58,6 +58,28 @@ export function createFixtureResolver(): ToolResolver {
       },
       {
         match(call) {
+          return (
+            requestText(call.message) === 'set then fail' &&
+            JSON.stringify(call.context.piConversation ?? []).includes('"role":"toolResult"')
+          )
+        },
+        error: 'Fixture provider failed after the write',
+        repeat: true
+      },
+      {
+        match(call) {
+          return requestText(call.message) === 'set then fail'
+        },
+        resolution: {
+          toolName: 'set_counter',
+          input: { value: 6 },
+          confidence: 1,
+          reason: 'Requested fixture write before a provider failure'
+        },
+        repeat: true
+      },
+      {
+        match(call) {
           return requestText(call.message) === 'invalid'
         },
         resolution: {

@@ -11,7 +11,7 @@ import type {
   WebMCPChatLabels,
   WebMCPChatOptions
 } from './interfaces/chat'
-import { activityText, statusText, updateTranscript } from './render'
+import { activityText, retryBlockedSinceLastUser, statusText, updateTranscript } from './render'
 import { createLabels } from './labels'
 import { ChatApproval } from './approval'
 import { chatStyles, popupStyles } from './styles'
@@ -598,12 +598,7 @@ export function defineWebMCPChat(): void {
           break
         }
       if (lastUser < 0) return false
-      for (let index = lastUser + 1; index < messages.length; index++) {
-        const message = messages[index]!
-        if (message.role !== 'tool') continue
-        if (message.code === 'confirmation_denied' || message.status === 'unknown') return false
-      }
-      return true
+      return !retryBlockedSinceLastUser(messages)
     }
 
     private lastUserText() {

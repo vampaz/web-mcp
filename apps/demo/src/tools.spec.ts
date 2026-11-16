@@ -1,10 +1,17 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { invokeTool, setConfirmationHandler, unregisterTool } from '@vampaz/webmcp-kit'
+import {
+  defineTool,
+  invokeTool,
+  registerTool,
+  setConfirmationHandler,
+  unregisterTool
+} from '@vampaz/webmcp-kit'
 import { installApprovalDialog, registerCounterTools } from './tools'
 
 afterEach(function cleanup() {
   unregisterTool('read_counter')
   unregisterTool('set_counter')
+  unregisterTool('save_draft')
   setConfirmationHandler(undefined)
   document.body.innerHTML = ''
 })
@@ -58,6 +65,71 @@ it('skips approval only for pi when the preference is off', async function test(
 
   remove()
   counter.destroy()
+  dialog.remove()
+})
+
+it('opens approval for a caller-required confirmation even when the pi preference is off', async function test() {
+  const counter = registerCounterTools(function changed() {})
+  const dialog = createApprovalDialog()
+  const remove = installApprovalDialog(dialog, function requiresApproval() {
+    return false
+  })
+
+  const pending = invokeTool({
+    toolName: 'set_counter',
+    input: { value: 5 },
+    source: 'pi',
+    requireConfirmation: { reason: 'This action follows content from an untrusted source.' }
+  })
+  await vi.waitFor(function waitingForDialog() {
+    expect(dialog.open).toBe(true)
+  })
+  // The tool's own reason still wins when both the tool and the caller require approval.
+  expect(dialog.querySelector('#approval-action')?.textContent).toContain(
+    'Change the application counter?'
+  )
+
+  dialog.close('approve')
+  expect(await pending).toMatchObject({ status: 'success', output: { value: 5 } })
+
+  remove()
+  counter.destroy()
+  dialog.remove()
+})
+
+it('opens approval for a caller-required confirmation on an unconfirmed tool', async function test() {
+  registerTool(
+    defineTool({
+      name: 'save_draft',
+      description: 'Save the current draft.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      execute() {
+        return { saved: true }
+      }
+    })
+  )
+  const dialog = createApprovalDialog()
+  const remove = installApprovalDialog(dialog, function requiresApproval() {
+    return false
+  })
+
+  const pending = invokeTool({
+    toolName: 'save_draft',
+    input: {},
+    source: 'pi',
+    requireConfirmation: { reason: 'This action follows content from an untrusted source.' }
+  })
+  await vi.waitFor(function waitingForDialog() {
+    expect(dialog.open).toBe(true)
+  })
+  expect(dialog.querySelector('#approval-action')?.textContent).toContain(
+    'This action follows content from an untrusted source.'
+  )
+
+  dialog.close('deny')
+  expect(await pending).toMatchObject({ status: 'blocked', code: 'confirmation_denied' })
+
+  remove()
   dialog.remove()
 })
 

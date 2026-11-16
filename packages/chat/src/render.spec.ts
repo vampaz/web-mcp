@@ -87,6 +87,26 @@ it('maps provider failures and keeps action-risk warnings', function providerErr
   ).toEqual({ text: 'The action may have run. Check application state.', tone: 'error' })
 })
 
+it('replaces the retry hint with a state warning after a completed action', function providerAfterAction() {
+  expect(
+    statusText(
+      {
+        state: 'idle',
+        messages: [
+          { id: 'q', role: 'user', text: 'Set the counter to 9' },
+          { id: 't', role: 'tool', toolName: 'set_counter', text: '9', status: 'success' },
+          { id: 'a', role: 'assistant', text: 'HTTP 503', failed: true }
+        ],
+        error: { code: 'provider_failed', message: 'Provider failed' }
+      },
+      labels
+    )
+  ).toEqual({
+    text: 'The last response failed. Check application state before sending a new request.',
+    tone: 'error'
+  })
+})
+
 it('reports a declined action neutrally before and after recovery', function declined() {
   const message = {
     id: 'tool',

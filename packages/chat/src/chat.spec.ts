@@ -817,6 +817,43 @@ it.each([
         actionMayHaveRun: true
       }
     }
+  ],
+  [
+    'a completed action',
+    {
+      state: 'idle' as const,
+      messages: [
+        { id: 'q', role: 'user' as const, text: 'Set the counter to 9' },
+        {
+          id: 't',
+          role: 'tool' as const,
+          toolName: 'set_counter',
+          text: '9',
+          status: 'success' as const
+        },
+        { id: 'a', role: 'assistant' as const, text: 'HTTP 503', failed: true }
+      ],
+      error: { code: 'provider_failed' as const, message: 'Provider failed' }
+    }
+  ],
+  [
+    'a failed action',
+    {
+      state: 'idle' as const,
+      messages: [
+        { id: 'q', role: 'user' as const, text: 'Set the counter to 9' },
+        {
+          id: 't',
+          role: 'tool' as const,
+          toolName: 'set_counter',
+          text: 'The action failed.',
+          status: 'error' as const,
+          failed: true
+        },
+        { id: 'a', role: 'assistant' as const, text: 'HTTP 503', failed: true }
+      ],
+      error: { code: 'provider_failed' as const, message: 'Provider failed' }
+    }
   ]
 ])('does not offer retry after %s', function noRetry(_label, snapshot) {
   const fixture = controller()

@@ -88,6 +88,8 @@ export interface ConfirmationRequest {
   signal?: AbortSignal
   source?: ToolContext['source']
   invocationId?: string
+  /** True when the caller added the confirmation requirement, not only the tool. */
+  callerRequired?: boolean
 }
 ```
 
