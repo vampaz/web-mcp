@@ -2,6 +2,7 @@ import { defineWebMCPCommandInput } from './command-input'
 import { setConfirmationHandler } from './confirmation'
 import { assertValidTool } from './define-tool'
 import type { WebMCPCommandInputElement } from './interfaces/command-input'
+import { WebMCPKitError } from './kit-error'
 import type {
   ConfirmationHandler,
   ResolverContext,
@@ -31,9 +32,13 @@ export interface WebMCPInitHandle {
   destroy: () => void
 }
 
+/** Initializes a command input, registers optional tools, and returns a teardown handle. */
 export function initWebMCP(options: InitWebMCPOptions = {}): WebMCPInitHandle {
   if (typeof document === 'undefined') {
-    throw new Error('initWebMCP() must run in a browser document context.')
+    throw new WebMCPKitError(
+      'invalid_configuration',
+      'initWebMCP() must run in a browser document context.'
+    )
   }
 
   // Resolve everything that can throw before performing side effects.
@@ -93,11 +98,15 @@ function assertRegistrableInitTools(tools: readonly WebMCPTool[] | undefined): v
   for (const tool of tools) {
     assertValidTool(tool)
     if (names.has(tool.name)) {
-      throw new Error(`initWebMCP() received duplicate tool name "${tool.name}".`)
+      throw new WebMCPKitError(
+        'duplicate_tool',
+        `initWebMCP() received duplicate tool name "${tool.name}".`
+      )
     }
     names.add(tool.name)
     if (getTool(tool.name)) {
-      throw new Error(
+      throw new WebMCPKitError(
+        'duplicate_tool',
         `initWebMCP() cannot register "${tool.name}" because a tool with that name is already registered. Unregister it first or rename the tool.`
       )
     }
@@ -115,7 +124,10 @@ function resolveCommandInputElement(target: string | WebMCPCommandInputElement |
   if (typeof target === 'string') {
     const element = document.querySelector<WebMCPCommandInputElement>(target)
     if (!element) {
-      throw new Error(`initWebMCP() found no element matching "${target}".`)
+      throw new WebMCPKitError(
+        'invalid_configuration',
+        `initWebMCP() found no element matching "${target}".`
+      )
     }
     return { created: false, element }
   }

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearToolsForTest } from '@vampaz/webmcp-kit/testing'
 import { defineTool, registerTool, setConfirmationHandler } from '@vampaz/webmcp-kit'
 
-import { createLocalMCPBridge } from './index'
+import { createLocalMCPBridge, type MCPBridgeRequest } from './index'
 
 describe('local MCP bridge', () => {
   beforeEach(() => {
@@ -177,6 +177,72 @@ describe('local MCP bridge', () => {
     ])
   })
 
+  it('returns detached schemas and annotations', async () => {
+    const outputSchema = {
+      type: 'object',
+      properties: { count: { type: 'integer' } },
+      required: ['count']
+    }
+    registerTool(
+      defineTool({
+        name: 'read_count',
+        description: 'Read the current item count for the open workspace.',
+        inputSchema: {
+          type: 'object',
+          properties: { note: { type: 'string', maxLength: 3 } },
+          additionalProperties: false
+        },
+        outputSchema,
+        annotations: { readOnlyHint: true },
+        execute() {
+          return { count: 1 }
+        }
+      })
+    )
+    const bridge = createLocalMCPBridge()
+    const [tool] = bridge.listTools()
+    if (!tool?.inputSchema.properties || !tool.outputSchema?.properties) {
+      throw new Error('Expected the bridge to return both schemas.')
+    }
+
+    tool.inputSchema.properties.note.maxLength = 1000
+    tool.outputSchema.properties.count.type = 'string'
+    tool.annotations!.readOnlyHint = false
+
+    expect(bridge.listTools()).toEqual([
+      {
+        name: 'read_count',
+        description: 'Read the current item count for the open workspace.',
+        inputSchema: {
+          type: 'object',
+          properties: { note: { type: 'string', maxLength: 3 } },
+          additionalProperties: false
+        },
+        outputSchema,
+        annotations: { readOnlyHint: true }
+      }
+    ])
+
+    await expect(
+      bridge.handleRequest({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'read_count', arguments: { note: 'abcd' } }
+      })
+    ).resolves.toMatchObject({ result: { isError: true } })
+    await expect(
+      bridge.handleRequest({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'tools/call',
+        params: { name: 'read_count', arguments: { note: 'abc' } }
+      })
+    ).resolves.toMatchObject({
+      result: { isError: false, structuredContent: { count: 1 } }
+    })
+  })
+
   it('tags tool calls with the mcp-bridge source', async () => {
     const execute = vi.fn(function readCart() {
       return { lines: 0 }
@@ -334,4 +400,62 @@ it('returns structured content for any schema-valid output, even if the tool unr
     isError: false
   })
   clearToolsForTest()
+})
+
+it.each([null, undefined, 'tools/list', 1, []])(
+  'returns an invalid request error for %j',
+  async function test(request) {
+    const response = await createLocalMCPBridge().handleRequest(
+      request as unknown as MCPBridgeRequest
+    )
+
+    expect(response).toEqual({
+      jsonrpc: '2.0',
+      id: null,
+      error: { code: -32600, message: 'Expected a JSON-RPC request object.' }
+    })
+  }
+)
+
+async function expectUnserializableOutput(execute: () => unknown): Promise<void> {
+  clearToolsForTest()
+  registerTool(
+    defineTool({
+      name: 'unserializable_output',
+      description: 'Return a value JSON cannot carry.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      execute
+    })
+  )
+
+  const response = await createLocalMCPBridge().handleRequest({
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'tools/call',
+    params: { name: 'unserializable_output', arguments: {} }
+  })
+
+  expect(response).toEqual({
+    jsonrpc: '2.0',
+    id: 1,
+    result: {
+      content: [{ type: 'text', text: 'Tool result could not be serialized.' }],
+      isError: true
+    }
+  })
+  clearToolsForTest()
+}
+
+it('reports output that JSON cannot serialize: a BigInt', async function test() {
+  await expectUnserializableOutput(function bigintOutput() {
+    return 1n
+  })
+})
+
+it('reports output that JSON cannot serialize: a cyclic value', async function test() {
+  await expectUnserializableOutput(function cyclicOutput() {
+    const cyclic: Record<string, unknown> = {}
+    cyclic.self = cyclic
+    return cyclic
+  })
 })

@@ -4,6 +4,7 @@ import type { ConfirmationEventDetail, ResolverContext } from '@vampaz/webmcp-ki
 import type { PiToolHost, RegistryToolHostOptions } from './interfaces/host'
 import { PiFailure } from './errors'
 
+/** Creates the default Pi tool host backed by the page's tool registry. */
 export function createRegistryToolHost(
   context: () => ResolverContext | Promise<ResolverContext> = function empty() {
     return {}
@@ -65,7 +66,14 @@ export function createRegistryToolHost(
           toolName: call.name,
           input: call.input,
           source: 'pi',
-          signal
+          signal,
+          ...(call.requireApproval
+            ? {
+                requireConfirmation: {
+                  reason: 'This action follows content from an untrusted source.'
+                }
+              }
+            : {})
         })
       } finally {
         unsubscribe()

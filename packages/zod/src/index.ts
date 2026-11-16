@@ -6,6 +6,7 @@ import type { DefineZodToolOptions, ZodWebMCPTool } from './interfaces/zod-tool'
 
 export type { DefineZodToolOptions, ZodWebMCPTool } from './interfaces/zod-tool'
 
+/** Defines a tool from a Zod schema, converting it to JSON Schema for WebMCP. */
 export function defineZodTool<TSchema extends z.ZodType, TOutput = unknown>(
   options: DefineZodToolOptions<TSchema, TOutput>
 ): ZodWebMCPTool<TSchema, TOutput> {

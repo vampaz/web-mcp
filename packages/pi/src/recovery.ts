@@ -97,7 +97,7 @@ function toolOutcome(
   text: string,
   isError: boolean,
   invoked: boolean
-): Pick<PiMessage, 'text' | 'status' | 'output' | 'failed'> {
+): Pick<PiMessage, 'text' | 'status' | 'output' | 'failed' | 'code'> {
   try {
     const result = JSON.parse(text) as Partial<ToolInvocationResult>
     if (result && typeof result === 'object' && typeof result.status === 'string') {
@@ -107,6 +107,7 @@ function toolOutcome(
           ? (JSON.stringify(result.output) ?? '')
           : (result.error ?? 'The action did not succeed.'),
         status: result.status,
+        ...(result.code !== undefined ? { code: result.code } : {}),
         ...(success && result.output !== undefined ? { output: result.output } : {}),
         ...(!success && result.details !== undefined
           ? {

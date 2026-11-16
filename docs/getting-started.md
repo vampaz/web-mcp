@@ -15,7 +15,6 @@ const tools = registerTools([
   defineTool({
     name: 'read_counter',
     description: 'Read the current application counter.',
-    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true },
     execute() {
       return { value: counter }
@@ -51,13 +50,45 @@ tools.unregister()
 disposeApproval()
 ```
 
-`registerTools()` registers the set atomically and returns one disposer. Input is validated against the schema before approval, so `{ value: 'seven' }` returns `invalid_input` without asking the user. With native browser WebMCP, agents discover the same tools; without it, the fallback registry serves the command input, Pi, devtools, and tests. During development, `mountDevtoolsOverlay()` from `/devtools` lists and invokes registered tools.
+`registerTools()` registers the set atomically and returns one disposer. `defineTool()` supplies a strict empty-object `inputSchema` when one is omitted; tools that take fields still declare one. Input is validated against the schema before approval, so `{ value: 'seven' }` returns `invalid_input` without asking the user. With native browser WebMCP, agents discover the same tools; without it, the fallback registry serves the command input, Pi, devtools, and tests. During development, `mountDevtoolsOverlay()` from `/devtools` lists and invokes registered tools.
 
 A module that registers at top level should also unregister in `import.meta.hot?.dispose()` so hot reload does not hit the duplicate-name check.
 
+## Script tag without an import map
+
+The package also ships a self-contained ES module at `dist/cdn/webmcp-kit.js`. It bundles core, chat, Pi, and `mountAssistant()` with no bare imports or extra chunks, so a module script can load it directly:
+
+```html
+<div id="assistant"></div>
+<script type="module">
+  import { defineTool, registerTool, mountAssistant } from '/assets/webmcp-kit.js'
+
+  registerTool(
+    defineTool({
+      name: 'read_value',
+      description: 'Read the visible value.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      execute() {
+        return { value: 7 }
+      }
+    })
+  )
+
+  const assistant = mountAssistant({
+    container: document.querySelector('#assistant'),
+    session: { namespace: 'my-app', ownerId: 'local-user', conversationId: 'one' },
+    resolver: applicationResolver, // Your resolver and tools stay application-owned.
+    chat: { mode: 'inline', title: 'Application assistant' }
+  })
+  await assistant.ready
+</script>
+```
+
+Copy the file into a served asset path or reference the installed package path. The script still needs a secure browser context, IndexedDB, and your resolver. Use the normal package entries when a bundler or import map is available.
+
 ## Dependency model
 
-WebMCP Kit is one ESM package. Core, command input, Pi, chat, devtools, testing, and the local bridge require no framework. Pi's implementation libraries are bundled into the distribution and remain isolated from core/chat imports.
+WebMCP Kit is one ESM package. Core, command input, Pi, chat, assistant, server, devtools, testing, the page bridge, and the local bridge require no framework. Pi's implementation libraries are bundled into the distribution and remain isolated from core/chat imports.
 
 Install `vue` for `/vue`, `react` for `/react`, `svelte` for `/svelte`, or `zod` for `/zod`. The accepted peer ranges are Vue 3.3+, React 18+, Svelte 4+, and Zod 4+. A declared range is not evidence that every version has been tested. The package requires Node 24 or newer for tooling, matching this repository's development version in `.nvmrc`.
 

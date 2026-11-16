@@ -20,26 +20,59 @@ import { artifact, run, verifyArtifact } from './fixtures'
 // Reviewed eager bytes: root 25,467; mcp-bridge 26,280; react 26,165; svelte 26,112;
 // vue 26,173; zod 25,804; pi 29,428; command-input 29,838; hosted 9,630.
 // Pi total is 149,727 bytes. Raise only exceeded ceilings with the same 10% policy above.
+// Phase 5 default-schema, coded-error, and lint-ID growth reviews these graphs:
+// root 28,171; mcp-bridge 29,117; react 28,876; svelte 28,816; vue 28,942; zod 28,508;
+// pi 32,181 eager / 152,531 total. New ceilings add 10%, rounded up to 100.
 const budgets: Record<string, { eager: number; total: number }> = {
-  '.': { eager: 28_100, total: 28_100 },
-  './chat': { eager: 22_200, total: 22_200 },
+  '.': { eager: 31_000, total: 31_000 },
+  // 0.9.x chat approval card, unread/persistence state, tool labels and Markdown styles:
+  // reviewed graph 23,536 bytes (20,093 at 0.9.0). New ceiling adds 10%, rounded up to 100.
+  './chat': { eager: 25_900, total: 25_900 },
+  // Dependency-free Markdown entry: reviewed graph 1,154 bytes after the linear inline parser.
+  './chat/markdown': { eager: 1_300, total: 1_300 },
+  // New /assistant entry composes the reviewed chat and Pi graphs and the explicit lifecycle
+  // machine: 56,481 eager / 176,831 total, with no additional runtime dependency.
+  // New ceiling adds 10%, rounded up to 100.
+  './assistant': { eager: 60_900, total: 193_200 },
+  // New /server entry shares the pure resolver prompt, schema validation, and abort chunks.
+  // Review hardening raises the measured graph to 10,080 bytes; the existing 10,700 ceiling fits.
+  './server': { eager: 10_700, total: 10_700 },
   './command-input': { eager: 32_900, total: 32_900 },
-  './devtools': { eager: 33_300, total: 33_300 },
+  // Phase 1–2 shared core invocation, validation and security growth raises the reviewed
+  // devtools graph to 34,690; 10% policy applies.
+  './devtools': { eager: 38_200, total: 38_200 },
   './hosted': { eager: 10_600, total: 10_600 },
   // 0.9.0 page bridge shares the registry and invocation pipeline: 11,264 bytes.
-  './page-bridge': { eager: 12_400, total: 12_400 },
-  './mcp-bridge': { eager: 29_000, total: 29_000 },
-  './pi': { eager: 32_400, total: 152_300 },
-  './react': { eager: 28_800, total: 28_800 },
-  './svelte': { eager: 28_800, total: 28_800 },
+  // Phase 1–2 shared core invocation/security growth raises the reviewed graph to 12,479;
+  // 10% policy applies. The page bridge has no chat dependency.
+  './page-bridge': { eager: 13_800, total: 13_800 },
+  './mcp-bridge': { eager: 32_100, total: 32_100 },
+  './pi': { eager: 32_400, total: 167_800 },
+  './react': { eager: 31_800, total: 31_800 },
+  './svelte': { eager: 31_700, total: 31_700 },
   // 0.8.0 shares the native runner through the Playwright helper entry: 27,418 bytes.
-  './testing': { eager: 30_200, total: 30_200 },
+  // Phase 1–2 shared core invocation/validation growth raises the reviewed graph to 31,074;
+  // 10% policy applies.
+  './testing': { eager: 34_200, total: 34_200 },
   // 0.8.0 native journey runner adds shared resolution/schema validation: 25,596 bytes.
+  // Phase 1–2 shared core invocation/validation growth raises the reviewed graph to 29,357;
+  // 10% policy applies.
   // This Node-side testing entry has no effect on application entry budgets.
-  './testing/playwright': { eager: 28_200, total: 28_200 },
-  './vue': { eager: 28_800, total: 28_800 },
-  './zod': { eager: 28_400, total: 28_400 }
+  './testing/playwright': { eager: 32_300, total: 32_300 },
+  './vue': { eager: 31_900, total: 31_900 },
+  './zod': { eager: 31_400, total: 31_400 }
 }
+
+it('keeps the CDN bundle within its gzip budget', async function cdnBundleSize() {
+  await verifyArtifact()
+  const { stdout: code } = await run('tar', ['-xOf', artifact, 'package/dist/cdn/webmcp-kit.js'], {
+    maxBuffer: 8 * 1024 * 1024
+  })
+  const bytes = gzipSync(Buffer.from(code)).byteLength
+  // New self-contained core + chat + Pi + assistant browser bundle: 180,810 bytes.
+  // No runtime dependencies. The existing 198,300 ceiling retains its headroom.
+  expect(bytes).toBeLessThanOrEqual(198_300)
+})
 
 it('keeps each entry chunk graph within its gzip budget', async function bundleSize() {
   await verifyArtifact()

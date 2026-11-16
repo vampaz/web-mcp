@@ -93,7 +93,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          sparse-checkout: /.nvmrc
+          sparse-checkout: |
+            /.nvmrc
+            /CHANGELOG.md
+            /scripts/release-notes.ts
           sparse-checkout-cone-mode: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -106,6 +109,9 @@ jobs:
         run: |
           echo "$(jq -r .sha256 artifacts/webmcp-kit.json)  artifacts/webmcp-kit.tgz" | sha256sum --check --strict
           test "$(tar -xzOf artifacts/webmcp-kit.tgz package/package.json | jq -r .version)" = "$VERSION"
+
+      - name: Extract and validate release notes
+        run: node --experimental-strip-types scripts/release-notes.ts "$VERSION" "$RUNNER_TEMP/release-notes.md"
 
       - name: Publish to npm
         if: needs.prepare.outputs.npm != 'true'
@@ -132,7 +138,7 @@ jobs:
           gh release create "v$VERSION" \
             --target "$GITHUB_SHA" \
             --title "@vampaz/webmcp-kit v$VERSION" \
-            --generate-notes
+            --notes-file "$RUNNER_TEMP/release-notes.md"
         env:
           GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

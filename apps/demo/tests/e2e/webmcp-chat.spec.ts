@@ -1,6 +1,10 @@
-import { expect, test, type Locator } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import type { PiSnapshot, PiTurnOutcome } from '@vampaz/webmcp-kit/pi'
 import type { WebMCPChatElement } from '@vampaz/webmcp-kit/chat'
+
+async function waitForDemoProvider(page: Page) {
+  await expect(page.locator('#model-status')).toContainText('Test responses')
+}
 
 test('sends, confirms, re-resolves, and restores dialogue without replay', async function conversation({
   page
@@ -29,11 +33,24 @@ test('denies without a follow-up model call and keeps the page unchanged', async
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('set 12')
   await page.getByRole('button', { name: 'Send', exact: true }).click()
   await page.getByRole('button', { name: 'Deny', exact: true }).click()
-  await expect(page.locator('webmcp-chat').getByRole('status')).toContainText(
-    'Change the application counter?'
+  const chat = page.locator('webmcp-chat')
+  await expect(chat.getByRole('status')).toContainText(
+    'You declined this action. Nothing was changed.'
   )
+  await expect(chat.getByRole('status')).not.toHaveAttribute('data-tone', 'error')
+  await expect(chat.locator('.tool-call')).toHaveAttribute('data-status', 'declined')
+  await expect(chat.locator('.tool-outcome')).toHaveText('Declined')
   await expect(page.locator('#counter')).toHaveText('0')
-  await expect(page.locator('webmcp-chat')).not.toContainText('Fixture answer')
+  await expect(chat).not.toContainText('Fixture answer')
+
+  await page.reload()
+  await expect(chat.getByRole('status')).toContainText(
+    'You declined this action. Nothing was changed.'
+  )
+  await expect(chat.getByRole('status')).not.toHaveAttribute('data-tone', 'error')
+  await expect(chat.locator('.tool-call')).toHaveAttribute('data-status', 'declined')
+  await expect(chat.locator('.tool-outcome')).toHaveText('Declined')
+  await expect(chat.getByRole('button', { name: 'Try again', exact: true })).toBeHidden()
 })
 
 test('supports keyboard, narrow layouts, and distinct controls in two instances', async function accessibility({
@@ -90,7 +107,7 @@ test('stops resolving and reports a failed provider without a fallback', async f
   await input.fill('fail')
   await input.press('Enter')
   await expect(page.locator('webmcp-chat').getByRole('status')).toContainText(
-    'Fixture provider failed'
+    'The model could not be reached. Try again.'
   )
   await page.reload()
   await expect(page.locator('webmcp-chat').getByRole('status')).toContainText(
@@ -98,6 +115,149 @@ test('stops resolving and reports a failed provider without a fallback', async f
   )
   await expect(page.locator('webmcp-chat li').last()).toContainText('Assistant — response failed')
   await expect(page.locator('webmcp-chat li').last().locator('details')).not.toHaveAttribute('open')
+})
+
+test('retries a failed provider turn from the composer exactly once', async function retry({
+  page
+}) {
+  await page.goto('/?mode=chat')
+  const chat = page.locator('webmcp-chat')
+  const input = page.getByRole('textbox', { name: 'Message', exact: true })
+  await input.fill('flaky')
+  await input.press('Enter')
+  await expect(chat.getByRole('status')).toContainText('The model could not be reached. Try again.')
+  const retry = chat.getByRole('button', { name: 'Try again', exact: true })
+  await expect(retry).toBeVisible()
+  await retry.click()
+  await expect(chat).toContainText('Fixture answer')
+  await expect(retry).toBeHidden()
+  await expect(chat.locator('li[data-role=user]').filter({ hasText: 'flaky' })).toHaveCount(2)
+})
+
+test('hides retry after a completed write when the provider then fails', async function afterWriteRetry({
+  page
+}) {
+  await page.goto('/?mode=chat')
+  const chat = page.locator('webmcp-chat')
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill('set then fail')
+  await page.getByRole('button', { name: 'Send', exact: true }).click()
+  await page.getByRole('button', { name: 'Approve', exact: true }).click()
+  await expect(page.locator('#counter')).toHaveText('6')
+  await expect(chat.getByRole('status')).toContainText(
+    'The last response failed. Check application state before sending a new request.'
+  )
+  await expect(chat.getByRole('button', { name: 'Try again', exact: true })).toBeHidden()
+  await expect(chat.getByRole('button', { name: 'Edit last message', exact: true })).toBeVisible()
+})
+
+test('focuses the composer for keyboard retry and immediate suggestions', async function shortcutFocus({
+  page
+}) {
+  await page.goto('/?mode=chat')
+  const chat = page.locator('webmcp-chat')
+  const input = chat.getByRole('textbox', { name: 'Message', exact: true })
+  await input.fill('flaky')
+  await input.press('Enter')
+  await expect(chat.getByRole('status')).toContainText('The model could not be reached. Try again.')
+  const retry = chat.getByRole('button', { name: 'Try again', exact: true })
+  await retry.focus()
+  await retry.press('Enter')
+  await expect(input).toBeFocused()
+  await expect(chat).toContainText('Fixture answer')
+  await expect(input).toBeFocused()
+
+  await chat.getByRole('button', { name: 'New chat', exact: true }).click()
+  await chat.evaluate(function sendSuggestions(element) {
+    const target = element as WebMCPChatElement
+    target.configure({
+      controller: target.controller!,
+      suggestedPrompts: ['Read the counter'],
+      suggestionAction: 'send'
+    })
+  })
+  const suggestion = chat.getByRole('button', { name: 'Read the counter', exact: true })
+  await suggestion.focus()
+  await suggestion.press('Enter')
+  await expect(input).toBeFocused()
+  await expect(chat).toContainText('Fixture answer')
+  await expect(input).toBeFocused()
+})
+
+test('does not offer retry after an unknown outcome', async function unknown({ page }) {
+  await page.goto('/?mode=chat')
+  const chat = page.locator('webmcp-chat')
+  await expect(chat).toBeVisible()
+  await page.evaluate(function configure() {
+    const element = document.querySelector('webmcp-chat') as WebMCPChatElement
+    const snapshot: PiSnapshot = {
+      state: 'idle',
+      messages: [
+        { id: 'q', role: 'user', text: 'Set the counter to 9' },
+        {
+          id: 't',
+          role: 'tool',
+          toolName: 'set_counter',
+          text: 'Outcome unknown',
+          status: 'unknown',
+          failed: true
+        }
+      ],
+      error: { code: 'tool_failed', message: 'The action may have run. Check application state.' }
+    }
+    element.configure({
+      controller: {
+        getSnapshot() {
+          return snapshot
+        },
+        subscribe(listener) {
+          listener(snapshot)
+          return function remove() {}
+        },
+        async send() {
+          return { status: 'error' }
+        },
+        async stop() {},
+        async clear() {},
+        async refresh() {},
+        async destroy() {}
+      }
+    })
+  })
+  await expect(chat.getByRole('button', { name: 'Try again', exact: true })).toBeHidden()
+})
+
+test('keeps the inline composer stable and honors a host block size', async function stable({
+  page
+}) {
+  await page.setViewportSize({ width: 1280, height: 1000 })
+  await page.goto('/?mode=chat')
+  const chat = page.locator('webmcp-chat')
+  const input = page.getByRole('textbox', { name: 'Message', exact: true })
+  const composer = chat.locator('.composer')
+  await expectIdle(chat)
+  const chatBefore = await chat.boundingBox()
+  const before = await composer.boundingBox()
+  for (const message of ['read', 'read', 'read']) {
+    await input.fill(message)
+    await input.press('Enter')
+    await expectIdle(chat)
+  }
+  const chatAfter = await chat.boundingBox()
+  const after = await composer.boundingBox()
+  expect(
+    Math.abs((after?.y ?? 0) - (chatAfter?.y ?? 0) - ((before?.y ?? 0) - (chatBefore?.y ?? 0)))
+  ).toBeLessThan(2)
+
+  const defaultHeight = (await chat.boundingBox())?.height ?? 0
+  expect(defaultHeight).toBeLessThan(600)
+  await page.evaluate(function override() {
+    const host = document.querySelector<HTMLElement>('.chat-host')!
+    host.style.blockSize = '640px'
+    const element = host.querySelector<HTMLElement>('webmcp-chat')!
+    element.style.blockSize = '100%'
+  })
+  await expect.poll(async () => (await chat.boundingBox())?.height ?? 0).toBeGreaterThan(600)
+  expect((await chat.boundingBox())?.height ?? 0).toBeCloseTo(640, 0)
 })
 
 test('keeps focus outside chat when a pending response arrives', async function focus({ page }) {
@@ -727,6 +887,320 @@ test('opens the popup as a full-width bottom sheet on a phone', async function s
   expect(bounds.y + bounds.height).toBeGreaterThan(843)
   await expect(chat.getByRole('button', { name: 'Move chat', exact: true })).not.toBeVisible()
   await expect(chat.getByRole('button', { name: 'Close chat', exact: true })).toBeVisible()
+})
+
+test('shows a launcher dot for a reply that arrives while the popup is closed', async function unread({
+  page
+}) {
+  await page.goto('/?mode=chat&presentation=popup')
+  await waitForDemoProvider(page)
+  const chat = page.locator('webmcp-chat')
+  const launcher = chat.locator('.launcher')
+  await chat.evaluate(function configure(element) {
+    const target = element as WebMCPChatElement & {
+      publishReview(snapshot: PiSnapshot): void
+    }
+    let listener: ((value: PiSnapshot) => void) | undefined
+    let snapshot: PiSnapshot = { state: 'idle', messages: [] }
+    target.publishReview = function publish(next) {
+      snapshot = next
+      listener?.(next)
+    }
+    target.controller = {
+      getSnapshot() {
+        return snapshot
+      },
+      subscribe(next) {
+        listener = next
+        next(snapshot)
+        return function remove() {}
+      },
+      async send() {
+        return { status: 'completed' }
+      },
+      async stop() {},
+      async clear() {},
+      async refresh() {},
+      async destroy() {}
+    }
+  })
+  await launcher.click()
+  await chat.evaluate(function running(element) {
+    const target = element as WebMCPChatElement & {
+      publishReview(snapshot: PiSnapshot): void
+    }
+    target.publishReview({
+      state: 'running',
+      messages: [{ id: 'q', role: 'user', text: 'New question' }]
+    })
+  })
+  await chat.getByRole('button', { name: 'Close chat', exact: true }).click()
+  await chat.evaluate(function completed(element) {
+    const target = element as WebMCPChatElement & {
+      publishReview(snapshot: PiSnapshot): void
+    }
+    target.publishReview({
+      state: 'idle',
+      messages: [
+        { id: 'q', role: 'user', text: 'New question' },
+        { id: 'a', role: 'assistant', text: 'New answer' }
+      ]
+    })
+  })
+  await expect(launcher).toHaveAttribute('data-unread', '')
+  await expect(launcher).toHaveAttribute('aria-label', 'Open Assistant, new reply')
+  await launcher.click()
+  await expect(launcher).not.toHaveAttribute('data-unread', '')
+  await expect(launcher).toHaveAttribute('aria-label', 'Open Assistant')
+  await expect(chat).toContainText('New answer')
+})
+
+test('uses application-owned in-chat approval with keyboard, denial, and Stop', async function inlineApproval({
+  page
+}) {
+  await page.goto('/?mode=chat&approval=inline')
+  const chat = page.locator('webmcp-chat')
+  const input = chat.getByRole('textbox', { name: 'Message', exact: true })
+  const card = chat.locator('.approval-card')
+
+  await input.fill('set 6')
+  await input.press('Enter')
+  await expect(card).toBeVisible()
+  await expect(card).toContainText('Change the application counter?')
+  await expect(card.getByRole('button', { name: 'Deny', exact: true })).toBeFocused()
+  await expect(card.getByRole('button', { name: 'Deny', exact: true })).toHaveAccessibleDescription(
+    /Change the application counter\? set_counter \{"value":6\}/
+  )
+  await card.getByRole('button', { name: 'Approve', exact: true }).click()
+  await expect(page.locator('#counter')).toHaveText('6')
+  await expect(card).toBeHidden()
+  await expectIdle(chat)
+
+  await input.fill('set 7')
+  await input.press('Enter')
+  await expect(card).toBeVisible()
+  await card.getByRole('button', { name: 'Deny', exact: true }).click()
+  await expect(card).toBeHidden()
+  await expect(page.locator('#counter')).toHaveText('6')
+  await expect(chat.getByRole('status')).toContainText('You declined this action')
+  await expect(chat.locator('ol[aria-busy="false"]')).toHaveCount(1)
+
+  await input.fill('set 8')
+  await input.press('Enter')
+  await expect(card).toBeVisible()
+  await chat.getByRole('button', { name: 'Stop', exact: true }).click()
+  await expect(card).toBeHidden()
+  await expect(page.locator('#counter')).toHaveText('6')
+  await expect(chat.locator('ol[aria-busy="false"]')).toHaveCount(1)
+
+  await input.fill('set 9')
+  await input.press('Enter')
+  await expect(card).toBeVisible()
+  const deny = card.getByRole('button', { name: 'Deny', exact: true })
+  await expect(deny).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(card).toBeHidden()
+  await expect(page.locator('#counter')).toHaveText('6')
+})
+
+test('opens a closed popup for application-requested approval', async function popupApproval({
+  page
+}) {
+  await page.goto('/?mode=chat&presentation=popup&approval=inline')
+  const chat = page.locator('webmcp-chat')
+  const panel = chat.getByRole('dialog', { name: 'Assistant', exact: true })
+  await expect(panel).toBeHidden()
+  await expect(chat.locator('.launcher')).toHaveAttribute('aria-label', 'Open Assistant')
+  await expect(chat.locator('ol[aria-busy="false"]')).toHaveCount(1)
+  const element = await chat.elementHandle()
+  const decision = page.evaluate(async function requestApproval(target) {
+    const approval = await (target as WebMCPChatElement).requestApproval({
+      toolName: 'set_counter',
+      input: { value: 4 },
+      reason: 'Approve from the popup?'
+    })
+    return approval
+  }, element)
+
+  await expect(panel).toBeVisible()
+  const card = chat.locator('.approval-card')
+  await expect(card).toBeVisible()
+  await expect(card.getByRole('button', { name: 'Deny', exact: true })).toBeFocused()
+  await card.getByRole('button', { name: 'Deny', exact: true }).click()
+  await expect(card).toBeHidden()
+  await expect(decision).resolves.toBe(false)
+})
+
+test('renders safe Markdown and keeps injection inert', async function markdown({ page }) {
+  await page.goto('/?mode=chat&markdown=1')
+  const chat = page.locator('webmcp-chat')
+  const input = chat.getByRole('textbox', { name: 'Message', exact: true })
+  await input.fill('markdown')
+  await input.press('Enter')
+  await expect(chat.locator('.body strong')).toHaveText('bold')
+  await expect(chat.locator('.body em')).toHaveText('italic')
+  const literal = chat.locator('.body p').filter({
+    hasText: 'set_counter_value and 2 * 3 * 4 stay literal.'
+  })
+  await expect(literal).toHaveCount(1)
+  await expect(literal.locator('em')).toHaveCount(0)
+  await expect(chat.locator('.body p code')).toHaveText('inline code')
+  await expect(chat.locator('.body ul li')).toHaveCount(2)
+  await expect(chat.locator('.body ol li')).toHaveCount(2)
+  await expect(chat.locator('.body pre code')).toContainText('const safe = "<b>code</b>"')
+  const links = chat.locator('.body a')
+  await expect(links).toHaveCount(1)
+  await expect(links).toHaveAttribute('href', 'https://example.com/docs')
+  await expect(links).toHaveAttribute('rel', 'noopener noreferrer')
+  await expect(links).toHaveAttribute('target', '_blank')
+  await expect(chat.locator('.body img')).toHaveCount(0)
+  await expect(chat.locator('.body script')).toHaveCount(0)
+  await expect(chat).toContainText('javascript:alert(1)')
+  await expect(chat).toContainText('<img src=x onerror=alert(1)>')
+})
+
+test('shows approval over settings and the model picker without losing the page', async function approvalOverlays({
+  page
+}) {
+  await page.goto('/?mode=chat&approval=inline')
+  await waitForDemoProvider(page)
+  const chat = page.locator('webmcp-chat')
+  await chat.getByRole('button', { name: 'Settings', exact: true }).click()
+  await expect(chat.locator('.settings-panel')).toBeVisible()
+  const element = await chat.elementHandle()
+  const first = page.evaluate(async function request(target) {
+    return (target as WebMCPChatElement).requestApproval({
+      toolName: 'set_counter',
+      input: { value: 1 },
+      reason: 'Approval over settings?'
+    })
+  }, element)
+  await expect(chat.locator('.approval-card')).toBeVisible()
+  await expect(chat.locator('.settings-panel')).toBeHidden()
+  await expect(
+    chat.locator('.approval-card').getByRole('button', { name: 'Deny', exact: true })
+  ).toBeFocused()
+  await chat.locator('.approval-card').getByRole('button', { name: 'Deny', exact: true }).click()
+  await expect(first).resolves.toBe(false)
+
+  await chat.locator('.model-button').click()
+  await expect(chat.locator('.model-picker')).toBeVisible()
+  const second = page.evaluate(async function request(target) {
+    return (target as WebMCPChatElement).requestApproval({
+      toolName: 'set_counter',
+      input: { value: 2 },
+      reason: 'Approval over picker?'
+    })
+  }, element)
+  await expect(chat.locator('.approval-card')).toBeVisible()
+  await expect(chat.locator('.model-picker')).toBeHidden()
+  const input = chat.getByRole('textbox', { name: 'Message', exact: true })
+  await chat.locator('.approval-card').getByRole('button', { name: 'Deny', exact: true }).click()
+  await expect(second).resolves.toBe(false)
+  await input.fill('read')
+  await expect(input).toHaveValue('read')
+})
+
+test('persists opt-in popup position, size, and open state without drafts', async function persistence({
+  page
+}) {
+  await page.setViewportSize({ width: 1100, height: 800 })
+  await page.goto('/?mode=chat&presentation=popup&persist=review')
+  const chat = page.locator('webmcp-chat')
+  const launcher = chat.locator('.launcher')
+  await expect(launcher).toBeVisible()
+  const start = (await launcher.boundingBox())!
+  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(start.x - 160, start.y - 120, { steps: 5 })
+  await page.mouse.up()
+  const movedLauncher = (await launcher.boundingBox())!
+
+  await launcher.click()
+  const panel = chat.getByRole('dialog', { name: 'Assistant', exact: true })
+  await expect(panel).toBeVisible()
+  const resize = chat.getByRole('button', { name: 'Resize chat', exact: true })
+  await resize.click()
+  await resize.press('ArrowLeft')
+  await resize.press('ArrowUp')
+  const panelBefore = (await panel.boundingBox())!
+  await chat.getByRole('textbox', { name: 'Message', exact: true }).fill('Private draft')
+
+  await expect
+    .poll(function stored() {
+      return page.evaluate(function read() {
+        return localStorage.getItem('webmcp-chat:review')
+      })
+    })
+    .not.toBeNull()
+  const raw = (await page.evaluate(function read() {
+    return localStorage.getItem('webmcp-chat:review')
+  }))!
+  const stored = JSON.parse(raw) as Record<string, unknown>
+  expect(Object.keys(stored).sort()).toEqual(['open', 'panel', 'position'])
+  expect(stored.open).toBe(true)
+  expect(raw).not.toContain('Private draft')
+  expect(raw).not.toContain('Fixture answer')
+
+  await page.reload()
+  await expect(panel).toBeVisible()
+  const restoredLauncher = (await launcher.boundingBox())!
+  const restoredPanel = (await panel.boundingBox())!
+  expect(Math.abs(restoredLauncher.x - movedLauncher.x)).toBeLessThan(2)
+  expect(Math.abs(restoredLauncher.y - movedLauncher.y)).toBeLessThan(2)
+  expect(Math.abs(restoredPanel.width - panelBefore.width)).toBeLessThan(2)
+  expect(Math.abs(restoredPanel.height - panelBefore.height)).toBeLessThan(2)
+  await expect(chat.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('')
+
+  await page.setViewportSize({ width: 700, height: 600 })
+  await expect
+    .poll(async function contained() {
+      const launcherBox = (await launcher.boundingBox())!
+      const panelBox = (await panel.boundingBox())!
+      return (
+        launcherBox.x >= 0 &&
+        launcherBox.y >= 0 &&
+        launcherBox.x + launcherBox.width <= 700 &&
+        launcherBox.y + launcherBox.height <= 600 &&
+        panelBox.x >= 0 &&
+        panelBox.y >= 0 &&
+        panelBox.x + panelBox.width <= 700 &&
+        panelBox.y + panelBox.height <= 600
+      )
+    })
+    .toBe(true)
+})
+
+test('keeps default popup corner anchoring when persistence restores at a wider viewport', async function defaultAnchor({
+  page
+}) {
+  await page.setViewportSize({ width: 700, height: 700 })
+  await page.goto('/?mode=chat&presentation=popup&persist=anchor-review')
+  const chat = page.locator('webmcp-chat')
+  const launcher = chat.getByRole('button', { name: 'Open Assistant', exact: true })
+  await launcher.click()
+  const panel = chat.getByRole('dialog', { name: 'Assistant', exact: true })
+  await expect(panel).toBeVisible()
+  await expect
+    .poll(function stored() {
+      return page.evaluate(function read() {
+        return localStorage.getItem('webmcp-chat:anchor-review')
+      })
+    })
+    .not.toBeNull()
+  const stored = JSON.parse(
+    (await page.evaluate(function read() {
+      return localStorage.getItem('webmcp-chat:anchor-review')
+    }))!
+  ) as Record<string, unknown>
+  expect(stored).not.toHaveProperty('position')
+
+  await page.setViewportSize({ width: 1200, height: 800 })
+  await page.reload()
+  await expect(panel).toBeVisible()
+  const box = (await launcher.boundingBox())!
+  expect(1200 - (box.x + box.width)).toBeLessThan(12)
+  expect(800 - (box.y + box.height)).toBeLessThan(12)
 })
 
 test('drags the popup launcher and panel, resizes by keyboard, and stays within the viewport', async function geometry({

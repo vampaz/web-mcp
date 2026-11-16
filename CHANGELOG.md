@@ -1,5 +1,86 @@
 # Changelog
 
+## 0.10.0 — 2026-11-16
+
+### Core
+
+- **Scope:** fail closed when `scope()` returns `undefined`, `null`, or an object without a boolean `available`. The invocation ends with `scope_failed` instead of running the tool; tools without `scope` stay available.
+- **Fenced JSON:** parse fenced model JSON with linear slicing instead of a backtracking regex, so malformed output cannot stall the main thread. Well-formed input is unchanged.
+- **Validation:** cap reported schema errors at 20 plus one "More errors omitted." entry, shorten long property names in messages, stop `uniqueItems` at the first duplicate, and reject sparse arrays instead of passing holes to the tool as `undefined`.
+- **Diagnostics:** warn when a string property uses `pattern` without `maxLength`, when a form tool declares `confirmation` while native WebMCP is present, and when that form also uses `toolautosubmit`.
+- **Approval input:** give confirmation handlers and guards their own copy of the parsed input so they cannot change what executes. Parser outputs that cloning would change semantically or cannot copy, such as class instances or null-prototype objects, keep their original reference and remain application-owned.
+- **Approval metadata:** the test bridge, MCP bridge, and catalog adapter return detached schema copies. The MCP bridge also copies annotations; the test bridge and catalog expose confirmation as `{ reason }` only. Confirmation handlers receive optional `source`, `invocationId`, and `callerRequired`, and the `window.confirm()` fallback shows the tool name plus a bounded JSON argument summary. `callerRequired` is true when the caller added the requirement, such as Pi's untrusted-content rule; a source-scoped preference can use it to preserve the approval, and the handler still decides.
+- **Per-invocation approval:** allow `requireConfirmation: { reason }` on `invokeTool()` and pipeline options. It can add approval to one invocation but never removes a tool's own confirmation.
+- **Tool definitions:** `defineTool()` may omit `inputSchema` and defaults to a strict empty object. The resulting `WebMCPTool` still requires a schema, and hand-built `registerTool()` definitions must still declare one.
+- **Errors and diagnostics:** add `WebMCPKitError` with `duplicate_tool`, `invalid_definition`, and `invalid_configuration` codes while preserving messages, plus `isWebMCPKitError()`, `isToolExecutionError()`, and `lintTool()`. `lintTool()` has stable rule IDs and adds missing-description and sensitive-name `readOnlyHint` rules; `RegisteredTool.warnings` stays a string list.
+- **Duplicate copies:** warn once in development when another module instance of the kit marks the shared registry symbol, including copies bundled under one URL. Production builds write no marker and emit no warning.
+- **Page bridge:** reject a second in-flight invocation that reuses a `requestId` with an error reply, and keep the first invocation cancellable.
+- **MCP bridge:** return a JSON-RPC `-32600` error for a request that is not an object, and report output that JSON cannot serialize as `isError: true` instead of throwing.
+- **Command input:** apply the untrusted-content approval rule across resolved sequences, so a later non-read-only step requires approval after an untrusted-content step. The requirement resets for each command.
+- **Resolvers:** direct `user-key` and `none` requests follow no redirects and omit credentials on cross-origin calls. User-key mode rejects an effective `http:` destination unless the host is loopback, including relative and protocol-relative base URLs resolved against the page.
+- **Resolvers:** redact `Bearer` tokens and `sk-` keys from provider error messages before shortening them.
+
+### Pi
+
+- **Untrusted content:** after a successful call to a tool with `untrustedContentHint`, every later non-read-only call in the same Pi turn requires approval with the reason "This action follows content from an untrusted source." `PiToolHost.invoke` accepts `requireApproval`, and the requirement resets each user turn.
+- **Tool outcomes:** keep the stable tool outcome `code` on persisted Pi messages, including `confirmation_denied` after reopening, so chat and application code can distinguish denials from failures.
+
+### Chat
+
+- **Declined actions:** show a denied action as "Declined" with neutral styling and a "You declined this action. Nothing was changed." status before and after reload.
+- **Provider failures:** map `provider_failed` to a retryable message and add a safe "Try again" action that resends the last user message once. It stays hidden after denials, unknown outcomes, actions that may have run, and any tool call that completed or failed, so a retry cannot repeat a write. When a completed action precedes the provider failure, the status asks the user to check application state instead of suggesting a retry.
+- **Height:** default the inline panel to a stable block size at its previous minimum while preserving host `block-size` overrides.
+- **Suggestions:** add `suggestionAction: 'draft' | 'send'`; the default remains `'draft'`.
+- **Readability and touch:** raise small text to at least `.86em` and make icon, send, stop, copy, Retry, Edit, Approve, and Deny targets at least 44px under coarse pointers.
+- **Tool rows:** add `toolLabel()` display names and `toolDetails: 'hidden'` for non-expanding rows without argument previews; screen-reader labels use the display name.
+- **Unread replies:** show a launcher dot and an `openChatUnread(title)` accessible label when a reply arrives while the popup is closed; clear it when the popup opens.
+- **Popup persistence:** add opt-in `persistKey` storage for open state, launcher position, and panel size only, ignoring malformed or blocked storage and never storing messages or drafts. Default corner anchoring is preserved after a viewport change; only user-moved coordinates are stored and clamped to the current viewport.
+- **History warning:** show a neutral "This conversation is almost full. Start a new chat soon." status at 90% of the history limit, with errors taking priority.
+- **Attributes:** accept `mode`, `theme`, `placement`, `heading`, and `placeholder` attributes as defaults below `configure()` options.
+- **In-chat approval:** add `requestApproval()` with a state-machine-backed approval card. It opens a closed popup, focuses Deny, and resolves false on abort, disconnect, controller replacement, or replacement requests; the application still owns the confirmation handler. Both actions carry an accessible description built from the reason, tool label, and argument summary.
+- **Public types:** export `WebMCPChatApprovalRequest` from the `/chat` entry.
+- **Markdown:** add the `/chat/markdown` entry with a dependency-free `renderMarkdown()` that builds DOM and text only, limits links to `http:`, `https:`, and `mailto:`, and adds the required styles inside `.body[data-custom]`. Intraword underscores and whitespace-separated asterisks stay literal.
+- **Lab approval:** scope the demo approval preference to `source === 'pi'` so page-bridge, native, devtools, resolver, and MCP-bridge calls still open the approval dialog.
+
+### Assistant
+
+- **New entry:** add `/assistant` with `mountAssistant()` and `createDialogApproval()`. `mountAssistant()` creates the Pi harness and chat element, resolves `ready` after mounting or a late teardown, rejects it after cleanup on initialization failure, and waits for pending initialization and a controller that finishes after `destroy()` before teardown settles. Repeated `destroy()` calls return the same promise, cleanup failure rejects it, and the borrowed resolver and application tools stay application-owned.
+- **Dialog approval:** `createDialogApproval()` extracts the documented dialog flow with abort and replacement handling, a bounded input summary, and an unreadable-input fallback.
+
+### Server
+
+- **New entry:** add `/server` with `createResolverHandler(options): (request: Request) => Promise<Response>` for `createResolver({ auth: { mode: 'server' } })`. It validates the resolver wire format, bounds the body stream without trusting `Content-Length`, enforces the server-owned provider, model, key, and base URL policy, and requires an `authorize` hook that must return literal `true`.
+- **Request handling:** authorize before checking the model allowlist, so an unauthorized caller receives the same denial for allowed and disallowed models. Forward cancellation, honor `singleStep` and `purpose: 'summary'`, validate upstream results with the existing resolution validator, and return `{ error }` with a non-2xx status without exposing the provider key or request body.
+- **Input schema patterns:** reject `pattern` anywhere in a caller-supplied tool `inputSchema` with an explicit `400` before authorization or any upstream request, because the server would evaluate it with the backtracking RegExp engine. Nested properties, items, prefix items, combinators, `not`, `propertyNames`, and `additionalProperties` are included. Keep pattern validation in the authoritative tool definition at invocation and send a pattern-free schema to the resolver; `outputSchema` and the incoming `responseSchema` are not evaluated and may still carry `pattern` metadata.
+
+### Testing
+
+- **Scripted resolver:** add `createScriptedResolver()` to `/testing` with ordered `match`, `times`, and `repeat` steps, fallback handling, configured errors, exhaustion failures, and abort-based cancellation.
+- **Framework runtimes:** add real React StrictMode and Svelte mount tests that prove one registration remains across re-renders, in-flight calls survive, and unmount unregisters.
+- **Mobile browser:** add the `mobile-chromium` Playwright project and `chat-mobile.spec.ts`, covering the touch bottom sheet, Enter adding a newline instead of sending, Send-button submission, 44px New chat, Send, Stop, Copy, Retry, Edit, Approve, and Deny targets, and Deny focus.
+- **CDN runtime:** execute the packed `dist/cdn/webmcp-kit.js` from a script-tag page over local TLS, registering and invoking a tool without bare imports.
+
+### Tooling
+
+- **CDN bundle:** add the self-contained `dist/cdn/webmcp-kit.js` ES module with core, chat, Pi, and assistant bundled, no bare imports, and no extra chunks for script-tag use.
+- **Coverage:** enforce whole-percent coverage floors (statements 90, branches 84, functions 93, lines 93) and run `npm run test:coverage` in the validation workflow.
+- **Changelog checks:** add `scripts/check-changelog.ts` and wire it into `npm run check`. `scripts/release-notes.ts` shares the heading and next-section rules, extracts the exact version section, and fails on a missing, malformed, or whitespace-only section. The publish job runs that extraction before any registry publish and passes the validated file with `--notes-file`.
+- **Package job:** split the validation workflow into a minimal `package` job that builds, packs, and uploads `webmcp-kit-package`, and a validate job that downloads the built artifact and tests those bytes with `npm run test:package`.
+- **Artifact lint:** run strict `publint` and `attw --profile esm-only` against the packed tarball in the package suite.
+- **Dependabot:** give bundled `@earendil-works/*` dependencies their own update group and keep the general npm group separate. No cooldown override is configured because Dependabot applies its documented default to version updates.
+- **CI traces:** upload `test-results/browser` when e2e fails, using the existing SHA-pinned upload action.
+- **Repository hygiene:** remove stale `.astro` and `.wrangler` ignore entries after confirming the repository does not produce either directory.
+
+### Documentation
+
+- **Version notices:** replace stale hardcoded 0.5 and 0.6 version notices with pointers to the changelog and migration guides.
+- **Page bridge:** document `/page-bridge`, `installPageBridge()`, the `webmcp-kit-bridge/v1` protocol, and its trust model; add it to the README entry table, contributor list, and project shape.
+- **Upgrade guide:** add `docs/upgrading.md` covering consumer-visible changes from 0.5 through 0.9.
+- **Roadmap:** refresh `docs/next-features.md` and mark `mountAssistant()`, the dialog approval helper, the `/server` helper, and the duplicate-copy warning as delivered.
+- **First run:** add the TLS trust prompt, `vite-local-tls doctor`, model-free tabs, and fixtures command to `CONTRIBUTING.md`, and align install commands on `npm ci --ignore-scripts`.
+- **API JSDoc:** add concise JSDoc to the most-used public functions across core, Pi, chat, command input, devtools, page bridge, testing, zod, and the React, Svelte, and Vue helpers.
+- **New entries:** document `/assistant`, `/server`, `/chat/markdown`, the CDN script-tag example, and the packed `mountAssistant()` consumer as the reference example.
+
 ## 0.9.1 — 2026-11-16
 
 - **Core:** tag every tool invocation outcome with the invocation id used to correlate it, including outcomes that occur before tool execution, and fail guarded tool calls closed when a guard does not approve.

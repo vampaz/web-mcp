@@ -1,7 +1,7 @@
 <template>
   <h1>Packed Vue consumer</h1>
   <p id="registry-count">{{ registryCount }}</p>
-  <button type="button" @click="showPopup">Use popup</button>
+  <p v-if="error" role="alert">{{ error }}</p>
   <div ref="container"></div>
 </template>
 
@@ -9,14 +9,14 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { listTools } from '@vampaz/webmcp-kit'
 import { useWebMCPTool } from '@vampaz/webmcp-kit/vue'
-import { createPiHarness, type PiController } from '@vampaz/webmcp-kit/pi'
-import { defineWebMCPChat, type WebMCPChatElement } from '@vampaz/webmcp-kit/chat'
+import { mountAssistant, type MountedAssistant } from '@vampaz/webmcp-kit/assistant'
+import { createScriptedResolver } from '@vampaz/webmcp-kit/testing'
 
 const registryCount = ref(0)
+const error = ref('')
 const container = ref<HTMLDivElement | null>(null)
-let harness: PiController | undefined
+let assistant: MountedAssistant | undefined
 let closed = false
-let chat: WebMCPChatElement | undefined
 
 useWebMCPTool({
   name: 'read_value',
@@ -27,44 +27,45 @@ useWebMCPTool({
   }
 })
 
-function showPopup() {
-  if (harness) chat?.configure({ controller: harness, mode: 'popup' })
-}
-
 onMounted(async function mount() {
-  const next = await createPiHarness({
+  if (!container.value) return
+  assistant = mountAssistant({
+    container: container.value,
     session: { namespace: 'packed-consumer', ownerId: 'test', conversationId: 'one' },
-    resolver: {
+    resolver: createScriptedResolver({
       name: 'Package fixture',
-      capabilities: { conversation: true },
-      available: true,
-      status: 'ready',
       detail: 'Package test',
-      async resolve(_message, _tools, context) {
-        const completed = JSON.stringify(context?.piConversation).includes('toolResult')
+      steps: [
+        {
+          match: /Read/i,
+          resolution: {
+            toolName: 'read_value',
+            input: {},
+            confidence: 1,
+            reason: 'Package fixture'
+          }
+        }
+      ],
+      fallback() {
         return {
-          toolName: completed ? 'pi_reply' : 'read_value',
-          input: completed ? { text: 'Packed Pi read 7' } : {},
+          toolName: 'pi_reply',
+          input: { text: 'Packed Pi read 7' },
           confidence: 1,
           reason: 'Package fixture'
         }
       }
-    }
+    })
   })
-  if (closed) {
-    await next.destroy()
-    return
+  try {
+    await assistant.ready
+    if (!closed) registryCount.value = listTools().length
+  } catch (cause) {
+    if (!closed) error.value = cause instanceof Error ? cause.message : String(cause)
   }
-  harness = next
-  defineWebMCPChat()
-  const element = document.createElement('webmcp-chat') as WebMCPChatElement
-  chat = element
-  element.configure({ controller: harness })
-  container.value?.append(element)
-  registryCount.value = listTools().length
 })
+
 onUnmounted(function cleanup() {
   closed = true
-  void harness?.destroy()
+  void assistant?.destroy()
 })
 </script>

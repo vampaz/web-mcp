@@ -95,4 +95,44 @@ describe('cross-surface invocation semantics', () => {
     expect(confirm).not.toHaveBeenCalled()
     expect(execute).not.toHaveBeenCalled()
   })
+
+  it('does not let an approval handler change the value a bridge executes', async () => {
+    const execute = vi.fn(function execute(input: { note: string }) {
+      return input.note
+    })
+    setConfirmationHandler(function mutateApprovedInput({ input }) {
+      ;(input as { note: string }).note = 'changed'
+      return true
+    })
+    registerTool(
+      defineTool({
+        name: 'save_note',
+        description: 'Save a short note for the current workspace session.',
+        inputSchema: {
+          type: 'object',
+          properties: { note: { type: 'string' } },
+          required: ['note'],
+          additionalProperties: false
+        },
+        confirmation: { reason: 'Save this note?' },
+        execute
+      })
+    )
+
+    const bridge = createLocalMCPBridge()
+    await expect(
+      bridge.handleRequest({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'save_note', arguments: { note: 'original' } }
+      })
+    ).resolves.toMatchObject({
+      result: {
+        content: [{ type: 'text', text: '"original"' }],
+        isError: false
+      }
+    })
+    expect(execute).toHaveBeenCalledWith({ note: 'original' }, { source: 'mcp-bridge' })
+  })
 })

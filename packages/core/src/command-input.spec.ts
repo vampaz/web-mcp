@@ -10,6 +10,7 @@ import type {
   WebMCPCommandStepEventDetail
 } from './interfaces/command-input'
 import type { ToolResolution, ToolResolver } from './interfaces/tool'
+import { setConfirmationHandler } from './confirmation'
 import { clearToolsForTest, registerTool } from './registry'
 
 interface WindowWithLanguageModel extends Window {
@@ -32,6 +33,7 @@ const defaultViewport = {
 describe('WebMCP command input', () => {
   afterEach(() => {
     clearToolsForTest()
+    setConfirmationHandler(undefined)
     delete (window as WindowWithLanguageModel).LanguageModel
     document.body.innerHTML = ''
     setViewportSize(defaultViewport.width, defaultViewport.height)
@@ -335,6 +337,172 @@ describe('WebMCP command input', () => {
       'started:clear_item_selection:1/2',
       'completed:clear_item_selection:1/2'
     ])
+  })
+
+  it('requires approval for later steps after untrusted content', async () => {
+    const readExecute = vi.fn(function readPage() {
+      return { text: 'untrusted page content' }
+    })
+    registerTool(
+      defineTool({
+        name: 'read_page',
+        description: 'Read the visible page content for the current command.',
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        annotations: { readOnlyHint: true, untrustedContentHint: true },
+        execute: readExecute
+      })
+    )
+    const writeExecute = vi.fn(function setCounter() {
+      return { value: 1 }
+    })
+    registerTool(
+      defineTool({
+        name: 'set_counter',
+        description: 'Set the visible counter for the current command.',
+        inputSchema: {
+          type: 'object',
+          properties: { value: { type: 'integer' } },
+          required: ['value'],
+          additionalProperties: false
+        },
+        execute: writeExecute
+      })
+    )
+    const confirm = vi.fn(function deny() {
+      return false
+    })
+    setConfirmationHandler(confirm)
+
+    const resolver: ToolResolver = {
+      name: 'Sequence resolver',
+      available: true,
+      status: 'ready',
+      detail: 'Ready for tests.',
+      async resolve() {
+        return {
+          toolName: 'tool_sequence',
+          input: {},
+          confidence: 0.9,
+          reason: 'Read then write.',
+          steps: [
+            {
+              toolName: 'read_page',
+              input: {},
+              confidence: 0.9,
+              reason: 'Read the page.'
+            },
+            {
+              toolName: 'set_counter',
+              input: { value: 1 },
+              confidence: 0.9,
+              reason: 'Write the counter.'
+            }
+          ]
+        }
+      }
+    }
+    const element = createCommandInputElement()
+    element.resolver = resolver
+    document.body.append(element)
+    await Promise.resolve()
+
+    await expect(element.run('Read then write')).resolves.toMatchObject({
+      status: 'blocked',
+      code: 'confirmation_denied',
+      toolName: 'set_counter'
+    })
+    expect(readExecute).toHaveBeenCalledOnce()
+    expect(confirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reason: 'This action follows content from an untrusted source.'
+      })
+    )
+    expect(writeExecute).not.toHaveBeenCalled()
+  })
+
+  it('exempts read-only steps and resets untrusted content between commands', async () => {
+    const readPage = vi.fn(function readPage() {
+      return { text: 'untrusted page content' }
+    })
+    registerTool(
+      defineTool({
+        name: 'read_page',
+        description: 'Read the visible page content for the current command.',
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        annotations: { readOnlyHint: true, untrustedContentHint: true },
+        execute: readPage
+      })
+    )
+    registerTool(
+      defineTool({
+        name: 'read_metric',
+        description: 'Read the visible metric for the current command.',
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        annotations: { readOnlyHint: true },
+        execute() {
+          return { value: 2 }
+        }
+      })
+    )
+    const writeExecute = vi.fn(function setCounter() {
+      return { value: 3 }
+    })
+    registerTool(
+      defineTool({
+        name: 'set_counter',
+        description: 'Set the visible counter for the current command.',
+        inputSchema: {
+          type: 'object',
+          properties: { value: { type: 'integer' } },
+          required: ['value'],
+          additionalProperties: false
+        },
+        execute: writeExecute
+      })
+    )
+    const confirm = vi.fn(function deny() {
+      return false
+    })
+    setConfirmationHandler(confirm)
+    let round = 0
+    const resolver: ToolResolver = {
+      name: 'Sequence resolver',
+      available: true,
+      status: 'ready',
+      detail: 'Ready for tests.',
+      async resolve() {
+        round++
+        if (round === 1)
+          return {
+            toolName: 'tool_sequence',
+            input: {},
+            confidence: 0.9,
+            reason: 'Read two values.',
+            steps: [
+              { toolName: 'read_page', input: {}, confidence: 0.9, reason: 'Read the page.' },
+              { toolName: 'read_metric', input: {}, confidence: 0.9, reason: 'Read the metric.' }
+            ]
+          }
+        return {
+          toolName: 'set_counter',
+          input: { value: 3 },
+          confidence: 0.9,
+          reason: 'Write the counter.'
+        }
+      }
+    }
+    const element = createCommandInputElement()
+    element.resolver = resolver
+    document.body.append(element)
+    await Promise.resolve()
+
+    await expect(element.run('Read two values')).resolves.toMatchObject({ status: 'success' })
+    await expect(element.run('Write the counter')).resolves.toMatchObject({
+      status: 'success',
+      output: { value: 3 }
+    })
+    expect(confirm).not.toHaveBeenCalled()
+    expect(writeExecute).toHaveBeenCalledOnce()
   })
 
   it('cancels a command before resolving starts', async () => {

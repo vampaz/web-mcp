@@ -18,6 +18,7 @@ export interface ToolInvocationPipelineOptions {
   signal?: AbortSignal
   source: ToolContext['source']
   startedAt?: number
+  requireConfirmation?: { reason: string }
 }
 
 export function createInvocationId(): string {
@@ -164,7 +165,9 @@ async function executePipeline<TInput, TOutput>(
     if (parsingFailure) return parsingFailure
   }
 
-  if (tool.confirmation) {
+  const requiresConfirmation = Boolean(tool.confirmation || options.requireConfirmation)
+  const confirmationReason = tool.confirmation?.reason ?? options.requireConfirmation?.reason
+  if (requiresConfirmation) {
     const confirmation: ConfirmationEventDetail = {
       id,
       toolName: tool.name,
@@ -179,7 +182,13 @@ async function executePipeline<TInput, TOutput>(
     let approved = false
     try {
       approved = await waitForInvocation(
-        requestToolConfirmation(tool, input, options.signal),
+        requestToolConfirmation(tool, copyForObserver(input), {
+          signal: options.signal,
+          source: options.source,
+          invocationId: id,
+          reason: confirmationReason,
+          callerRequired: Boolean(options.requireConfirmation)
+        }),
         options.signal
       )
     } catch (error) {
@@ -211,7 +220,7 @@ async function executePipeline<TInput, TOutput>(
         'blocked',
         startedAt,
         undefined,
-        tool.confirmation.reason,
+        confirmationReason,
         'confirmation_denied',
         id
       )
@@ -222,7 +231,7 @@ async function executePipeline<TInput, TOutput>(
   if (tool.guard) {
     try {
       const guardResult = await waitForInvocation(
-        Promise.resolve(tool.guard(typedInput)),
+        Promise.resolve(tool.guard(copyForObserver(typedInput) as TInput)),
         options.signal
       )
       if (guardResult !== true) {
@@ -307,6 +316,82 @@ async function executePipeline<TInput, TOutput>(
 
 type JsonInputCopy = { valid: true; value: unknown } | { valid: false }
 
+/**
+ * Approval handlers and guards get a copy so they cannot change what executes.
+ * A parser output keeps its original reference when cloning would lose its
+ * prototype (class instances, null-prototype objects) or fails outright.
+ */
+function copyForObserver(value: unknown): unknown {
+  try {
+    const copy = structuredClone(value)
+    return preservesCloneSemantics(value, copy, new WeakSet()) ? copy : value
+  } catch {
+    return value
+  }
+}
+
+function preservesCloneSemantics(
+  original: unknown,
+  copy: unknown,
+  visited: WeakSet<object>
+): boolean {
+  if (original === null || typeof original !== 'object') return Object.is(original, copy)
+  if (copy === null || typeof copy !== 'object') return false
+  if (visited.has(original)) return true
+  visited.add(original)
+  if (Object.getPrototypeOf(original) !== Object.getPrototypeOf(copy)) return false
+  if (original instanceof Map) return sameMapContents(original, copy, visited)
+  if (original instanceof Set) return sameSetContents(original, copy, visited)
+  if (original instanceof Date)
+    return copy instanceof Date && Object.is(original.getTime(), copy.getTime())
+  if (original instanceof RegExp)
+    return (
+      copy instanceof RegExp && original.source === copy.source && original.flags === copy.flags
+    )
+  if (Array.isArray(original) && (!Array.isArray(copy) || original.length !== copy.length))
+    return false
+  return sameOwnProperties(original, copy, visited)
+}
+
+function sameMapContents(
+  original: Map<unknown, unknown>,
+  copy: unknown,
+  visited: WeakSet<object>
+): boolean {
+  if (!(copy instanceof Map) || original.size !== copy.size) return false
+  const copyEntries = copy.entries()
+  for (const [key, value] of original) {
+    const entry = copyEntries.next()
+    if (entry.done) return false
+    if (!preservesCloneSemantics(key, entry.value[0], visited)) return false
+    if (!preservesCloneSemantics(value, entry.value[1], visited)) return false
+  }
+  return true
+}
+
+function sameSetContents(original: Set<unknown>, copy: unknown, visited: WeakSet<object>): boolean {
+  if (!(copy instanceof Set) || original.size !== copy.size) return false
+  const copyValues = copy.values()
+  for (const value of original) {
+    const entry = copyValues.next()
+    if (entry.done) return false
+    if (!preservesCloneSemantics(value, entry.value, visited)) return false
+  }
+  return true
+}
+
+function sameOwnProperties(original: object, copy: object, visited: WeakSet<object>): boolean {
+  const keys = Object.keys(original)
+  if (keys.length !== Object.keys(copy).length) return false
+  for (const key of keys) {
+    if (!Object.hasOwn(copy, key)) return false
+    const originalValue = (original as Record<string, unknown>)[key]
+    const copyValue = (copy as Record<string, unknown>)[key]
+    if (!preservesCloneSemantics(originalValue, copyValue, visited)) return false
+  }
+  return true
+}
+
 /** Deep-copies plain JSON data and rejects everything else (BigInt, cycles, Map, Date, class instances). */
 function copyJsonInput(value: unknown): JsonInputCopy {
   const ancestors = new Set<object>()
@@ -321,7 +406,14 @@ function copyJsonInput(value: unknown): JsonInputCopy {
     if (ancestors.has(current)) throw new TypeError('cycle')
     ancestors.add(current)
     try {
-      if (Array.isArray(current)) return current.map(copy)
+      if (Array.isArray(current)) {
+        const result: unknown[] = []
+        for (let index = 0; index < current.length; index++) {
+          if (!Object.hasOwn(current, index)) throw new TypeError('sparse array')
+          result.push(copy(current[index]))
+        }
+        return result
+      }
       const prototype = Object.getPrototypeOf(current)
       if (prototype !== Object.prototype && prototype !== null)
         throw new TypeError('not a plain object')

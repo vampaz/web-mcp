@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { getToolWarnings } from './quality'
+import { getToolWarnings, lintTool } from './quality'
 
 it('matches words rather than fragments and respects read-only metadata', () => {
   const tool = {
@@ -24,7 +24,9 @@ it('matches words rather than fragments and respects read-only metadata', () => 
       name: 'send_email',
       description: 'Read the queued email before the user sends it.'
     })
-  ).toEqual([])
+  ).toEqual([
+    'readOnlyHint is true, but the tool name suggests a sensitive action; use readOnlyHint only for safe reads.'
+  ])
   expect(getToolWarnings({ ...tool, annotations: {}, name: 'send_email' })).toContain(
     'Sensitive action likely needs explicit confirmation metadata.'
   )
@@ -57,6 +59,74 @@ it('recognizes inflected and documented mutation verbs', () => {
   ).toEqual([])
 })
 
+it('warns about patterns without a maxLength', () => {
+  const tool = {
+    name: 'read_code',
+    description: 'Read the selected code sample from the current document.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        code: { type: 'string', description: 'The code sample.', pattern: '^[a-z]+$' }
+      }
+    },
+    execute() {
+      return {}
+    }
+  }
+
+  expect(getToolWarnings(tool)).toContain(
+    'inputSchema.properties.code uses a pattern without maxLength; add maxLength to bound regular-expression work.'
+  )
+  expect(
+    getToolWarnings({
+      ...tool,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          code: {
+            type: 'string',
+            description: 'The code sample.',
+            pattern: '^[a-z]+$',
+            maxLength: 20
+          }
+        }
+      }
+    })
+  ).toEqual([])
+})
+
+it('warns about patterns nested in every supported schema keyword', () => {
+  const tool = {
+    name: 'read_config',
+    description: 'Read the configuration for the current workspace.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        config: {
+          type: 'object',
+          additionalProperties: { type: 'string', pattern: '^[a-z]+$' },
+          propertyNames: { type: 'string', pattern: '^[a-z]+$' }
+        },
+        blocked: { not: { type: 'string', pattern: '^x+$' } }
+      }
+    },
+    execute() {
+      return {}
+    }
+  }
+
+  const warnings = getToolWarnings(tool)
+  expect(warnings).toContain(
+    'inputSchema.properties.config.additionalProperties uses a pattern without maxLength; add maxLength to bound regular-expression work.'
+  )
+  expect(warnings).toContain(
+    'inputSchema.properties.config.propertyNames uses a pattern without maxLength; add maxLength to bound regular-expression work.'
+  )
+  expect(warnings).toContain(
+    'inputSchema.properties.blocked.not uses a pattern without maxLength; add maxLength to bound regular-expression work.'
+  )
+})
+
 it('warns about string formats the validator does not check', () => {
   expect(
     getToolWarnings({
@@ -66,8 +136,8 @@ it('warns about string formats the validator does not check', () => {
       inputSchema: {
         type: 'object',
         properties: {
-          token: { type: 'string', format: 'jwt' },
-          id: { type: 'string', format: 'uuid' }
+          token: { type: 'string', description: 'The session token.', format: 'jwt' },
+          id: { type: 'string', description: 'The session ID.', format: 'uuid' }
         }
       },
       execute() {
@@ -77,4 +147,57 @@ it('warns about string formats the validator does not check', () => {
   ).toEqual([
     'inputSchema.properties.token uses format "jwt", which is not checked; add a pattern or validate in parseInput().'
   ])
+})
+
+it('returns stable lint rule IDs', () => {
+  const issues = lintTool({
+    name: 'SendStuff',
+    description: 'Handle things.',
+    annotations: { readOnlyHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        value: { type: 'string', pattern: '^x+$', format: 'custom' }
+      }
+    },
+    execute() {
+      return {}
+    }
+  })
+
+  expect(issues.map((issue) => issue.id)).toEqual(
+    expect.arrayContaining([
+      'name-format',
+      'description-too-short',
+      'description-vague',
+      'sensitive-read-only',
+      'unchecked-string-format',
+      'pattern-without-max-length',
+      'missing-property-description'
+    ])
+  )
+  expect(issues).toContainEqual({
+    id: 'missing-property-description',
+    message: 'inputSchema.properties.value needs a description.'
+  })
+})
+
+it('keeps form-specific rule IDs and skips the generic property rule', () => {
+  const issues = lintTool({
+    name: 'read_document',
+    description: 'Read the document details from the active workspace.',
+    inputSchema: {
+      type: 'object',
+      'x-webmcp-source': 'form',
+      properties: {
+        classname: { type: 'string' }
+      }
+    },
+    execute() {
+      return {}
+    }
+  })
+
+  expect(issues.map((issue) => issue.id)).toContain('form-field-description')
+  expect(issues.map((issue) => issue.id)).not.toContain('missing-property-description')
 })

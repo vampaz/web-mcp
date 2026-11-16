@@ -61,7 +61,9 @@ export { createResolver, normalizeJsonText } from './resolver'
 export { listLmStudioModels } from './lm-studio-models'
 export type { LmStudioModelOption } from './interfaces/model'
 export { isResolverError, ResolverError, type ResolverErrorCode } from './resolver-error'
-export { ToolExecutionError } from './tool-execution-error'
+export { WebMCPKitError, isWebMCPKitError, type WebMCPKitErrorCode } from './kit-error'
+export { ToolExecutionError, isToolExecutionError } from './tool-execution-error'
+export { lintTool, type ToolLintIssue } from './quality'
 export {
   isResolverOutcomeToolName,
   resolverOutcomeToolNames,

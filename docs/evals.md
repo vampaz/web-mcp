@@ -111,6 +111,42 @@ console.log(JSON.stringify(summary, null, 2))
 
 For chained resolutions, use `expectedSteps` to check tool order and important input fields. Still add an end-to-end test that invokes the resolution and asserts the final app state.
 
+## Scripted resolver
+
+Use `createScriptedResolver()` from `@vampaz/webmcp-kit/testing` when a test needs deterministic resolutions without a model. It always reports `capabilities: { conversation: true }`, so Pi and the command input can use it.
+
+```ts
+import { createScriptedResolver } from '@vampaz/webmcp-kit/testing'
+
+const resolver = createScriptedResolver({
+  steps: [
+    {
+      match: 'Read the counter',
+      resolution: {
+        toolName: 'read_counter',
+        input: {},
+        confidence: 1,
+        reason: 'Scripted read'
+      }
+    },
+    { match: /save/i, error: new Error('Provider unavailable') },
+    { match: 'wait', waitForAbort: true }
+  ],
+  fallback(call) {
+    return {
+      toolName: 'pi_reply',
+      input: { text: `Handled: ${call.message}` },
+      confidence: 1,
+      reason: 'Scripted fallback'
+    }
+  }
+})
+```
+
+`match` accepts an exact string, a `RegExp`, or a predicate receiving `{ message, context, options }`. Steps are matched in order and consumed as they run; `times` defaults to `1`, so a step handles that many matching calls before it is exhausted. Set `repeat: true` for a persistent step instead, without combining it with `times`. A `resolution` can be a value or a function. An `error` step throws its string or error. `waitForAbort` waits for the call's `AbortSignal` and rejects with `ScriptedResolverError` when it aborts; it requires a signal and rejects immediately when one is already aborted. A preaborted signal rejects before any step is consumed. Async resolution functions and fallbacks are raced against the signal, so cancellation rejects without an unhandled callback rejection.
+
+After no step matches, `fallback` handles the call. Without a fallback, exhaustion throws `ScriptedResolverError('The scripted resolver has no response left.')`. The resolver returns resolutions as-is; Pi and the command input still validate the selected tool, input schema, and response contract. Use the lab fixture for an example that combines scripts with a deterministic counter fallback.
+
 ## Failure Signals
 
 Treat these as eval failures, not just warnings:

@@ -117,6 +117,7 @@ const upgradableProperties = [
   'panelOpen'
 ]
 
+/** Registers the <webmcp-command-input> custom element once. */
 export function defineWebMCPCommandInput(
   tagName = webMCPCommandInputTagName
 ): CommandInputConstructor {

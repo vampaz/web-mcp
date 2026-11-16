@@ -195,6 +195,7 @@ import type { PiController, PiSnapshot } from '@vampaz/webmcp-kit/pi'
 import type { WebMCPChatElement } from '@vampaz/webmcp-kit/chat'
 import { installPageBridge, type PageBridgeHandle } from '@vampaz/webmcp-kit/page-bridge'
 import { installApprovalDialog, registerCounterTools } from '@/tools'
+import type { renderMarkdown as RenderMarkdown } from '@vampaz/webmcp-kit/chat/markdown'
 import { createDemoProviders } from '@/providers'
 import type { DemoProvider } from '@/interfaces/provider'
 
@@ -204,6 +205,10 @@ const ToolkitExamples = defineAsyncComponent(function load() {
 
 const parameters = new URLSearchParams(location.search)
 const requestedMode = parameters.get('mode') ?? 'chat'
+const persistPopup = parameters.get('persist') || undefined
+const inlineApproval = parameters.get('approval') === 'inline'
+const markdownDemo = parameters.get('markdown') === '1'
+let renderMarkdown: typeof RenderMarkdown | undefined
 const mode = ['core', 'harness', 'chat', 'toolkit', 'storage'].includes(requestedMode)
   ? requestedMode
   : 'chat'
@@ -304,6 +309,16 @@ function configureChats() {
         }
       },
       assistantLabel: 'Assistant',
+      persistKey: persistPopup,
+      ...(markdownDemo
+        ? {
+            renderMessage(message, target) {
+              if (message.role !== 'assistant') return false
+              renderMarkdown?.(message.text, target)
+              return true
+            }
+          }
+        : {}),
       suggestedPrompts: ['Read the counter', 'Set the counter to 7'],
       emptyState: 'Ask a question or request an action to get started.'
     })
@@ -423,6 +438,10 @@ async function start() {
       if (mode === 'chat') {
         const { defineWebMCPChat } = await import('@vampaz/webmcp-kit/chat')
         if (closed) return
+        if (markdownDemo) {
+          const markdown = await import('@vampaz/webmcp-kit/chat/markdown')
+          renderMarkdown = markdown.renderMarkdown
+        }
         defineWebMCPChat()
         const views = parameters.has('multiple') ? 2 : 1
         for (let index = 0; index < views; index++) {
@@ -462,9 +481,17 @@ onMounted(function mount() {
   tools = registerCounterTools(function changed(value) {
     counter.value = value
   })
-  removeApproval = installApprovalDialog(approval.value!, function requiresApproval() {
-    return confirmationsEnabled.value
-  })
+  removeApproval = installApprovalDialog(
+    approval.value!,
+    function requiresApproval() {
+      return confirmationsEnabled.value
+    },
+    inlineApproval
+      ? function requestInlineApproval(request) {
+          return chatElements.value[0]?.requestApproval(request) ?? Promise.resolve(false)
+        }
+      : undefined
+  )
   window.addEventListener('pagehide', pagehide)
   void start()
 })

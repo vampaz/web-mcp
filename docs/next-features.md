@@ -1,6 +1,6 @@
 # Next Features: Making WebMCP Kit Really Usable
 
-This roadmap starts from the current implementation. The first foundation layer is now in place: runtime input and output validation, Zod tool definitions, Vue/React/Svelte helpers, app-level confirmation handlers, scope-aware tool selection, bounded tool sequences, explicit resolver outcomes, server-backed tools, and repeatable resolver eval suites.
+This roadmap starts from the current implementation. The integration layer is now in place: runtime input and output validation, Zod tool definitions, Vue/React/Svelte helpers, app-level confirmation handlers, scope-aware tool selection, bounded tool sequences, explicit resolver outcomes, server-backed tools, repeatable resolver eval suites, `/assistant` mounting, the `/server` resolver endpoint, scripted resolvers for tests, the self-contained CDN bundle, and the development duplicate-copy warning.
 
 This file contains proposals, not additional exports. Code samples below are illustrative; for example, `createToolMetrics` and `defineRecipe` do not exist. Use the [API reference](./api-reference.md) to distinguish implemented APIs from proposals. [Pi](./pi.md) and [chat](./chat.md) are implemented surfaces.
 
@@ -17,6 +17,9 @@ These capabilities are part of the current API and should be treated as baseline
 - Resolvers can return a single tool, a bounded `tool_sequence`, `needs_clarification`, or `no_tools_match`.
 - `defineServerTool()` lets browser-visible tools delegate execution to an app-owned server endpoint.
 - Resolver eval helpers, including repeated runs and minimum pass-rate summaries, are available from `@vampaz/webmcp-kit/testing`.
+- `mountAssistant()` and `createDialogApproval()` are available from `@vampaz/webmcp-kit/assistant`.
+- `createResolverHandler()` implements the server-side resolver endpoint from `@vampaz/webmcp-kit/server`.
+- Development builds warn once when a distinct copy of the kit creates a separate registry.
 
 ## Tier 1 - Resolver Reliability
 
@@ -152,14 +155,11 @@ This would help multi-page apps, documentation, and pre-navigation agent workflo
 
 The next useful layer is resolver reliability: output-aware sequences, structured errors, and clearer clarification UX. After that, recipes, undo, observability, and manifests make WebMCP Kit easier to operate in larger applications.
 
-## Backlog after 0.5.0
+## Current backlog
 
 These additions remain backlog work:
 
-- `mountAssistant()` and reusable dialog approval helpers.
-- A `/server` resolver endpoint helper.
 - External MCP transport and connection lifecycle, including `initialize` and `ping`. The local bridge remains available.
-- Development warnings for duplicate package copies.
 - Relaxed IndexedDB durability for Pi commits. Recovery already aborts unfinished tasks, but an OS crash could lose the turn-started marker and its interrupted warning, so this needs a measured benefit first.
 - An option in Pi's bundled libraries to skip their TypeBox argument validation, which repeats core validation and adds bundle weight. This needs an upstream change.
 

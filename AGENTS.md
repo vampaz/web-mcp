@@ -16,9 +16,12 @@ WebMCP Kit is one ESM-only TypeScript npm package with multiple public entry poi
 - `packages/hosted`: `/hosted` entry for the hosted OpenAI-compatible resolver; the implementation lives in core.
 - `packages/pi`: persistent conversation runtime, page controller, and registry tool host running in the page.
 - `packages/chat`: framework-neutral chat custom element driven by a supplied controller.
+- `packages/assistant`: `/assistant` entry with `mountAssistant()` and `createDialogApproval()`; it mounts Pi and chat for application-owned tools and resolvers.
+- `packages/server`: `/server` entry with `createResolverHandler()`; a web-standard, server-owned OpenAI-compatible resolver endpoint.
 - `packages/devtools`: in-page tool inspection/invocation overlay.
 - `packages/testing`: resolver evaluations and Playwright bridge helpers.
 - `packages/mcp-bridge`: local MCP-style bridge over registered tools.
+- `packages/page-bridge`: `/page-bridge` entry with `installPageBridge()`; same-window registry discovery and invocation.
 - `packages/zod`: Zod-to-WebMCP tool helper.
 - `packages/vue`, `packages/react`, `packages/svelte`: thin lifecycle helpers around core `registerTool()`.
 - `tests/integration`: cross-package integration coverage.
@@ -63,8 +66,8 @@ WebMCP Kit is one ESM-only TypeScript npm package with multiple public entry poi
 
 ## Verification
 
-- All routine checks: `npm run check` (lint, format check, both typechecks, API reference and docs link checks, unit tests)
-- Unit/integration tests: `npm run test`; coverage report without thresholds: `npm run test:coverage`
+- All routine checks: `npm run check` (lint, format check, both typechecks, API reference and docs link checks, changelog version heading, unit tests)
+- Unit/integration tests: `npm run test`; coverage with whole-percent statement, branch, function, and line floors: `npm run test:coverage`
 - Single test file: `npm run test -- path/to/file.spec.ts`
 - Typecheck: `npm run typecheck`; lab: `npm run typecheck:demo`
 - Browser tests: `npm run test:e2e`; real-model checks are separate: `npm run test:lmstudio`

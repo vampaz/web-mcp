@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { setConfirmationHandler } from './confirmation'
 import { defineTool } from './define-tool'
@@ -86,6 +86,78 @@ describe('test bridge', () => {
       }),
       expect.objectContaining({ name: 'working', available: true })
     ])
+  })
+
+  it('reports an invalid scope result without hiding other tools', () => {
+    for (const name of ['invalid', 'working'])
+      registerTool(
+        defineTool({
+          name,
+          description: 'Read the current state.',
+          inputSchema: { type: 'object', properties: {} },
+          scope() {
+            if (name === 'invalid') return undefined as unknown as { available: boolean }
+            return { available: true }
+          },
+          execute() {
+            return {}
+          }
+        })
+      )
+    installWebMCPKitTestBridge()
+    expect(window.__webMCPKit?.listTools()).toEqual([
+      expect.objectContaining({
+        name: 'invalid',
+        available: false,
+        unavailableReason: 'Tool scope returned an invalid result.'
+      }),
+      expect.objectContaining({ name: 'working', available: true })
+    ])
+  })
+
+  it('returns detached schemas and confirmation metadata', async () => {
+    const handler = vi.fn(function approve() {
+      return true
+    })
+    registerTool(
+      defineTool({
+        name: 'save_note',
+        description: 'Save a short note for the current workspace session.',
+        inputSchema: {
+          type: 'object',
+          properties: { note: { type: 'string', maxLength: 3 } },
+          required: ['note'],
+          additionalProperties: false
+        },
+        outputSchema: {
+          type: 'object',
+          properties: { note: { type: 'string' } },
+          required: ['note']
+        },
+        annotations: { readOnlyHint: true },
+        confirmation: { reason: 'Save this note?', handler },
+        execute(input) {
+          return { note: input.note }
+        }
+      })
+    )
+    installWebMCPKitTestBridge()
+    const [summary] = window.__webMCPKit!.listTools()
+    if (!summary?.inputSchema.properties || !summary.outputSchema?.properties) {
+      throw new Error('Expected the test bridge to return both schemas.')
+    }
+
+    summary.inputSchema.properties.note.maxLength = 1000
+    summary.outputSchema.properties.note.type = 'number'
+
+    expect(summary.confirmation).toEqual({ reason: 'Save this note?' })
+    expect(summary.confirmation).not.toHaveProperty('handler')
+    expect(
+      await window.__webMCPKit!.invokeTool({ toolName: 'save_note', input: { note: 'abcd' } })
+    ).toMatchObject({ status: 'error', code: 'invalid_input' })
+    expect(
+      await window.__webMCPKit!.invokeTool({ toolName: 'save_note', input: { note: 'abc' } })
+    ).toMatchObject({ status: 'success', output: { note: 'abc' } })
   })
 
   it('does not let test callers bypass confirmation', async () => {

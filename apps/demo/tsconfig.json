@@ -6,6 +6,7 @@
     "paths": {
       "@/*": ["./src/*"],
       "@vampaz/webmcp-kit": ["../../packages/core/src/index.ts"],
+      "@vampaz/webmcp-kit/chat/markdown": ["../../packages/chat/src/markdown.ts"],
       "@vampaz/webmcp-kit/testing/playwright": ["../../packages/testing/src/playwright.ts"],
       "@vampaz/webmcp-kit/*": ["../../packages/*/src/index.ts"]
     }

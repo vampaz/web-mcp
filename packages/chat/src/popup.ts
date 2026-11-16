@@ -11,6 +11,12 @@ import type {
 } from './interfaces/popup'
 import { icon } from './icon'
 
+interface StoredPopupState {
+  open: boolean
+  position?: PopupPosition
+  panel?: { width: string; height: string; expanded: boolean }
+}
+
 export class ChatPopup {
   private readonly machine = createStateMachine<PopupState, PopupEvent>(
     { kind: 'inline' },
@@ -39,6 +45,13 @@ export class ChatPopup {
   private pinnedBottom = true
   private position?: PopupPosition
   private panelPosition?: PopupPosition
+  private userPositioned = false
+  private labels?: WebMCPChatLabels
+  private title = ''
+  private unread = false
+  private persistKey?: string
+  private persistScheduled = false
+  private restoring = false
   private readonly launcher = document.createElement('button')
   private readonly move = document.createElement('button')
   private readonly resize = document.createElement('button')
@@ -58,7 +71,7 @@ export class ChatPopup {
     this.launcher.type = this.move.type = this.resize.type = this.close.type = 'button'
     this.launcher.className = 'launcher'
     this.launcher.setAttribute('part', 'launcher')
-    this.launcher.innerHTML = icon('M5 5h14v11H10l-5 4V5M9 9h6M9 12h4')
+    this.launcher.innerHTML = `${icon('M5 5h14v11H10l-5 4V5M9 9h6M9 12h4')}<span class="launcher-dot" aria-hidden="true"></span>`
     this.launcher.setAttribute('aria-controls', panel.id)
     this.launcher.setAttribute('aria-haspopup', 'dialog')
     this.move.className = 'move icon-button'
@@ -101,6 +114,7 @@ export class ChatPopup {
         panel.toggleAttribute('data-expanded', this.size.state === 'expanded')
         panel.style.width = panel.style.height = ''
         this.placePanel()
+        this.schedulePersist()
       })
     })
     this.resize.addEventListener('keydown', (event) => {
@@ -223,10 +237,15 @@ export class ChatPopup {
     mode: 'inline' | 'popup',
     title: string,
     labels: WebMCPChatLabels,
-    placement: 'end' | 'start'
+    placement: 'end' | 'start',
+    persistKey?: string
   ) {
     const changed = this.enabled !== (mode === 'popup')
     const moved = this.placement !== placement
+    const keyChanged = this.persistKey !== persistKey
+    this.labels = labels
+    this.title = title
+    this.persistKey = persistKey
     if (changed) this.teardown()
     this.machine.send({ type: 'configure', mode }, () => {
       this.host.dataset.mode = mode
@@ -234,6 +253,7 @@ export class ChatPopup {
         this.placement = placement
         this.pinnedInline = true
         this.position = this.panelPosition = undefined
+        this.userPositioned = false
       }
       this.moveHelp.hidden = this.resizeHelp.hidden = !this.enabled
       this.launcher.hidden =
@@ -243,6 +263,7 @@ export class ChatPopup {
         this.grip.hidden =
           !this.enabled
       this.launcher.setAttribute('aria-label', labels.openChat(title))
+      this.applyLauncherLabel()
       this.move.setAttribute('aria-label', labels.moveChat)
       this.resize.setAttribute('aria-label', labels.resizeChat)
       this.close.setAttribute('aria-label', labels.closeChat)
@@ -264,6 +285,7 @@ export class ChatPopup {
       this.launcher.setAttribute('aria-expanded', String(this.opened))
       if (this.host.isConnected && changed) this.connect()
       else if (moved) this.reposition()
+      if (this.host.isConnected && keyChanged && this.enabled && !changed) this.restore()
     })
   }
 
@@ -284,6 +306,7 @@ export class ChatPopup {
       this.observer.observe(this.panel)
       this.reposition()
     })
+    if (this.persistKey) this.restore()
   }
 
   disconnect() {
@@ -295,6 +318,136 @@ export class ChatPopup {
 
   get isOpen(): boolean {
     return this.opened
+  }
+
+  get isPopup(): boolean {
+    return this.enabled
+  }
+
+  setUnread(unread: boolean) {
+    if (this.unread === unread) return
+    this.unread = unread
+    this.launcher.toggleAttribute('data-unread', unread)
+    this.applyLauncherLabel()
+  }
+
+  private applyLauncherLabel() {
+    if (!this.labels) return
+    this.launcher.setAttribute(
+      'aria-label',
+      this.unread ? this.labels.openChatUnread(this.title) : this.labels.openChat(this.title)
+    )
+  }
+
+  private storage(): Storage | undefined {
+    try {
+      return typeof localStorage === 'undefined' ? undefined : localStorage
+    } catch {
+      return undefined
+    }
+  }
+
+  private storedKey(): string | undefined {
+    return this.persistKey ? `webmcp-chat:${this.persistKey}` : undefined
+  }
+
+  private restore() {
+    if (!this.persistKey || !this.enabled || !this.host.isConnected) return
+    const data = this.readStoredState()
+    if (!data) return
+    this.restoring = true
+    try {
+      if (data.position) {
+        this.userPositioned = true
+        this.position = this.place(this.launcher, data.position)
+        const rect = this.launcher.getBoundingClientRect()
+        const offset = this.offset()
+        this.pinnedInline = this.pinRight()
+          ? Math.abs(rect.right - innerWidth + offset) < 2
+          : Math.abs(rect.left - offset) < 2
+        this.pinnedBottom = Math.abs(rect.bottom - innerHeight + offset) < 2
+        this.panelPosition = undefined
+      } else {
+        this.userPositioned = false
+        this.position = this.panelPosition = undefined
+        this.pinnedInline = this.pinnedBottom = true
+      }
+      if (data.panel) {
+        if ((this.size.state === 'expanded') !== data.panel.expanded) this.size.send('toggle')
+        this.panel.toggleAttribute('data-expanded', data.panel.expanded)
+        this.panel.style.width = data.panel.width
+        this.panel.style.height = data.panel.height
+      }
+      if (data.open !== this.opened) {
+        this.machine.send({ type: data.open ? 'open' : 'close' }, () => {
+          this.panel.hidden = !data.open
+          this.launcher.setAttribute('aria-expanded', String(data.open))
+          if (data.open) this.placePanel()
+          this.host.dispatchEvent(
+            new CustomEvent('webmcp-chat-toggle', {
+              detail: { open: data.open },
+              bubbles: true,
+              composed: true
+            })
+          )
+        })
+      } else if (this.opened) this.placePanel()
+      else this.reposition()
+    } finally {
+      this.restoring = false
+    }
+  }
+
+  private readStoredState(): StoredPopupState | undefined {
+    const key = this.storedKey()
+    try {
+      const raw = key ? this.storage()?.getItem(key) : null
+      if (!raw) return
+      const value = JSON.parse(raw) as unknown
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return
+      const record = value as Record<string, unknown>
+      const position = record.position
+      const panel = record.panel
+      return {
+        open: record.open === true,
+        ...(isPosition(position) ? { position } : {}),
+        ...(isPanelSize(panel) ? { panel } : {})
+      }
+    } catch {
+      return
+    }
+  }
+
+  private schedulePersist() {
+    if (!this.persistKey || !this.enabled || !this.host.isConnected) return
+    if (this.restoring || this.persistScheduled) return
+    this.persistScheduled = true
+    queueMicrotask(() => {
+      this.persistScheduled = false
+      this.persist()
+    })
+  }
+
+  private persist() {
+    if (!this.persistKey || !this.enabled || this.restoring) return
+    const key = this.storedKey()
+    const storage = this.storage()
+    if (!key || !storage) return
+    const rect = this.launcher.getBoundingClientRect()
+    const data: StoredPopupState = {
+      open: this.opened,
+      ...(this.userPositioned ? { position: this.position ?? { x: rect.left, y: rect.top } } : {}),
+      panel: {
+        width: this.panel.style.width,
+        height: this.panel.style.height,
+        expanded: this.size.state === 'expanded'
+      }
+    }
+    try {
+      storage.setItem(key, JSON.stringify(data))
+    } catch {
+      /* Storage can be blocked or full; the popup still works for this visit. */
+    }
   }
 
   toggle() {
@@ -320,6 +473,7 @@ export class ChatPopup {
       this.host.dispatchEvent(
         new CustomEvent('webmcp-chat-toggle', { detail: { open }, bubbles: true, composed: true })
       )
+      this.schedulePersist()
     })
   }
 
@@ -363,11 +517,13 @@ export class ChatPopup {
         y: this.panelPosition.y
       }
     this.placePanel()
+    this.schedulePersist()
   }
 
   private moveTo(control: HTMLElement, position: PopupPosition) {
     if (control === this.launcher) {
       this.position = this.place(this.launcher, position)
+      this.userPositioned = true
       const rect = this.launcher.getBoundingClientRect()
       const offset = this.offset()
       this.pinnedInline = this.pinRight()
@@ -377,6 +533,7 @@ export class ChatPopup {
       this.panelPosition = undefined
       this.placePanel()
     } else this.panelPosition = this.place(this.panel, position)
+    this.schedulePersist()
   }
 
   private reposition() {
@@ -386,6 +543,7 @@ export class ChatPopup {
       y: this.pinnedBottom ? innerHeight : (this.position?.y ?? innerHeight)
     })
     if (this.opened) this.placePanel()
+    this.schedulePersist()
   }
 
   private placePanel() {
@@ -438,4 +596,25 @@ export class ChatPopup {
     element.style.top = `${y / scale}px`
     return { x, y }
   }
+}
+
+function isPosition(value: unknown): value is PopupPosition {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  return (
+    typeof record.x === 'number' &&
+    Number.isFinite(record.x) &&
+    typeof record.y === 'number' &&
+    Number.isFinite(record.y)
+  )
+}
+
+function isPanelSize(value: unknown): value is NonNullable<StoredPopupState['panel']> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  return (
+    typeof record.width === 'string' &&
+    typeof record.height === 'string' &&
+    typeof record.expanded === 'boolean'
+  )
 }

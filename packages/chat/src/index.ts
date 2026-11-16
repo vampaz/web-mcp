@@ -6,6 +6,7 @@ export type {
   WebMCPChatSettings
 } from './interfaces/settings'
 export type {
+  WebMCPChatApprovalRequest,
   WebMCPChatElement,
   WebMCPChatLabels,
   WebMCPChatOptions,

@@ -4,10 +4,16 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Dependabot's documented default 3-day version-update cooldown applies; no override is configured.
     groups:
+      earendil-works:
+        patterns:
+          - '@earendil-works/*'
       npm:
         patterns:
           - '*'
+        exclude-patterns:
+          - '@earendil-works/*'
   - package-ecosystem: github-actions
     directory: /
     schedule:

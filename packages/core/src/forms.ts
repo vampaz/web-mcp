@@ -2,6 +2,7 @@ import { defineTool } from './define-tool'
 import type { JsonSchema, RegisteredTool, WebMCPTool } from './interfaces/tool'
 import { registerToolWithCleanup } from './registry'
 import { formatJsonValueValidationError, validateJsonValue } from './schema'
+import { isWebMCPSupported } from './support'
 
 export interface RegisterFormToolOptions<TOutput = FormData> {
   form: HTMLFormElement
@@ -19,6 +20,7 @@ export interface RegisterFormToolFieldOptions {
 
 export type FormInput = Record<string, string | number | boolean | string[]>
 
+/** Registers a native form as a tool, inferring its input schema from the fields. */
 export function registerFormTool<TOutput = FormData>(
   options: RegisterFormToolOptions<TOutput>
 ): RegisteredTool<FormInput, TOutput> {
@@ -57,11 +59,32 @@ export function registerFormTool<TOutput = FormData>(
   applyFormToolOptions(options)
 
   try {
-    return registerToolWithCleanup(tool, restoreAttributes, 'declarative')
+    return registerToolWithCleanup(
+      tool,
+      restoreAttributes,
+      'declarative',
+      getNativeFormConfirmationWarnings(options)
+    )
   } catch (error) {
     restoreAttributes()
     throw error
   }
+}
+
+function getNativeFormConfirmationWarnings<TOutput>(
+  options: RegisterFormToolOptions<TOutput>
+): string[] {
+  if (!options.confirmation || !isWebMCPSupported()) return []
+
+  const warnings = [
+    'Native WebMCP form tools do not run the kit confirmation pipeline; enforce approval in the form submit handler.'
+  ]
+  if (options.form.hasAttribute('toolautosubmit')) {
+    warnings.push(
+      'toolautosubmit submits this form without kit approval; do not combine it with confirmation.'
+    )
+  }
+  return warnings
 }
 
 function applyFormToolOptions<TOutput>(options: RegisterFormToolOptions<TOutput>): void {

@@ -1,11 +1,12 @@
 import { isDevelopmentEnvironment } from './environment'
-import type { ConfirmationHandler, ConfirmationTool } from './interfaces/tool'
+import type { ConfirmationHandler, ConfirmationTool, ToolContext } from './interfaces/tool'
 
 export type { ConfirmationHandler, ConfirmationRequest, ConfirmationTool } from './interfaces/tool'
 
 const handlers = new Map<symbol, ConfirmationHandler>()
 let warnedAboutWindowConfirm = false
 
+/** Installs the application approval handler and returns a disposer. Passing undefined clears installed handlers. */
 export function setConfirmationHandler(handler: ConfirmationHandler | undefined): () => void {
   const owner = Symbol('confirmation')
   if (handler) handlers.set(owner, handler)
@@ -27,15 +28,27 @@ export function getConfirmationHandler(): ConfirmationHandler | undefined {
 export async function requestToolConfirmation(
   tool: ConfirmationTool,
   input: unknown,
-  signal?: AbortSignal
+  options: ToolConfirmationOptions = {}
 ): Promise<boolean> {
-  const reason = tool.confirmation?.reason ?? 'Confirm this action?'
+  const reason = options.reason ?? tool.confirmation?.reason ?? 'Confirm this action?'
   const handler = tool.confirmation?.handler ?? getConfirmationHandler()
 
   if (handler) {
     try {
       // Only an explicit true approves; dialog return values such as 'cancel' must not.
-      return (await handler({ tool, input, reason, ...(signal ? { signal } : {}) })) === true
+      return (
+        (await handler({
+          tool,
+          input,
+          reason,
+          ...(options.signal ? { signal: options.signal } : {}),
+          ...(options.source ? { source: options.source } : {}),
+          ...(options.invocationId === undefined ? {} : { invocationId: options.invocationId }),
+          ...(options.callerRequired === undefined
+            ? {}
+            : { callerRequired: options.callerRequired })
+        })) === true
+      )
     } catch (error) {
       throw new Error(`Confirmation handler failed: ${getErrorMessage(error)}`)
     }
@@ -44,13 +57,40 @@ export async function requestToolConfirmation(
   if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
     warnAboutWindowConfirmFallback()
     try {
-      return window.confirm(reason)
+      return window.confirm(formatConfirmationPrompt(reason, tool.name, input))
     } catch (error) {
       throw new Error(`Confirmation handler failed: ${getErrorMessage(error)}`)
     }
   }
 
   return false
+}
+
+export interface ToolConfirmationOptions {
+  signal?: AbortSignal
+  source?: ToolContext['source']
+  invocationId?: string
+  reason?: string
+  callerRequired?: boolean
+}
+
+const maxConfirmationDetailLength = 500
+
+function formatConfirmationPrompt(reason: string, toolName: string, input: unknown): string {
+  const detail = `${toolName}\n${summarizeConfirmationInput(input)}`
+  const bounded =
+    detail.length > maxConfirmationDetailLength
+      ? `${detail.slice(0, maxConfirmationDetailLength - 1)}…`
+      : detail
+  return `${reason}\n\n${bounded}`
+}
+
+function summarizeConfirmationInput(input: unknown): string {
+  try {
+    return JSON.stringify(input) ?? String(input)
+  } catch {
+    return '[unserializable input]'
+  }
 }
 
 function warnAboutWindowConfirmFallback(): void {

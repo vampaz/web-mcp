@@ -17,7 +17,7 @@ export interface ToolCatalogEntry {
   mode: RegisteredTool['mode']
   inputSchema: JsonSchema
   outputSchema?: JsonSchema
-  confirmation?: ToolConfirmation
+  confirmation?: { reason: string }
   examples: unknown[]
   warnings: string[]
   available: boolean
@@ -55,9 +55,13 @@ export function createToolCatalog(
         name: registration.tool.name,
         description: registration.tool.description,
         mode: registration.mode,
-        inputSchema: registration.tool.inputSchema,
-        outputSchema: registration.tool.outputSchema,
-        confirmation: registration.tool.confirmation,
+        inputSchema: structuredClone(registration.tool.inputSchema),
+        outputSchema: registration.tool.outputSchema
+          ? structuredClone(registration.tool.outputSchema)
+          : undefined,
+        confirmation: registration.tool.confirmation
+          ? { reason: registration.tool.confirmation.reason }
+          : undefined,
         examples: registration.tool.examples ?? [],
         warnings: registration.warnings,
         available: availability?.available ?? true,

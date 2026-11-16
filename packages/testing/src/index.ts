@@ -12,6 +12,15 @@ export {
   type WebMCPResolverOutcome
 } from './evals'
 export {
+  createScriptedResolver,
+  ScriptedResolverError,
+  type ScriptedResolverCall,
+  type ScriptedResolverMatch,
+  type ScriptedResolverOptions,
+  type ScriptedResolverResolution,
+  type ScriptedResolverStep
+} from './scripted-resolver'
+export {
   getWebMCPRegistrySnapshot,
   invokeWebMCPTool,
   listWebMCPTools,

@@ -1,4 +1,4 @@
-import type { ResolverContext, ToolResolver } from '@vampaz/webmcp-kit'
+import type { ResolverContext, ToolInvocationErrorCode, ToolResolver } from '@vampaz/webmcp-kit'
 import type { PiToolHost } from './host'
 import type { PiLimits, PiSession } from './session'
 
@@ -52,6 +52,8 @@ export interface PiMessage {
   input?: Record<string, unknown>
   /** Tool messages: `unknown` when an interruption hid whether the action ran. */
   status?: PiToolStatus
+  /** Tool messages: stable invocation outcome code, including `confirmation_denied`. */
+  code?: ToolInvocationErrorCode
   /** Tool messages: application output, or a structured failure when partial-result details exist. */
   output?: unknown
 }

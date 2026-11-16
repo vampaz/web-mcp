@@ -12,6 +12,7 @@ This walkthrough adds a persistent assistant to an existing HTTPS application. T
 | Execute short natural-language commands   | Core plus a resolver and `<webmcp-command-input>` |
 | Persistent conversations with your own UI | `/pi` and a conversational resolver               |
 | Persistent conversations with supplied UI | The preceding setup plus `/chat`                  |
+| Supplied UI with managed startup/teardown | The preceding setup plus `/assistant`             |
 | Use chat with your own controller         | `/chat` and an implementation of `PiController`   |
 
 Install WebMCP Kit:
@@ -52,7 +53,7 @@ registration.unregister()
 
 For a mutation, declare `confirmation`, validate all required input, and use `scope()` or `guard()` for application rules. Browser checks improve interaction; server authorization must still run on every server mutation. Use `defineServerTool()` when execution belongs on your server.
 
-The complete [counter assistant example](./examples/counter-assistant.ts) registers read and confirmed-write actions, supplies fresh context, mounts chat, and handles teardown during asynchronous initialization. The package-consumer suite typechecks this example against the actual tarball. Copy it into your app as a starting point, then replace its in-memory counter with your application's action functions. Mount one instance because its tool names are fixed.
+The complete [counter assistant example](./examples/counter-assistant.ts) registers read and confirmed-write actions and mounts the assistant with `mountAssistant()`. It supplies fresh context, unregisters its tools, and handles teardown during asynchronous initialization. The package-consumer suite typechecks this example against the actual tarball. Copy it into your app as a starting point, then replace its in-memory counter with your application's action functions. Mount one instance because its tool names are fixed.
 
 ### Optional offline command input
 
@@ -104,10 +105,11 @@ Add application markup:
 </dialog>
 ```
 
-Copy the [example module](./examples/counter-assistant.ts) into your client source. Run the following from browser mounting code, after the markup exists. The host supplies the current authenticated account ID; use a distinct explicit anonymous-session ID for a guest.
+Copy the [example module](./examples/counter-assistant.ts) into your client source. It registers the two actions, calls `mountAssistant()` from `/assistant`, and unregisters its tools on teardown. Run the following from browser mounting code, after the markup exists. The host supplies the current authenticated account ID; use a distinct explicit anonymous-session ID for a guest.
 
 ```ts
-import { createDialogApproval, mountCounterAssistant } from './counter-assistant'
+import { createDialogApproval } from '@vampaz/webmcp-kit/assistant'
+import { mountCounterAssistant } from './counter-assistant'
 
 // `resolver` comes from step 3; `signedInUserId` comes from your authenticated application.
 const approval = createDialogApproval(document.querySelector<HTMLDialogElement>('#approval')!)
@@ -136,13 +138,13 @@ async function teardown() {
 }
 ```
 
-The module uses popup mode. Set `mode: 'inline'` in its `element.configure()` call to render in your layout. The [chat guide](./chat.md) lists text options, CSS variables, resizing, keyboard behavior, and draft preservation. Approval is a separate application dialog; chat itself does not approve mutations.
+`mountAssistant()` creates the Pi harness and chat element. It never registers or unregisters tools and never disposes the supplied resolver; the application keeps both responsibilities. It accepts `session`, `resolver`, `context`, `limits`, `onCancel`, and `chat`, which is `WebMCPChatOptions` without `controller`. It does not accept a custom `PiToolHost`; use `/pi` and `/chat` directly when you supply one. Applications that register tools elsewhere call `mountAssistant()` directly with the same options. Popup is the default mode; pass `chat: { mode: 'inline' }` to render in your layout. The [chat guide](./chat.md) lists text options, CSS variables, resizing, keyboard behavior, and draft preservation. Approval is a separate application dialog; chat itself does not approve mutations.
 
-The sample's `ready` promise rejects on initialization failure, and its `destroy()` closes a controller that finishes initialization after teardown. Wire teardown immediately in the framework lifecycle rather than waiting for initialization to finish. Do not destroy the controller merely because a popup closes. To support the back/forward cache in a custom document teardown handler, preserve the controller when `pagehide.persisted` is true; the harness already stops the active turn in that case.
+The sample's `ready` promise rejects on initialization failure, and its `destroy()` waits for pending initialization and closes a controller that finishes after teardown. Wire teardown immediately in the framework lifecycle rather than waiting for initialization to finish. Do not destroy the controller merely because a popup closes. To support the back/forward cache in a custom document teardown handler, preserve the controller when `pagehide.persisted` is true; the harness already stops the active turn in that case.
 
 ## 5. Own account, route, and resolver changes
 
-Destroy the old controller and cancel approval UI before creating a replacement for another account, conversation partition, or resolver. Unsubscribe old views and unregister route-owned tools. A supplied resolver belongs to the host; the harness does not dispose it automatically.
+Destroy the old assistant and cancel approval UI before creating a replacement for another account, conversation partition, or resolver. Unsubscribe old views and unregister route-owned tools. A supplied resolver belongs to the host; `mountAssistant()` does not dispose it automatically.
 
 Use a stable, application-specific namespace and an explicit conversation ID. `ownerId` partitions storage but does not authenticate the user. Never assign legacy anonymous history to the next signed-in account. Clear browser history according to your application's retention policy, including sign-out if required.
 

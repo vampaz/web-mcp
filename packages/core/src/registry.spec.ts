@@ -127,11 +127,54 @@ describe('registry', () => {
     })
 
     expect(result.status).toBe('success')
-    expect(confirm).toHaveBeenCalledWith({
-      tool: expect.objectContaining({ name: 'void_invoice' }),
-      input: { invoiceId: 'inv_1' },
-      reason: 'Voiding an invoice cannot be undone in this demo.'
+    expect(confirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tool: expect.objectContaining({ name: 'void_invoice' }),
+        input: { invoiceId: 'inv_1' },
+        reason: 'Voiding an invoice cannot be undone in this demo.',
+        source: 'fallback',
+        invocationId: expect.any(String)
+      })
+    )
+  })
+
+  it('adds an invocation-level confirmation without a tool declaration', async () => {
+    const execute = vi.fn(function setCounter() {
+      return { value: 1 }
     })
+    const confirm = vi.fn(function confirmInvocation({ reason }: { reason: string }) {
+      return reason === 'This action follows content from an untrusted source.'
+    })
+    setConfirmationHandler(confirm)
+    registerTool(
+      defineTool({
+        name: 'set_counter',
+        description: 'Set the visible counter to a value between zero and one hundred.',
+        inputSchema: {
+          type: 'object',
+          properties: { value: { type: 'integer' } },
+          required: ['value'],
+          additionalProperties: false
+        },
+        execute
+      })
+    )
+
+    await expect(
+      invokeTool({
+        toolName: 'set_counter',
+        input: { value: 1 },
+        requireConfirmation: { reason: 'This action follows content from an untrusted source.' }
+      })
+    ).resolves.toMatchObject({ status: 'success', output: { value: 1 } })
+    expect(confirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'fallback',
+        invocationId: expect.any(String),
+        reason: 'This action follows content from an untrusted source.'
+      })
+    )
+    expect(execute).toHaveBeenCalledOnce()
   })
 
   it('returns an error when the confirmation handler fails', async () => {

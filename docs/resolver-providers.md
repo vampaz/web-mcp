@@ -14,7 +14,7 @@ const browser = await createResolver({ provider: 'chrome-built-in' })
 
 `local` uses deterministic resolution and asks for missing required inputs. It matches the request against tool names, descriptions, property names, and enum values, requires a minimum match before choosing a tool, and fills optional inputs only from evidence in the request (an enum value, a literal boolean, a matching context ID, or a search query). `auto` prefers Chrome AI and permits deterministic fallback. An explicit `chrome-built-in` selection reports provider failure and never switches to heuristics. Chrome requests clone an unprompted base session and destroy each clone, so unrelated requests do not accumulate context. While Chrome downloads its model, `status` is `downloading` and `detail` reports progress; a cancelled request stops waiting while the download continues for other requests. The host disposes the resolver when it is no longer needed.
 
-Built-in remote, server, and hosted resolvers throw `ResolverError` on HTTP failure, with `code` (`context_overflow` or `provider_failed`), `status`, and the provider's message shortened to 300 characters. Custom resolvers can throw `new ResolverError(message, 'context_overflow')` so Pi compacts history instead of failing the turn. A resolution that does not match the offered tools, and model text that is empty or not JSON, throws `ToolResolutionValidationError`; custom resolvers can throw it so Pi retries once with the error.
+Built-in remote, server, and hosted resolvers throw `ResolverError` on HTTP failure, with `code` (`context_overflow` or `provider_failed`), `status`, and the provider's message with `Bearer` tokens and `sk-` keys redacted, then shortened to 300 characters. Custom resolvers can throw `new ResolverError(message, 'context_overflow')` so Pi compacts history instead of failing the turn. A resolution that does not match the offered tools, and model text that is empty or not JSON, throws `ToolResolutionValidationError`; custom resolvers can throw it so Pi retries once with the error.
 
 Remote providers are `openai`, `openrouter`, `openai-compatible`, and `cloudflare-binding`. Choose a model that your endpoint permits; example identifiers are placeholders, not availability claims.
 
@@ -76,6 +76,41 @@ Validate the request, restrict provider/model selection, and treat tool descript
 
 For `purpose: 'summary'`, summarize the supplied history through the offered `pi_reply` tool. Do not select application actions, answer the original request, or offer `needs_clarification` or `no_tools_match`. The supplied response schema excludes these outcomes. Preserve this purpose when forwarding requests to another resolver, and validate the response against the summary contract. Hosted endpoint integrations receive the same field.
 
+### Managed server handler
+
+`@vampaz/webmcp-kit/server` supplies a web-standard handler for this contract when the upstream is OpenAI-compatible:
+
+```ts
+import { createResolverHandler } from '@vampaz/webmcp-kit/server'
+
+const resolve = createResolverHandler({
+  provider: 'openai',
+  baseUrl: 'https://api.openai.com/v1',
+  apiKey: process.env.OPENAI_API_KEY!,
+  allowedModels: ['your-approved-model'],
+  maxBodyBytes: 1024 * 1024,
+  responseFormat: 'json_schema',
+  async authorize(request, payload) {
+    return isAllowedAccount(request, payload.model)
+  }
+})
+
+// Cloudflare Workers, Node, or another web-standard runtime:
+export default {
+  fetch(request: Request) {
+    return resolve(request)
+  }
+}
+```
+
+`provider`, `baseUrl`, `apiKey`, and `allowedModels` are server-owned; the browser cannot change them. `authorize` is required and only a literal `true` result allows the request. It receives the original `Request` and the validated payload, so it can check a session, account, origin, or rate limit. A throw or any other result is denied. Authorization runs before the model allowlist check, so an unauthorized caller receives the same denial whether or not the requested model is allowed.
+
+The handler accepts only `POST`, reads the body as a bounded stream (the default limit is 1 MiB and `Content-Length` is not trusted), rejects invalid shapes, and returns `{ error }` with a non-2xx status. It honors `singleStep` and `purpose: 'summary'`, reuses the same prompt and schema construction as the browser resolver, and validates the upstream result before returning it. The incoming `responseSchema` is validated as wire metadata but is not used to constrain the upstream request; the handler rebuilds the schema from the tools and request flags. Upstream failures and malformed results do not expose the provider key or request body.
+
+The handler rejects `pattern` anywhere in a caller-supplied tool `inputSchema`, including nested properties, items, combinators, `not`, `propertyNames`, and `additionalProperties`, with an explicit `400` before authorization or any upstream request. The server would otherwise evaluate that caller-controlled expression with the backtracking regular-expression engine, where a short input can stall the request indefinitely. Keep pattern validation in the application's authoritative tool definition at invocation time, and send a pattern-free schema to the resolver; do not strip or skip that application validation. `outputSchema` and the incoming `responseSchema` are not evaluated by the handler, so they may still carry `pattern` metadata.
+
+The provider key stays in the server environment. Never send it to the browser, include it in logs, or return it from a handler. Cross-origin browser endpoints still need deliberate CORS and authentication configuration; `authorize` is the application's authorization boundary.
+
 ## OpenAI-compatible endpoint
 
 ```ts
@@ -95,6 +130,8 @@ This posts to `baseUrl + '/chat/completions'` and expects an OpenAI-compatible r
 Use `responseFormat: 'text'` when the endpoint's constrained decoder cannot support your tool schemas. This explicitly requests text output containing the same JSON resolution; the kit still validates the JSON, tool name, and complete input schema before returning it. For local models, configure `maxTokens`, `temperature`, and `reasoningEffort` explicitly to keep generation bounded.
 
 User-key mode is `{ mode: 'user-key', apiKey, storageKey? }`. The key is visible to the page. Use server mode for application secrets. Command-input attributes no longer accept credentials.
+
+Direct provider requests (`user-key` and `none` modes) follow no redirects and omit credentials on cross-origin calls. In `user-key` mode, the effective request destination must use HTTPS unless its host is loopback (`localhost`, `127.0.0.0/8`, or `::1`); relative and protocol-relative `baseUrl` values are resolved against the page URL first, and a name such as `localhost.example.com` is not loopback. Without a browser page URL, a relative `baseUrl` is left unresolved and the request fails as fetch does. Server mode keeps normal fetch session behavior.
 
 ## Hosted integration
 

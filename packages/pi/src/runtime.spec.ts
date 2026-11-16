@@ -6,7 +6,7 @@ import { createRegistry, Harness } from '@earendil-works/pi-durable'
 import { createResolver, type ToolResolution, type ToolResolver } from '@vampaz/webmcp-kit'
 import { createPiRuntime } from './runtime'
 import type { PiController } from './interfaces/controller'
-import type { PiToolHost } from './interfaces/host'
+import type { PiToolCatalog, PiToolHost } from './interfaces/host'
 import type { PiActionOutcome } from './interfaces/action-outcome'
 import { PiFailure } from './errors'
 import { installBrowserStorage } from './test-utils/browser'
@@ -692,6 +692,19 @@ it('ends a denied action without another model round', async function test() {
     error: { code: 'action_denied' }
   })
   expect(config.resolver.resolve).toHaveBeenCalledTimes(1)
+  expect(
+    runtime.getSnapshot().messages.find(function denied(message) {
+      return message.role === 'tool'
+    })
+  ).toMatchObject({ status: 'blocked', code: 'confirmation_denied', failed: true })
+
+  await runtime.destroy()
+  runtime = await createPiRuntime(config)
+  expect(
+    runtime.getSnapshot().messages.find(function denied(message) {
+      return message.role === 'tool'
+    })
+  ).toMatchObject({ status: 'blocked', code: 'confirmation_denied', failed: true })
 })
 
 it('discards a stale choice and resolves again when tools change during inference', async function test() {
@@ -759,6 +772,149 @@ it('gives the model one correction round with the validation error', async funct
   expect(await runtime.send('Read')).toEqual({ status: 'completed' })
   const retry = vi.mocked(config.resolver.resolve).mock.calls[1]?.[2]
   expect(String(retry?.piCorrection)).toContain('invented_tool')
+})
+
+it('forces approval after an untrusted read, exempts read-only tools, and resets each turn', async function test() {
+  const invoke = vi.fn(async function invoke(call: {
+    name: string
+    input: Record<string, unknown>
+    revision: string
+    requireApproval?: boolean
+  }) {
+    return {
+      toolName: call.name,
+      status: 'success' as const,
+      output: {},
+      durationMs: 0
+    }
+  })
+  const config = options(
+    [
+      resolution('read_page', {}),
+      resolution('read_metric', {}),
+      resolution('set_counter', { value: 1 }),
+      resolution(),
+      resolution('set_counter', { value: 2 }),
+      resolution()
+    ],
+    {
+      async discover(): Promise<PiToolCatalog> {
+        return {
+          revision: '1',
+          tools: [
+            {
+              name: 'read_page',
+              description: 'Read the current page content.',
+              inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+              annotations: { readOnlyHint: true, untrustedContentHint: true }
+            },
+            {
+              name: 'read_metric',
+              description: 'Read the current metric.',
+              inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+              annotations: { readOnlyHint: true }
+            },
+            {
+              name: 'set_counter',
+              description: 'Set the visible counter.',
+              inputSchema: {
+                type: 'object',
+                properties: { value: { type: 'integer' } },
+                required: ['value'],
+                additionalProperties: false
+              }
+            }
+          ]
+        }
+      },
+      invoke
+    }
+  )
+  runtime = await createPiRuntime(config)
+
+  expect(await runtime.send('Read and write')).toEqual({ status: 'completed' })
+  const calls = invoke.mock.calls.map(function callArguments(call) {
+    return call[0]
+  })
+  expect(calls[0]).not.toHaveProperty('requireApproval')
+  expect(calls[1]).not.toHaveProperty('requireApproval')
+  expect(calls[2]).toMatchObject({ name: 'set_counter', requireApproval: true })
+
+  expect(await runtime.send('Write again')).toEqual({ status: 'completed' })
+  expect(invoke.mock.calls.at(-1)?.[0]).not.toHaveProperty('requireApproval')
+})
+
+it('reports approval activity and stops when a forced write is denied', async function test() {
+  let approvalActivity: unknown
+  const invoke = vi.fn(async function invoke(
+    call: { name: string; input: Record<string, unknown>; revision: string },
+    _signal: AbortSignal,
+    progress?: (phase: 'approval' | 'running') => void
+  ) {
+    if (call.name === 'set_counter') {
+      progress?.('approval')
+      approvalActivity = runtime?.getSnapshot().activity
+      return {
+        toolName: 'set_counter',
+        status: 'blocked' as const,
+        code: 'confirmation_denied' as const,
+        error: 'This action follows content from an untrusted source.',
+        durationMs: 0
+      }
+    }
+    return {
+      toolName: call.name,
+      status: 'success' as const,
+      output: {},
+      durationMs: 0
+    }
+  })
+  const config = options([resolution('read_page', {}), resolution('set_counter', { value: 1 })], {
+    async discover(): Promise<PiToolCatalog> {
+      return {
+        revision: '1',
+        tools: [
+          {
+            name: 'read_page',
+            description: 'Read the current page content.',
+            inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+            annotations: { readOnlyHint: true, untrustedContentHint: true }
+          },
+          {
+            name: 'set_counter',
+            description: 'Set the visible counter.',
+            inputSchema: {
+              type: 'object',
+              properties: { value: { type: 'integer' } },
+              required: ['value'],
+              additionalProperties: false
+            }
+          }
+        ]
+      }
+    },
+    invoke
+  })
+  runtime = await createPiRuntime(config)
+
+  expect(await runtime.send('Read then write')).toMatchObject({
+    status: 'error',
+    error: { code: 'action_denied' }
+  })
+  expect(approvalActivity).toMatchObject({
+    kind: 'tool',
+    toolName: 'set_counter',
+    phase: 'approval'
+  })
+  expect(runtime.getSnapshot().messages).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        role: 'tool',
+        failed: true,
+        text: expect.stringContaining('untrusted source')
+      })
+    ])
+  )
 })
 
 it('enforces the configured tool call limit', async function test() {

@@ -1,15 +1,19 @@
 import { createStateMachine } from '../../core/src/state-machine'
 import type { ChatOperationState, ChatOperationEvent } from './interfaces/chat-state'
 import { transitionChatOperation } from './chat-state'
+import type { LauncherUnreadEvent, LauncherUnreadState } from './unread-state'
+import { transitionLauncherUnread } from './unread-state'
 import type { PiController, PiSnapshot } from '@vampaz/webmcp-kit/pi'
 import type {
   ChatStatus,
+  WebMCPChatApprovalRequest,
   WebMCPChatElement,
   WebMCPChatLabels,
   WebMCPChatOptions
 } from './interfaces/chat'
-import { activityText, statusText, updateTranscript } from './render'
+import { activityText, retryBlockedSinceLastUser, statusText, updateTranscript } from './render'
 import { createLabels } from './labels'
+import { ChatApproval } from './approval'
 import { chatStyles, popupStyles } from './styles'
 import { ChatPopup } from './popup'
 import { icon } from './icon'
@@ -19,9 +23,13 @@ import { ChatModelPicker } from './model-picker'
 let instanceCount = 0
 const defaultMessageLimit = 16000
 
+/** Registers the <webmcp-chat> custom element once. Call it in browser code. */
 export function defineWebMCPChat(): void {
   if (typeof customElements === 'undefined' || customElements.get('webmcp-chat')) return
   class ChatElement extends HTMLElement implements WebMCPChatElement {
+    static get observedAttributes() {
+      return ['mode', 'theme', 'placement', 'heading', 'placeholder']
+    }
     private options?: WebMCPChatOptions
     private labels: WebMCPChatLabels = createLabels()
     private unsubscribe?: () => void
@@ -43,6 +51,10 @@ export function defineWebMCPChat(): void {
     private activity = ''
     private notice?: ChatStatus
     private unread = false
+    private readonly launcherUnread = createStateMachine<LauncherUnreadState, LauncherUnreadEvent>(
+      'initial',
+      transitionLauncherUnread
+    )
     private readonly focusTrackers = new Set<() => boolean>()
     private readonly coarsePointer = matchMedia('(pointer: coarse)')
     private readonly root = this.attachShadow({ mode: 'open' })
@@ -72,11 +84,13 @@ export function defineWebMCPChat(): void {
     private readonly stopText: HTMLSpanElement
     private readonly clearButton: HTMLButtonElement
     private readonly editButton: HTMLButtonElement
+    private readonly retryButton: HTMLButtonElement
     private readonly suggestions: HTMLDivElement
     private readonly hint: HTMLParagraphElement
     private readonly limit: HTMLParagraphElement
     private readonly jumpButton: HTMLButtonElement
     private readonly popup: ChatPopup
+    private readonly approval: ChatApproval
     private settings?: ChatSettings
     private picker?: ChatModelPicker
 
@@ -91,7 +105,7 @@ export function defineWebMCPChat(): void {
             <div class="header-actions"><slot name="header-actions"></slot><button class="icon-button" type="button" data-clear part="new-chat">${icon('M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6M18.4 3.6a2 2 0 0 1 2.9 2.9L13 14.8l-3.8 1 1-3.8z')}</button></div>
           </header>
           <div class="conversation">
-            <div class="transcript" part="transcript" tabindex="0" role="region"><div data-empty><slot name="empty"><p></p></slot></div><div class="suggestions"></div><div role="log"><ol></ol><p class="working" hidden aria-hidden="true"><span class="working-dots"><span></span><span></span><span></span></span><span class="working-text"></span></p></div></div>
+            <div class="transcript" part="transcript" tabindex="0" role="region"><div data-empty><slot name="empty"><p></p></slot></div><div class="suggestions"></div><div role="log"><ol></ol><p class="working" hidden aria-hidden="true"><span class="working-dots"><span></span><span></span><span></span></span><span class="working-text"></span></p></div><div class="approval-slot"></div></div>
             <p class="visually-hidden" aria-live="polite" data-activity></p>
             <button type="button" class="jump-latest" part="jump-latest" hidden></button>
           </div>
@@ -102,7 +116,7 @@ export function defineWebMCPChat(): void {
               <textarea id="${id}-message" part="textarea" rows="2" enterkeyhint="send"></textarea>
               <div class="composer-bar"><div class="composer-tools"></div><div class="actions"><button type="button" class="icon-button" data-stop part="stop">${icon('M7 7h10v10H7z')}<span class="visually-hidden"></span></button><button class="send icon-button" type="submit" part="send">${icon('M12 19V5M6 11l6-6 6 6')}</button></div></div>
             </div>
-            <div class="composer-meta"><slot name="composer-meta"></slot><p class="status" part="status" role="status" aria-live="polite">${icon('M12 8v5M12 16h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0')}<span></span></p><button type="button" data-edit-last hidden></button><p class="hint" id="${id}-hint"></p></div>
+            <div class="composer-meta"><slot name="composer-meta"></slot><p class="status" part="status" role="status" aria-live="polite">${icon('M12 8v5M12 16h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0')}<span></span></p><button type="button" data-edit-last hidden></button><button type="button" data-retry-last hidden></button><p class="hint" id="${id}-hint"></p></div>
             <p class="limit" id="${id}-limit" hidden></p>
             <slot name="footer"></slot>
           </form>
@@ -126,6 +140,7 @@ export function defineWebMCPChat(): void {
       this.stopText = this.root.querySelector('[data-stop] span')!
       this.clearButton = this.root.querySelector('[data-clear]')!
       this.editButton = this.root.querySelector('[data-edit-last]')!
+      this.retryButton = this.root.querySelector('[data-retry-last]')!
       this.suggestions = this.root.querySelector('.suggestions')!
       this.hint = this.root.querySelector('.hint')!
       this.limit = this.root.querySelector('.limit')!
@@ -154,6 +169,18 @@ export function defineWebMCPChat(): void {
         this.root.querySelector('section')!,
         this.heading.id
       )
+      this.approval = new ChatApproval(this.root.querySelector('.approval-slot')!, {
+        getLabels: () => this.labels,
+        getToolLabel: () => this.options?.toolLabel,
+        onOpen: () => {
+          this.picker?.close(false)
+          this.settings?.setOpen(false)
+          if (this.popup.isPopup && !this.popup.isOpen) this.popup.setOpen(true)
+        },
+        onResolve: (_approved, fromUser) => {
+          if (fromUser && this.isConnected) this.input.focus({ preventScroll: true })
+        }
+      })
       this.root.querySelector('.composer')!.addEventListener('submit', (event) => {
         event.preventDefault()
         void this.send()
@@ -185,6 +212,19 @@ export function defineWebMCPChat(): void {
         this.input.focus()
         this.input.setSelectionRange(text.length, text.length)
       })
+      this.retryButton.addEventListener('click', () => {
+        const text = this.lastUserText()
+        if (text === undefined) return
+        this.input.value = text
+        this.input.focus()
+        this.updateComposer()
+        void this.send()
+      })
+      this.addEventListener('webmcp-chat-toggle', (event) => {
+        if (!(event as CustomEvent<{ open: boolean }>).detail.open) return
+        this.launcherUnread.send('opened')
+        this.popup.setUnread(false)
+      })
       this.transcript.addEventListener('scroll', () => this.updateJump())
       this.jumpButton.addEventListener('click', () => {
         this.scrollToEnd()
@@ -200,10 +240,14 @@ export function defineWebMCPChat(): void {
       this.resizeObserver.observe(this.transcript)
       this.connect()
     }
+    attributeChangedCallback() {
+      this.applyStaticOptions()
+    }
     disconnectedCallback() {
       this.popup.disconnect()
       queueMicrotask(() => {
         if (this.isConnected) return
+        this.approval.cancel()
         this.operation.send({ type: 'reset' }, () => {
           this.resizeObserver.disconnect()
           for (const finish of this.focusTrackers) finish()
@@ -251,11 +295,16 @@ export function defineWebMCPChat(): void {
       this.input.value = text
       this.updateComposer()
     }
+    requestApproval(request: WebMCPChatApprovalRequest): Promise<boolean> {
+      if (!this.isConnected) return Promise.resolve(false)
+      return this.approval.request(request)
+    }
 
     configure(options: WebMCPChatOptions) {
       if (!options?.controller) throw new Error('Configure a conversation controller.')
       if (this.options?.controller !== options.controller) {
         this.input.value = ''
+        this.approval.cancel()
         this.list.replaceChildren()
         this.transcript.scrollTop = 0
         this.snapshot = options.controller.getSnapshot()
@@ -263,6 +312,8 @@ export function defineWebMCPChat(): void {
         this.latestId = this.latestText = undefined
         this.notice = undefined
         this.unread = false
+        this.launcherUnread.send('reset')
+        this.popup.setUnread(false)
         this.operation.send({ type: 'reset' })
         for (const finish of this.focusTrackers) finish()
       }
@@ -270,14 +321,7 @@ export function defineWebMCPChat(): void {
       this.unsubscribe = undefined
       this.options = { ...options }
       this.labels = createLabels(options.labels, options.locale)
-      this.dataset.theme = options.theme ?? 'light'
-      this.heading.textContent = options.title ?? 'Assistant'
-      this.popup.configure(
-        options.mode ?? 'inline',
-        this.heading.textContent,
-        this.labels,
-        options.placement ?? 'end'
-      )
+      this.applyStaticOptions()
       this.applyLabels()
       if (options.settings) {
         const panel = this.root.querySelector<HTMLElement>('.panel')!
@@ -291,7 +335,6 @@ export function defineWebMCPChat(): void {
         this.settings?.destroy()
         this.settings = undefined
       }
-      this.input.placeholder = options.placeholder ?? 'Ask the assistant'
       this.emptyText.textContent =
         options.emptyState ?? 'Ask a question or choose a suggestion to start.'
       this.suggestions.replaceChildren()
@@ -301,6 +344,13 @@ export function defineWebMCPChat(): void {
         button.setAttribute('part', 'suggestion')
         button.textContent = prompt
         button.addEventListener('click', () => {
+          if (this.options?.suggestionAction === 'send') {
+            this.input.value = prompt
+            this.input.focus()
+            this.updateComposer()
+            void this.send()
+            return
+          }
           this.setDraft(prompt)
           this.input.focus()
         })
@@ -322,6 +372,34 @@ export function defineWebMCPChat(): void {
       this.messageLabel.textContent = labels.message
       this.hint.textContent = labels.hint
       this.editButton.textContent = labels.editLastMessage
+      this.retryButton.textContent = labels.retry
+    }
+
+    private applyStaticOptions() {
+      if (!this.options) return
+      const mode = this.options.mode ?? this.attributeValue('mode')
+      const theme = this.options.theme ?? this.attributeValue('theme')
+      const placement = this.options.placement ?? this.attributeValue('placement')
+      this.dataset.theme =
+        theme === 'dark' || theme === 'auto' ? theme : theme === 'light' ? 'light' : 'light'
+      const heading = this.options.title ?? this.attributeValue('heading') ?? 'Assistant'
+      this.heading.textContent = heading
+      this.input.placeholder =
+        this.options.placeholder ?? this.attributeValue('placeholder') ?? 'Ask the assistant'
+      this.popup.configure(
+        mode === 'popup' ? 'popup' : 'inline',
+        heading,
+        this.labels,
+        placement === 'start' ? 'start' : 'end',
+        this.options.persistKey
+      )
+      this.popup.setUnread(
+        this.launcherUnread.state === 'unread' && this.popup.isPopup && !this.popup.isOpen
+      )
+    }
+
+    private attributeValue(name: string): string | undefined {
+      return this.getAttribute(name)?.trim() || undefined
     }
 
     private connect() {
@@ -331,10 +409,12 @@ export function defineWebMCPChat(): void {
     }
 
     private update(snapshot = this.snapshot) {
+      const previousSnapshot = this.snapshot
       const stateChanged = snapshot.state !== this.snapshot.state
       const cleared = this.snapshot.messages.length > 0 && snapshot.messages.length === 0
       const nearEnd = this.snapshot.messages.length === 0 || this.nearEnd()
       this.snapshot = snapshot
+      this.updateLauncherUnread(previousSnapshot, snapshot)
       const latest = snapshot.messages.at(-1)
       if ((latest?.id !== this.latestId || latest?.text !== this.latestText) && !nearEnd)
         this.unread = true
@@ -345,10 +425,16 @@ export function defineWebMCPChat(): void {
         snapshot.messages,
         this.options?.assistantLabel ?? 'Assistant',
         this.labels,
-        this.options?.renderMessage
+        this.options?.renderMessage,
+        {
+          toolLabel: this.options?.toolLabel,
+          toolDetails: this.options?.toolDetails
+        }
       )
       const working = this.isWorking()
-      const activity = working ? activityText(snapshot.activity, this.labels) : ''
+      const activity = working
+        ? activityText(snapshot.activity, this.labels, this.options?.toolLabel)
+        : ''
       const kind = working ? (snapshot.activity?.kind ?? 'resolving') : ''
       const indicatorChanged = this.working.hidden === working || activity !== this.activity
       // Operation notices describe the conversation they followed; drop them once it changes.
@@ -445,8 +531,35 @@ export function defineWebMCPChat(): void {
       )
       this.editButton.hidden = !this.turnFailed() || length > 0 || this.lastUserText() === undefined
       this.editButton.disabled = Boolean(disabled || this.clearing)
+      this.retryButton.hidden = !this.canRetry()
+      this.retryButton.disabled = Boolean(disabled || this.clearing)
       for (const button of this.suggestions.querySelectorAll('button'))
         button.disabled = Boolean(disabled || busy)
+    }
+
+    private updateLauncherUnread(previous: PiSnapshot, next: PiSnapshot) {
+      if (this.launcherUnread.state === 'initial' && next.state !== 'loading')
+        this.launcherUnread.send('baseline')
+      else if (this.launcherUnread.state === 'read' && this.popup.isPopup && !this.popup.isOpen) {
+        const previousAssistant = new Set(
+          previous.messages
+            .filter(function assistant(message) {
+              return message.role === 'assistant'
+            })
+            .map(function id(message) {
+              return message.id
+            })
+        )
+        const newAssistant = next.messages.some(function assistant(message) {
+          return message.role === 'assistant' && !previousAssistant.has(message.id)
+        })
+        const wasWorking = previous.state === 'running' || previous.state === 'stopping'
+        const ended = wasWorking && !['running', 'stopping'].includes(next.state)
+        if (newAssistant || ended) this.launcherUnread.send('arrived')
+      }
+      this.popup.setUnread(
+        this.launcherUnread.state === 'unread' && this.popup.isPopup && !this.popup.isOpen
+      )
     }
 
     private isWorking() {
@@ -472,6 +585,20 @@ export function defineWebMCPChat(): void {
         state === 'error' ||
         (state === 'idle' && Boolean(error || messages.at(-1)?.failed))
       )
+    }
+
+    private canRetry() {
+      const { error, messages } = this.snapshot
+      if (!this.turnFailed() || this.input.value.length > 0) return false
+      if (error?.actionMayHaveRun || error?.code === 'action_denied') return false
+      let lastUser = -1
+      for (let index = messages.length - 1; index >= 0; index--)
+        if (messages[index].role === 'user') {
+          lastUser = index
+          break
+        }
+      if (lastUser < 0) return false
+      return !retryBlockedSinceLastUser(messages)
     }
 
     private lastUserText() {
@@ -555,7 +682,7 @@ export function defineWebMCPChat(): void {
           })
           if (failed && !recorded && !this.input.value) this.input.value = draft
           this.update()
-          if (errorText) this.showNotice(errorText, 'error')
+          if (errorText && !this.snapshot.error) this.showNotice(errorText, 'error')
           if (restoreFocus && this.isConnected) this.input.focus()
         }
       }

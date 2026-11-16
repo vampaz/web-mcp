@@ -19,6 +19,7 @@ export type {
   UseWebMCPToolsResult
 } from './interfaces/webmcp-tool'
 
+/** Registers one tool while the component is mounted and returns a handle with unregister and getRegistration. */
 export function useWebMCPTool<TInput = Record<string, unknown>, TOutput = unknown>(
   tool: WebMCPTool<TInput, TOutput>,
   options: UseWebMCPToolOptions = {}

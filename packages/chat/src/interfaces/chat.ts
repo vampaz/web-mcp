@@ -5,6 +5,9 @@ export interface WebMCPChatStatusLabels {
   loading: string
   interrupted: string
   error: string
+  providerFailed: string
+  declined: string
+  historyNearlyFull: string
   closed: string
   lastFailed: string
   newChatStarted: string
@@ -49,6 +52,9 @@ export interface WebMCPChatLabels {
   /** @deprecated Unused; New chat starts immediately without confirmation. */
   cancel: string
   tool: string
+  approvalTitle: string
+  approve: string
+  deny: string
   toolInput: string
   toolOutput: string
   toolResult: string
@@ -60,12 +66,17 @@ export interface WebMCPChatLabels {
   copyFailed: string
   /** Visible outcome beside a failed tool call. */
   toolStatusFailed: string
+  /** Visible outcome beside a declined tool call. */
+  toolStatusDeclined: string
   /** Visible outcome beside a tool call whose result is unknown. */
   toolStatusUnknown: string
+  /** Resends the last user message after a failed turn. */
+  retry: string
   searchModels: string
   noModelsMatch: string
   status: WebMCPChatStatusLabels
   openChat(title: string): string
+  openChatUnread(title: string): string
   /** Heading of a block of consecutive tool calls. */
   toolsUsed(count: number): string
   /** Accessible name of the composer model button; must contain the visible model label. */
@@ -73,6 +84,7 @@ export interface WebMCPChatLabels {
   characterCount(count: number, max: number): string
   tooLong(count: number, max: number): string
   toolFailed(name: string): string
+  toolDeclined(name: string): string
   toolUnknown(name: string): string
   runningTool(name: string): string
   awaitingApproval(name: string): string
@@ -91,6 +103,14 @@ export interface WebMCPChatOptions {
   placeholder?: string
   emptyState?: string
   suggestedPrompts?: readonly string[]
+  /** Defaults to `draft`; `send` submits a suggestion as soon as it is clicked. */
+  suggestionAction?: 'draft' | 'send'
+  /** Opt-in localStorage key suffix for popup open state, launcher position and panel size. */
+  persistKey?: string
+  /** Display name for a tool in rows and activity text. */
+  toolLabel?: (toolName: string) => string
+  /** Defaults to `full`; `hidden` removes the argument preview and row expansion. */
+  toolDetails?: 'full' | 'hidden'
   disabled?: boolean
   /** Optional provider, model and approval controls. The application owns their behavior. */
   settings?: WebMCPChatSettings
@@ -120,9 +140,18 @@ export interface WebMCPChatElement extends HTMLElement {
   openSettings(): void
   /** Opens the composer model picker. No effect without `settings`. */
   openModelPicker(): void
+  /** Shows an approval card and resolves with the user's decision. Application-owned. */
+  requestApproval(request: WebMCPChatApprovalRequest): Promise<boolean>
 }
 
 export interface ChatStatus {
   text: string
   tone?: 'error'
+}
+
+export interface WebMCPChatApprovalRequest {
+  toolName: string
+  input: unknown
+  reason: string
+  signal?: AbortSignal
 }

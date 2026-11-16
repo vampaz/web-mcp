@@ -7,6 +7,7 @@ import { PiFailure } from './errors'
 import { createPiRuntime } from './runtime'
 import { createRegistryToolHost } from './tool-host'
 
+/** Creates a persistent Pi controller for a session and resolver. Requires a secure browser context, IndexedDB, and Web Locks. */
 export async function createPiHarness(options: PiHarnessOptions): Promise<PiController> {
   if (typeof window === 'undefined' || !window.isSecureContext)
     throw new PiFailure('unsupported', 'Pi needs a secure browser context.')

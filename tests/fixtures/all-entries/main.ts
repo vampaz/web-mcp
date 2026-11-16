@@ -8,13 +8,16 @@ import {
 import { defineWebMCPCommandInput } from '@vampaz/webmcp-kit/command-input'
 import { createPiRuntime, type PiController } from '@vampaz/webmcp-kit/pi'
 import { defineWebMCPChat, type WebMCPChatElement } from '@vampaz/webmcp-kit/chat'
+import { renderMarkdown } from '@vampaz/webmcp-kit/chat/markdown'
+import { createDialogApproval, mountAssistant } from '@vampaz/webmcp-kit/assistant'
+import { createResolverHandler } from '@vampaz/webmcp-kit/server'
 import { createHostedOpenAIResolver } from '@vampaz/webmcp-kit/hosted'
 import { useWebMCPTool as useVueTool } from '@vampaz/webmcp-kit/vue'
 import { useWebMCPTool as useReactTool } from '@vampaz/webmcp-kit/react'
 import { useWebMCPTool as useSvelteTool } from '@vampaz/webmcp-kit/svelte'
 import { defineZodTool } from '@vampaz/webmcp-kit/zod'
 import { mountDevtoolsOverlay } from '@vampaz/webmcp-kit/devtools'
-import { installWebMCPKitTestBridge } from '@vampaz/webmcp-kit/testing'
+import { createScriptedResolver, installWebMCPKitTestBridge } from '@vampaz/webmcp-kit/testing'
 import { runNativeWebMCPAgent, waitForWebMCPTool } from '@vampaz/webmcp-kit/testing/playwright'
 import { createLocalMCPBridge } from '@vampaz/webmcp-kit/mcp-bridge'
 import { installPageBridge } from '@vampaz/webmcp-kit/page-bridge'
@@ -42,6 +45,8 @@ const zodTool = defineZodTool({
 useVueTool(tool, { when: ref(true) })
 useReactTool(tool)
 useSvelteTool(zodTool, { when: readable(true) })
+const markdownTarget = document.createElement('div')
+renderMarkdown('**All entries**', markdownTarget)
 
 export function connectChat(chat: WebMCPChatElement, controller: PiController) {
   chat.configure({ controller })
@@ -54,10 +59,15 @@ void [
   defineWebMCPCommandInput,
   createPiRuntime,
   defineWebMCPChat,
+  renderMarkdown,
   createHostedOpenAIResolver,
   mountDevtoolsOverlay,
   installWebMCPKitTestBridge,
   waitForWebMCPTool,
   createLocalMCPBridge,
-  installPageBridge
+  installPageBridge,
+  mountAssistant,
+  createDialogApproval,
+  createResolverHandler,
+  createScriptedResolver
 ]

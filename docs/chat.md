@@ -4,6 +4,8 @@
 
 `@vampaz/webmcp-kit/chat` defines `<webmcp-chat>` explicitly. It imports controller types only. It can render a fake or application-owned `PiController` without loading the Pi runtime or installing a UI framework. Imports are safe during server rendering; call `defineWebMCPChat()` in the browser.
 
+Use `/assistant` and `mountAssistant()` when the page should also create the Pi controller and manage its startup and teardown. This entry remains for application-owned controllers, custom tool hosts, and UI-only use.
+
 ```ts
 import { defineWebMCPChat, type WebMCPChatElement } from '@vampaz/webmcp-kit/chat'
 
@@ -17,6 +19,12 @@ element.configure({
   placeholder: 'Ask about this page',
   emptyState: 'Ask a question to start.',
   suggestedPrompts: ['What actions are available?'],
+  suggestionAction: 'draft', // Or 'send' to submit a suggestion immediately.
+  toolLabel(toolName) {
+    return toolName.replaceAll('_', ' ')
+  },
+  toolDetails: 'full', // Or 'hidden' to remove argument previews and expansion.
+  persistKey: 'support-chat', // Opt in to popup state persistence.
   disabled: false
 })
 container.append(element)
@@ -26,7 +34,7 @@ The host supplies `controller` and `container`, owns account UI, and destroys th
 
 ## Presentation
 
-`mode: 'inline'` renders in the host's layout and fills the height the host gives it (`webmcp-chat { block-size: 100% }`), down to `--webmcp-chat-min-height`. `mode: 'popup'` supplies a floating launcher and a resizable, nonmodal conversation panel. Changing modes keeps the same controller, history, and draft.
+`mode: 'inline'` renders in the host's layout with a default block size equal to `--webmcp-chat-min-height`, so the composer does not move as messages arrive. A host rule such as `webmcp-chat { block-size: 100% }` overrides that default. `mode: 'popup'` supplies a floating launcher and a resizable, nonmodal conversation panel. Changing modes keeps the same controller, history, and draft.
 
 ```ts
 element.configure({ controller, mode: 'popup', title: 'Ask this page', placement: 'start' })
@@ -34,6 +42,10 @@ document.body.append(element)
 ```
 
 The popup starts closed. Its launcher opens it and focuses the composer. Close, Escape, or the launcher returns focus to the launcher, even in browsers that do not focus a clicked button. `close()` from code moves focus only if it was inside the chat. Closing keeps the draft and any running turn; use Stop to cancel. The page remains interactive. Drag the launcher or the Move chat handle; arrow keys move either control, with Shift for larger steps. Resize chat cycles compact and expanded sizes; its arrow keys adjust the size, and the inline-end lower corner supports pointer resizing. The launcher sits on the inline-end side by default, which is the left in right-to-left pages; `placement: 'start'` uses the other side. Positions and sizes stay inside the viewport. Below about 30rem the popup becomes a full-width bottom sheet. Moving the element in the DOM keeps an open popup open. Popup mode uses the browser's Popover API to avoid ancestor clipping and does not trap focus.
+
+When a reply arrives or a turn ends while the popup is closed, the launcher shows a dot and uses the “Open … new reply” accessible name. Opening the popup clears it. Restored history does not mark the launcher unread. Set `persistKey` to remember the open state, launcher position and panel size in `localStorage` under `webmcp-chat:<persistKey>`; it stores no messages, drafts or other content, ignores malformed or blocked storage, and keeps the popup inside the viewport after a resize. The default bottom-end launcher anchor is preserved across viewport changes; only user-moved coordinates are stored and clamped to the current viewport.
+
+Static `mode`, `theme`, `placement`, `heading` and `placeholder` attributes are defaults for a controller-only mount. Values passed to `configure()` win, and the controller still comes from `configure()` or the `controller` property. Use the `heading` attribute for the visible title; the global `title` attribute is not used and would only add a browser tooltip.
 
 Control the element from application code:
 
@@ -56,15 +68,33 @@ While a turn runs, the working row shows the controller's `activity`: “Thinkin
 
 User messages appear as bubbles and assistant replies as plain text. The “You” and assistant labels stay available to screen readers but are not shown. Each assistant reply has a Copy button that announces the result in the status region.
 
-Consecutive tool calls form one activity block headed “Used N tools”. Each call is a collapsed row with a status icon, the tool name and a one-line argument preview; expanding it shows the input and output in monospace. A failed call shows “Failed” and a call whose outcome is unknown after an interruption shows “Outcome unknown”; screen readers hear “name — failed” or “name — outcome unknown”. While a tool runs, the working row shows a spinner. Raw tool requests do not appear as assistant replies. Failed replies keep a visible failure label and collapsed diagnostic details after reopening.
+Consecutive tool calls form one activity block headed “Used N tools”. Each call is a collapsed row with a status icon, the tool name and a one-line argument preview; expanding it shows the input and output in monospace. Use `toolLabel(name)` for friendly display names in rows and activity text. Set `toolDetails: 'hidden'` to remove argument previews and prevent expansion. A failed call shows “Failed”, a declined call shows “Declined” with a neutral icon and colour, and a call whose outcome is unknown after an interruption shows “Outcome unknown”; screen readers hear “name — failed”, “name — declined”, or “name — outcome unknown”. While a tool runs, the working row shows a spinner. Raw tool requests do not appear as assistant replies. Failed replies keep a visible failure label and collapsed diagnostic details after reopening.
 
-Errors appear in the status region under the composer with an error colour and icon, in place of the send hint. The region is empty while idle. Stop replaces Send while a turn runs. After a failed or interrupted turn, “Edit last message” puts the last user message back in the composer without sending it; it is hidden while the composer has text.
+Errors appear in the status region under the composer, in place of the send hint. Provider failures use “The model could not be reached. Try again.”; other errors keep their message, including the check-application-state warning when an action may have run. After a completed action, a provider failure instead says “The last response failed. Check application state before sending a new request.” A declined action shows “You declined this action. Nothing was changed.” in neutral text, before and after reopening. When `usage` reaches 90% of `maxHistoryBytes`, the status warns “This conversation is almost full. Start a new chat soon.”; error status takes priority. The region is empty while idle. Stop replaces Send while a turn runs. After a failed or interrupted turn, “Edit last message” puts the last user message back in the composer without sending it. “Try again” resends the last user message once when the composer is empty, the action was not declined, the action cannot have run, and no tool call after that message completed, failed, or returned an unknown outcome. A retry is hidden after any action that started, because resending the request could repeat a write; it stays available when the turn failed before an action ran. Both actions hide while the composer has text.
 
 Enter sends and Shift+Enter adds a line on devices with a fine pointer. On touch devices Enter adds a line and the Send button sends. IME composition is preserved. Suggestions appear only with an empty conversation and composer. The composer stays editable during a turn, so users can draft a follow-up while Stop replaces Send. `maxMessageLength` (default 16,000) shows feedback near the limit and blocks oversized sends without truncating the draft; match it to the controller's `maxMessageChars` limit.
 
 New chat immediately calls `controller.clear()` without confirmation. After clearing succeeds, it resets the draft, focuses the composer, and announces completion. Clearing never undoes application actions. If clearing fails, the history and draft stay available with an error message.
 
 If a send fails before the controller records the user message, the composer restores the draft. Completion returns focus to the composer only while the user remains in the chat controls. Restored history opens at the latest message. Later messages scroll into view only when the reader is already near the end; a jump-to-latest button appears while reading earlier messages and indicates new arrivals.
+
+## In-chat approval
+
+The element can render an application-owned approval card without installing a confirmation handler:
+
+```ts
+setConfirmationHandler(function approve(request) {
+  if (request.source !== 'pi') return showApplicationDialog(request)
+  return element.requestApproval({
+    toolName: request.tool.name,
+    input: request.input,
+    reason: request.reason,
+    signal: request.signal
+  })
+})
+```
+
+`requestApproval()` shows the reason, friendly tool label and argument summary at the end of the transcript, opens a closed popup, and focuses Deny first. Approve and Deny resolve the promise and both carry an accessible description built from the reason, tool label, and argument summary. Abort, controller replacement, or disconnect resolves `false`; a newer request replaces and denies the pending card. The kit never installs a handler itself and never grants approval. Keep `source` checks so page-bridge, native, devtools, resolver and MCP-bridge calls still use the application's dialog. `WebMCPChatApprovalRequest` is exported from the `/chat` entry.
 
 ## Optional settings module
 
@@ -104,6 +134,8 @@ element.configure({ controller, settings })
 
 The callbacks above are application functions. The module does not create resolvers, fetch model lists, persist preferences, or grant approval. It reports the chosen option through `onChange(providerId, model)`; `model` is `undefined` for a provider offered without models. Choosing the current option does not call `onChange`. Reconfigure with the selected values and the complete options after a change. Use `settings.disabled` during active turns or provider changes, `detail` for status, and `error` for a visible failure. Omit `confirmations` if users must not change your approval policy. Never put credentials in provider labels, model IDs, status text, or slotted content.
 
+Scope an approval preference by caller. `ConfirmationRequest` includes `source`, `invocationId`, and `callerRequired`; only skip the dialog for the source the preference belongs to, for example `source === 'pi'`, and still ask when `callerRequired` is true. A handler that returns `true` whenever the chat preference is off also auto-approves page-bridge, native, devtools, resolver, and MCP-bridge calls.
+
 Settings replace the visible conversation while open, preserving its transcript, draft, and running turn. In inline mode they also replace the header. The back button or Escape returns focus to the icon; Escape closes settings before closing a popup. The module keeps controls mounted and focused across configuration updates. Omit `settings` on reconfiguration to remove it. `focusComposer()` returns to the conversation. Keep a disabled, application-owned controller/view available during initialization or provider failure if users need settings to recover.
 
 Use the `settings` slot for app-specific diagnostics or additional controls:
@@ -121,15 +153,19 @@ The local lab uses this module to select LM Studio chat models or Chrome built-i
 All model and tool text is rendered as text by default. To render formatting, supply `renderMessage(message, target)`. It runs for user and assistant message bodies when their text changes; return `true` to skip the default text rendering. Message text is untrusted user and model output, so sanitize anything you insert as HTML.
 
 ```ts
+import { renderMarkdown } from '@vampaz/webmcp-kit/chat/markdown'
+
 element.configure({
   controller,
   renderMessage(message, target) {
     if (message.role !== 'assistant') return false
-    target.replaceChildren(renderSafeMarkdown(message.text))
+    renderMarkdown(message.text, target)
     return true
   }
 })
 ```
+
+`renderMarkdown()` builds DOM nodes and text only. It supports paragraphs, line breaks, bold, italic, inline code, fenced code, ordered and unordered lists, and links using `http:`, `https:` or `mailto:`. Other links and raw HTML render as text. Links open with `rel="noopener noreferrer"` in a new tab. Intraword underscores such as `set_counter_value` and asterisks separated by spaces such as `2 * 3 * 4` stay literal.
 
 ## Labels and localization
 

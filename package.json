@@ -1,6 +1,6 @@
 {
   "name": "@vampaz/webmcp-kit",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "type": "module",
   "description": "WebMCP tool registration, resolvers, framework helpers, devtools, and testing helpers for web apps.",
   "homepage": "https://github.com/vampaz/web-mcp#readme",
@@ -79,6 +79,18 @@
       "types": "./dist/packages/chat/src/index.d.ts",
       "default": "./dist/chat.js"
     },
+    "./chat/markdown": {
+      "types": "./dist/packages/chat/src/markdown.d.ts",
+      "default": "./dist/chat/markdown.js"
+    },
+    "./assistant": {
+      "types": "./dist/packages/assistant/src/index.d.ts",
+      "default": "./dist/assistant.js"
+    },
+    "./server": {
+      "types": "./dist/packages/server/src/index.d.ts",
+      "default": "./dist/server.js"
+    },
     "./command-input": {
       "types": "./dist/packages/command-input/src/index.d.ts",
       "default": "./dist/command-input.js"
@@ -90,7 +102,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && vite build --config vite.cdn.config.ts",
     "test": "vitest --run",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest --run --coverage",
@@ -108,7 +120,8 @@
     "docs:api": "node --experimental-strip-types scripts/generate-api-docs.ts",
     "docs:api:check": "npm run docs:api -- --check && npm run docs:links",
     "docs:links": "node --experimental-strip-types scripts/check-doc-links.ts",
-    "check": "npm run lint && npm run format:check && npm run typecheck && npm run typecheck:demo && npm run docs:api:check && npm run test"
+    "check:changelog": "node --experimental-strip-types scripts/check-changelog.ts",
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm run typecheck:demo && npm run docs:api:check && npm run check:changelog && npm run test"
   },
   "peerDependencies": {
     "react": ">=18",
@@ -131,12 +144,14 @@
     }
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
     "@earendil-works/chord": "1.3.0",
     "@earendil-works/pi-ai": "1.3.0",
     "@earendil-works/pi-durable": "1.3.0",
     "@playwright/test": "1.64.1",
     "@types/node": "^25.9.1",
-    "@types/react": "^19.2.15",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@vampaz/vite-plugin-local-tls": "0.2.0",
     "@vitejs/plugin-vue": "6.0.10",
     "@vitest/coverage-v8": "^5.0.5",
@@ -145,7 +160,9 @@
     "jsdom": "^29.1.1",
     "oxfmt": "^0.73.0",
     "oxlint": "^1.67.0",
-    "react": "^19.2.6",
+    "publint": "^0.3.25",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "svelte": "^5.55.9",
     "typescript": "^6.0.3",
     "vite": "^8.3.5",

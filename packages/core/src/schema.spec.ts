@@ -411,6 +411,41 @@ describe('schema validation', () => {
     ])
   })
 
+  it('bounds collected validation errors and shortens property names', () => {
+    const names = Array.from({ length: 30 }, function fieldName(_value, index) {
+      return `field_${index}`
+    })
+    const errors = validateJsonValue(
+      {},
+      {
+        type: 'object',
+        properties: Object.fromEntries(
+          names.map(function schema(fieldName) {
+            return [fieldName, { type: 'string' }]
+          })
+        ),
+        required: names
+      }
+    )
+    expect(errors).toHaveLength(21)
+    expect(errors[0]).toBe('/field_0 is required.')
+    expect(errors[20]).toBe('More errors omitted.')
+
+    const longName = 'p'.repeat(10_000)
+    const [nameError] = validateJsonValue(
+      { [longName]: 1 },
+      { type: 'object', properties: { [longName]: { type: 'string' } } }
+    )
+    expect(nameError).toContain('…')
+    expect(nameError!.length).toBeLessThan(300)
+  })
+
+  it('reports only the first duplicate item', () => {
+    expect(validateJsonValue([1, 2, 1, 1], { type: 'array', uniqueItems: true })).toEqual([
+      '/2 is a duplicate item.'
+    ])
+  })
+
   it('skips pattern checks after a failed length bound and bounds error values', () => {
     const started = performance.now()
     const errors = validateJsonValue(`${'a'.repeat(40)}!`, {

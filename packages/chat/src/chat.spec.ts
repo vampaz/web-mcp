@@ -24,6 +24,7 @@ beforeEach(function layout() {
 })
 afterEach(function cleanup() {
   document.body.replaceChildren()
+  localStorage.clear()
   vi.unstubAllGlobals()
 })
 
@@ -455,6 +456,26 @@ it('keeps the composer usable without submitting a second turn while waiting', a
   )
 })
 
+it('sends a suggestion immediately when configured', function test() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.configure({
+    controller: fixture.api,
+    suggestedPrompts: ['Read the counter'],
+    suggestionAction: 'send'
+  })
+  const root = element.shadowRoot!
+  const input = root.querySelector('textarea')!
+  const suggestion = root.querySelector<HTMLButtonElement>('.suggestions button')!
+  suggestion.focus()
+  suggestion.click()
+
+  expect(fixture.api.send).toHaveBeenCalledTimes(1)
+  expect(fixture.api.send).toHaveBeenCalledWith('Read the counter')
+  expect(input.value).toBe('')
+  expect(root.activeElement).toBe(input)
+})
+
 it('keeps suggestions outside message announcements when the draft is cleared', function announcements() {
   const fixture = controller()
   const element = mount(fixture.api)
@@ -638,7 +659,7 @@ it('shows errors with an error tone and stays quiet after a successful turn', fu
     messages: [],
     error: { code: 'provider_failed', message: 'Provider failed' }
   })
-  expect(status.textContent).toBe('Provider failed')
+  expect(status.textContent).toBe('The model could not be reached. Try again.')
   expect(status.dataset.tone).toBe('error')
   fixture.publish({ state: 'interrupted', messages: [] })
   expect(status.textContent).toContain('interrupted')
@@ -682,6 +703,187 @@ it.each([{ state: 'interrupted' as const }, { state: 'idle' as const, failed: tr
     expect(fixture.api.send).not.toHaveBeenCalled()
   }
 )
+
+it('offers retry after a failed turn and resends the last message once', async function retry() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  const root = element.shadowRoot!
+  const input = root.querySelector('textarea')!
+  const retry = root.querySelector<HTMLButtonElement>('[data-retry-last]')!
+  fixture.publish({
+    state: 'idle',
+    messages: [
+      { id: 'q', role: 'user', text: 'Set the counter to 9' },
+      { id: 'a', role: 'assistant', text: 'HTTP 503', failed: true }
+    ],
+    error: { code: 'provider_failed', message: 'Provider failed' }
+  })
+
+  expect(retry.hidden).toBe(false)
+  expect(retry.textContent).toBe('Try again')
+  retry.click()
+
+  expect(fixture.api.send).toHaveBeenCalledTimes(1)
+  expect(fixture.api.send).toHaveBeenCalledWith('Set the counter to 9')
+  expect(input.value).toBe('')
+  await Promise.resolve()
+  expect(fixture.api.send).toHaveBeenCalledTimes(1)
+})
+
+it('focuses the composer for a keyboard retry and preserves outside focus while pending', async function retryFocus() {
+  const fixture = controller()
+  let complete!: (outcome: PiTurnOutcome) => void
+  vi.mocked(fixture.api.send).mockImplementationOnce(function pending() {
+    return new Promise(function wait(resolve) {
+      complete = resolve
+    })
+  })
+  const element = mount(fixture.api)
+  const root = element.shadowRoot!
+  const input = root.querySelector('textarea')!
+  const retry = root.querySelector<HTMLButtonElement>('[data-retry-last]')!
+  fixture.publish({
+    state: 'idle',
+    messages: [
+      { id: 'q', role: 'user', text: 'Set the counter to 9' },
+      { id: 'a', role: 'assistant', text: 'HTTP 503', failed: true }
+    ],
+    error: { code: 'provider_failed', message: 'Provider failed' }
+  })
+
+  retry.focus()
+  retry.click()
+  expect(root.activeElement).toBe(input)
+  expect(fixture.api.send).toHaveBeenCalledTimes(1)
+  expect(fixture.api.send).toHaveBeenCalledWith('Set the counter to 9')
+
+  const outside = document.createElement('input')
+  document.body.append(outside)
+  outside.focus()
+  complete({ status: 'completed' })
+  await Promise.resolve()
+  expect(document.activeElement).toBe(outside)
+})
+
+it.each([
+  [
+    'a declined action',
+    {
+      state: 'idle' as const,
+      messages: [
+        { id: 'q', role: 'user' as const, text: 'Set the counter to 9' },
+        {
+          id: 't',
+          role: 'tool' as const,
+          toolName: 'set_counter',
+          text: 'Change the counter?',
+          status: 'blocked' as const,
+          code: 'confirmation_denied' as const,
+          failed: true
+        }
+      ],
+      error: { code: 'action_denied' as const, message: 'Change the counter?' }
+    }
+  ],
+  [
+    'an unknown outcome',
+    {
+      state: 'idle' as const,
+      messages: [
+        { id: 'q', role: 'user' as const, text: 'Set the counter to 9' },
+        {
+          id: 't',
+          role: 'tool' as const,
+          toolName: 'set_counter',
+          text: 'Outcome unknown',
+          status: 'unknown' as const,
+          failed: true
+        }
+      ],
+      error: { code: 'tool_failed' as const, message: 'The action may have run.' }
+    }
+  ],
+  [
+    'an action that may have run',
+    {
+      state: 'idle' as const,
+      messages: [
+        { id: 'q', role: 'user' as const, text: 'Set the counter to 9' },
+        { id: 'a', role: 'assistant' as const, text: 'HTTP 503', failed: true }
+      ],
+      error: {
+        code: 'tool_failed' as const,
+        message: 'The action may have run. Check application state.',
+        actionMayHaveRun: true
+      }
+    }
+  ],
+  [
+    'a completed action',
+    {
+      state: 'idle' as const,
+      messages: [
+        { id: 'q', role: 'user' as const, text: 'Set the counter to 9' },
+        {
+          id: 't',
+          role: 'tool' as const,
+          toolName: 'set_counter',
+          text: '9',
+          status: 'success' as const
+        },
+        { id: 'a', role: 'assistant' as const, text: 'HTTP 503', failed: true }
+      ],
+      error: { code: 'provider_failed' as const, message: 'Provider failed' }
+    }
+  ],
+  [
+    'a failed action',
+    {
+      state: 'idle' as const,
+      messages: [
+        { id: 'q', role: 'user' as const, text: 'Set the counter to 9' },
+        {
+          id: 't',
+          role: 'tool' as const,
+          toolName: 'set_counter',
+          text: 'The action failed.',
+          status: 'error' as const,
+          failed: true
+        },
+        { id: 'a', role: 'assistant' as const, text: 'HTTP 503', failed: true }
+      ],
+      error: { code: 'provider_failed' as const, message: 'Provider failed' }
+    }
+  ]
+])('does not offer retry after %s', function noRetry(_label, snapshot) {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  const retry = element.shadowRoot!.querySelector<HTMLButtonElement>('[data-retry-last]')!
+
+  fixture.publish(snapshot)
+
+  expect(retry.hidden).toBe(true)
+})
+
+it('hides retry while the composer holds a draft', function retryDraft() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  const root = element.shadowRoot!
+  const input = root.querySelector('textarea')!
+  const retry = root.querySelector<HTMLButtonElement>('[data-retry-last]')!
+  input.value = 'Keep this draft'
+  input.dispatchEvent(new Event('input'))
+  fixture.publish({
+    state: 'idle',
+    messages: [
+      { id: 'q', role: 'user', text: 'Set the counter to 9' },
+      { id: 'a', role: 'assistant', text: 'HTTP 503', failed: true }
+    ],
+    error: { code: 'provider_failed', message: 'Provider failed' }
+  })
+
+  expect(retry.hidden).toBe(true)
+})
 
 it('renders and announces activity changes once', function activity() {
   const fixture = controller()
@@ -798,6 +1000,419 @@ it('keeps an open popup open when the element moves in the document', async func
   expect(element.shadowRoot!.querySelector('section')!.hidden).toBe(false)
   expect(element.shadowRoot!.querySelector('.launcher')!.getAttribute('aria-expanded')).toBe('true')
   expect(fixture.listeners.size).toBe(1)
+})
+
+it('marks the launcher unread for a reply while closed and clears it on open', function unread() {
+  const fixture = controller()
+  const history = [{ id: 'a', role: 'assistant' as const, text: 'Saved answer' }]
+  fixture.publish({ state: 'idle', messages: history })
+  const element = mount(fixture.api)
+  element.configure({ controller: fixture.api, mode: 'popup', title: 'Helper' })
+  const launcher = element.shadowRoot!.querySelector<HTMLButtonElement>('.launcher')!
+
+  expect(launcher.hasAttribute('data-unread')).toBe(false)
+  expect(launcher.getAttribute('aria-label')).toBe('Open Helper')
+
+  fixture.publish({
+    state: 'running',
+    messages: [...history, { id: 'q', role: 'user', text: 'New question' }]
+  })
+  fixture.publish({
+    state: 'idle',
+    messages: [
+      ...history,
+      { id: 'q', role: 'user', text: 'New question' },
+      { id: 'a2', role: 'assistant', text: 'New answer' }
+    ]
+  })
+  expect(launcher.hasAttribute('data-unread')).toBe(true)
+  expect(launcher.getAttribute('aria-label')).toBe('Open Helper, new reply')
+
+  fixture.publish({ state: 'idle', messages: [...history] })
+  expect(launcher.hasAttribute('data-unread')).toBe(true)
+
+  launcher.click()
+  expect(launcher.hasAttribute('data-unread')).toBe(false)
+  expect(launcher.getAttribute('aria-label')).toBe('Open Helper')
+})
+
+it('marks a new closed assistant message after an empty baseline', function emptyBaseline() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.configure({ controller: fixture.api, mode: 'popup', title: 'Helper' })
+  const launcher = element.shadowRoot!.querySelector<HTMLButtonElement>('.launcher')!
+
+  fixture.publish({
+    state: 'idle',
+    messages: [{ id: 'a', role: 'assistant', text: 'Unexpected reply' }]
+  })
+
+  expect(launcher.hasAttribute('data-unread')).toBe(true)
+})
+
+it('acknowledges unread when persistence restores an open popup without stealing focus', function restored() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.configure({ controller: fixture.api, mode: 'popup', title: 'Helper' })
+  const launcher = element.shadowRoot!.querySelector<HTMLButtonElement>('.launcher')!
+  fixture.publish({ state: 'running', messages: [{ id: 'q', role: 'user', text: 'Hi' }] })
+  fixture.publish({
+    state: 'idle',
+    messages: [
+      { id: 'q', role: 'user', text: 'Hi' },
+      { id: 'a', role: 'assistant', text: 'Hello' }
+    ]
+  })
+  expect(launcher.hasAttribute('data-unread')).toBe(true)
+
+  const outside = document.createElement('input')
+  document.body.append(outside)
+  outside.focus()
+  localStorage.setItem('webmcp-chat:restore', JSON.stringify({ open: true }))
+  element.configure({
+    controller: fixture.api,
+    mode: 'popup',
+    title: 'Helper',
+    persistKey: 'restore'
+  })
+  expect(element.shadowRoot!.querySelector('section')!.hidden).toBe(false)
+  expect(launcher.hasAttribute('data-unread')).toBe(false)
+  expect(document.activeElement).toBe(outside)
+
+  launcher.click()
+  expect(launcher.hasAttribute('data-unread')).toBe(false)
+})
+
+it('marks the launcher unread when a closed turn ends without an assistant reply', function ended() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.configure({ controller: fixture.api, mode: 'popup', title: 'Helper' })
+  const launcher = element.shadowRoot!.querySelector<HTMLButtonElement>('.launcher')!
+  const messages = [{ id: 'q', role: 'user' as const, text: 'Act now' }]
+
+  fixture.publish({ state: 'running', messages })
+  fixture.publish({ state: 'interrupted', messages })
+
+  expect(launcher.hasAttribute('data-unread')).toBe(true)
+})
+
+it('shows no launcher unread state in inline mode', function inlineUnread() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  const launcher = element.shadowRoot!.querySelector<HTMLButtonElement>('.launcher')!
+  fixture.publish({ state: 'running', messages: [{ id: 'q', role: 'user', text: 'Hi' }] })
+  fixture.publish({
+    state: 'idle',
+    messages: [{ id: 'a', role: 'assistant', text: 'Hello' }]
+  })
+  expect(launcher.hasAttribute('data-unread')).toBe(false)
+})
+
+it('persists and restores only popup open state, position and size', async function persisted() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.configure({
+    controller: fixture.api,
+    mode: 'popup',
+    title: 'Helper',
+    persistKey: 'demo'
+  })
+  const root = element.shadowRoot!
+  const launcher = root.querySelector<HTMLButtonElement>('.launcher')!
+  const resize = root.querySelector<HTMLButtonElement>('[data-resize]')!
+  const input = root.querySelector('textarea')!
+  input.value = 'Private draft'
+  input.dispatchEvent(new Event('input'))
+
+  launcher.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', cancelable: true }))
+  resize.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', cancelable: true }))
+  launcher.click()
+  await Promise.resolve()
+  await Promise.resolve()
+
+  const raw = localStorage.getItem('webmcp-chat:demo')
+  expect(raw).toBeTruthy()
+  const stored = JSON.parse(raw!) as Record<string, unknown>
+  expect(Object.keys(stored).sort()).toEqual(['open', 'panel', 'position'])
+  expect(stored.open).toBe(true)
+  expect(stored.position).toEqual({ x: expect.any(Number), y: expect.any(Number) })
+  expect(stored.panel).toMatchObject({
+    width: expect.any(String),
+    height: expect.any(String),
+    expanded: false
+  })
+  expect(raw).not.toContain('Private draft')
+
+  element.remove()
+  const nextFixture = controller()
+  const next = document.createElement('webmcp-chat') as WebMCPChatElement
+  next.configure({
+    controller: nextFixture.api,
+    mode: 'popup',
+    title: 'Helper',
+    persistKey: 'demo'
+  })
+  const presentation = next.shadowRoot!.querySelector<HTMLElement>('.presentation')!
+  presentation.showPopover = vi.fn()
+  presentation.hidePopover = vi.fn()
+  document.body.append(next)
+  await Promise.resolve()
+  const panel = next.shadowRoot!.querySelector<HTMLElement>('section')!
+  expect(panel.hidden).toBe(false)
+  expect(next.shadowRoot!.querySelector('.launcher')!.getAttribute('aria-expanded')).toBe('true')
+  expect(panel.style.width).toBe((JSON.parse(raw!).panel as { width: string }).width)
+})
+
+it('restores default popup corner anchoring after a wider viewport', async function anchored() {
+  vi.stubGlobal('innerWidth', 600)
+  vi.stubGlobal('innerHeight', 600)
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.configure({
+    controller: fixture.api,
+    mode: 'popup',
+    title: 'Helper',
+    persistKey: 'anchor'
+  })
+  element.open()
+  await Promise.resolve()
+  await Promise.resolve()
+  const raw = localStorage.getItem('webmcp-chat:anchor')
+  expect(raw).toBeTruthy()
+  expect(JSON.parse(raw!)).not.toHaveProperty('position')
+  element.remove()
+
+  vi.stubGlobal('innerWidth', 1200)
+  vi.stubGlobal('innerHeight', 900)
+  const next = document.createElement('webmcp-chat') as WebMCPChatElement
+  next.configure({
+    controller: controller().api,
+    mode: 'popup',
+    title: 'Helper',
+    persistKey: 'anchor'
+  })
+  const presentation = next.shadowRoot!.querySelector<HTMLElement>('.presentation')!
+  presentation.showPopover = vi.fn()
+  presentation.hidePopover = vi.fn()
+  document.body.append(next)
+  await Promise.resolve()
+
+  const launcher = next.shadowRoot!.querySelector<HTMLButtonElement>('.launcher')!
+  expect(parseFloat(launcher.style.left)).toBeGreaterThan(1199)
+  expect(parseFloat(launcher.style.top)).toBeGreaterThan(899)
+})
+
+it('clamps a restored dragged popup position to the current viewport', async function clamped() {
+  vi.stubGlobal('innerWidth', 800)
+  vi.stubGlobal('innerHeight', 600)
+  localStorage.setItem(
+    'webmcp-chat:drag',
+    JSON.stringify({ open: false, position: { x: 5000, y: 5000 } })
+  )
+  const next = document.createElement('webmcp-chat') as WebMCPChatElement
+  next.configure({
+    controller: controller().api,
+    mode: 'popup',
+    title: 'Helper',
+    persistKey: 'drag'
+  })
+  const presentation = next.shadowRoot!.querySelector<HTMLElement>('.presentation')!
+  presentation.showPopover = vi.fn()
+  presentation.hidePopover = vi.fn()
+  document.body.append(next)
+  await Promise.resolve()
+
+  const launcher = next.shadowRoot!.querySelector<HTMLButtonElement>('.launcher')!
+  expect(parseFloat(launcher.style.left)).toBeGreaterThan(799)
+  expect(parseFloat(launcher.style.top)).toBeGreaterThan(599)
+})
+
+it('ignores malformed or blocked popup storage', async function blockedStorage() {
+  localStorage.setItem('webmcp-chat:bad', '{not json')
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.configure({
+    controller: fixture.api,
+    mode: 'popup',
+    title: 'Helper',
+    persistKey: 'bad'
+  })
+  expect(element.shadowRoot!.querySelector('section')!.hidden).toBe(true)
+
+  const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function deny() {
+    throw new Error('blocked')
+  })
+  const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function deny() {
+    throw new Error('blocked')
+  })
+  try {
+    const next = document.createElement('webmcp-chat') as WebMCPChatElement
+    next.configure({
+      controller: controller().api,
+      mode: 'popup',
+      title: 'Helper',
+      persistKey: 'blocked'
+    })
+    const presentation = next.shadowRoot!.querySelector<HTMLElement>('.presentation')!
+    presentation.showPopover = vi.fn()
+    presentation.hidePopover = vi.fn()
+    document.body.append(next)
+    next.shadowRoot!.querySelector<HTMLButtonElement>('.launcher')!.click()
+    await Promise.resolve()
+    expect(next.shadowRoot!.querySelector('section')!.hidden).toBe(false)
+  } finally {
+    setItem.mockRestore()
+    getItem.mockRestore()
+  }
+})
+
+it('uses observed attributes as defaults and configure overrides them', function attributes() {
+  const element = document.createElement('webmcp-chat') as WebMCPChatElement
+  element.setAttribute('mode', 'popup')
+  element.setAttribute('theme', 'dark')
+  element.setAttribute('placement', 'start')
+  element.setAttribute('heading', 'Helper')
+  element.setAttribute('placeholder', 'Ask helper')
+  element.setAttribute('title', 'Tooltip only')
+  const fixture = controller()
+  element.controller = fixture.api
+  const presentation = element.shadowRoot!.querySelector<HTMLElement>('.presentation')!
+  presentation.showPopover = vi.fn()
+  presentation.hidePopover = vi.fn()
+  document.body.append(element)
+
+  const root = element.shadowRoot!
+  expect(element.dataset.mode).toBe('popup')
+  expect(element.dataset.theme).toBe('dark')
+  expect(root.querySelector('h2')!.textContent).toBe('Helper')
+  expect(root.querySelector('textarea')!.placeholder).toBe('Ask helper')
+  expect(root.querySelector('.launcher')!.getAttribute('aria-label')).toBe('Open Helper')
+
+  element.setAttribute('heading', 'Page helper')
+  element.setAttribute('theme', 'light')
+  expect(root.querySelector('h2')!.textContent).toBe('Page helper')
+  expect(element.dataset.theme).toBe('light')
+
+  element.configure({
+    controller: fixture.api,
+    mode: 'inline',
+    theme: 'auto',
+    placement: 'end',
+    title: 'Configured',
+    placeholder: 'Configured ask'
+  })
+  element.setAttribute('heading', 'Ignored')
+  element.setAttribute('theme', 'dark')
+  element.setAttribute('mode', 'popup')
+  element.setAttribute('placeholder', 'Ignored ask')
+  expect(element.dataset.mode).toBe('inline')
+  expect(element.dataset.theme).toBe('auto')
+  expect(root.querySelector('h2')!.textContent).toBe('Configured')
+  expect(root.querySelector('textarea')!.placeholder).toBe('Configured ask')
+
+  element.remove()
+  document.body.append(element)
+  expect(element.dataset.mode).toBe('inline')
+  expect(root.querySelector('h2')!.textContent).toBe('Configured')
+})
+
+it('shows application-requested approval and opens a closed popup', async function approvalCard() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.configure({ controller: fixture.api, mode: 'popup', title: 'Helper' })
+  const panel = element.shadowRoot!.querySelector<HTMLElement>('section')!
+  expect(panel.hidden).toBe(true)
+
+  const pending = element.requestApproval({
+    toolName: 'set_counter',
+    input: { value: 7 },
+    reason: 'Change the counter?'
+  })
+  expect(panel.hidden).toBe(false)
+  const card = element.shadowRoot!.querySelector<HTMLElement>('.approval-card')!
+  expect(card.textContent).toContain('Change the counter?')
+  expect(card.textContent).toContain('set_counter')
+  expect(card.textContent).toContain('{"value":7}')
+  const [deny, approve] = Array.from(card.querySelectorAll('button'))
+  expect(element.shadowRoot!.activeElement).toBe(deny)
+  approve!.click()
+  await expect(pending).resolves.toBe(true)
+  expect(element.shadowRoot!.querySelector('.approval-card')).toBeNull()
+})
+
+it('denies replaced approval cards and resolves false on disconnect', async function approvalLifecycle() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  const first = element.requestApproval({
+    toolName: 'set_counter',
+    input: { value: 1 },
+    reason: 'First?'
+  })
+  const second = element.requestApproval({
+    toolName: 'set_counter',
+    input: { value: 2 },
+    reason: 'Second?'
+  })
+  await expect(first).resolves.toBe(false)
+  expect(element.shadowRoot!.querySelector('.approval-card')!.textContent).toContain('Second?')
+
+  element.remove()
+  await Promise.resolve()
+  await expect(second).resolves.toBe(false)
+  expect(element.shadowRoot!.querySelector('.approval-card')).toBeNull()
+})
+
+it('closes settings and the model picker before showing approval', async function approvalOverlays() {
+  const fixture = controller()
+  const element = document.createElement('webmcp-chat') as WebMCPChatElement
+  element.configure({
+    controller: fixture.api,
+    settings: {
+      providers: [{ id: 'p', label: 'Provider', models: [{ model: 'm', label: 'Model' }] }],
+      providerId: 'p',
+      model: 'm',
+      onChange() {}
+    }
+  })
+  const presentation = element.shadowRoot!.querySelector<HTMLElement>('.presentation')!
+  presentation.showPopover = vi.fn()
+  presentation.hidePopover = vi.fn()
+  document.body.append(element)
+  const root = element.shadowRoot!
+
+  element.openSettings()
+  expect(root.querySelector<HTMLElement>('.settings-panel')!.hidden).toBe(false)
+  const first = element.requestApproval({
+    toolName: 'set_counter',
+    input: { value: 1 },
+    reason: 'Settings approval?'
+  })
+  expect(root.querySelector<HTMLElement>('.settings-panel')!.hidden).toBe(true)
+  const card = root.querySelector('.approval-card')!
+  expect(root.activeElement).toBe(card.querySelector('button'))
+  card.querySelectorAll('button')[0]!.click()
+  await expect(first).resolves.toBe(false)
+
+  element.openModelPicker()
+  expect(root.querySelector<HTMLElement>('.model-picker')!.hidden).toBe(false)
+  const second = element.requestApproval({
+    toolName: 'set_counter',
+    input: { value: 2 },
+    reason: 'Picker approval?'
+  })
+  expect(root.querySelector<HTMLElement>('.model-picker')!.hidden).toBe(true)
+  expect(root.activeElement).toBe(root.querySelector('.approval-card button'))
+  root.querySelectorAll<HTMLButtonElement>('.approval-card button')[1]!.click()
+  await expect(second).resolves.toBe(true)
+})
+
+it('does not request approval on a disconnected element', async function disconnectedApproval() {
+  const fixture = controller()
+  const element = document.createElement('webmcp-chat') as WebMCPChatElement
+  element.configure({ controller: fixture.api })
+  await expect(
+    element.requestApproval({ toolName: 'save', input: {}, reason: 'Save?' })
+  ).resolves.toBe(false)
 })
 
 it('inserts new lines with Enter on touch pointers and describes only visible help', function touch() {

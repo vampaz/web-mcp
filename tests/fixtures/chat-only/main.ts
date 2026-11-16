@@ -3,6 +3,7 @@ import {
   type WebMCPChatSettings,
   type WebMCPChatElement
 } from '@vampaz/webmcp-kit/chat'
+import { renderMarkdown } from '@vampaz/webmcp-kit/chat/markdown'
 import { fakeController } from './controller.js'
 defineWebMCPChat()
 const element = document.createElement('webmcp-chat') as WebMCPChatElement
@@ -12,4 +13,6 @@ const settings: WebMCPChatSettings = {
   onChange() {}
 }
 element.configure({ controller: fakeController(), settings })
-document.body.append(element)
+const markdown = document.createElement('div')
+renderMarkdown('**Chat only**', markdown)
+document.body.append(element, markdown)

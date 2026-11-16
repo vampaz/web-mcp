@@ -63,6 +63,14 @@ async function callTool(
 }
 
 async function handleRequest(request: MCPBridgeRequest): Promise<MCPBridgeResponse> {
+  if (!isRecord(request)) {
+    return {
+      jsonrpc: '2.0',
+      id: null,
+      error: { code: -32600, message: 'Expected a JSON-RPC request object.' }
+    }
+  }
+
   if (request.method === 'tools/list') {
     return {
       jsonrpc: '2.0',
@@ -84,6 +92,17 @@ async function handleRequest(request: MCPBridgeRequest): Promise<MCPBridgeRespon
     // Read the schema before the call: a tool can unregister itself while it runs.
     const declaresOutput = Boolean(getTool(name)?.tool.outputSchema)
     const result = await callTool(name, input)
+    const text = serializeResult(result)
+    if (text === undefined) {
+      return {
+        jsonrpc: '2.0',
+        id: request.id,
+        result: {
+          content: [{ type: 'text', text: 'Tool result could not be serialized.' }],
+          isError: true
+        }
+      }
+    }
     // MCP requires structured content, which may be any JSON value, when an output schema is declared.
     const structured = declaresOutput && result.status === 'success' && result.output !== undefined
 
@@ -94,7 +113,7 @@ async function handleRequest(request: MCPBridgeRequest): Promise<MCPBridgeRespon
         content: [
           {
             type: 'text',
-            text: JSON.stringify(result.output ?? result.error ?? null)
+            text
           }
         ],
         ...(structured ? { structuredContent: result.output } : {}),
@@ -111,9 +130,18 @@ function toBridgeTool(registration: RegisteredTool): MCPBridgeTool {
   return {
     name: registration.tool.name,
     description: registration.tool.description,
-    inputSchema: registration.tool.inputSchema,
-    ...(outputSchema ? { outputSchema } : {}),
-    ...(annotations ? { annotations } : {})
+    inputSchema: structuredClone(registration.tool.inputSchema),
+    ...(outputSchema ? { outputSchema: structuredClone(outputSchema) } : {}),
+    ...(annotations ? { annotations: structuredClone(annotations) } : {})
+  }
+}
+
+function serializeResult(result: ToolInvocationResult): string | undefined {
+  try {
+    const text = JSON.stringify(result.output ?? result.error ?? null)
+    return typeof text === 'string' ? text : undefined
+  } catch {
+    return undefined
   }
 }
 

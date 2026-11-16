@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { defineTool } from '../define-tool'
 import type { RegisteredTool, ToolScopeResult } from '../interfaces/tool'
@@ -35,6 +35,35 @@ describe('tool catalog adapter', () => {
         })
       ]
     })
+  })
+
+  it('returns detached schemas and confirmation metadata', () => {
+    const handler = vi.fn(function approve() {
+      return true
+    })
+    const registration = createRegistration()
+    registration.tool.confirmation = { reason: registration.tool.confirmation!.reason, handler }
+    registration.tool.outputSchema = {
+      type: 'object',
+      properties: { productId: { type: 'string' } }
+    }
+    const [entry] = createToolCatalog([registration]).tools
+    if (!entry?.inputSchema.properties || !entry.outputSchema?.properties || !entry.confirmation) {
+      throw new Error('Expected a catalog entry with schemas and confirmation.')
+    }
+
+    entry.inputSchema.properties.productId = { type: 'number' }
+    entry.outputSchema.properties.productId = { type: 'number' }
+    entry.confirmation.reason = 'Changed.'
+
+    expect(registration.tool.inputSchema.properties?.productId).toEqual({ type: 'string' })
+    const [next] = createToolCatalog([registration]).tools
+    expect(next?.confirmation).toEqual({
+      reason: 'Adding a product changes cart state.'
+    })
+    expect(next?.confirmation).not.toHaveProperty('handler')
+    expect(next?.inputSchema.properties?.productId).toEqual({ type: 'string' })
+    expect(next?.outputSchema?.properties?.productId).toEqual({ type: 'string' })
   })
 
   it('formats a Markdown catalog for docs and reviews', () => {

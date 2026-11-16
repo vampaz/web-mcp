@@ -81,6 +81,8 @@ interface BridgeState {
 let state: BridgeState | undefined
 
 /**
+ * Installs the versioned `window.postMessage` bridge for the fallback registry.
+ *
  * Any script running in the page can message this bridge. That carries no extra
  * trust: such a script could already call the page's own code directly. Sites
  * that do not want this surface simply never call `installPageBridge`.
@@ -156,6 +158,16 @@ export function installPageBridge(): PageBridgeHandle {
       })
       return
     }
+    if (calls.has(request.requestId)) {
+      post({
+        protocol: PAGE_BRIDGE_PROTOCOL,
+        kind: 'invoke-reply',
+        requestId: request.requestId,
+        status: 'error',
+        error: 'An invocation with this request ID is already in progress.'
+      })
+      return
+    }
     const controller = new AbortController()
     calls.set(request.requestId, controller)
     let result: ToolInvocationResult
@@ -176,7 +188,7 @@ export function installPageBridge(): PageBridgeHandle {
       })
       return
     } finally {
-      calls.delete(request.requestId)
+      if (calls.get(request.requestId) === controller) calls.delete(request.requestId)
     }
     if (result.status === 'success') {
       let output: unknown

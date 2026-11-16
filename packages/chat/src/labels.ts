@@ -40,6 +40,9 @@ export function createLabels(
     confirmClearAction: 'Delete',
     cancel: 'Cancel',
     tool: 'Tool',
+    approvalTitle: 'Approval needed',
+    approve: 'Approve',
+    deny: 'Deny',
     toolInput: 'Input',
     toolOutput: 'Output',
     toolResult: 'Result',
@@ -50,7 +53,9 @@ export function createLabels(
     copied: 'Reply copied.',
     copyFailed: 'The reply could not be copied.',
     toolStatusFailed: 'Failed',
+    toolStatusDeclined: 'Declined',
     toolStatusUnknown: 'Outcome unknown',
+    retry: 'Try again',
     searchModels: 'Search models',
     noModelsMatch: 'No models match.',
     status: {
@@ -58,6 +63,9 @@ export function createLabels(
       interrupted:
         'The previous turn was interrupted. Check application state, then send a new request.',
       error: 'The turn failed. Check the application and try a new request.',
+      providerFailed: 'The model could not be reached. Try again.',
+      declined: 'You declined this action. Nothing was changed.',
+      historyNearlyFull: 'This conversation is almost full. Start a new chat soon.',
       closed: 'Conversation closed.',
       lastFailed: 'The last response failed. Check application state before sending a new request.',
       newChatStarted: 'New chat started.',
@@ -65,6 +73,9 @@ export function createLabels(
     },
     openChat(title) {
       return `Open ${title}`
+    },
+    openChatUnread(title) {
+      return `Open ${title}, new reply`
     },
     toolsUsed(value) {
       return `Used ${numbers.format(value)} tools`
@@ -78,6 +89,9 @@ export function createLabels(
     },
     toolFailed(name) {
       return `${name} — failed`
+    },
+    toolDeclined(name) {
+      return `${name} — declined`
     },
     toolUnknown(name) {
       return `${name} — outcome unknown`
