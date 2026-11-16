@@ -52,6 +52,9 @@ export interface WebMCPChatLabels {
   /** @deprecated Unused; New chat starts immediately without confirmation. */
   cancel: string
   tool: string
+  approvalTitle: string
+  approve: string
+  deny: string
   toolInput: string
   toolOutput: string
   toolResult: string
@@ -137,9 +140,18 @@ export interface WebMCPChatElement extends HTMLElement {
   openSettings(): void
   /** Opens the composer model picker. No effect without `settings`. */
   openModelPicker(): void
+  /** Shows an approval card and resolves with the user's decision. Application-owned. */
+  requestApproval(request: WebMCPChatApprovalRequest): Promise<boolean>
 }
 
 export interface ChatStatus {
   text: string
   tone?: 'error'
+}
+
+export interface WebMCPChatApprovalRequest {
+  toolName: string
+  input: unknown
+  reason: string
+  signal?: AbortSignal
 }

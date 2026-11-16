@@ -45,7 +45,13 @@ export function registerCounterTools(onChange: (value: number) => void) {
 
 export function installApprovalDialog(
   dialog: HTMLDialogElement,
-  requiresApproval: () => boolean = () => true
+  requiresApproval: () => boolean = () => true,
+  inlineApproval?: (request: {
+    toolName: string
+    input: unknown
+    reason: string
+    signal?: AbortSignal
+  }) => Promise<boolean>
 ): () => void {
   let pending: ((approved: boolean) => void) | undefined
   let cleanup: (() => void) | undefined
@@ -56,10 +62,20 @@ export function installApprovalDialog(
     input,
     reason,
     signal,
-    source
+    source,
+    tool
   }) {
     cancel()
-    if (source === 'pi' && !requiresApproval()) return true
+    if (source === 'pi') {
+      if (!requiresApproval()) return true
+      if (inlineApproval)
+        return inlineApproval({
+          toolName: tool.name,
+          input,
+          reason,
+          ...(signal ? { signal } : {})
+        })
+    }
     return new Promise<boolean>(function approval(resolve) {
       function finish(approved: boolean) {
         pending = undefined

@@ -28,6 +28,8 @@
 - **Chat:** add opt-in `persistKey` popup persistence for open state, launcher position and panel size, ignoring malformed or blocked storage and excluding messages and drafts.
 - **Chat:** warn neutrally when conversation history reaches 90% of its limit, with errors taking priority.
 - **Chat:** accept `mode`, `theme`, `placement`, `heading` and `placeholder` attributes as defaults below `configure()` options.
+- **Chat:** add `requestApproval()` with an application-controlled in-chat approval card. It opens a closed popup, focuses Deny, and denies pending cards on abort, disconnect, controller replacement or replacement requests.
+- **Chat:** add the `/chat/markdown` entry with a dependency-free `renderMarkdown()` that builds DOM and text only and limits links to `http:`, `https:` and `mailto:`.
 
 ## 0.9.1 — 2026-11-16
 

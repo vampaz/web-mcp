@@ -79,6 +79,10 @@
       "types": "./dist/packages/chat/src/index.d.ts",
       "default": "./dist/chat.js"
     },
+    "./chat/markdown": {
+      "types": "./dist/packages/chat/src/markdown.d.ts",
+      "default": "./dist/chat/markdown.js"
+    },
     "./command-input": {
       "types": "./dist/packages/command-input/src/index.d.ts",
       "default": "./dist/command-input.js"

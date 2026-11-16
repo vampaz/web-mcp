@@ -28,6 +28,8 @@ Start with the [integration guide](./integration.md) for a working application, 
 
 - [`@vampaz/webmcp-kit/chat`](#vampazwebmcp-kitchat)
 
+- [`@vampaz/webmcp-kit/chat/markdown`](#vampazwebmcp-kitchatmarkdown)
+
 - [`@vampaz/webmcp-kit/command-input`](#vampazwebmcp-kitcommand-input)
 
 - [`@vampaz/webmcp-kit/hosted`](#vampazwebmcp-kithosted)
@@ -2458,6 +2460,8 @@ export interface WebMCPChatElement extends HTMLElement {
   openSettings(): void
   /** Opens the composer model picker. No effect without `settings`. */
   openModelPicker(): void
+  /** Shows an approval card and resolves with the user's decision. Application-owned. */
+  requestApproval(request: WebMCPChatApprovalRequest): Promise<boolean>
 }
 ```
 
@@ -2504,6 +2508,9 @@ export interface WebMCPChatLabels {
   /** @deprecated Unused; New chat starts immediately without confirmation. */
   cancel: string
   tool: string
+  approvalTitle: string
+  approve: string
+  deny: string
   toolInput: string
   toolOutput: string
   toolResult: string
@@ -2675,6 +2682,18 @@ export interface WebMCPChatStatusLabels {
 
 ```ts
 declare function defineWebMCPChat(): void
+```
+
+## @vampaz/webmcp-kit/chat/markdown
+
+### renderMarkdown
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/chat/src/markdown.ts).
+
+Safe, dependency-free Markdown for `renderMessage`. Inserts DOM nodes and text only.
+
+```ts
+declare function renderMarkdown(text: string, target: HTMLElement): void
 ```
 
 ## @vampaz/webmcp-kit/command-input
@@ -3056,6 +3075,19 @@ interface CatalogRegistration {
 
 ```ts
 type Listener = (event: WebMCPKitEvent) => void
+```
+
+### WebMCPChatApprovalRequest
+
+[Source in the repository](https://github.com/vampaz/web-mcp/blob/master/packages/chat/src/interfaces/chat.ts).
+
+```ts
+export interface WebMCPChatApprovalRequest {
+  toolName: string
+  input: unknown
+  reason: string
+  signal?: AbortSignal
+}
 ```
 
 ### WebMCPCommandInputRunOptions

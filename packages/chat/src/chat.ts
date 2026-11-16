@@ -6,12 +6,14 @@ import { transitionLauncherUnread } from './unread-state'
 import type { PiController, PiSnapshot } from '@vampaz/webmcp-kit/pi'
 import type {
   ChatStatus,
+  WebMCPChatApprovalRequest,
   WebMCPChatElement,
   WebMCPChatLabels,
   WebMCPChatOptions
 } from './interfaces/chat'
 import { activityText, statusText, updateTranscript } from './render'
 import { createLabels } from './labels'
+import { ChatApproval } from './approval'
 import { chatStyles, popupStyles } from './styles'
 import { ChatPopup } from './popup'
 import { icon } from './icon'
@@ -87,6 +89,7 @@ export function defineWebMCPChat(): void {
     private readonly limit: HTMLParagraphElement
     private readonly jumpButton: HTMLButtonElement
     private readonly popup: ChatPopup
+    private readonly approval: ChatApproval
     private settings?: ChatSettings
     private picker?: ChatModelPicker
 
@@ -101,7 +104,7 @@ export function defineWebMCPChat(): void {
             <div class="header-actions"><slot name="header-actions"></slot><button class="icon-button" type="button" data-clear part="new-chat">${icon('M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6M18.4 3.6a2 2 0 0 1 2.9 2.9L13 14.8l-3.8 1 1-3.8z')}</button></div>
           </header>
           <div class="conversation">
-            <div class="transcript" part="transcript" tabindex="0" role="region"><div data-empty><slot name="empty"><p></p></slot></div><div class="suggestions"></div><div role="log"><ol></ol><p class="working" hidden aria-hidden="true"><span class="working-dots"><span></span><span></span><span></span></span><span class="working-text"></span></p></div></div>
+            <div class="transcript" part="transcript" tabindex="0" role="region"><div data-empty><slot name="empty"><p></p></slot></div><div class="suggestions"></div><div role="log"><ol></ol><p class="working" hidden aria-hidden="true"><span class="working-dots"><span></span><span></span><span></span></span><span class="working-text"></span></p></div><div class="approval-slot"></div></div>
             <p class="visually-hidden" aria-live="polite" data-activity></p>
             <button type="button" class="jump-latest" part="jump-latest" hidden></button>
           </div>
@@ -165,6 +168,18 @@ export function defineWebMCPChat(): void {
         this.root.querySelector('section')!,
         this.heading.id
       )
+      this.approval = new ChatApproval(this.root.querySelector('.approval-slot')!, {
+        getLabels: () => this.labels,
+        getToolLabel: () => this.options?.toolLabel,
+        onOpen: () => {
+          this.picker?.close(false)
+          this.settings?.setOpen(false)
+          if (this.popup.isPopup && !this.popup.isOpen) this.popup.setOpen(true)
+        },
+        onResolve: (_approved, fromUser) => {
+          if (fromUser && this.isConnected) this.input.focus({ preventScroll: true })
+        }
+      })
       this.root.querySelector('.composer')!.addEventListener('submit', (event) => {
         event.preventDefault()
         void this.send()
@@ -231,6 +246,7 @@ export function defineWebMCPChat(): void {
       this.popup.disconnect()
       queueMicrotask(() => {
         if (this.isConnected) return
+        this.approval.cancel()
         this.operation.send({ type: 'reset' }, () => {
           this.resizeObserver.disconnect()
           for (const finish of this.focusTrackers) finish()
@@ -278,11 +294,16 @@ export function defineWebMCPChat(): void {
       this.input.value = text
       this.updateComposer()
     }
+    requestApproval(request: WebMCPChatApprovalRequest): Promise<boolean> {
+      if (!this.isConnected) return Promise.resolve(false)
+      return this.approval.request(request)
+    }
 
     configure(options: WebMCPChatOptions) {
       if (!options?.controller) throw new Error('Configure a conversation controller.')
       if (this.options?.controller !== options.controller) {
         this.input.value = ''
+        this.approval.cancel()
         this.list.replaceChildren()
         this.transcript.scrollTop = 0
         this.snapshot = options.controller.getSnapshot()

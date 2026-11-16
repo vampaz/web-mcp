@@ -76,6 +76,24 @@ New chat immediately calls `controller.clear()` without confirmation. After clea
 
 If a send fails before the controller records the user message, the composer restores the draft. Completion returns focus to the composer only while the user remains in the chat controls. Restored history opens at the latest message. Later messages scroll into view only when the reader is already near the end; a jump-to-latest button appears while reading earlier messages and indicates new arrivals.
 
+## In-chat approval
+
+The element can render an application-owned approval card without installing a confirmation handler:
+
+```ts
+setConfirmationHandler(function approve(request) {
+  if (request.source !== 'pi') return showApplicationDialog(request)
+  return element.requestApproval({
+    toolName: request.tool.name,
+    input: request.input,
+    reason: request.reason,
+    signal: request.signal
+  })
+})
+```
+
+`requestApproval()` shows the reason, friendly tool label and argument summary at the end of the transcript, opens a closed popup, and focuses Deny first. Approve and Deny resolve the promise. Abort, controller replacement, or disconnect resolves `false`; a newer request replaces and denies the pending card. The kit never installs a handler itself and never grants approval. Keep `source` checks so page-bridge, native, devtools, resolver and MCP-bridge calls still use the application's dialog.
+
 ## Optional settings module
 
 Pass `settings` to add a model button to the composer and a **Settings** icon to the header. The model button opens a picker grouped by provider; providers can add a `description` beside their heading and an `icon` (`cloud`, `route`, `server` or `chip`), and models can add a `detail` line and a `badge`. A provider without models appears as one option with its own `detail` and `badge`. A search field appears when there are more than eight options. The picker follows the listbox pattern: arrow keys, Home and End move, Enter chooses, Escape closes and returns focus to the button. Settings opens as a full view with a back button and the optional approval control. The module adds no model provider or inference dependency.
@@ -133,15 +151,19 @@ The local lab uses this module to select LM Studio chat models or Chrome built-i
 All model and tool text is rendered as text by default. To render formatting, supply `renderMessage(message, target)`. It runs for user and assistant message bodies when their text changes; return `true` to skip the default text rendering. Message text is untrusted user and model output, so sanitize anything you insert as HTML.
 
 ```ts
+import { renderMarkdown } from '@vampaz/webmcp-kit/chat/markdown'
+
 element.configure({
   controller,
   renderMessage(message, target) {
     if (message.role !== 'assistant') return false
-    target.replaceChildren(renderSafeMarkdown(message.text))
+    renderMarkdown(message.text, target)
     return true
   }
 })
 ```
+
+`renderMarkdown()` builds DOM nodes and text only. It supports paragraphs, line breaks, bold, italic, inline code, fenced code, ordered and unordered lists, and links using `http:`, `https:` or `mailto:`. Other links and raw HTML render as text. Links open with `rel="noopener noreferrer"` in a new tab.
 
 ## Labels and localization
 

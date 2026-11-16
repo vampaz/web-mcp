@@ -8,6 +8,7 @@ import {
 import { defineWebMCPCommandInput } from '@vampaz/webmcp-kit/command-input'
 import { createPiRuntime, type PiController } from '@vampaz/webmcp-kit/pi'
 import { defineWebMCPChat, type WebMCPChatElement } from '@vampaz/webmcp-kit/chat'
+import { renderMarkdown } from '@vampaz/webmcp-kit/chat/markdown'
 import { createHostedOpenAIResolver } from '@vampaz/webmcp-kit/hosted'
 import { useWebMCPTool as useVueTool } from '@vampaz/webmcp-kit/vue'
 import { useWebMCPTool as useReactTool } from '@vampaz/webmcp-kit/react'
@@ -42,6 +43,8 @@ const zodTool = defineZodTool({
 useVueTool(tool, { when: ref(true) })
 useReactTool(tool)
 useSvelteTool(zodTool, { when: readable(true) })
+const markdownTarget = document.createElement('div')
+renderMarkdown('**All entries**', markdownTarget)
 
 export function connectChat(chat: WebMCPChatElement, controller: PiController) {
   chat.configure({ controller })
@@ -54,6 +57,7 @@ void [
   defineWebMCPCommandInput,
   createPiRuntime,
   defineWebMCPChat,
+  renderMarkdown,
   createHostedOpenAIResolver,
   mountDevtoolsOverlay,
   installWebMCPKitTestBridge,

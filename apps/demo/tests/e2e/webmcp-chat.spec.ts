@@ -934,6 +934,143 @@ test('shows a launcher dot for a reply that arrives while the popup is closed', 
   await expect(chat).toContainText('New answer')
 })
 
+test('uses application-owned in-chat approval with keyboard, denial, and Stop', async function inlineApproval({
+  page
+}) {
+  await page.goto('/?mode=chat&approval=inline')
+  const chat = page.locator('webmcp-chat')
+  const input = chat.getByRole('textbox', { name: 'Message', exact: true })
+  const card = chat.locator('.approval-card')
+
+  await input.fill('set 6')
+  await input.press('Enter')
+  await expect(card).toBeVisible()
+  await expect(card).toContainText('Change the application counter?')
+  await expect(card.getByRole('button', { name: 'Deny', exact: true })).toBeFocused()
+  await card.getByRole('button', { name: 'Approve', exact: true }).click()
+  await expect(page.locator('#counter')).toHaveText('6')
+  await expect(card).toBeHidden()
+  await expectIdle(chat)
+
+  await input.fill('set 7')
+  await input.press('Enter')
+  await expect(card).toBeVisible()
+  await card.getByRole('button', { name: 'Deny', exact: true }).click()
+  await expect(card).toBeHidden()
+  await expect(page.locator('#counter')).toHaveText('6')
+  await expect(chat.getByRole('status')).toContainText('You declined this action')
+  await expect(chat.locator('ol[aria-busy="false"]')).toHaveCount(1)
+
+  await input.fill('set 8')
+  await input.press('Enter')
+  await expect(card).toBeVisible()
+  await chat.getByRole('button', { name: 'Stop', exact: true }).click()
+  await expect(card).toBeHidden()
+  await expect(page.locator('#counter')).toHaveText('6')
+  await expect(chat.locator('ol[aria-busy="false"]')).toHaveCount(1)
+
+  await input.fill('set 9')
+  await input.press('Enter')
+  await expect(card).toBeVisible()
+  const deny = card.getByRole('button', { name: 'Deny', exact: true })
+  await expect(deny).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(card).toBeHidden()
+  await expect(page.locator('#counter')).toHaveText('6')
+})
+
+test('opens a closed popup for application-requested approval', async function popupApproval({
+  page
+}) {
+  await page.goto('/?mode=chat&presentation=popup&approval=inline')
+  const chat = page.locator('webmcp-chat')
+  const panel = chat.getByRole('dialog', { name: 'Assistant', exact: true })
+  await expect(panel).toBeHidden()
+  await expect(chat.locator('.launcher')).toHaveAttribute('aria-label', 'Open Assistant')
+  await expect(chat.locator('ol[aria-busy="false"]')).toHaveCount(1)
+  const element = await chat.elementHandle()
+  const decision = page.evaluate(async function requestApproval(target) {
+    const approval = await (target as WebMCPChatElement).requestApproval({
+      toolName: 'set_counter',
+      input: { value: 4 },
+      reason: 'Approve from the popup?'
+    })
+    return approval
+  }, element)
+
+  await expect(panel).toBeVisible()
+  const card = chat.locator('.approval-card')
+  await expect(card).toBeVisible()
+  await expect(card.getByRole('button', { name: 'Deny', exact: true })).toBeFocused()
+  await card.getByRole('button', { name: 'Deny', exact: true }).click()
+  await expect(card).toBeHidden()
+  await expect(decision).resolves.toBe(false)
+})
+
+test('renders safe Markdown and keeps injection inert', async function markdown({ page }) {
+  await page.goto('/?mode=chat&markdown=1')
+  const chat = page.locator('webmcp-chat')
+  const input = chat.getByRole('textbox', { name: 'Message', exact: true })
+  await input.fill('markdown')
+  await input.press('Enter')
+  await expect(chat.locator('.body strong')).toHaveText('bold')
+  await expect(chat.locator('.body em')).toHaveText('italic')
+  await expect(chat.locator('.body p code')).toHaveText('inline code')
+  await expect(chat.locator('.body ul li')).toHaveCount(2)
+  await expect(chat.locator('.body ol li')).toHaveCount(2)
+  await expect(chat.locator('.body pre code')).toContainText('const safe = "<b>code</b>"')
+  const links = chat.locator('.body a')
+  await expect(links).toHaveCount(1)
+  await expect(links).toHaveAttribute('href', 'https://example.com/docs')
+  await expect(links).toHaveAttribute('rel', 'noopener noreferrer')
+  await expect(links).toHaveAttribute('target', '_blank')
+  await expect(chat.locator('.body img')).toHaveCount(0)
+  await expect(chat.locator('.body script')).toHaveCount(0)
+  await expect(chat).toContainText('javascript:alert(1)')
+  await expect(chat).toContainText('<img src=x onerror=alert(1)>')
+})
+
+test('shows approval over settings and the model picker without losing the page', async function approvalOverlays({
+  page
+}) {
+  await page.goto('/?mode=chat&approval=inline')
+  const chat = page.locator('webmcp-chat')
+  await chat.getByRole('button', { name: 'Settings', exact: true }).click()
+  await expect(chat.locator('.settings-panel')).toBeVisible()
+  const element = await chat.elementHandle()
+  const first = page.evaluate(async function request(target) {
+    return (target as WebMCPChatElement).requestApproval({
+      toolName: 'set_counter',
+      input: { value: 1 },
+      reason: 'Approval over settings?'
+    })
+  }, element)
+  await expect(chat.locator('.approval-card')).toBeVisible()
+  await expect(chat.locator('.settings-panel')).toBeHidden()
+  await expect(
+    chat.locator('.approval-card').getByRole('button', { name: 'Deny', exact: true })
+  ).toBeFocused()
+  await chat.locator('.approval-card').getByRole('button', { name: 'Deny', exact: true }).click()
+  await expect(first).resolves.toBe(false)
+
+  await chat.locator('.model-button').click()
+  await expect(chat.locator('.model-picker')).toBeVisible()
+  const second = page.evaluate(async function request(target) {
+    return (target as WebMCPChatElement).requestApproval({
+      toolName: 'set_counter',
+      input: { value: 2 },
+      reason: 'Approval over picker?'
+    })
+  }, element)
+  await expect(chat.locator('.approval-card')).toBeVisible()
+  await expect(chat.locator('.model-picker')).toBeHidden()
+  const input = chat.getByRole('textbox', { name: 'Message', exact: true })
+  await chat.locator('.approval-card').getByRole('button', { name: 'Deny', exact: true }).click()
+  await expect(second).resolves.toBe(false)
+  await input.fill('read')
+  await expect(input).toHaveValue('read')
+})
+
 test('persists opt-in popup position, size, and open state without drafts', async function persistence({
   page
 }) {

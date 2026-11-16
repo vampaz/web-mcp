@@ -1215,6 +1215,105 @@ it('uses observed attributes as defaults and configure overrides them', function
   expect(root.querySelector('h2')!.textContent).toBe('Configured')
 })
 
+it('shows application-requested approval and opens a closed popup', async function approvalCard() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  element.configure({ controller: fixture.api, mode: 'popup', title: 'Helper' })
+  const panel = element.shadowRoot!.querySelector<HTMLElement>('section')!
+  expect(panel.hidden).toBe(true)
+
+  const pending = element.requestApproval({
+    toolName: 'set_counter',
+    input: { value: 7 },
+    reason: 'Change the counter?'
+  })
+  expect(panel.hidden).toBe(false)
+  const card = element.shadowRoot!.querySelector<HTMLElement>('.approval-card')!
+  expect(card.textContent).toContain('Change the counter?')
+  expect(card.textContent).toContain('set_counter')
+  expect(card.textContent).toContain('{"value":7}')
+  const [deny, approve] = Array.from(card.querySelectorAll('button'))
+  expect(element.shadowRoot!.activeElement).toBe(deny)
+  approve!.click()
+  await expect(pending).resolves.toBe(true)
+  expect(element.shadowRoot!.querySelector('.approval-card')).toBeNull()
+})
+
+it('denies replaced approval cards and resolves false on disconnect', async function approvalLifecycle() {
+  const fixture = controller()
+  const element = mount(fixture.api)
+  const first = element.requestApproval({
+    toolName: 'set_counter',
+    input: { value: 1 },
+    reason: 'First?'
+  })
+  const second = element.requestApproval({
+    toolName: 'set_counter',
+    input: { value: 2 },
+    reason: 'Second?'
+  })
+  await expect(first).resolves.toBe(false)
+  expect(element.shadowRoot!.querySelector('.approval-card')!.textContent).toContain('Second?')
+
+  element.remove()
+  await Promise.resolve()
+  await expect(second).resolves.toBe(false)
+  expect(element.shadowRoot!.querySelector('.approval-card')).toBeNull()
+})
+
+it('closes settings and the model picker before showing approval', async function approvalOverlays() {
+  const fixture = controller()
+  const element = document.createElement('webmcp-chat') as WebMCPChatElement
+  element.configure({
+    controller: fixture.api,
+    settings: {
+      providers: [{ id: 'p', label: 'Provider', models: [{ model: 'm', label: 'Model' }] }],
+      providerId: 'p',
+      model: 'm',
+      onChange() {}
+    }
+  })
+  const presentation = element.shadowRoot!.querySelector<HTMLElement>('.presentation')!
+  presentation.showPopover = vi.fn()
+  presentation.hidePopover = vi.fn()
+  document.body.append(element)
+  const root = element.shadowRoot!
+
+  element.openSettings()
+  expect(root.querySelector<HTMLElement>('.settings-panel')!.hidden).toBe(false)
+  const first = element.requestApproval({
+    toolName: 'set_counter',
+    input: { value: 1 },
+    reason: 'Settings approval?'
+  })
+  expect(root.querySelector<HTMLElement>('.settings-panel')!.hidden).toBe(true)
+  const card = root.querySelector('.approval-card')!
+  expect(root.activeElement).toBe(card.querySelector('button'))
+  card.querySelectorAll('button')[0]!.click()
+  await expect(first).resolves.toBe(false)
+
+  element.openModelPicker()
+  expect(root.querySelector<HTMLElement>('.model-picker')!.hidden).toBe(false)
+  const second = element.requestApproval({
+    toolName: 'set_counter',
+    input: { value: 2 },
+    reason: 'Picker approval?'
+  })
+  expect(root.querySelector<HTMLElement>('.model-picker')!.hidden).toBe(true)
+  expect(root.activeElement).toBe(root.querySelector('.approval-card button'))
+  root.querySelectorAll<HTMLButtonElement>('.approval-card button')[1]!.click()
+  await expect(second).resolves.toBe(true)
+})
+
+it('does not request approval on a disconnected element', async function disconnectedApproval() {
+  const fixture = controller()
+  const element = document.createElement('webmcp-chat') as WebMCPChatElement
+  element.configure({ controller: fixture.api })
+  await expect(
+    element.requestApproval({ toolName: 'save', input: {}, reason: 'Save?' })
+  ).resolves.toBe(false)
+})
+
 it('inserts new lines with Enter on touch pointers and describes only visible help', function touch() {
   coarsePointer = true
   const fixture = controller()

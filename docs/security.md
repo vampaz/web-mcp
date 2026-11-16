@@ -42,7 +42,7 @@ const disposeApproval = setConfirmationHandler(async function confirmTool({
 
 WebMCP Kit enforces confirmation before execution in both fallback and native wrapper paths. If no handler is configured, browser runtimes fall back to `window.confirm()`.
 
-`showConfirmationModal()` is application code: resolve its promise with the user's decision and close it when the signal aborts. The [complete dialog example](./examples/counter-assistant.ts) handles cancellation and replacement approvals. Native declarative form submissions do not use the imperative wrapper; enforce approval in the form's actual submission handler as well.
+`showConfirmationModal()` is application code: resolve its promise with the user's decision and close it when the signal aborts. The [complete dialog example](./examples/counter-assistant.ts) handles cancellation and replacement approvals. Native declarative form submissions do not use the imperative wrapper; enforce approval in the form's actual submission handler as well. The chat element's `requestApproval()` is also application-controlled: it renders a card but never installs a confirmation handler, so keep the `source` check before forwarding a request to it.
 
 When a tool declares `outputSchema`, WebMCP Kit validates the returned value before reporting a successful invocation. Treat an `invalid_output` result as a tool implementation failure; do not pass that output to another tool or UI assertion.
 

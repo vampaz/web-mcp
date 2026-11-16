@@ -21,6 +21,31 @@ export function createFixtureResolver(): ToolResolver {
           )
         })
       const history = JSON.stringify(context?.piConversation ?? [])
+      if (message === 'markdown')
+        return {
+          toolName: 'pi_reply',
+          input: {
+            text: [
+              'Here is **bold**, *italic*, and `inline code`.',
+              '',
+              '- one',
+              '- two',
+              '',
+              '1. first',
+              '2. second',
+              '',
+              '[safe link](https://example.com/docs) [bad link](javascript:alert(1))',
+              '',
+              '<img src=x onerror=alert(1)>',
+              '',
+              '```js',
+              'const safe = "<b>code</b>"',
+              '```'
+            ].join('\n')
+          },
+          confidence: 1,
+          reason: 'Markdown fixture'
+        }
       if (message === 'fail') throw new Error('Fixture provider failed')
       if (message === 'flaky' && flakyAttempts++ === 0)
         throw new Error('Fixture provider failed once')

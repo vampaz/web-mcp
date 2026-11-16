@@ -22,21 +22,33 @@ import { artifact, run, verifyArtifact } from './fixtures'
 // Pi total is 149,727 bytes. Raise only exceeded ceilings with the same 10% policy above.
 const budgets: Record<string, { eager: number; total: number }> = {
   '.': { eager: 28_100, total: 28_100 },
-  './chat': { eager: 22_200, total: 22_200 },
+  // 0.9.x chat approval card, unread/persistence state, tool labels and Markdown styles:
+  // reviewed graph 23,536 bytes (20,093 at 0.9.0). New ceiling adds 10%, rounded up to 100.
+  './chat': { eager: 25_900, total: 25_900 },
+  // Dependency-free Markdown entry: reviewed graph 1,154 bytes after the linear inline parser.
+  './chat/markdown': { eager: 1_300, total: 1_300 },
   './command-input': { eager: 32_900, total: 32_900 },
-  './devtools': { eager: 33_300, total: 33_300 },
+  // Phase 1–2 shared core invocation, validation and security growth raises the reviewed
+  // devtools graph to 34,690; 10% policy applies.
+  './devtools': { eager: 38_200, total: 38_200 },
   './hosted': { eager: 10_600, total: 10_600 },
   // 0.9.0 page bridge shares the registry and invocation pipeline: 11,264 bytes.
-  './page-bridge': { eager: 12_400, total: 12_400 },
+  // Phase 1–2 shared core invocation/security growth raises the reviewed graph to 12,479;
+  // 10% policy applies. The page bridge has no chat dependency.
+  './page-bridge': { eager: 13_800, total: 13_800 },
   './mcp-bridge': { eager: 29_000, total: 29_000 },
   './pi': { eager: 32_400, total: 152_300 },
   './react': { eager: 28_800, total: 28_800 },
   './svelte': { eager: 28_800, total: 28_800 },
   // 0.8.0 shares the native runner through the Playwright helper entry: 27,418 bytes.
-  './testing': { eager: 30_200, total: 30_200 },
+  // Phase 1–2 shared core invocation/validation growth raises the reviewed graph to 31,074;
+  // 10% policy applies.
+  './testing': { eager: 34_200, total: 34_200 },
   // 0.8.0 native journey runner adds shared resolution/schema validation: 25,596 bytes.
+  // Phase 1–2 shared core invocation/validation growth raises the reviewed graph to 29,357;
+  // 10% policy applies.
   // This Node-side testing entry has no effect on application entry budgets.
-  './testing/playwright': { eager: 28_200, total: 28_200 },
+  './testing/playwright': { eager: 32_300, total: 32_300 },
   './vue': { eager: 28_800, total: 28_800 },
   './zod': { eager: 28_400, total: 28_400 }
 }
