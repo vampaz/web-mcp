@@ -51,7 +51,7 @@ describe('React useWebMCPTool', () => {
     expect(listTools()).toEqual([])
   })
 
-  it('fails guarded react tool calls closed when the guard does not approve', async () => {
+  it('preserves the react guard method receiver through the committed tool', async () => {
     const runtime = createReactHookRuntime()
     vi.doMock('react', function mockReact() {
       return runtime
@@ -79,6 +79,38 @@ describe('React useWebMCPTool', () => {
 
     const result = await invokeTool({ toolName: 'refund_refund', input: {} })
     expect(result).toMatchObject({ status: 'success', output: 'executed' })
+
+    runtime.cleanup()
+  })
+
+  it('fails guarded react tool calls closed when the guard does not approve', async () => {
+    const runtime = createReactHookRuntime()
+    vi.doMock('react', function mockReact() {
+      return runtime
+    })
+
+    const { useWebMCPTool } = await import('./index')
+    const { defineTool, invokeTool } = await import('@vampaz/webmcp-kit')
+    const execute = vi.fn(function execute() {
+      return 'executed'
+    })
+    const tool = defineTool({
+      name: 'refund_refund',
+      description: 'Refund a payment from the current React screen.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      guard(this: { name: string }, _input) {
+        return undefined as unknown as boolean | string
+      },
+      execute
+    })
+
+    runtime.render(function renderHook() {
+      useWebMCPTool(tool)
+    })
+
+    const result = await invokeTool({ toolName: 'refund_refund', input: {} })
+    expect(result).toMatchObject({ status: 'blocked', code: 'guard_blocked' })
+    expect(execute).not.toHaveBeenCalled()
 
     runtime.cleanup()
   })
