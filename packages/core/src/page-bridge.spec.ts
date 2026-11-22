@@ -629,4 +629,43 @@ describe('installPageBridge', () => {
     expect(await ignored).toBe('ignored as expected')
     second.uninstall()
   })
+
+  it('preserves structured toolStatus and code when a guard blocks execution', async () => {
+    const bridge = installPageBridge()
+    registerTool(
+      defineTool({
+        name: 'guarded_tool',
+        description: 'A tool with a stock guard.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          required: [],
+          additionalProperties: false
+        },
+        guard() {
+          return 'There is not enough stock for that quantity.'
+        },
+        execute() {
+          return { ok: true }
+        }
+      })
+    )
+
+    const reply = await sendRequest({
+      protocol: PAGE_BRIDGE_PROTOCOL,
+      kind: 'invoke',
+      requestId: 'guard-check',
+      name: 'guarded_tool',
+      input: {}
+    })
+    expect(reply).toMatchObject({
+      kind: 'invoke-reply',
+      requestId: 'guard-check',
+      status: 'error',
+      toolStatus: 'blocked',
+      code: 'guard_blocked',
+      error: 'There is not enough stock for that quantity.'
+    })
+    bridge.uninstall()
+  })
 })

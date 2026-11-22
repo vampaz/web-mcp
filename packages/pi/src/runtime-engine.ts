@@ -196,6 +196,8 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
     let untrustedContentSeen = false
     const completedActions: PiActionOutcome[] = []
     const unchangedReads = new Map<string, { result: string; count: number }>()
+    const blockedCalls = new Map<string, number>()
+    let recoverableBlocks = 0
     const progressCorrection = createStateMachine<CorrectionState, 'correct'>(
       'available',
       transitionCorrection
@@ -433,15 +435,36 @@ export async function openRuntime(options: PiRuntimeOptions): Promise<PiControll
                           }
                         } else unchangedReads.clear()
                         action.send({ type: 'receive', callId: api.callId })
-                        if (result.status !== 'success')
-                          failure = {
-                            code:
-                              result.code === 'confirmation_denied'
-                                ? 'action_denied'
-                                : 'tool_failed',
-                            message: result.error ?? 'The action did not succeed.'
+                        const isRecoverableBlock =
+                          result.status === 'blocked' &&
+                          (result.code === 'guard_blocked' ||
+                            result.code === 'scope_unavailable' ||
+                            result.code === 'invalid_input')
+                        if (result.status !== 'success') {
+                          if (isRecoverableBlock) {
+                            const blockKey = canonicalJson([
+                              roundCatalog.revision,
+                              tool.name,
+                              actionInput
+                            ])
+                            const seen = (blockedCalls.get(blockKey) ?? 0) + 1
+                            blockedCalls.set(blockKey, seen)
+                            recoverableBlocks++
+                            if (seen > 1 || recoverableBlocks > 3)
+                              failure = {
+                                code: 'tool_failed',
+                                message: result.error ?? 'The action did not succeed.'
+                              }
+                          } else {
+                            failure = {
+                              code:
+                                result.code === 'confirmation_denied'
+                                  ? 'action_denied'
+                                  : 'tool_failed',
+                              message: result.error ?? 'The action did not succeed.'
+                            }
                           }
-                        else {
+                        } else {
                           // Pi captures its offered tools before the next model request.
                           try {
                             const next = await hostCall(

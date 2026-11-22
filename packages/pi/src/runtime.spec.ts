@@ -707,6 +707,63 @@ it('ends a denied action without another model round', async function test() {
   ).toMatchObject({ status: 'blocked', code: 'confirmation_denied', failed: true })
 })
 
+it('feeds guard_blocked outcomes back to the model so it can reply naturally', async function test() {
+  const config = options(
+    [
+      resolution('read_counter', {}),
+      resolution('pi_reply', { text: 'That item is currently sold out.' })
+    ],
+    {
+      async invoke() {
+        return {
+          toolName: 'read_counter',
+          status: 'blocked',
+          code: 'guard_blocked',
+          error: 'There is not enough stock for that quantity.',
+          durationMs: 0
+        }
+      }
+    }
+  )
+  runtime = await createPiRuntime(config)
+  expect(await runtime.send('Add item')).toEqual({ status: 'completed' })
+  expect(config.resolver.resolve).toHaveBeenCalledTimes(2)
+  const messages = runtime.getSnapshot().messages
+  expect(messages.find((message) => message.role === 'tool')).toMatchObject({
+    status: 'blocked',
+    code: 'guard_blocked',
+    text: 'There is not enough stock for that quantity.',
+    failed: true
+  })
+  expect(messages.at(-1)).toMatchObject({
+    role: 'assistant',
+    text: 'That item is currently sold out.'
+  })
+})
+
+it('stops if the model repeats the same guard_blocked call without making progress', async function test() {
+  const config = options([resolution('read_counter', {}), resolution('read_counter', {})], {
+    async invoke() {
+      return {
+        toolName: 'read_counter',
+        status: 'blocked',
+        code: 'guard_blocked',
+        error: 'There is not enough stock for that quantity.',
+        durationMs: 0
+      }
+    }
+  })
+  runtime = await createPiRuntime(config)
+  expect(await runtime.send('Add item')).toMatchObject({
+    status: 'error',
+    error: {
+      code: 'tool_failed',
+      message: 'There is not enough stock for that quantity.'
+    }
+  })
+  expect(config.resolver.resolve).toHaveBeenCalledTimes(2)
+})
+
 it('discards a stale choice and resolves again when tools change during inference', async function test() {
   const config = options([])
   let revision = 'initial'

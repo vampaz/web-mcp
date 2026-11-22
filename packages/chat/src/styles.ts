@@ -118,9 +118,10 @@ li[data-layout=tools] { overflow:hidden; border:1px solid var(--_border); border
 .tool-call[data-details=hidden] > summary { cursor:default }
 .tool-call[data-details=hidden] .tool-chevron { visibility:hidden }
 .tool-call[data-details=hidden] .tool-sections { display:none }
-.tool-sections { display:grid; gap:.6em; padding:0 .9em .85em 2.85em }
+.tool-sections { display:grid; grid-template-columns:minmax(0,1fr); gap:.6em; padding:0 .9em .85em 2.85em }
+.tool-section { min-inline-size:0 }
 .tool-heading { margin:0 0 .25em; font-size:.94em; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--_muted) }
-.tool-section pre { margin:0; padding:.6em .75em; max-block-size:16em; overflow:auto; white-space:pre; overflow-wrap:normal; font-family:var(--_mono); font-size:.92em; line-height:1.55; color:var(--_color); background:var(--_surface); border:1px solid var(--_border); border-radius:.55em }
+.tool-section pre { margin:0; padding:.6em .75em; max-block-size:16em; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font-family:var(--_mono); font-size:.92em; line-height:1.55; color:var(--_color); background:var(--_surface); border:1px solid var(--_border); border-radius:.55em }
 code { font:inherit }
 [data-empty] { text-align:center; max-inline-size:28ch; margin:clamp(1.15em,5vh,3.4em) auto; color:var(--_muted); line-height:1.7 }
 [data-empty][data-custom] { max-inline-size:none; margin:0; text-align:start; color:inherit; line-height:inherit }

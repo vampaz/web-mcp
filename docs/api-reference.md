@@ -1514,6 +1514,9 @@ export type PageBridgeReply =
       requestId: string
       status: 'error'
       error: string
+      toolStatus?: 'error' | 'blocked' | 'unavailable'
+      code?: ToolInvocationResult['code']
+      details?: unknown
     }
   | { protocol: typeof PAGE_BRIDGE_PROTOCOL; kind: 'cancel-reply'; requestId: string }
 ```
@@ -1531,6 +1534,7 @@ export type PageBridgeRequest =
       requestId: string
       name: string
       input: Record<string, unknown>
+      requireApproval?: boolean
     }
   | { protocol: typeof PAGE_BRIDGE_PROTOCOL; kind: 'cancel'; requestId: string }
 ```

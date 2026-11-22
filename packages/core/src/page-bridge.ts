@@ -34,6 +34,7 @@ export type PageBridgeRequest =
       requestId: string
       name: string
       input: Record<string, unknown>
+      requireApproval?: boolean
     }
   | { protocol: typeof PAGE_BRIDGE_PROTOCOL; kind: 'cancel'; requestId: string }
 
@@ -57,6 +58,9 @@ export type PageBridgeReply =
       requestId: string
       status: 'error'
       error: string
+      toolStatus?: 'error' | 'blocked' | 'unavailable'
+      code?: ToolInvocationResult['code']
+      details?: unknown
     }
   | { protocol: typeof PAGE_BRIDGE_PROTOCOL; kind: 'cancel-reply'; requestId: string }
 
@@ -176,7 +180,14 @@ export function installPageBridge(): PageBridgeHandle {
         toolName: request.name,
         input: request.input,
         source: 'page-bridge',
-        signal: controller.signal
+        signal: controller.signal,
+        ...(request.requireApproval
+          ? {
+              requireConfirmation: {
+                reason: 'This action follows content from an untrusted source.'
+              }
+            }
+          : {})
       })
     } catch {
       post({
@@ -215,12 +226,23 @@ export function installPageBridge(): PageBridgeHandle {
       })
       return
     }
+    let details: unknown
+    if (result.details !== undefined) {
+      try {
+        details = jsonClone(result.details)
+      } catch {
+        /* Uncloneable details must not prevent delivering the failure reason. */
+      }
+    }
     post({
       protocol: PAGE_BRIDGE_PROTOCOL,
       kind: 'invoke-reply',
       requestId: request.requestId,
       status: 'error',
-      error: result.error ?? 'Tool invocation failed.'
+      error: result.error ?? 'Tool invocation failed.',
+      toolStatus: result.status,
+      ...(result.code ? { code: result.code } : {}),
+      ...(details !== undefined ? { details } : {})
     })
   }
 
