@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.10.1 — 2026-11-22
+
+### Core
+
+- **Page bridge:** preserve structured `toolStatus`, `code`, and `details` on error `invoke-reply` messages so callers can distinguish pre-execution guard rejections and confirmation denials from uncertain transport failures.
+- **Page bridge:** accept optional `requireApproval` on `invoke` requests and forward it to `invokeTool()` as `requireConfirmation` for actions following untrusted content.
+
+### Pi
+
+- **Recoverable blocks:** feed pre-execution `guard_blocked`, `scope_unavailable`, and `invalid_input` results back to the model instead of immediately terminating the turn, allowing conversational explanations and bounded self-correction while stopping on repeated identical blocks or >3 blocks per turn. `confirmation_denied` and `execution_failed` keep their existing immediate termination behavior.
+
+### Chat
+
+- **Tool detail wrapping:** constrain `.tool-sections` to `minmax(0, 1fr)` and wrap `.tool-section pre` content (`white-space: pre-wrap; overflow-wrap: anywhere`) so long tool inputs, outputs, and error messages stay readable inside narrow side panels without horizontal clipping.
+
 ## 0.10.0 — 2026-11-16
 
 ### Core
